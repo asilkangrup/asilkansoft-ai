@@ -340,6 +340,6 @@ class CreateAiBot extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        return route('filament.admin.pages.kurulum-merkezi');
+        return route('filament.admin.pages.test-sohbeti');
     }
 }

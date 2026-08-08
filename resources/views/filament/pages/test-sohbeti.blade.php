@@ -1,103 +1,54 @@
 <x-filament-panels::page>
 
 <style>
-    .ai-test-wrap {
-        max-width: 980px;
-        margin: 0 auto;
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
-    }
-
-    .ai-test-header {
-        padding: 24px 26px;
-        border-radius: 22px;
-        color: #ffffff;
-        background:
-            radial-gradient(circle at top right, rgba(59, 130, 246, .35), transparent 32%),
-            linear-gradient(135deg, #111827 0%, #172554 55%, #1e3a8a 100%);
-        box-shadow: 0 16px 40px rgba(15, 23, 42, .15);
-    }
-
-    .ai-test-header-inner {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+    .test-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(300px, .8fr);
         gap: 20px;
+        align-items: start;
     }
 
-    .ai-test-kicker {
+    .test-main,
+    .test-side {
+        min-width: 0;
+    }
+
+    .test-header {
+        padding: 24px;
+        border-radius: 22px;
+        color: #fff;
+        background:
+            radial-gradient(circle at top right, rgba(59, 130, 246, .35), transparent 30%),
+            linear-gradient(135deg, #111827 0%, #172554 55%, #1e3a8a 100%);
+        box-shadow: 0 16px 40px rgba(15, 23, 42, .14);
+        margin-bottom: 18px;
+    }
+
+    .test-kicker {
         display: inline-flex;
-        align-items: center;
-        gap: 8px;
         padding: 6px 11px;
         border-radius: 999px;
-        border: 1px solid rgba(255,255,255,.15);
+        border: 1px solid rgba(255,255,255,.16);
         background: rgba(255,255,255,.08);
         font-size: 11px;
         font-weight: 800;
         letter-spacing: .05em;
     }
 
-    .ai-test-title {
+    .test-title {
         margin: 12px 0 0;
         font-size: 27px;
-        line-height: 1.2;
         font-weight: 800;
     }
 
-    .ai-test-subtitle {
+    .test-subtitle {
         margin: 8px 0 0;
-        max-width: 650px;
-        color: rgba(255,255,255,.75);
+        color: rgba(255,255,255,.74);
         font-size: 14px;
-        line-height: 1.6;
+        line-height: 1.7;
     }
 
-    .ai-test-status {
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        margin-top: 12px;
-        color: #bbf7d0;
-        font-size: 12px;
-        font-weight: 700;
-    }
-
-    .ai-test-status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: #22c55e;
-        box-shadow: 0 0 0 4px rgba(34, 197, 94, .15);
-    }
-
-    .ai-clear-button {
-        flex-shrink: 0;
-        padding: 10px 15px;
-        border: 1px solid rgba(255,255,255,.20);
-        border-radius: 11px;
-        background: rgba(255,255,255,.10);
-        color: #ffffff;
-        font-size: 13px;
-        font-weight: 800;
-        cursor: pointer;
-        transition: .2s ease;
-    }
-
-    .ai-clear-button:hover {
-        background: rgba(255,255,255,.17);
-    }
-
-    .ai-clear-button:disabled {
-        opacity: .5;
-        cursor: not-allowed;
-    }
-
-    .ai-chat-card {
-        display: flex;
-        flex-direction: column;
-        min-height: 500px;
+    .test-chat {
         overflow: hidden;
         border: 1px solid #e5e7eb;
         border-radius: 22px;
@@ -105,20 +56,26 @@
         box-shadow: 0 8px 25px rgba(15, 23, 42, .06);
     }
 
-    .ai-chat-topbar {
+    .chat-top {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 16px 20px;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 16px 18px;
         border-bottom: 1px solid #e5e7eb;
-        background: #ffffff;
+        background: #fff;
     }
 
-    .ai-avatar {
+    .chat-identity {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+    }
+
+    .chat-avatar {
         display: flex;
         width: 42px;
         height: 42px;
-        flex: 0 0 42px;
         align-items: center;
         justify-content: center;
         border-radius: 13px;
@@ -126,350 +83,335 @@
         font-size: 21px;
     }
 
-    .ai-chat-name {
+    .chat-name {
         margin: 0;
-        color: #111827;
         font-size: 14px;
         font-weight: 800;
+        color: #111827;
     }
 
-    .ai-chat-desc {
+    .chat-meta {
         margin: 3px 0 0;
-        color: #6b7280;
         font-size: 12px;
+        color: #6b7280;
     }
 
-    .ai-messages {
-        flex: 1;
-        min-height: 400px;
-        padding: 24px;
+    .clear-btn {
+        padding: 9px 13px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: #fff;
+        color: #374151;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .messages {
+        min-height: 430px;
+        max-height: 560px;
         overflow-y: auto;
-        background:
-            radial-gradient(circle at 20% 10%, rgba(59,130,246,.04), transparent 26%),
-            #f8fafc;
+        padding: 20px;
     }
 
-    .ai-message-row {
+    .msg-row {
         display: flex;
-        margin-bottom: 14px;
+        margin-bottom: 13px;
     }
 
-    .ai-message-row.user {
+    .msg-row.user {
         justify-content: flex-end;
     }
 
-    .ai-message-row.bot {
+    .msg-row.bot {
         justify-content: flex-start;
     }
 
-    .ai-message {
-        max-width: 72%;
+    .msg {
+        max-width: 76%;
         padding: 11px 14px;
         border-radius: 16px;
         font-size: 14px;
         line-height: 1.6;
         word-break: break-word;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, .05);
     }
 
-    .ai-message.user {
-        border-bottom-right-radius: 5px;
+    .msg.user {
         background: #2563eb;
-        color: #ffffff;
+        color: #fff;
+        border-bottom-right-radius: 5px;
     }
 
-    .ai-message.bot {
-        border: 1px solid #e5e7eb;
-        border-bottom-left-radius: 5px;
-        background: #ffffff;
+    .msg.bot {
+        background: #fff;
         color: #1f2937;
-    }
-
-    .ai-thinking {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 11px 14px;
         border: 1px solid #e5e7eb;
-        border-radius: 16px;
         border-bottom-left-radius: 5px;
-        background: #ffffff;
-        color: #6b7280;
-        font-size: 13px;
     }
 
-    .ai-thinking-dots {
-        display: inline-flex;
-        gap: 3px;
-    }
-
-    .ai-thinking-dots span {
-        width: 5px;
-        height: 5px;
-        border-radius: 999px;
-        background: #9ca3af;
-        animation: ai-dot 1.2s infinite ease-in-out;
-    }
-
-    .ai-thinking-dots span:nth-child(2) {
-        animation-delay: .15s;
-    }
-
-    .ai-thinking-dots span:nth-child(3) {
-        animation-delay: .30s;
-    }
-
-    @keyframes ai-dot {
-        0%, 80%, 100% {
-            transform: scale(.7);
-            opacity: .5;
-        }
-
-        40% {
-            transform: scale(1);
-            opacity: 1;
-        }
-    }
-
-    .ai-compose {
-        padding: 16px;
-        border-top: 1px solid #e5e7eb;
-        background: #ffffff;
-    }
-
-    .ai-compose-inner {
+    .compose {
         display: flex;
         gap: 10px;
+        padding: 15px;
+        border-top: 1px solid #e5e7eb;
+        background: #fff;
     }
 
-    .ai-input {
-        width: 100%;
-        min-height: 48px;
-        padding: 12px 15px;
+    .compose input {
+        flex: 1;
+        min-height: 46px;
+        padding: 11px 14px;
         border: 1px solid #d1d5db;
-        border-radius: 13px;
+        border-radius: 12px;
         outline: none;
-        background: #ffffff;
-        color: #111827;
         font-size: 14px;
-        transition: border-color .2s ease, box-shadow .2s ease;
     }
 
-    .ai-input:focus {
+    .compose input:focus {
         border-color: #2563eb;
         box-shadow: 0 0 0 3px rgba(37, 99, 235, .10);
     }
 
-    .ai-input::placeholder {
-        color: #9ca3af;
-    }
-
-    .ai-send {
+    .send-btn {
         min-width: 105px;
-        padding: 0 18px;
         border: 0;
-        border-radius: 13px;
+        border-radius: 12px;
         background: #2563eb;
-        color: #ffffff;
+        color: #fff;
         font-size: 13px;
         font-weight: 800;
         cursor: pointer;
-        transition: background .2s ease;
     }
 
-    .ai-send:hover {
-        background: #1d4ed8;
-    }
-
-    .ai-send:disabled {
-        opacity: .55;
-        cursor: not-allowed;
-    }
-
-    .ai-tip {
-        padding: 15px 18px;
+    .side-card {
         border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        background: #ffffff;
+        border-radius: 22px;
+        background: #fff;
+        box-shadow: 0 8px 25px rgba(15, 23, 42, .06);
+        overflow: hidden;
+    }
+
+    .side-head {
+        padding: 18px 20px;
+        border-bottom: 1px solid #e5e7eb;
+        background: #f9fafb;
+    }
+
+    .side-head h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .side-head p {
+        margin: 4px 0 0;
+        font-size: 12px;
         color: #6b7280;
+    }
+
+    .settings {
+        padding: 18px 20px;
+    }
+
+    .setting-item {
+        padding: 13px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .setting-item:last-child {
+        border-bottom: 0;
+    }
+
+    .setting-label {
+        font-size: 11px;
+        font-weight: 800;
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }
+
+    .setting-value {
+        margin-top: 4px;
+        color: #111827;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.5;
+        word-break: break-word;
+    }
+
+    .side-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 0 20px 20px;
+    }
+
+    .edit-btn,
+    .approve-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 46px;
+        border-radius: 12px;
+        text-decoration: none !important;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .edit-btn {
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #374151 !important;
+    }
+
+    .approve-btn {
+        border: 0;
+        background: #16a34a;
+        color: #fff !important;
+    }
+
+    .approve-btn:hover {
+        background: #15803d;
+    }
+
+    .flow-note {
+        margin-top: 18px;
+        padding: 14px 16px;
+        border: 1px solid #dbeafe;
+        border-radius: 14px;
+        background: #eff6ff;
+        color: #1e40af;
         font-size: 12px;
         line-height: 1.6;
     }
 
-    @media (max-width: 700px) {
-        .ai-test-header-inner {
-            flex-direction: column;
-            align-items: stretch;
+    @media (max-width: 950px) {
+        .test-layout {
+            grid-template-columns: 1fr;
         }
+    }
 
-        .ai-clear-button {
-            width: 100%;
-        }
-
-        .ai-test-header {
-            padding: 22px;
-        }
-
-        .ai-test-title {
-            font-size: 23px;
-        }
-
-        .ai-messages {
-            padding: 16px;
-        }
-
-        .ai-message {
-            max-width: 88%;
-        }
-
-        .ai-compose-inner {
+    @media (max-width: 650px) {
+        .compose {
             flex-direction: column;
         }
 
-        .ai-send {
+        .send-btn {
             min-height: 46px;
             width: 100%;
+        }
+
+        .msg {
+            max-width: 88%;
         }
     }
 </style>
 
+<div class="test-layout">
 
-<div class="ai-test-wrap">
+    <div class="test-main">
 
-    <section class="ai-test-header">
-
-        <div class="ai-test-header-inner">
-
-            <div>
-
-                <div class="ai-test-kicker">
-                    🤖 YAPAY ZEKÂ TEST MERKEZİ
-                </div>
-
-                <h2 class="ai-test-title">
-                    Yapay Zekânızı Test Edin
-                </h2>
-
-                <p class="ai-test-subtitle">
-                    Müşterilerinizle nasıl konuşacağını canlıya almadan önce burada deneyin.
-                    Sorular sorun, fiyat ve firma bilgilerini test edin ve cevapları kontrol edin.
-                </p>
-
-                <div class="ai-test-status">
-                    <span class="ai-test-status-dot"></span>
-                    Yapay zekâ teste hazır
-                </div>
-
+        <div class="test-header">
+            <div class="test-kicker">
+                🤖 CANLI YAPAY ZEKÂ TESTİ
             </div>
 
-            <button
-                type="button"
-                wire:click="sohbetiTemizle"
-                wire:loading.attr="disabled"
-                wire:target="sohbetiTemizle"
-                class="ai-clear-button"
-            >
-                <span wire:loading.remove wire:target="sohbetiTemizle">
+            <h2 class="test-title">
+                WhatsApp'a geçmeden önce test edin
+            </h2>
+
+            <p class="test-subtitle">
+                Buradaki yapay zekâ, WhatsApp'ta kullanacağınız aynı firma bilgileri,
+                ürünler, kurallar ve özel talimatlarla cevap verir.
+            </p>
+        </div>
+
+        <div class="test-chat">
+
+            <div class="chat-top">
+
+                <div class="chat-identity">
+                    <div class="chat-avatar">
+                        🤖
+                    </div>
+
+                    <div>
+                        <p class="chat-name">
+                            {{ $aiBot?->name ?? 'Yapay Zekâ Asistanı' }}
+                        </p>
+
+                        <p class="chat-meta">
+                            {{ $aiBot?->company_name ?? 'Firma bilgisi bulunamadı' }}
+                        </p>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    wire:click="sohbetiTemizle"
+                    wire:loading.attr="disabled"
+                    wire:target="sohbetiTemizle"
+                    class="clear-btn"
+                >
                     Sohbeti Temizle
-                </span>
+                </button>
 
-                <span wire:loading wire:target="sohbetiTemizle">
-                    Temizleniyor...
-                </span>
-            </button>
-
-        </div>
-
-    </section>
-
-
-    <section class="ai-chat-card">
-
-        <div class="ai-chat-topbar">
-
-            <div class="ai-avatar">
-                🤖
             </div>
 
-            <div>
-                <h3 class="ai-chat-name">
-                    Yapay Zekâ Asistanınız
-                </h3>
+            <div class="messages">
 
-                <p class="ai-chat-desc">
-                    Test konuşması • Sadece sizin panelinizde görünür
-                </p>
-            </div>
+                @foreach ($mesajlar as $mesajKaydi)
 
-        </div>
+                    @if ($mesajKaydi['rol'] === 'user')
 
-
-        <div class="ai-messages" id="ai-test-messages">
-
-            @foreach ($mesajlar as $mesajKaydi)
-
-                @if ($mesajKaydi['rol'] === 'user')
-
-                    <div class="ai-message-row user">
-                        <div class="ai-message user">
-                            {{ $mesajKaydi['metin'] }}
+                        <div class="msg-row user">
+                            <div class="msg user">
+                                {{ $mesajKaydi['metin'] }}
+                            </div>
                         </div>
-                    </div>
 
-                @else
+                    @else
 
-                    <div class="ai-message-row bot">
-                        <div class="ai-message bot">
-                            {{ $mesajKaydi['metin'] }}
+                        <div class="msg-row bot">
+                            <div class="msg bot">
+                                {{ $mesajKaydi['metin'] }}
+                            </div>
                         </div>
+
+                    @endif
+
+                @endforeach
+
+                <div
+                    wire:loading
+                    wire:target="mesajGonder"
+                    class="msg-row bot"
+                >
+                    <div class="msg bot">
+                        Yapay zekâ düşünüyor...
                     </div>
-
-                @endif
-
-            @endforeach
-
-
-            <div
-                wire:loading
-                wire:target="mesajGonder"
-                class="ai-message-row bot"
-            >
-                <div class="ai-thinking">
-
-                    Yapay zekâ düşünüyor
-
-                    <span class="ai-thinking-dots">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </span>
-
                 </div>
+
             </div>
 
-        </div>
-
-
-        <form
-            wire:submit="mesajGonder"
-            class="ai-compose"
-        >
-
-            <div class="ai-compose-inner">
-
+            <form
+                wire:submit="mesajGonder"
+                class="compose"
+            >
                 <input
                     type="text"
                     wire:model="mesaj"
                     placeholder="Müşteriniz gibi bir soru yazın..."
                     autocomplete="off"
-                    class="ai-input"
                 >
 
                 <button
                     type="submit"
                     wire:loading.attr="disabled"
                     wire:target="mesajGonder"
-                    class="ai-send"
+                    class="send-btn"
                 >
                     <span wire:loading.remove wire:target="mesajGonder">
                         Gönder
@@ -479,31 +421,143 @@
                         Gönderiliyor...
                     </span>
                 </button>
+            </form>
+
+        </div>
+
+    </div>
+
+    <aside class="test-side">
+
+        <div class="side-card">
+
+            <div class="side-head">
+                <h3>
+                    Yapay Zekâ Ayarları
+                </h3>
+
+                <p>
+                    Test sırasında kullanılan aktif bilgiler
+                </p>
+            </div>
+
+            <div class="settings">
+
+                <div class="setting-item">
+                    <div class="setting-label">
+                        Firma
+                    </div>
+
+                    <div class="setting-value">
+                        {{ $aiBot?->company_name ?: 'Tanımlanmadı' }}
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-label">
+                        Yapay Zekâ Rolü
+                    </div>
+
+                    <div class="setting-value">
+                        {{ $roleLabel }}
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-label">
+                        Çalışma Saatleri
+                    </div>
+
+                    <div class="setting-value">
+                        {{ $aiBot?->working_hours ?: 'Tanımlanmadı' }}
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-label">
+                        Kargo / Teslimat
+                    </div>
+
+                    <div class="setting-value">
+                        {{ $aiBot?->cargo_information ?: 'Tanımlanmadı' }}
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-label">
+                        Ödeme
+                    </div>
+
+                    <div class="setting-value">
+                        {{ $aiBot?->payment_information ?: 'Tanımlanmadı' }}
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-label">
+                        Otomatik Takip
+                    </div>
+
+                    <div class="setting-value">
+                        {{ $aiBot?->follow_up_enabled ? 'Aktif' : 'Kapalı' }}
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-label">
+                        WhatsApp
+                    </div>
+
+                    <div class="setting-value">
+                        {{ $whatsappLabel }}
+                    </div>
+                </div>
 
             </div>
 
-        </form>
+            <div class="side-actions">
 
-    </section>
+                <a
+                    href="{{ $editUrl }}"
+                    class="edit-btn"
+                >
+                    Ayarları Düzenle
+                </a>
 
+                <button
+                    type="button"
+                    wire:click="whatsappBaglantisinaGec"
+                    wire:loading.attr="disabled"
+                    wire:target="whatsappBaglantisinaGec"
+                    class="approve-btn"
+                >
+                    <span
+                        wire:loading.remove
+                        wire:target="whatsappBaglantisinaGec"
+                    >
+                        ✓ Testi Onayla ve WhatsApp'ı Bağla
+                    </span>
 
-    <div class="ai-tip">
-        <strong>Test önerisi:</strong>
-        Firmanızın fiyatlarını, çalışma saatlerini, kargo koşullarını ve müşterinin
-        zor sorularına vereceği cevapları burada deneyebilirsiniz.
-    </div>
+                    <span
+                        wire:loading
+                        wire:target="whatsappBaglantisinaGec"
+                    >
+                        WhatsApp'a geçiliyor...
+                    </span>
+                </button>
+
+            </div>
+
+        </div>
+
+        <div class="flow-note">
+            Önce müşteriniz gibi birkaç soru sorun. Cevapları kontrol edin.
+            Gerekirse ayarları düzenleyin. Cevaplardan memnunsanız testi onaylayıp
+            WhatsApp bağlantısına geçin.
+        </div>
+
+    </aside>
 
 </div>
-
-
-<script>
-    document.addEventListener('livewire:navigated', () => {
-        const container = document.getElementById('ai-test-messages');
-
-        if (container) {
-            container.scrollTop = container.scrollHeight;
-        }
-    });
-</script>
 
 </x-filament-panels::page>

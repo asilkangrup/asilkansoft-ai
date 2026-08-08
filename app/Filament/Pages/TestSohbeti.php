@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\AiBots\AiBotResource;
 use App\Models\AiBot;
 use App\Services\MemoryService;
 use App\Services\OpenAIService;
@@ -34,6 +35,12 @@ class TestSohbeti extends Page
 
     public ?int $aiBotId = null;
 
+    /*
+    |--------------------------------------------------------------------------
+    | SAYFA AÇILIŞI
+    |--------------------------------------------------------------------------
+    */
+
     public function mount(
         MemoryService $memoryService
     ): void {
@@ -45,12 +52,8 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | KULLANICININ YAPAY ZEKÂSINI BUL
+        | MÜŞTERİNİN KENDİ BOTUNU BUL
         |--------------------------------------------------------------------------
-        |
-        | Şimdilik kullanıcının en son oluşturduğu yapay zekâyı test ediyoruz.
-        | Böylece başka müşterinin botuna erişim mümkün olmaz.
-        |
         */
 
         $aiBot = AiBot::query()
@@ -74,7 +77,7 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | TEST OTURUMU
+        | YENİ TEST OTURUMU
         |--------------------------------------------------------------------------
         */
 
@@ -94,6 +97,66 @@ class TestSohbeti extends Page
             ],
         ];
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | VIEW VERİLERİ
+    |--------------------------------------------------------------------------
+    |
+    | Sağ taraftaki Yapay Zekâ Ayarları paneli için gerekli bilgiler.
+    |
+    */
+
+    public function getViewData(): array
+    {
+        $user = Filament::auth()->user();
+
+        $aiBot = null;
+
+        if ($user && $this->aiBotId) {
+            $aiBot = AiBot::query()
+                ->where('id', $this->aiBotId)
+                ->where('user_id', $user->id)
+                ->first();
+        }
+
+        $roleLabel = match ($aiBot?->role) {
+            'sales' => 'Satış Uzmanı',
+            'support' => 'Müşteri Temsilcisi',
+            'technical' => 'Teknik Destek',
+            'assistant' => 'Sekreter / Asistan',
+            default => 'Tanımlanmadı',
+        };
+
+        $whatsappLabel = match ($aiBot?->whatsapp_status) {
+            'connected' => 'Bağlı',
+            'connecting' => 'QR Bekleniyor',
+            default => 'Henüz Bağlanmadı',
+        };
+
+        return [
+            'aiBot' => $aiBot,
+
+            'roleLabel' => $roleLabel,
+
+            'whatsappLabel' => $whatsappLabel,
+
+            'editUrl' => $aiBot
+                ? AiBotResource::getUrl(
+                    'edit',
+                    [
+                        'record' => $aiBot,
+                    ]
+                )
+                : '#',
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MESAJ GÖNDER
+    |--------------------------------------------------------------------------
+    */
 
     public function mesajGonder(
         OpenAIService $openAIService,
@@ -125,12 +188,8 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | DOĞRU YAPAY ZEKÂYI BUL
+        | DOĞRU BOTU GÜVENLİ ŞEKİLDE BUL
         |--------------------------------------------------------------------------
-        |
-        | ID tek başına yeterli değil.
-        | user_id kontrolü sayesinde müşteri sadece kendi botunu test edebilir.
-        |
         */
 
         $aiBot = AiBot::query()
@@ -154,9 +213,6 @@ class TestSohbeti extends Page
         |--------------------------------------------------------------------------
         | MÜŞTERİ MESAJINI HAFIZAYA KAYDET
         |--------------------------------------------------------------------------
-        |
-        | WhatsApp ile aynı şekilde ai_bot_id kullanıyoruz.
-        |
         */
 
         $memoryService->mesajKaydet(
@@ -176,11 +232,8 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | KONUŞMA GEÇMİŞİNİ HAZIRLA
+        | KONUŞMA GEÇMİŞİ
         |--------------------------------------------------------------------------
-        |
-        | WhatsApp tarafındaki gibi son 20 mesajı kullanıyoruz.
-        |
         */
 
         $gecmis =
@@ -194,28 +247,6 @@ class TestSohbeti extends Page
         |--------------------------------------------------------------------------
         | WHATSAPP İLE AYNI YAPAY ZEKÂ MOTORU
         |--------------------------------------------------------------------------
-        |
-        | EN ÖNEMLİ KISIM BURASI.
-        |
-        | Artık aiBot parametresi null değil.
-        |
-        | Böylece OpenAIService:
-        |
-        | - Firma adını
-        | - Firma açıklamasını
-        | - Yapay zekâ rolünü
-        | - Çalışma saatlerini
-        | - Kargo bilgilerini
-        | - Ödeme bilgilerini
-        | - İade politikasını
-        | - Firma kurallarını
-        | - Özel yapay zekâ talimatlarını
-        | - Ürünleri
-        | - Ürün fiyatlarını
-        | - Stok durumlarını
-        |
-        | WhatsApp'ta olduğu gibi kullanır.
-        |
         */
 
         $yapayZekaCevabi =
@@ -244,6 +275,12 @@ class TestSohbeti extends Page
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | SOHBETİ TEMİZLE
+    |--------------------------------------------------------------------------
+    */
+
     public function sohbetiTemizle(
         MemoryService $memoryService
     ): void {
@@ -258,12 +295,6 @@ class TestSohbeti extends Page
                 sessionId: $this->sessionId,
             );
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | YENİ TEST OTURUMU
-        |--------------------------------------------------------------------------
-        */
 
         $this->sessionId =
             'test:'
@@ -295,5 +326,57 @@ class TestSohbeti extends Page
                     .'. Size nasıl yardımcı olabilirim?',
             ],
         ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TESTİ ONAYLA → WHATSAPP'A GEÇ
+    |--------------------------------------------------------------------------
+    */
+
+    public function whatsappBaglantisinaGec(): void
+    {
+        $user = Filament::auth()->user();
+
+        if (! $user || ! $this->aiBotId) {
+            Notification::make()
+                ->title('Yapay zekâ bulunamadı.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $aiBot = AiBot::query()
+            ->where('id', $this->aiBotId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $aiBot) {
+            Notification::make()
+                ->title('Bu yapay zekâya erişilemiyor.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('Test onaylandı')
+            ->body(
+                'Şimdi WhatsApp bağlantınızı tamamlayabilirsiniz.'
+            )
+            ->success()
+            ->send();
+
+        $this->redirect(
+            AiBotResource::getUrl(
+                'whatsapp',
+                [
+                    'record' => $aiBot,
+                ]
+            ),
+            navigate: true
+        );
     }
 }
