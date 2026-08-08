@@ -6,12 +6,17 @@ use App\Filament\Resources\AiBots\AiBotResource;
 use App\Filament\Resources\Products\ProductResource;
 use App\Models\AiBot;
 use App\Models\Product;
+use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
+use Filament\Support\Icons\Heroicon;
 
 class KurulumMerkezi extends Page
 {
     protected string $view = 'filament.pages.kurulum-merkezi';
+
+    protected static string|BackedEnum|null $navigationIcon =
+        Heroicon::OutlinedRocketLaunch;
 
     protected static ?string $navigationLabel = 'Kurulum Merkezi';
 
@@ -56,7 +61,9 @@ class KurulumMerkezi extends Page
                 'url' => $bot
                     ? AiBotResource::getUrl('edit', ['record' => $bot])
                     : AiBotResource::getUrl('create'),
-                'button' => $botCreated ? 'Yapay Zekâyı Düzenle' : 'Yapay Zekâ Oluştur',
+                'button' => $botCreated
+                    ? 'Yapay Zekâyı Düzenle'
+                    : 'Yapay Zekâ Oluştur',
                 'icon' => '🤖',
             ],
             [
@@ -76,7 +83,9 @@ class KurulumMerkezi extends Page
                 'url' => $bot
                     ? AiBotResource::getUrl('whatsapp', ['record' => $bot])
                     : AiBotResource::getUrl('create'),
-                'button' => $whatsappConnected ? 'WhatsApp Durumunu Gör' : 'WhatsApp Bağla',
+                'button' => $whatsappConnected
+                    ? 'WhatsApp Durumunu Gör'
+                    : 'WhatsApp Bağla',
                 'icon' => '💬',
             ],
             [

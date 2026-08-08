@@ -4,16 +4,23 @@ namespace App\Filament\Pages;
 
 use App\Services\MemoryService;
 use App\Services\OpenAIService;
+use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Support\Icons\Heroicon;
 
 class TestSohbeti extends Page
 {
+    protected static string|BackedEnum|null $navigationIcon =
+        Heroicon::OutlinedChatBubbleLeftRight;
+
     protected static ?string $navigationLabel = 'Test Sohbeti';
 
     protected static ?string $title = 'Yapay Zekâyı Test Et';
 
     protected static ?string $slug = 'test-sohbeti';
+
+    protected static ?int $navigationSort = 2;
 
     protected string $view = 'filament.pages.test-sohbeti';
 
@@ -98,8 +105,9 @@ class TestSohbeti extends Page
         ];
     }
 
-    public function sohbetiTemizle(MemoryService $memoryService): void
-    {
+    public function sohbetiTemizle(
+        MemoryService $memoryService
+    ): void {
         $userId = auth()->id();
 
         if ($userId && $this->sessionId !== '') {
@@ -109,7 +117,8 @@ class TestSohbeti extends Page
             );
         }
 
-        $this->sessionId = $memoryService->yeniOturumId();
+        $this->sessionId =
+            $memoryService->yeniOturumId();
 
         $this->mesaj = '';
 
