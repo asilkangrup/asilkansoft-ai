@@ -109,22 +109,14 @@ class AiBotsTable
                                 ? 'success'
                                 : 'warning'
                     )
-
                     ->action(function (AiBot $record): mixed {
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | AYNI BOT İÇİN ÇİFT TIKLAMA KİLİDİ
-                        |--------------------------------------------------------------------------
-                        */
 
                         $lock = Cache::lock(
                             'whatsapp-connect-ai-bot-'.$record->id,
-                            15
+                            20
                         );
 
                         if (! $lock->get()) {
-
                             Notification::make()
                                 ->title('Bağlantı işlemi devam ediyor')
                                 ->body(
@@ -137,87 +129,125 @@ class AiBotsTable
                         }
 
                         try {
-
-                            /*
-                            |--------------------------------------------------------------------------
-                            | KAYDI YENİDEN OKU
-                            |--------------------------------------------------------------------------
-                            |
-                            | İlk tıklama DB'yi güncellemiş olabilir.
-                            |
-                            */
-
                             $record->refresh();
 
+                            $whatsAppService = app(
+                                WhatsAppService::class
+                            );
+
                             /*
                             |--------------------------------------------------------------------------
-                            | INSTANCE ZATEN VARSA TEKRAR OLUŞTURMA
+                            | INSTANCE YOKSA OLUŞTUR
                             |--------------------------------------------------------------------------
                             */
 
-                            if (filled($record->whatsapp_instance)) {
+                            if (blank($record->whatsapp_instance)) {
 
-                                return redirect(
-                                    AiBotResource::getUrl('whatsapp', [
-                                        'record' => $record,
-                                    ])
+                                $firmaAdi = Str::slug(
+                                    $record->company_name
+                                    ?: $record->name
+                                );
+
+                                $instanceName = trim(
+                                    $firmaAdi.'-'.$record->id,
+                                    '-'
+                                );
+
+                                $response = $whatsAppService
+                                    ->createInstance(
+                                        $instanceName
+                                    );
+
+                                $qrCode =
+                                    data_get(
+                                        $response,
+                                        'qrcode.base64'
+                                    )
+                                    ?? data_get(
+                                        $response,
+                                        'qrcode.code'
+                                    )
+                                    ?? data_get(
+                                        $response,
+                                        'base64'
+                                    )
+                                    ?? data_get(
+                                        $response,
+                                        'code'
+                                    );
+
+                                $record->update([
+                                    'whatsapp_instance' =>
+                                        $instanceName,
+
+                                    'whatsapp_status' =>
+                                        'connecting',
+
+                                    'whatsapp_qr' =>
+                                        is_string($qrCode)
+                                            ? $qrCode
+                                            : null,
+                                ]);
+
+                                /*
+                                |--------------------------------------------------------------------------
+                                | WEBHOOK'U OTOMATİK KUR
+                                |--------------------------------------------------------------------------
+                                */
+
+                                $webhookUrl =
+                                    rtrim(
+                                        (string) config(
+                                            'app.url'
+                                        ),
+                                        '/'
+                                    )
+                                    .'/api/whatsapp/webhook';
+
+                                $whatsAppService->setWebhook(
+                                    $instanceName,
+                                    $webhookUrl
                                 );
                             }
 
                             /*
                             |--------------------------------------------------------------------------
-                            | INSTANCE ADI
+                            | MEVCUT INSTANCE VARSA WEBHOOK'U YİNE KONTROL ET
                             |--------------------------------------------------------------------------
+                            |
+                            | Eski müşterilerde webhook boş kalmış olabilir.
+                            | Bu nedenle WhatsApp Bağla ekranına her girişte webhook'u
+                            | yeniden set ediyoruz.
+                            |
                             */
 
-                            $firmaAdi = Str::slug(
-                                $record->company_name ?: $record->name
-                            );
+                            if (
+                                filled(
+                                    $record->whatsapp_instance
+                                )
+                            ) {
+                                $webhookUrl =
+                                    rtrim(
+                                        (string) config(
+                                            'app.url'
+                                        ),
+                                        '/'
+                                    )
+                                    .'/api/whatsapp/webhook';
 
-                            $instanceName = trim(
-                                $firmaAdi.'-'.$record->id,
-                                '-'
-                            );
-
-                            /*
-                            |--------------------------------------------------------------------------
-                            | EVOLUTION INSTANCE OLUŞTUR
-                            |--------------------------------------------------------------------------
-                            */
-
-                            $response = app(WhatsAppService::class)
-                                ->createInstance($instanceName);
-
-                            $qrCode =
-                                data_get($response, 'qrcode.base64')
-                                ?? data_get($response, 'qrcode.code')
-                                ?? data_get($response, 'base64')
-                                ?? data_get($response, 'code');
-
-                            /*
-                            |--------------------------------------------------------------------------
-                            | DB'YE KAYDET
-                            |--------------------------------------------------------------------------
-                            */
-
-                            $record->update([
-                                'whatsapp_instance' => $instanceName,
-                                'whatsapp_status' => 'connecting',
-                                'whatsapp_qr' => is_string($qrCode)
-                                    ? $qrCode
-                                    : null,
-                            ]);
-
-                            /*
-                            |--------------------------------------------------------------------------
-                            | BAĞLANTI SAYFASINA GİT
-                            |--------------------------------------------------------------------------
-                            */
+                                $whatsAppService->setWebhook(
+                                    $record->whatsapp_instance,
+                                    $webhookUrl
+                                );
+                            }
 
                             return redirect(
-                                AiBotResource::getUrl('whatsapp', [
-                                    'record' => $record,
-                                ])
+                                AiBotResource::getUrl(
+                                    'whatsapp',
+                                    [
+                                        'record' => $record,
+                                    ]
+                                )
                             );
 
                         } catch (Throwable $exception) {
@@ -225,17 +255,19 @@ class AiBotsTable
                             report($exception);
 
                             Notification::make()
-                                ->title('WhatsApp bağlantısı açılamadı')
+                                ->title(
+                                    'WhatsApp bağlantısı açılamadı'
+                                )
                                 ->body(
                                     'Bağlantı sırasında bir sorun oluştu. Lütfen tekrar deneyin.'
                                 )
                                 ->danger()
+                                ->persistent()
                                 ->send();
 
                             return null;
 
                         } finally {
-
                             $lock->release();
                         }
                     }),
@@ -251,6 +283,9 @@ class AiBotsTable
                 ]),
             ])
 
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort(
+                'created_at',
+                'desc'
+            );
     }
 }
