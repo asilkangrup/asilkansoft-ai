@@ -109,6 +109,195 @@
         transition: width .4s ease;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | DENEME / PAKET KARTI
+    |--------------------------------------------------------------------------
+    */
+
+    .trial-card {
+        position: relative;
+        overflow: hidden;
+        padding: 24px;
+        border: 1px solid #bfdbfe;
+        border-radius: 22px;
+        background:
+            radial-gradient(circle at top right, rgba(59,130,246,.10), transparent 35%),
+            #ffffff;
+        box-shadow: 0 8px 25px rgba(15,23,42,.06);
+    }
+
+    .trial-card.expired {
+        border-color: #fecaca;
+        background:
+            radial-gradient(circle at top right, rgba(239,68,68,.08), transparent 35%),
+            #ffffff;
+    }
+
+    .trial-card.active {
+        border-color: #bbf7d0;
+        background:
+            radial-gradient(circle at top right, rgba(34,197,94,.10), transparent 35%),
+            #ffffff;
+    }
+
+    .trial-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 20px;
+    }
+
+    .trial-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-size: 11px;
+        font-weight: 800;
+    }
+
+    .trial-card.expired .trial-badge {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .trial-card.active .trial-badge {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .trial-title {
+        margin: 12px 0 0;
+        color: #111827;
+        font-size: 20px;
+        font-weight: 800;
+    }
+
+    .trial-description {
+        margin: 7px 0 0;
+        max-width: 700px;
+        color: #6b7280;
+        font-size: 13px;
+        line-height: 1.7;
+    }
+
+    .trial-number {
+        flex-shrink: 0;
+        text-align: right;
+    }
+
+    .trial-number strong {
+        display: block;
+        color: #111827;
+        font-size: 28px;
+        line-height: 1;
+        font-weight: 800;
+    }
+
+    .trial-number span {
+        display: block;
+        margin-top: 6px;
+        color: #6b7280;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .trial-progress-track {
+        width: 100%;
+        height: 12px;
+        margin-top: 22px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #e5e7eb;
+    }
+
+    .trial-progress-bar {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #3b82f6, #2563eb);
+        transition: width .4s ease;
+    }
+
+    .trial-card.expired .trial-progress-bar {
+        background: linear-gradient(90deg, #f97316, #ef4444);
+    }
+
+    .trial-card.active .trial-progress-bar {
+        background: linear-gradient(90deg, #22c55e, #16a34a);
+    }
+
+    .trial-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        margin-top: 16px;
+    }
+
+    .trial-info {
+        color: #4b5563;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .trial-remaining {
+        color: #2563eb;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .trial-card.expired .trial-remaining {
+        color: #dc2626;
+    }
+
+    .trial-card.active .trial-remaining {
+        color: #16a34a;
+    }
+
+    .buy-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 46px;
+        padding: 0 18px;
+        border-radius: 12px;
+        background: #dc2626;
+        color: #ffffff !important;
+        text-decoration: none !important;
+        font-size: 13px;
+        font-weight: 800;
+        transition: .2s ease;
+    }
+
+    .buy-button:hover {
+        background: #b91c1c;
+        transform: translateY(-1px);
+    }
+
+    .active-plan-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 16px;
+        border-radius: 12px;
+        background: #dcfce7;
+        color: #166534;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KURULUM TAMAMLANDI
+    |--------------------------------------------------------------------------
+    */
+
     .setup-complete {
         display: flex;
         gap: 14px;
@@ -143,6 +332,12 @@
         color: #15803d;
         font-size: 13px;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KURULUM ADIMLARI
+    |--------------------------------------------------------------------------
+    */
 
     .section-heading {
         margin: 4px 0 0;
@@ -277,6 +472,12 @@
         color: #374151 !important;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | DESTEK
+    |--------------------------------------------------------------------------
+    */
+
     .support-card {
         display: flex;
         align-items: center;
@@ -320,6 +521,16 @@
         .steps-grid {
             grid-template-columns: 1fr;
         }
+
+        .trial-head,
+        .trial-footer {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .trial-number {
+            text-align: left;
+        }
     }
 
     @media (max-width: 600px) {
@@ -345,12 +556,21 @@
         .support-button {
             text-align: center;
         }
+
+        .trial-card {
+            padding: 20px;
+        }
+
+        .buy-button {
+            width: 100%;
+        }
     }
 </style>
 
 
 <div class="setup-wrap">
 
+    {{-- ÜST KARŞILAMA --}}
     <section class="setup-hero">
 
         <div class="setup-hero-inner">
@@ -367,8 +587,7 @@
 
                 <p class="setup-subtitle">
                     Yapay zekâ asistanınızı kullanıma hazırlamak yalnızca birkaç adım sürer.
-                    Aşağıdaki kurulumları tamamlayın, WhatsApp yapay zekânız müşterilerinizle
-                    görüşmeye hazır hale gelsin.
+                    Kurulumu tamamlayın ve WhatsApp üzerinden müşterilerinizle otomatik görüşmeye başlayın.
                 </p>
 
             </div>
@@ -379,6 +598,7 @@
                 <div class="progress-top">
 
                     <div>
+
                         <div class="progress-label">
                             KURULUM İLERLEMESİ
                         </div>
@@ -386,6 +606,7 @@
                         <div class="progress-value">
                             %{{ $progress }}
                         </div>
+
                     </div>
 
                     <div class="progress-count">
@@ -395,10 +616,12 @@
                 </div>
 
                 <div class="progress-track">
+
                     <div
                         class="progress-bar"
                         style="width: {{ $progress }}%;"
                     ></div>
+
                 </div>
 
             </div>
@@ -408,6 +631,156 @@
     </section>
 
 
+    {{-- ÜCRETSİZ DENEME / PAKET --}}
+    @if ($bot)
+
+        <section
+            class="trial-card
+                {{ $trialCompleted ? 'expired' : '' }}
+                {{ $subscriptionActive ? 'active' : '' }}"
+        >
+
+            <div class="trial-head">
+
+                <div>
+
+                    <div class="trial-badge">
+
+                        @if ($subscriptionActive)
+                            ✓ ÜCRETLİ PAKET
+                        @elseif ($trialCompleted)
+                            ⚠ DENEME TAMAMLANDI
+                        @else
+                            🎁 ÜCRETSİZ DENEME
+                        @endif
+
+                    </div>
+
+                    <h3 class="trial-title">
+                        {{ $planTitle }}
+                    </h3>
+
+                    <p class="trial-description">
+                        {{ $planDescription }}
+                    </p>
+
+                </div>
+
+
+                <div class="trial-number">
+
+                    @if ($subscriptionActive)
+
+                        <strong>
+                            Aktif
+                        </strong>
+
+                        <span>
+                            WhatsApp AI kullanımı
+                        </span>
+
+                    @else
+
+                        <strong>
+                            {{ $trialMessagesUsed }} / {{ $trialMessageLimit }}
+                        </strong>
+
+                        <span>
+                            WhatsApp AI cevabı kullanıldı
+                        </span>
+
+                    @endif
+
+                </div>
+
+            </div>
+
+
+            @if (! $subscriptionActive)
+
+                <div class="trial-progress-track">
+
+                    <div
+                        class="trial-progress-bar"
+                        style="width: {{ $trialProgress }}%;"
+                    ></div>
+
+                </div>
+
+
+                <div class="trial-footer">
+
+                    <div>
+
+                        @if ($trialCompleted)
+
+                            <div class="trial-remaining">
+                                Ücretsiz kullanım hakkınız tamamlandı.
+                            </div>
+
+                            <div class="trial-info">
+                                WhatsApp bağlantınız korunur. Paket aktif edildiğinde yapay zekâ yeniden cevap vermeye başlar.
+                            </div>
+
+                        @else
+
+                            <div class="trial-remaining">
+                                {{ $trialMessagesRemaining }} ücretsiz AI cevabı kaldı
+                            </div>
+
+                            <div class="trial-info">
+                                Sayaç yalnızca WhatsApp üzerinden başarıyla gönderilen yapay zekâ cevaplarında azalır.
+                            </div>
+
+                        @endif
+
+                    </div>
+
+
+                    @if ($trialCompleted)
+
+                        <a
+                            href="#"
+                            class="buy-button"
+                        >
+                            Paketi Satın Al
+                            <span>→</span>
+                        </a>
+
+                    @endif
+
+                </div>
+
+            @else
+
+                <div class="trial-footer">
+
+                    <div>
+
+                        <div class="trial-remaining">
+                            Yapay zekânız aktif
+                        </div>
+
+                        <div class="trial-info">
+                            WhatsApp üzerinden müşterilerinize yanıt vermeye devam ediyor.
+                        </div>
+
+                    </div>
+
+                    <div class="active-plan-button">
+                        ✓ Paket Aktif
+                    </div>
+
+                </div>
+
+            @endif
+
+        </section>
+
+    @endif
+
+
+    {{-- KURULUM TAMAMLANDI --}}
     @if ($progress === 100)
 
         <div class="setup-complete">
@@ -423,8 +796,7 @@
                 </h3>
 
                 <p class="complete-text">
-                    Yapay zekâ sisteminiz kullanıma hazır. Artık WhatsApp üzerinden
-                    müşterilerinizle otomatik olarak görüşebilirsiniz.
+                    Yapay zekâ sisteminiz kullanıma hazır.
                 </p>
 
             </div>
@@ -434,6 +806,7 @@
     @endif
 
 
+    {{-- KURULUM ADIMLARI --}}
     <div class="section-heading">
 
         <h2>
@@ -470,20 +843,26 @@
                     Adım {{ $index + 1 }}
                 </div>
 
+
                 <h3 class="step-title">
                     {{ $step['title'] }}
                 </h3>
 
+
                 <p class="step-description">
                     {{ $step['description'] }}
                 </p>
+
 
                 <a
                     class="step-action"
                     href="{{ $step['url'] }}"
                 >
                     {{ $step['button'] }}
-                    <span>→</span>
+
+                    <span>
+                        →
+                    </span>
                 </a>
 
             </article>
@@ -493,6 +872,7 @@
     </div>
 
 
+    {{-- DESTEK --}}
     <div class="support-card">
 
         <div>
