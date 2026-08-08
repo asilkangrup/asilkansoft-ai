@@ -1,72 +1,73 @@
 <x-filament-panels::page>
 
 <style>
-    .test-layout {
+    .studio-layout {
         display: grid;
-        grid-template-columns: minmax(0, 1.7fr) minmax(300px, .8fr);
+        grid-template-columns: minmax(0, 1.55fr) minmax(340px, .85fr);
         gap: 20px;
         align-items: start;
     }
 
-    .test-main,
-    .test-side {
+    .studio-main,
+    .studio-side {
         min-width: 0;
     }
 
-    .test-header {
-        padding: 24px;
+    .studio-hero {
+        margin-bottom: 18px;
+        padding: 24px 26px;
         border-radius: 22px;
         color: #fff;
         background:
-            radial-gradient(circle at top right, rgba(59, 130, 246, .35), transparent 30%),
+            radial-gradient(circle at top right, rgba(59,130,246,.35), transparent 30%),
             linear-gradient(135deg, #111827 0%, #172554 55%, #1e3a8a 100%);
-        box-shadow: 0 16px 40px rgba(15, 23, 42, .14);
-        margin-bottom: 18px;
+        box-shadow: 0 16px 40px rgba(15,23,42,.14);
     }
 
-    .test-kicker {
+    .studio-kicker {
         display: inline-flex;
         padding: 6px 11px;
-        border-radius: 999px;
         border: 1px solid rgba(255,255,255,.16);
+        border-radius: 999px;
         background: rgba(255,255,255,.08);
         font-size: 11px;
         font-weight: 800;
         letter-spacing: .05em;
     }
 
-    .test-title {
+    .studio-title {
         margin: 12px 0 0;
         font-size: 27px;
         font-weight: 800;
     }
 
-    .test-subtitle {
+    .studio-subtitle {
         margin: 8px 0 0;
-        color: rgba(255,255,255,.74);
+        max-width: 720px;
+        color: rgba(255,255,255,.76);
         font-size: 14px;
         line-height: 1.7;
     }
 
-    .test-chat {
+    .chat-card,
+    .settings-card {
         overflow: hidden;
         border: 1px solid #e5e7eb;
         border-radius: 22px;
-        background: #f8fafc;
-        box-shadow: 0 8px 25px rgba(15, 23, 42, .06);
+        background: #fff;
+        box-shadow: 0 8px 25px rgba(15,23,42,.06);
     }
 
-    .chat-top {
+    .chat-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 14px;
         padding: 16px 18px;
         border-bottom: 1px solid #e5e7eb;
-        background: #fff;
     }
 
-    .chat-identity {
+    .chat-person {
         display: flex;
         align-items: center;
         gap: 11px;
@@ -74,8 +75,8 @@
 
     .chat-avatar {
         display: flex;
-        width: 42px;
-        height: 42px;
+        width: 43px;
+        height: 43px;
         align-items: center;
         justify-content: center;
         border-radius: 13px;
@@ -85,18 +86,18 @@
 
     .chat-name {
         margin: 0;
+        color: #111827;
         font-size: 14px;
         font-weight: 800;
-        color: #111827;
     }
 
-    .chat-meta {
+    .chat-company {
         margin: 3px 0 0;
-        font-size: 12px;
         color: #6b7280;
+        font-size: 12px;
     }
 
-    .clear-btn {
+    .clear-button {
         padding: 9px 13px;
         border: 1px solid #d1d5db;
         border-radius: 10px;
@@ -108,26 +109,27 @@
     }
 
     .messages {
-        min-height: 430px;
-        max-height: 560px;
+        min-height: 470px;
+        max-height: 600px;
         overflow-y: auto;
         padding: 20px;
+        background: #f8fafc;
     }
 
-    .msg-row {
+    .message-row {
         display: flex;
         margin-bottom: 13px;
     }
 
-    .msg-row.user {
+    .message-row.user {
         justify-content: flex-end;
     }
 
-    .msg-row.bot {
+    .message-row.bot {
         justify-content: flex-start;
     }
 
-    .msg {
+    .message {
         max-width: 76%;
         padding: 11px 14px;
         border-radius: 16px;
@@ -136,17 +138,17 @@
         word-break: break-word;
     }
 
-    .msg.user {
+    .message.user {
+        border-bottom-right-radius: 5px;
         background: #2563eb;
         color: #fff;
-        border-bottom-right-radius: 5px;
     }
 
-    .msg.bot {
-        background: #fff;
-        color: #1f2937;
+    .message.bot {
         border: 1px solid #e5e7eb;
         border-bottom-left-radius: 5px;
+        background: #fff;
+        color: #1f2937;
     }
 
     .compose {
@@ -154,12 +156,11 @@
         gap: 10px;
         padding: 15px;
         border-top: 1px solid #e5e7eb;
-        background: #fff;
     }
 
-    .compose input {
+    .compose-input {
         flex: 1;
-        min-height: 46px;
+        min-height: 47px;
         padding: 11px 14px;
         border: 1px solid #d1d5db;
         border-radius: 12px;
@@ -167,12 +168,16 @@
         font-size: 14px;
     }
 
-    .compose input:focus {
+    .compose-input:focus,
+    .studio-input:focus,
+    .studio-textarea:focus,
+    .studio-select:focus {
         border-color: #2563eb;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, .10);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(37,99,235,.10);
     }
 
-    .send-btn {
+    .send-button {
         min-width: 105px;
         border: 0;
         border-radius: 12px;
@@ -183,113 +188,164 @@
         cursor: pointer;
     }
 
-    .side-card {
-        border: 1px solid #e5e7eb;
-        border-radius: 22px;
-        background: #fff;
-        box-shadow: 0 8px 25px rgba(15, 23, 42, .06);
-        overflow: hidden;
-    }
-
-    .side-head {
+    .settings-header {
         padding: 18px 20px;
         border-bottom: 1px solid #e5e7eb;
         background: #f9fafb;
     }
 
-    .side-head h3 {
+    .settings-header h3 {
         margin: 0;
+        color: #111827;
         font-size: 16px;
         font-weight: 800;
-        color: #111827;
     }
 
-    .side-head p {
-        margin: 4px 0 0;
-        font-size: 12px;
+    .settings-header p {
+        margin: 5px 0 0;
         color: #6b7280;
+        font-size: 12px;
+        line-height: 1.5;
     }
 
-    .settings {
-        padding: 18px 20px;
+    .settings-body {
+        max-height: 670px;
+        overflow-y: auto;
+        padding: 18px;
     }
 
-    .setting-item {
-        padding: 13px 0;
-        border-bottom: 1px solid #f1f5f9;
+    .field {
+        margin-bottom: 17px;
     }
 
-    .setting-item:last-child {
-        border-bottom: 0;
+    .field:last-child {
+        margin-bottom: 0;
     }
 
-    .setting-label {
-        font-size: 11px;
+    .field-label {
+        display: block;
+        margin-bottom: 7px;
+        color: #374151;
+        font-size: 12px;
         font-weight: 800;
-        color: #9ca3af;
-        text-transform: uppercase;
-        letter-spacing: .05em;
     }
 
-    .setting-value {
-        margin-top: 4px;
+    .studio-input,
+    .studio-select,
+    .studio-textarea {
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px solid #d1d5db;
+        border-radius: 11px;
+        background: #fff;
         color: #111827;
         font-size: 13px;
-        font-weight: 700;
-        line-height: 1.5;
-        word-break: break-word;
     }
 
-    .side-actions {
+    .studio-input,
+    .studio-select {
+        min-height: 43px;
+        padding: 9px 11px;
+    }
+
+    .studio-textarea {
+        min-height: 90px;
+        padding: 10px 11px;
+        resize: vertical;
+        line-height: 1.5;
+    }
+
+    .field-help {
+        margin-top: 5px;
+        color: #9ca3af;
+        font-size: 11px;
+        line-height: 1.5;
+    }
+
+    .switch-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #f9fafb;
+    }
+
+    .switch-title {
+        color: #111827;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .switch-text {
+        margin-top: 3px;
+        color: #6b7280;
+        font-size: 11px;
+    }
+
+    .settings-actions {
         display: flex;
         flex-direction: column;
         gap: 10px;
-        padding: 0 20px 20px;
+        padding: 16px 18px 18px;
+        border-top: 1px solid #e5e7eb;
+        background: #fff;
     }
 
-    .edit-btn,
-    .approve-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 46px;
+    .save-button,
+    .approve-button {
+        min-height: 47px;
+        border: 0;
         border-radius: 12px;
-        text-decoration: none !important;
+        color: #fff;
         font-size: 13px;
         font-weight: 800;
         cursor: pointer;
     }
 
-    .edit-btn {
-        border: 1px solid #d1d5db;
-        background: #fff;
-        color: #374151 !important;
+    .save-button {
+        background: #2563eb;
     }
 
-    .approve-btn {
-        border: 0;
+    .save-button:hover {
+        background: #1d4ed8;
+    }
+
+    .approve-button {
         background: #16a34a;
-        color: #fff !important;
     }
 
-    .approve-btn:hover {
+    .approve-button:hover {
         background: #15803d;
     }
 
-    .flow-note {
-        margin-top: 18px;
-        padding: 14px 16px;
+    .save-button:disabled,
+    .approve-button:disabled,
+    .send-button:disabled {
+        opacity: .55;
+        cursor: not-allowed;
+    }
+
+    .update-info {
+        margin-bottom: 14px;
+        padding: 12px 14px;
         border: 1px solid #dbeafe;
-        border-radius: 14px;
+        border-radius: 12px;
         background: #eff6ff;
         color: #1e40af;
-        font-size: 12px;
+        font-size: 11px;
         line-height: 1.6;
     }
 
-    @media (max-width: 950px) {
-        .test-layout {
+    @media (max-width: 1000px) {
+        .studio-layout {
             grid-template-columns: 1fr;
+        }
+
+        .settings-body {
+            max-height: none;
         }
     }
 
@@ -298,54 +354,61 @@
             flex-direction: column;
         }
 
-        .send-btn {
+        .send-button {
             min-height: 46px;
             width: 100%;
         }
 
-        .msg {
-            max-width: 88%;
+        .message {
+            max-width: 89%;
         }
     }
 </style>
 
-<div class="test-layout">
+<div class="studio-hero">
 
-    <div class="test-main">
+    <div class="studio-kicker">
+        ✦ ASİLKANSOFT AI TEST STÜDYOSU
+    </div>
 
-        <div class="test-header">
-            <div class="test-kicker">
-                🤖 CANLI YAPAY ZEKÂ TESTİ
-            </div>
+    <h2 class="studio-title">
+        Ayarla, test et, geliştir
+    </h2>
 
-            <h2 class="test-title">
-                WhatsApp'a geçmeden önce test edin
-            </h2>
+    <p class="studio-subtitle">
+        Sağ taraftaki bilgileri değiştirebilir, ayarları kaydedebilir ve
+        WhatsApp'a geçmeden önce yapay zekânın yeni ayarlarla nasıl cevap verdiğini
+        anında test edebilirsiniz.
+    </p>
 
-            <p class="test-subtitle">
-                Buradaki yapay zekâ, WhatsApp'ta kullanacağınız aynı firma bilgileri,
-                ürünler, kurallar ve özel talimatlarla cevap verir.
-            </p>
-        </div>
+</div>
 
-        <div class="test-chat">
 
-            <div class="chat-top">
+<div class="studio-layout">
 
-                <div class="chat-identity">
+    {{-- CANLI SOHBET --}}
+    <section class="studio-main">
+
+        <div class="chat-card">
+
+            <div class="chat-head">
+
+                <div class="chat-person">
+
                     <div class="chat-avatar">
                         🤖
                     </div>
 
                     <div>
                         <p class="chat-name">
-                            {{ $aiBot?->name ?? 'Yapay Zekâ Asistanı' }}
+                            {{ $botName ?: 'Yapay Zekâ Asistanı' }}
                         </p>
 
-                        <p class="chat-meta">
-                            {{ $aiBot?->company_name ?? 'Firma bilgisi bulunamadı' }}
+                        <p class="chat-company">
+                            {{ $companyName ?: 'Firma bilgisi girilmedi' }}
                         </p>
                     </div>
+
                 </div>
 
                 <button
@@ -353,12 +416,13 @@
                     wire:click="sohbetiTemizle"
                     wire:loading.attr="disabled"
                     wire:target="sohbetiTemizle"
-                    class="clear-btn"
+                    class="clear-button"
                 >
                     Sohbeti Temizle
                 </button>
 
             </div>
+
 
             <div class="messages">
 
@@ -366,16 +430,16 @@
 
                     @if ($mesajKaydi['rol'] === 'user')
 
-                        <div class="msg-row user">
-                            <div class="msg user">
+                        <div class="message-row user">
+                            <div class="message user">
                                 {{ $mesajKaydi['metin'] }}
                             </div>
                         </div>
 
                     @else
 
-                        <div class="msg-row bot">
-                            <div class="msg bot">
+                        <div class="message-row bot">
+                            <div class="message bot">
                                 {{ $mesajKaydi['metin'] }}
                             </div>
                         </div>
@@ -384,152 +448,403 @@
 
                 @endforeach
 
+
                 <div
                     wire:loading
                     wire:target="mesajGonder"
-                    class="msg-row bot"
+                    class="message-row bot"
                 >
-                    <div class="msg bot">
+                    <div class="message bot">
                         Yapay zekâ düşünüyor...
                     </div>
                 </div>
 
             </div>
 
+
             <form
                 wire:submit="mesajGonder"
                 class="compose"
             >
+
                 <input
                     type="text"
                     wire:model="mesaj"
                     placeholder="Müşteriniz gibi bir soru yazın..."
                     autocomplete="off"
+                    class="compose-input"
                 >
 
                 <button
                     type="submit"
                     wire:loading.attr="disabled"
                     wire:target="mesajGonder"
-                    class="send-btn"
+                    class="send-button"
                 >
-                    <span wire:loading.remove wire:target="mesajGonder">
+                    <span
+                        wire:loading.remove
+                        wire:target="mesajGonder"
+                    >
                         Gönder
                     </span>
 
-                    <span wire:loading wire:target="mesajGonder">
-                        Gönderiliyor...
+                    <span
+                        wire:loading
+                        wire:target="mesajGonder"
+                    >
+                        Bekleyin...
                     </span>
                 </button>
+
             </form>
 
         </div>
 
-    </div>
+    </section>
 
-    <aside class="test-side">
 
-        <div class="side-card">
+    {{-- CANLI AYAR PANELİ --}}
+    <aside class="studio-side">
 
-            <div class="side-head">
+        <div class="settings-card">
+
+            <div class="settings-header">
                 <h3>
-                    Yapay Zekâ Ayarları
+                    ⚙️ Canlı Yapay Zekâ Ayarları
                 </h3>
 
                 <p>
-                    Test sırasında kullanılan aktif bilgiler
+                    Değişikliklerinizi kaydedin ve yeni ayarları hemen test edin.
                 </p>
             </div>
 
-            <div class="settings">
 
-                <div class="setting-item">
-                    <div class="setting-label">
-                        Firma
-                    </div>
+            <div class="settings-body">
 
-                    <div class="setting-value">
-                        {{ $aiBot?->company_name ?: 'Tanımlanmadı' }}
-                    </div>
+                <div class="update-info">
+                    <strong>Nasıl çalışır?</strong><br>
+                    Bilgileri değiştir → Ayarları Kaydet ve Testi Yenile →
+                    sohbet sıfırlansın → yeni ayarlarla tekrar konuş.
                 </div>
 
-                <div class="setting-item">
-                    <div class="setting-label">
+
+                <div class="field">
+                    <label class="field-label">
+                        Yapay Zekâ Adı
+                    </label>
+
+                    <input
+                        type="text"
+                        wire:model="botName"
+                        class="studio-input"
+                    >
+                </div>
+
+
+                <div class="field">
+                    <label class="field-label">
+                        Firma Adı
+                    </label>
+
+                    <input
+                        type="text"
+                        wire:model="companyName"
+                        class="studio-input"
+                    >
+                </div>
+
+
+                <div class="field">
+                    <label class="field-label">
                         Yapay Zekâ Rolü
-                    </div>
+                    </label>
 
-                    <div class="setting-value">
-                        {{ $roleLabel }}
+                    <select
+                        wire:model="role"
+                        class="studio-select"
+                    >
+                        <option value="sales">
+                            Satış Uzmanı
+                        </option>
+
+                        <option value="support">
+                            Müşteri Temsilcisi
+                        </option>
+
+                        <option value="technical">
+                            Teknik Destek
+                        </option>
+
+                        <option value="assistant">
+                            Sekreter / Asistan
+                        </option>
+                    </select>
+                </div>
+
+
+                <div class="field">
+                    <label class="field-label">
+                        Firma Hakkında
+                    </label>
+
+                    <textarea
+                        wire:model="companyDescription"
+                        class="studio-textarea"
+                        rows="5"
+                    ></textarea>
+
+                    <div class="field-help">
+                        Yapay zekâ firmanızı anlatırken bu bilgileri kullanır.
                     </div>
                 </div>
 
-                <div class="setting-item">
-                    <div class="setting-label">
+
+                <div class="field">
+                    <label class="field-label">
                         Çalışma Saatleri
-                    </div>
+                    </label>
 
-                    <div class="setting-value">
-                        {{ $aiBot?->working_hours ?: 'Tanımlanmadı' }}
+                    <textarea
+                        wire:model="workingHours"
+                        class="studio-textarea"
+                        rows="3"
+                    ></textarea>
+                </div>
+
+
+                <div class="field">
+                    <label class="field-label">
+                        Kargo / Teslimat / Hizmet Bölgesi
+                    </label>
+
+                    <textarea
+                        wire:model="cargoInformation"
+                        class="studio-textarea"
+                        rows="5"
+                    ></textarea>
+                </div>
+
+
+                <div class="field">
+                    <label class="field-label">
+                        Ödeme Bilgileri
+                    </label>
+
+                    <textarea
+                        wire:model="paymentInformation"
+                        class="studio-textarea"
+                        rows="4"
+                    ></textarea>
+                </div>
+
+
+                <div class="field">
+                    <label class="field-label">
+                        İade / Değişim / İptal
+                    </label>
+
+                    <textarea
+                        wire:model="returnPolicy"
+                        class="studio-textarea"
+                        rows="4"
+                    ></textarea>
+                </div>
+
+
+                <div class="field">
+                    <label class="field-label">
+                        Özel Firma Kuralları
+                    </label>
+
+                    <textarea
+                        wire:model="companyRules"
+                        class="studio-textarea"
+                        rows="6"
+                    ></textarea>
+
+                    <div class="field-help">
+                        Örn: Fiyat uydurma, kesin teslimat sözü verme,
+                        stok bilgisini tahmin etme.
                     </div>
                 </div>
 
-                <div class="setting-item">
-                    <div class="setting-label">
-                        Kargo / Teslimat
-                    </div>
 
-                    <div class="setting-value">
-                        {{ $aiBot?->cargo_information ?: 'Tanımlanmadı' }}
+                <div class="field">
+                    <label class="field-label">
+                        Konuşma ve Satış Talimatları
+                    </label>
+
+                    <textarea
+                        wire:model="systemPrompt"
+                        class="studio-textarea"
+                        rows="6"
+                    ></textarea>
+
+                    <div class="field-help">
+                        Yapay zekânın müşterilerle nasıl konuşmasını istediğinizi yazın.
                     </div>
                 </div>
 
-                <div class="setting-item">
-                    <div class="setting-label">
-                        Ödeme
+
+                <div class="field">
+
+                    <div class="switch-row">
+
+                        <div>
+                            <div class="switch-title">
+                                Otomatik Takip
+                            </div>
+
+                            <div class="switch-text">
+                                Cevap vermeyen müşterilere hatırlatma gönder.
+                            </div>
+                        </div>
+
+                        <input
+                            type="checkbox"
+                            wire:model.live="followUpEnabled"
+                        >
+
                     </div>
 
-                    <div class="setting-value">
-                        {{ $aiBot?->payment_information ?: 'Tanımlanmadı' }}
-                    </div>
                 </div>
 
-                <div class="setting-item">
-                    <div class="setting-label">
-                        Otomatik Takip
+
+                @if ($followUpEnabled)
+
+                    <div class="field">
+                        <label class="field-label">
+                            1. Hatırlatma Süresi
+                        </label>
+
+                        <select
+                            wire:model="firstFollowUpMinutes"
+                            class="studio-select"
+                        >
+                            <option value="60">1 Saat</option>
+                            <option value="120">2 Saat</option>
+                            <option value="180">3 Saat</option>
+                            <option value="360">6 Saat</option>
+                            <option value="720">12 Saat</option>
+                            <option value="1440">24 Saat</option>
+                            <option value="2880">2 Gün</option>
+                            <option value="4320">3 Gün</option>
+                            <option value="7200">5 Gün</option>
+                            <option value="10080">7 Gün</option>
+                        </select>
                     </div>
 
-                    <div class="setting-value">
-                        {{ $aiBot?->follow_up_enabled ? 'Aktif' : 'Kapalı' }}
-                    </div>
-                </div>
 
-                <div class="setting-item">
-                    <div class="setting-label">
-                        WhatsApp
+                    <div class="field">
+                        <label class="field-label">
+                            1. Hatırlatma Mesajı
+                        </label>
+
+                        <textarea
+                            wire:model="firstFollowUpMessage"
+                            class="studio-textarea"
+                            rows="4"
+                        ></textarea>
                     </div>
 
-                    <div class="setting-value">
-                        {{ $whatsappLabel }}
+
+                    <div class="field">
+
+                        <div class="switch-row">
+
+                            <div>
+                                <div class="switch-title">
+                                    2. Hatırlatma
+                                </div>
+
+                                <div class="switch-text">
+                                    İkinci ve son takip mesajını gönder.
+                                </div>
+                            </div>
+
+                            <input
+                                type="checkbox"
+                                wire:model.live="secondFollowUpEnabled"
+                            >
+
+                        </div>
+
                     </div>
-                </div>
+
+
+                    @if ($secondFollowUpEnabled)
+
+                        <div class="field">
+                            <label class="field-label">
+                                2. Hatırlatma Süresi
+                            </label>
+
+                            <select
+                                wire:model="secondFollowUpMinutes"
+                                class="studio-select"
+                            >
+                                <option value="1440">1 Gün</option>
+                                <option value="2880">2 Gün</option>
+                                <option value="4320">3 Gün</option>
+                                <option value="5760">4 Gün</option>
+                                <option value="7200">5 Gün</option>
+                                <option value="10080">7 Gün</option>
+                                <option value="14400">10 Gün</option>
+                                <option value="20160">14 Gün</option>
+                            </select>
+                        </div>
+
+
+                        <div class="field">
+                            <label class="field-label">
+                                2. ve Son Hatırlatma Mesajı
+                            </label>
+
+                            <textarea
+                                wire:model="secondFollowUpMessage"
+                                class="studio-textarea"
+                                rows="4"
+                            ></textarea>
+                        </div>
+
+                    @endif
+
+                @endif
 
             </div>
 
-            <div class="side-actions">
 
-                <a
-                    href="{{ $editUrl }}"
-                    class="edit-btn"
+            <div class="settings-actions">
+
+                <button
+                    type="button"
+                    wire:click="ayarlariKaydet"
+                    wire:loading.attr="disabled"
+                    wire:target="ayarlariKaydet"
+                    class="save-button"
                 >
-                    Ayarları Düzenle
-                </a>
+                    <span
+                        wire:loading.remove
+                        wire:target="ayarlariKaydet"
+                    >
+                        💾 Ayarları Kaydet ve Testi Yenile
+                    </span>
+
+                    <span
+                        wire:loading
+                        wire:target="ayarlariKaydet"
+                    >
+                        Ayarlar kaydediliyor...
+                    </span>
+                </button>
+
 
                 <button
                     type="button"
                     wire:click="whatsappBaglantisinaGec"
                     wire:loading.attr="disabled"
                     wire:target="whatsappBaglantisinaGec"
-                    class="approve-btn"
+                    class="approve-button"
                 >
                     <span
                         wire:loading.remove
@@ -548,12 +863,6 @@
 
             </div>
 
-        </div>
-
-        <div class="flow-note">
-            Önce müşteriniz gibi birkaç soru sorun. Cevapları kontrol edin.
-            Gerekirse ayarları düzenleyin. Cevaplardan memnunsanız testi onaylayıp
-            WhatsApp bağlantısına geçin.
         </div>
 
     </aside>
