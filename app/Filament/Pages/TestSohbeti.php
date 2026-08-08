@@ -2,9 +2,11 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\AiBot;
 use App\Services\MemoryService;
 use App\Services\OpenAIService;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -30,14 +32,65 @@ class TestSohbeti extends Page
 
     public string $sessionId = '';
 
-    public function mount(MemoryService $memoryService): void
-    {
-        $this->sessionId = $memoryService->yeniOturumId();
+    public ?int $aiBotId = null;
+
+    public function mount(
+        MemoryService $memoryService
+    ): void {
+        $user = Filament::auth()->user();
+
+        if (! $user) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | KULLANICININ YAPAY ZEKÂSINI BUL
+        |--------------------------------------------------------------------------
+        |
+        | Şimdilik kullanıcının en son oluşturduğu yapay zekâyı test ediyoruz.
+        | Böylece başka müşterinin botuna erişim mümkün olmaz.
+        |
+        */
+
+        $aiBot = AiBot::query()
+            ->where('user_id', $user->id)
+            ->latest('id')
+            ->first();
+
+        if (! $aiBot) {
+            Notification::make()
+                ->title('Yapay zekâ bulunamadı')
+                ->body(
+                    'Test sohbetini kullanmadan önce bir yapay zekâ oluşturmalısınız.'
+                )
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->aiBotId = $aiBot->id;
+
+        /*
+        |--------------------------------------------------------------------------
+        | TEST OTURUMU
+        |--------------------------------------------------------------------------
+        */
+
+        $this->sessionId =
+            'test:'
+            .$aiBot->id
+            .':'
+            .$memoryService->yeniOturumId();
 
         $this->mesajlar = [
             [
                 'rol' => 'assistant',
-                'metin' => 'Merhaba 👋 Ben yapay zekâ asistanınızım. Size nasıl yardımcı olabilirim?',
+                'metin' =>
+                    'Merhaba 👋 Ben '
+                    .$aiBot->name
+                    .'. Size nasıl yardımcı olabilirim?',
             ],
         ];
     }
@@ -46,7 +99,9 @@ class TestSohbeti extends Page
         OpenAIService $openAIService,
         MemoryService $memoryService
     ): void {
-        $kullaniciMesaji = trim($this->mesaj);
+        $kullaniciMesaji = trim(
+            $this->mesaj
+        );
 
         if ($kullaniciMesaji === '') {
             Notification::make()
@@ -57,9 +112,9 @@ class TestSohbeti extends Page
             return;
         }
 
-        $userId = auth()->id();
+        $user = Filament::auth()->user();
 
-        if (! $userId) {
+        if (! $user) {
             Notification::make()
                 ->title('Oturum bulunamadı.')
                 ->danger()
@@ -68,9 +123,45 @@ class TestSohbeti extends Page
             return;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | DOĞRU YAPAY ZEKÂYI BUL
+        |--------------------------------------------------------------------------
+        |
+        | ID tek başına yeterli değil.
+        | user_id kontrolü sayesinde müşteri sadece kendi botunu test edebilir.
+        |
+        */
+
+        $aiBot = AiBot::query()
+            ->where('id', $this->aiBotId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $aiBot) {
+            Notification::make()
+                ->title('Yapay zekâ bulunamadı.')
+                ->body(
+                    'Lütfen Yapay Zekâlar bölümünden botunuzu kontrol edin.'
+                )
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | MÜŞTERİ MESAJINI HAFIZAYA KAYDET
+        |--------------------------------------------------------------------------
+        |
+        | WhatsApp ile aynı şekilde ai_bot_id kullanıyoruz.
+        |
+        */
+
         $memoryService->mesajKaydet(
-            userId: $userId,
-            aiBotId: null,
+            userId: $aiBot->user_id,
+            aiBotId: $aiBot->id,
             sessionId: $this->sessionId,
             role: 'user',
             message: $kullaniciMesaji,
@@ -83,17 +174,65 @@ class TestSohbeti extends Page
 
         $this->mesaj = '';
 
-        $gecmis = $memoryService->openAIMesajlariHazirla(
-            userId: $userId,
-            sessionId: $this->sessionId,
-            limit: 20,
-        );
+        /*
+        |--------------------------------------------------------------------------
+        | KONUŞMA GEÇMİŞİNİ HAZIRLA
+        |--------------------------------------------------------------------------
+        |
+        | WhatsApp tarafındaki gibi son 20 mesajı kullanıyoruz.
+        |
+        */
 
-        $yapayZekaCevabi = $openAIService->cevapVer($gecmis);
+        $gecmis =
+            $memoryService->openAIMesajlariHazirla(
+                userId: $aiBot->user_id,
+                sessionId: $this->sessionId,
+                limit: 20,
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | WHATSAPP İLE AYNI YAPAY ZEKÂ MOTORU
+        |--------------------------------------------------------------------------
+        |
+        | EN ÖNEMLİ KISIM BURASI.
+        |
+        | Artık aiBot parametresi null değil.
+        |
+        | Böylece OpenAIService:
+        |
+        | - Firma adını
+        | - Firma açıklamasını
+        | - Yapay zekâ rolünü
+        | - Çalışma saatlerini
+        | - Kargo bilgilerini
+        | - Ödeme bilgilerini
+        | - İade politikasını
+        | - Firma kurallarını
+        | - Özel yapay zekâ talimatlarını
+        | - Ürünleri
+        | - Ürün fiyatlarını
+        | - Stok durumlarını
+        |
+        | WhatsApp'ta olduğu gibi kullanır.
+        |
+        */
+
+        $yapayZekaCevabi =
+            $openAIService->cevapVer(
+                mesajlar: $gecmis,
+                aiBot: $aiBot,
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | YAPAY ZEKÂ CEVABINI HAFIZAYA KAYDET
+        |--------------------------------------------------------------------------
+        */
 
         $memoryService->mesajKaydet(
-            userId: $userId,
-            aiBotId: null,
+            userId: $aiBot->user_id,
+            aiBotId: $aiBot->id,
             sessionId: $this->sessionId,
             role: 'assistant',
             message: $yapayZekaCevabi,
@@ -108,24 +247,52 @@ class TestSohbeti extends Page
     public function sohbetiTemizle(
         MemoryService $memoryService
     ): void {
-        $userId = auth()->id();
+        $user = Filament::auth()->user();
 
-        if ($userId && $this->sessionId !== '') {
+        if (
+            $user
+            && $this->sessionId !== ''
+        ) {
             $memoryService->sohbetiTemizle(
-                userId: $userId,
+                userId: $user->id,
                 sessionId: $this->sessionId,
             );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | YENİ TEST OTURUMU
+        |--------------------------------------------------------------------------
+        */
+
         $this->sessionId =
-            $memoryService->yeniOturumId();
+            'test:'
+            .$this->aiBotId
+            .':'
+            .$memoryService->yeniOturumId();
 
         $this->mesaj = '';
+
+        $aiBot = null;
+
+        if ($user && $this->aiBotId) {
+            $aiBot = AiBot::query()
+                ->where('id', $this->aiBotId)
+                ->where('user_id', $user->id)
+                ->first();
+        }
+
+        $botAdi =
+            $aiBot?->name
+            ?: 'yapay zekâ asistanınız';
 
         $this->mesajlar = [
             [
                 'rol' => 'assistant',
-                'metin' => 'Sohbet temizlendi. Size nasıl yardımcı olabilirim?',
+                'metin' =>
+                    'Sohbet temizlendi. Ben '
+                    .$botAdi
+                    .'. Size nasıl yardımcı olabilirim?',
             ],
         ];
     }
