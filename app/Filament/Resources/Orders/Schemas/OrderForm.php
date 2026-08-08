@@ -35,7 +35,23 @@ class OrderForm
 
                         Select::make('ai_bot_id')
                             ->label('Yapay Zekâ')
-                            ->relationship('aiBot', 'name')
+                            ->relationship(
+                                name: 'aiBot',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: function ($query) {
+                                    $user = auth()->user();
+
+                                    if (! $user) {
+                                        return $query->whereRaw('1 = 0');
+                                    }
+
+                                    if ($user->is_admin) {
+                                        return $query;
+                                    }
+
+                                    return $query->where('user_id', $user->id);
+                                }
+                            )
                             ->searchable()
                             ->preload()
                             ->required(),

@@ -9,10 +9,12 @@ use App\Filament\Resources\Orders\Schemas\OrderForm;
 use App\Filament\Resources\Orders\Tables\OrdersTable;
 use App\Models\Order;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class OrderResource extends Resource
 {
@@ -30,6 +32,39 @@ class OrderResource extends Resource
     protected static ?string $recordTitleAttribute = 'customer_name';
 
     protected static ?int $navigationSort = 2;
+
+    /*
+    |--------------------------------------------------------------------------
+    | MÜŞTERİ İZOLASYONU
+    |--------------------------------------------------------------------------
+    |
+    | Admin:
+    | Tüm müşterilerin siparişlerini görebilir.
+    |
+    | Normal müşteri:
+    | Yalnızca kendi user_id değerine bağlı yapay zekâ botlarının
+    | siparişlerini görebilir.
+    |
+    */
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = Filament::auth()->user();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        return $query->whereHas('aiBot', function (Builder $query) use ($user) {
+            $query->where('user_id', $user->id);
+        });
+    }
 
     public static function form(Schema $schema): Schema
     {

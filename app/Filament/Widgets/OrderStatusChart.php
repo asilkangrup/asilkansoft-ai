@@ -3,7 +3,9 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Order;
+use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Database\Eloquent\Builder;
 
 class OrderStatusChart extends ChartWidget
 {
@@ -12,14 +14,60 @@ class OrderStatusChart extends ChartWidget
     protected ?string $description =
         'Siparişlerin mevcut durumlara göre dağılımı.';
 
+    /*
+    |--------------------------------------------------------------------------
+    | KULLANICIYA AİT SİPARİŞ SORGUSU
+    |--------------------------------------------------------------------------
+    |
+    | Admin tüm siparişleri görür.
+    | Normal müşteri yalnızca kendi yapay zekâ botlarına ait siparişleri görür.
+    |
+    */
+
+    private function ordersQuery(): Builder
+    {
+        $query = Order::query();
+
+        $user = Filament::auth()->user();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        return $query->whereHas('aiBot', function (Builder $query) use ($user) {
+            $query->where('user_id', $user->id);
+        });
+    }
+
     protected function getData(): array
     {
-        $pending = Order::where('status', 'pending')->count();
-        $confirmed = Order::where('status', 'confirmed')->count();
-        $preparing = Order::where('status', 'preparing')->count();
-        $shipped = Order::where('status', 'shipped')->count();
-        $delivered = Order::where('status', 'delivered')->count();
-        $cancelled = Order::where('status', 'cancelled')->count();
+        $pending = $this->ordersQuery()
+            ->where('status', 'pending')
+            ->count();
+
+        $confirmed = $this->ordersQuery()
+            ->where('status', 'confirmed')
+            ->count();
+
+        $preparing = $this->ordersQuery()
+            ->where('status', 'preparing')
+            ->count();
+
+        $shipped = $this->ordersQuery()
+            ->where('status', 'shipped')
+            ->count();
+
+        $delivered = $this->ordersQuery()
+            ->where('status', 'delivered')
+            ->count();
+
+        $cancelled = $this->ordersQuery()
+            ->where('status', 'cancelled')
+            ->count();
 
         return [
             'datasets' => [

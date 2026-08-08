@@ -4,7 +4,9 @@ namespace App\Filament\Widgets;
 
 use App\Models\Order;
 use Carbon\Carbon;
+use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Database\Eloquent\Builder;
 
 class WeeklyRevenueChart extends ChartWidget
 {
@@ -12,6 +14,38 @@ class WeeklyRevenueChart extends ChartWidget
 
     protected ?string $description =
         'Bugün dahil son 7 günde teslim edilen siparişlerden elde edilen ciro.';
+
+    /*
+    |--------------------------------------------------------------------------
+    | KULLANICIYA AİT SİPARİŞ SORGUSU
+    |--------------------------------------------------------------------------
+    |
+    | Admin:
+    | Tüm siparişlerin cirosunu görür.
+    |
+    | Normal müşteri:
+    | Yalnızca kendi yapay zekâ botlarına ait siparişlerin cirosunu görür.
+    |
+    */
+
+    private function ordersQuery(): Builder
+    {
+        $query = Order::query();
+
+        $user = Filament::auth()->user();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        return $query->whereHas('aiBot', function (Builder $query) use ($user) {
+            $query->where('user_id', $user->id);
+        });
+    }
 
     protected function getData(): array
     {
@@ -35,11 +69,11 @@ class WeeklyRevenueChart extends ChartWidget
             | O GÜNÜN CİROSU
             |--------------------------------------------------------------------------
             |
-            | Sadece teslim edilmiş siparişleri ciroya dahil ediyoruz.
+            | Sadece teslim edilmiş siparişler ciroya dahil edilir.
             |
             */
 
-            $revenue = Order::query()
+            $revenue = $this->ordersQuery()
                 ->where('status', 'delivered')
                 ->whereDate('updated_at', $date)
                 ->sum('total_amount');

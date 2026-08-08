@@ -4,69 +4,91 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Orders\OrderResource;
 use App\Models\Order;
+use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Database\Eloquent\Builder;
 
 class OrderStatsOverview extends StatsOverviewWidget
 {
+    /*
+    |--------------------------------------------------------------------------
+    | KULLANICIYA AİT SİPARİŞ SORGUSU
+    |--------------------------------------------------------------------------
+    |
+    | Admin:
+    | Tüm siparişleri görür.
+    |
+    | Normal müşteri:
+    | Yalnızca kendi yapay zekâ botlarına ait siparişleri görür.
+    |
+    */
+
+    private function ordersQuery(): Builder
+    {
+        $query = Order::query();
+
+        $user = Filament::auth()->user();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        return $query->whereHas('aiBot', function (Builder $query) use ($user) {
+            $query->where('user_id', $user->id);
+        });
+    }
+
     protected function getStats(): array
     {
-        $newOrders = Order::where('status', 'pending')->count();
+        $newOrders = $this->ordersQuery()
+            ->where('status', 'pending')
+            ->count();
 
-        $confirmedOrders = Order::where(
-            'status',
-            'confirmed'
-        )->count();
+        $confirmedOrders = $this->ordersQuery()
+            ->where('status', 'confirmed')
+            ->count();
 
-        $preparingOrders = Order::where(
-            'status',
-            'preparing'
-        )->count();
+        $preparingOrders = $this->ordersQuery()
+            ->where('status', 'preparing')
+            ->count();
 
-        $shippedOrders = Order::where(
-            'status',
-            'shipped'
-        )->count();
+        $shippedOrders = $this->ordersQuery()
+            ->where('status', 'shipped')
+            ->count();
 
-        $deliveredOrders = Order::where(
-            'status',
-            'delivered'
-        )->count();
+        $deliveredOrders = $this->ordersQuery()
+            ->where('status', 'delivered')
+            ->count();
 
-        $cancelledOrders = Order::where(
-            'status',
-            'cancelled'
-        )->count();
+        $cancelledOrders = $this->ordersQuery()
+            ->where('status', 'cancelled')
+            ->count();
 
-        $totalOrders = Order::where(
-            'status',
-            '!=',
-            'draft'
-        )->count();
-
-        $todayOrders = Order::whereDate(
-            'created_at',
-            today()
-        )
+        $totalOrders = $this->ordersQuery()
             ->where('status', '!=', 'draft')
             ->count();
 
-        $totalRevenue = Order::where(
-            'status',
-            'delivered'
-        )->sum('total_amount');
+        $todayOrders = $this->ordersQuery()
+            ->whereDate('created_at', today())
+            ->where('status', '!=', 'draft')
+            ->count();
 
-        $todayRevenue = Order::where(
-            'status',
-            'delivered'
-        )
+        $totalRevenue = $this->ordersQuery()
+            ->where('status', 'delivered')
+            ->sum('total_amount');
+
+        $todayRevenue = $this->ordersQuery()
+            ->where('status', 'delivered')
             ->whereDate('updated_at', today())
             ->sum('total_amount');
 
-        $monthlyRevenue = Order::where(
-            'status',
-            'delivered'
-        )
+        $monthlyRevenue = $this->ordersQuery()
+            ->where('status', 'delivered')
             ->whereYear('updated_at', now()->year)
             ->whereMonth('updated_at', now()->month)
             ->sum('total_amount');
@@ -113,9 +135,7 @@ class OrderStatsOverview extends StatsOverviewWidget
 
             Stat::make('Toplam Sipariş', $totalOrders)
                 ->description('Taslaklar hariç toplam sipariş')
-                ->descriptionIcon(
-                    'heroicon-m-clipboard-document-list'
-                )
+                ->descriptionIcon('heroicon-m-clipboard-document-list')
                 ->color('primary')
                 ->url($baseUrl),
 
@@ -134,9 +154,7 @@ class OrderStatsOverview extends StatsOverviewWidget
                     '.'
                 )
             )
-                ->description(
-                    'Bugün teslim edilen siparişlerden'
-                )
+                ->description('Bugün teslim edilen siparişlerden')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('success')
                 ->url($baseUrl.'?status=delivered'),
@@ -150,9 +168,7 @@ class OrderStatsOverview extends StatsOverviewWidget
                     '.'
                 )
             )
-                ->description(
-                    'Bu ay teslim edilen siparişlerden'
-                )
+                ->description('Bu ay teslim edilen siparişlerden')
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color('success')
                 ->url($baseUrl.'?status=delivered'),
@@ -166,12 +182,8 @@ class OrderStatsOverview extends StatsOverviewWidget
                     '.'
                 )
             )
-                ->description(
-                    'Teslim edilen tüm siparişlerden'
-                )
-                ->descriptionIcon(
-                    'heroicon-m-currency-dollar'
-                )
+                ->description('Teslim edilen tüm siparişlerden')
+                ->descriptionIcon('heroicon-m-currency-dollar')
                 ->color('success')
                 ->url($baseUrl.'?status=delivered'),
         ];

@@ -9,10 +9,12 @@ use App\Filament\Resources\Products\Schemas\ProductForm;
 use App\Filament\Resources\Products\Tables\ProductsTable;
 use App\Models\Product;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ProductResource extends Resource
 {
@@ -30,6 +32,35 @@ class ProductResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
 
     protected static ?int $navigationSort = 3;
+
+    /*
+    |--------------------------------------------------------------------------
+    | MÜŞTERİ İZOLASYONU
+    |--------------------------------------------------------------------------
+    |
+    | Admin bütün ürünleri görür.
+    | Normal müşteri yalnızca kendi botlarına ait ürünleri görür.
+    |
+    */
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = Filament::auth()->user();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        return $query->whereHas('aiBot', function (Builder $query) use ($user) {
+            $query->where('user_id', $user->id);
+        });
+    }
 
     public static function form(Schema $schema): Schema
     {

@@ -4,7 +4,9 @@ namespace App\Filament\Widgets;
 
 use App\Models\Order;
 use Carbon\Carbon;
+use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Database\Eloquent\Builder;
 
 class WeeklyOrdersChart extends ChartWidget
 {
@@ -12,6 +14,38 @@ class WeeklyOrdersChart extends ChartWidget
 
     protected ?string $description =
         'Bugün dahil son 7 günde alınan sipariş sayıları.';
+
+    /*
+    |--------------------------------------------------------------------------
+    | KULLANICIYA AİT SİPARİŞ SORGUSU
+    |--------------------------------------------------------------------------
+    |
+    | Admin:
+    | Tüm siparişleri görür.
+    |
+    | Normal müşteri:
+    | Yalnızca kendi yapay zekâ botlarına ait siparişleri görür.
+    |
+    */
+
+    private function ordersQuery(): Builder
+    {
+        $query = Order::query();
+
+        $user = Filament::auth()->user();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        return $query->whereHas('aiBot', function (Builder $query) use ($user) {
+            $query->where('user_id', $user->id);
+        });
+    }
 
     protected function getData(): array
     {
@@ -28,12 +62,6 @@ class WeeklyOrdersChart extends ChartWidget
 
             $date = Carbon::today()->subDays($i);
 
-            /*
-            |--------------------------------------------------------------------------
-            | GRAFİK ALTINDA GÖRÜNECEK TARİH
-            |--------------------------------------------------------------------------
-            */
-
             $labels[] = $date->format('d.m');
 
             /*
@@ -41,11 +69,11 @@ class WeeklyOrdersChart extends ChartWidget
             | O GÜN GELEN SİPARİŞ SAYISI
             |--------------------------------------------------------------------------
             |
-            | draft olan siparişler henüz tamamlanmadığı için sayılmıyor.
+            | Taslak siparişler tamamlanmadığı için dahil edilmez.
             |
             */
 
-            $orderCount = Order::query()
+            $orderCount = $this->ordersQuery()
                 ->whereDate('created_at', $date)
                 ->where('status', '!=', 'draft')
                 ->count();

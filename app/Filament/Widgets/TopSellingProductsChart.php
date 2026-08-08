@@ -3,7 +3,9 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Order;
+use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Database\Eloquent\Builder;
 
 class TopSellingProductsChart extends ChartWidget
 {
@@ -12,19 +14,47 @@ class TopSellingProductsChart extends ChartWidget
     protected ?string $description =
         'Teslim edilen siparişlere göre en çok satılan ürünler.';
 
+    /*
+    |--------------------------------------------------------------------------
+    | KULLANICIYA AİT SİPARİŞ SORGUSU
+    |--------------------------------------------------------------------------
+    |
+    | Admin:
+    | Tüm siparişleri görür.
+    |
+    | Normal müşteri:
+    | Yalnızca kendi yapay zekâ botlarına ait siparişleri görür.
+    |
+    */
+
+    private function ordersQuery(): Builder
+    {
+        $query = Order::query();
+
+        $user = Filament::auth()->user();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        return $query->whereHas('aiBot', function (Builder $query) use ($user) {
+            $query->where('user_id', $user->id);
+        });
+    }
+
     protected function getData(): array
     {
         /*
         |--------------------------------------------------------------------------
         | EN ÇOK SATAN ÜRÜNLER
         |--------------------------------------------------------------------------
-        |
-        | Sadece teslim edilmiş siparişleri dikkate alıyoruz.
-        | En çok sipariş edilen ilk 10 ürünü getiriyoruz.
-        |
         */
 
-        $products = Order::query()
+        $products = $this->ordersQuery()
             ->selectRaw('products, COUNT(*) as total')
             ->where('status', 'delivered')
             ->whereNotNull('products')
