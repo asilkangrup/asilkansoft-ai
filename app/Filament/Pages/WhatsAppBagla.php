@@ -34,15 +34,15 @@ class WhatsAppBagla extends Page
 
     public function baglantiyiYenile(
         WhatsAppService $whatsAppService
-    ): mixed {
-        return $this->baglantiBilgileriniYenile($whatsAppService);
+    ): void {
+        $this->baglantiBilgileriniYenile($whatsAppService);
     }
 
     private function baglantiBilgileriniYenile(
         WhatsAppService $whatsAppService
-    ): mixed {
+    ): void {
         if (blank($this->record->whatsapp_instance)) {
-            return null;
+            return;
         }
 
         try {
@@ -59,21 +59,16 @@ class WhatsAppBagla extends Page
 
                 Notification::make()
                     ->title('WhatsApp başarıyla bağlandı')
-                    ->body(
-                        'Numaranız yapay zekâ sistemine bağlandı.'
-                    )
+                    ->body('Numaranız yapay zekâ sistemine bağlandı.')
                     ->success()
                     ->send();
 
-                /*
-                |--------------------------------------------------------------------------
-                | BAĞLANTI TAMAMLANINCA YAPAY ZEKALAR LİSTESİNE DÖN
-                |--------------------------------------------------------------------------
-                */
-
-                return redirect(
-                    AiBotResource::getUrl('index')
+                $this->redirect(
+                    AiBotResource::getUrl('index'),
+                    navigate: true
                 );
+
+                return;
             }
 
             $qrCode = $whatsAppService->getQrCode(
@@ -87,21 +82,15 @@ class WhatsAppBagla extends Page
 
             $this->record->refresh();
 
-            return null;
-
         } catch (Throwable $exception) {
 
             report($exception);
 
             Notification::make()
                 ->title('WhatsApp durumu alınamadı')
-                ->body(
-                    'Bağlantı kontrol edilirken bir sorun oluştu.'
-                )
+                ->body('Bağlantı kontrol edilirken bir sorun oluştu.')
                 ->danger()
                 ->send();
-
-            return null;
         }
     }
 }
