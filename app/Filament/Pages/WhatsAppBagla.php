@@ -7,6 +7,7 @@ use App\Services\WhatsAppService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
+use Illuminate\Support\Str;
 use Throwable;
 
 class WhatsAppBagla extends Page
@@ -18,13 +19,29 @@ class WhatsAppBagla extends Page
     protected string $view =
         'filament.resources.ai-bots.pages.whatsapp-bagla';
 
+    /*
+    |--------------------------------------------------------------------------
+    | SAYFA AÇILIŞI
+    |--------------------------------------------------------------------------
+    |
+    | Kullanıcı bu sayfaya nereden gelirse gelsin:
+    |
+    | 1. Bot kaydı bulunur.
+    | 2. Evolution instance yoksa otomatik oluşturulur.
+    | 3. Webhook otomatik kurulur.
+    | 4. QR kod hazırlanır.
+    |
+    */
+
     public function mount(
         int|string $record,
         WhatsAppService $whatsAppService
     ): void {
         $this->record = $this->resolveRecord($record);
 
-        $this->baglantiBilgileriniYenile($whatsAppService);
+        $this->whatsappHazirla(
+            $whatsAppService
+        );
     }
 
     public function getTitle(): string
@@ -32,52 +49,232 @@ class WhatsAppBagla extends Page
         return 'WhatsApp Bağlantısı';
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | DURUMU YENİLE
+    |--------------------------------------------------------------------------
+    */
+
     public function baglantiyiYenile(
         WhatsAppService $whatsAppService
     ): void {
-        $this->baglantiBilgileriniYenile($whatsAppService);
+        $this->whatsappHazirla(
+            $whatsAppService
+        );
     }
 
-    private function baglantiBilgileriniYenile(
+    /*
+    |--------------------------------------------------------------------------
+    | WHATSAPP BAĞLANTISINI HAZIRLA
+    |--------------------------------------------------------------------------
+    */
+
+    private function whatsappHazirla(
         WhatsAppService $whatsAppService
     ): void {
-        if (blank($this->record->whatsapp_instance)) {
-            return;
-        }
-
         try {
-            $state = $whatsAppService->connectionState(
-                $this->record->whatsapp_instance
-            );
 
-            if (in_array($state, ['open', 'connected'], true)) {
+            /*
+            |--------------------------------------------------------------------------
+            | KAYDI GÜNCELLE
+            |--------------------------------------------------------------------------
+            */
+
+            $this->record->refresh();
+
+            /*
+            |--------------------------------------------------------------------------
+            | INSTANCE YOKSA OTOMATİK OLUŞTUR
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                blank(
+                    $this->record->whatsapp_instance
+                )
+            ) {
+                $firmaAdi = Str::slug(
+                    $this->record->company_name
+                    ?: $this->record->name
+                );
+
+                $instanceName = trim(
+                    $firmaAdi
+                    .'-'
+                    .$this->record->id,
+                    '-'
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | EVOLUTION INSTANCE OLUŞTUR
+                |--------------------------------------------------------------------------
+                */
+
+                $response =
+                    $whatsAppService
+                        ->createInstance(
+                            $instanceName
+                        );
+
+                /*
+                |--------------------------------------------------------------------------
+                | İLK QR KODU AL
+                |--------------------------------------------------------------------------
+                */
+
+                $qrCode =
+                    data_get(
+                        $response,
+                        'qrcode.base64'
+                    )
+                    ?? data_get(
+                        $response,
+                        'qrcode.code'
+                    )
+                    ?? data_get(
+                        $response,
+                        'base64'
+                    )
+                    ?? data_get(
+                        $response,
+                        'code'
+                    );
+
+                /*
+                |--------------------------------------------------------------------------
+                | BOT KAYDINI GÜNCELLE
+                |--------------------------------------------------------------------------
+                */
 
                 $this->record->update([
-                    'whatsapp_status' => 'connected',
-                    'whatsapp_qr' => null,
+                    'whatsapp_instance' =>
+                        $instanceName,
+
+                    'whatsapp_status' =>
+                        'connecting',
+
+                    'whatsapp_qr' =>
+                        is_string($qrCode)
+                            ? $qrCode
+                            : null,
                 ]);
 
-                Notification::make()
-                    ->title('WhatsApp başarıyla bağlandı')
-                    ->body('Numaranız yapay zekâ sistemine bağlandı.')
-                    ->success()
-                    ->send();
+                /*
+                |--------------------------------------------------------------------------
+                | WEBHOOK'U OTOMATİK KUR
+                |--------------------------------------------------------------------------
+                */
 
-                $this->redirect(
-                    AiBotResource::getUrl('index'),
-                    navigate: true
+                $webhookUrl =
+                    rtrim(
+                        (string) config(
+                            'app.url'
+                        ),
+                        '/'
+                    )
+                    .'/api/whatsapp/webhook';
+
+                $whatsAppService->setWebhook(
+                    $instanceName,
+                    $webhookUrl
                 );
+
+                $this->record->refresh();
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | INSTANCE VARSA WEBHOOK'U GARANTİLE
+            |--------------------------------------------------------------------------
+            |
+            | Eski botlarda webhook boş kalmış olabilir.
+            |
+            */
+
+            if (
+                filled(
+                    $this->record
+                        ->whatsapp_instance
+                )
+            ) {
+                $webhookUrl =
+                    rtrim(
+                        (string) config(
+                            'app.url'
+                        ),
+                        '/'
+                    )
+                    .'/api/whatsapp/webhook';
+
+                $whatsAppService->setWebhook(
+                    $this->record
+                        ->whatsapp_instance,
+                    $webhookUrl
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | BAĞLANTI DURUMUNU KONTROL ET
+            |--------------------------------------------------------------------------
+            */
+
+            $state =
+                $whatsAppService
+                    ->connectionState(
+                        $this->record
+                            ->whatsapp_instance
+                    );
+
+            /*
+            |--------------------------------------------------------------------------
+            | WHATSAPP ZATEN BAĞLI
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                in_array(
+                    $state,
+                    [
+                        'open',
+                        'connected',
+                    ],
+                    true
+                )
+            ) {
+                $this->record->update([
+                    'whatsapp_status' =>
+                        'connected',
+
+                    'whatsapp_qr' =>
+                        null,
+                ]);
+
+                $this->record->refresh();
 
                 return;
             }
 
-            $qrCode = $whatsAppService->getQrCode(
-                $this->record->whatsapp_instance
-            );
+            /*
+            |--------------------------------------------------------------------------
+            | BAĞLI DEĞİLSE QR KOD AL
+            |--------------------------------------------------------------------------
+            */
+
+            $qrCode =
+                $whatsAppService
+                    ->getQrCode(
+                        $this->record
+                            ->whatsapp_instance
+                    );
 
             $this->record->update([
-                'whatsapp_status' => 'connecting',
-                'whatsapp_qr' => $qrCode,
+                'whatsapp_status' =>
+                    'connecting',
+
+                'whatsapp_qr' =>
+                    $qrCode,
             ]);
 
             $this->record->refresh();
@@ -87,9 +284,14 @@ class WhatsAppBagla extends Page
             report($exception);
 
             Notification::make()
-                ->title('WhatsApp durumu alınamadı')
-                ->body('Bağlantı kontrol edilirken bir sorun oluştu.')
+                ->title(
+                    'WhatsApp bağlantısı hazırlanamadı'
+                )
+                ->body(
+                    $exception->getMessage()
+                )
                 ->danger()
+                ->persistent()
                 ->send();
         }
     }
