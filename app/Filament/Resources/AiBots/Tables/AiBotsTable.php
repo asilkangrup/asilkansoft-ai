@@ -13,6 +13,7 @@ use Filament\Notifications\Notification;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -22,6 +23,7 @@ class AiBotsTable
     {
         return $table
             ->columns([
+
                 TextColumn::make('name')
                     ->label('Yapay Zekâ')
                     ->searchable()
@@ -40,11 +42,13 @@ class AiBotsTable
 
                 BadgeColumn::make('whatsapp_status')
                     ->label('WhatsApp Durumu')
-                    ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        'connected' => 'Bağlı',
-                        'connecting' => 'QR Bekleniyor',
-                        default => 'Bağlı Değil',
-                    })
+                    ->formatStateUsing(
+                        fn (?string $state): string => match ($state) {
+                            'connected' => 'Bağlı',
+                            'connecting' => 'QR Bekleniyor',
+                            default => 'Bağlı Değil',
+                        }
+                    )
                     ->colors([
                         'success' => 'connected',
                         'warning' => 'connecting',
@@ -53,11 +57,13 @@ class AiBotsTable
 
                 BadgeColumn::make('status')
                     ->label('Bot Durumu')
-                    ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        'active' => 'Aktif',
-                        'passive' => 'Pasif',
-                        default => 'Taslak',
-                    })
+                    ->formatStateUsing(
+                        fn (?string $state): string => match ($state) {
+                            'active' => 'Aktif',
+                            'passive' => 'Pasif',
+                            default => 'Taslak',
+                        }
+                    )
                     ->colors([
                         'success' => 'active',
                         'danger' => 'passive',
@@ -66,92 +72,185 @@ class AiBotsTable
 
                 TextColumn::make('openai_model')
                     ->label('Model')
-                    ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        'gpt-5' => 'GPT-5',
-                        'gpt-5-mini' => 'GPT-5 Mini',
-                        default => $state ?? 'GPT-5 Mini',
-                    }),
+                    ->formatStateUsing(
+                        fn (?string $state): string => match ($state) {
+                            'gpt-5' => 'GPT-5',
+                            'gpt-5-mini' => 'GPT-5 Mini',
+                            default => $state ?? 'GPT-5 Mini',
+                        }
+                    ),
 
                 TextColumn::make('created_at')
                     ->label('Oluşturulma')
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
             ])
+
             ->filters([])
+
             ->recordActions([
+
                 Action::make('whatsappBagla')
-                    ->label(fn (AiBot $record): string =>
-                        $record->whatsapp_status === 'connected'
-                            ? 'WhatsApp Durumu'
-                            : 'WhatsApp Bağla'
+                    ->label(
+                        fn (AiBot $record): string =>
+                            $record->whatsapp_status === 'connected'
+                                ? 'WhatsApp Durumu'
+                                : 'WhatsApp Bağla'
                     )
-                    ->icon('heroicon-o-qr-code')
-                    ->color('success')
+                    ->icon(
+                        fn (AiBot $record): string =>
+                            $record->whatsapp_status === 'connected'
+                                ? 'heroicon-o-check-circle'
+                                : 'heroicon-o-qr-code'
+                    )
+                    ->color(
+                        fn (AiBot $record): string =>
+                            $record->whatsapp_status === 'connected'
+                                ? 'success'
+                                : 'warning'
+                    )
+
                     ->action(function (AiBot $record): mixed {
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | AYNI BOT İÇİN ÇİFT TIKLAMA KİLİDİ
+                        |--------------------------------------------------------------------------
+                        */
+
+                        $lock = Cache::lock(
+                            'whatsapp-connect-ai-bot-'.$record->id,
+                            15
+                        );
+
+                        if (! $lock->get()) {
+
+                            Notification::make()
+                                ->title('Bağlantı işlemi devam ediyor')
+                                ->body(
+                                    'WhatsApp bağlantısı hazırlanıyor. Lütfen birkaç saniye bekleyin.'
+                                )
+                                ->warning()
+                                ->send();
+
+                            return null;
+                        }
+
                         try {
+
                             /*
-                             * Daha önce instance oluşturulmadıysa
-                             * Evolution API üzerinde oluşturuyoruz.
-                             */
-                            if (blank($record->whatsapp_instance)) {
-                                $firmaAdi = Str::slug(
-                                    $record->company_name ?: $record->name
+                            |--------------------------------------------------------------------------
+                            | KAYDI YENİDEN OKU
+                            |--------------------------------------------------------------------------
+                            |
+                            | İlk tıklama DB'yi güncellemiş olabilir.
+                            |
+                            */
+
+                            $record->refresh();
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | INSTANCE ZATEN VARSA TEKRAR OLUŞTURMA
+                            |--------------------------------------------------------------------------
+                            */
+
+                            if (filled($record->whatsapp_instance)) {
+
+                                return redirect(
+                                    AiBotResource::getUrl('whatsapp', [
+                                        'record' => $record,
+                                    ])
                                 );
-
-                                $instanceName = trim(
-                                    $firmaAdi . '-' . $record->id,
-                                    '-'
-                                );
-
-                                $response = app(WhatsAppService::class)
-                                    ->createInstance($instanceName);
-
-                                $qrCode = data_get($response, 'qrcode.base64')
-                                    ?? data_get($response, 'qrcode.code')
-                                    ?? data_get($response, 'base64')
-                                    ?? data_get($response, 'code');
-
-                                $record->update([
-                                    'whatsapp_instance' => $instanceName,
-                                    'whatsapp_status' => 'connecting',
-                                    'whatsapp_qr' => is_string($qrCode)
-                                        ? $qrCode
-                                        : null,
-                                ]);
                             }
 
                             /*
-                             * Instance zaten varsa tekrar oluşturmuyoruz.
-                             * Doğrudan WhatsApp QR sayfasına gidiyoruz.
-                             */
+                            |--------------------------------------------------------------------------
+                            | INSTANCE ADI
+                            |--------------------------------------------------------------------------
+                            */
+
+                            $firmaAdi = Str::slug(
+                                $record->company_name ?: $record->name
+                            );
+
+                            $instanceName = trim(
+                                $firmaAdi.'-'.$record->id,
+                                '-'
+                            );
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | EVOLUTION INSTANCE OLUŞTUR
+                            |--------------------------------------------------------------------------
+                            */
+
+                            $response = app(WhatsAppService::class)
+                                ->createInstance($instanceName);
+
+                            $qrCode =
+                                data_get($response, 'qrcode.base64')
+                                ?? data_get($response, 'qrcode.code')
+                                ?? data_get($response, 'base64')
+                                ?? data_get($response, 'code');
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | DB'YE KAYDET
+                            |--------------------------------------------------------------------------
+                            */
+
+                            $record->update([
+                                'whatsapp_instance' => $instanceName,
+                                'whatsapp_status' => 'connecting',
+                                'whatsapp_qr' => is_string($qrCode)
+                                    ? $qrCode
+                                    : null,
+                            ]);
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | BAĞLANTI SAYFASINA GİT
+                            |--------------------------------------------------------------------------
+                            */
+
                             return redirect(
                                 AiBotResource::getUrl('whatsapp', [
                                     'record' => $record,
                                 ])
                             );
+
                         } catch (Throwable $exception) {
+
                             report($exception);
 
                             Notification::make()
                                 ->title('WhatsApp bağlantısı açılamadı')
-                                ->body($exception->getMessage())
+                                ->body(
+                                    'Bağlantı sırasında bir sorun oluştu. Lütfen tekrar deneyin.'
+                                )
                                 ->danger()
-                                ->persistent()
                                 ->send();
 
                             return null;
+
+                        } finally {
+
+                            $lock->release();
                         }
                     }),
 
                 EditAction::make()
                     ->label('Düzenle'),
             ])
+
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
                         ->label('Seçilenleri Sil'),
                 ]),
             ])
+
             ->defaultSort('created_at', 'desc');
     }
 }
