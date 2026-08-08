@@ -17,6 +17,24 @@ class CreateAiBot extends CreateRecord
 
     protected static string $resource = AiBotResource::class;
 
+    /*
+    |--------------------------------------------------------------------------
+    | "OLUŞTUR & YENİ OLUŞTUR" BUTONUNU KALDIR
+    |--------------------------------------------------------------------------
+    |
+    | Müşteri onboarding sırasında tek bot oluştursun.
+    | Gereksiz ikinci buton kafa karıştırmasın.
+    |
+    */
+
+    protected static bool $canCreateAnother = false;
+
+    /*
+    |--------------------------------------------------------------------------
+    | WIZARD ADIMLARI
+    |--------------------------------------------------------------------------
+    */
+
     protected function getSteps(): array
     {
         return [
@@ -293,7 +311,7 @@ class CreateAiBot extends CreateRecord
     {
         $data['user_id'] = auth()->id();
 
-        // Teknik model seçimini müşteriye göstermiyoruz.
+        // Teknik OpenAI model seçimini müşteriye göstermiyoruz.
         $data['openai_model'] = 'gpt-5-mini';
 
         return $data;
@@ -301,12 +319,27 @@ class CreateAiBot extends CreateRecord
 
     /*
     |--------------------------------------------------------------------------
-    | ADIMLAR SIRAYLA İLERLESİN
+    | ADIM ATLAMAYI KAPAT
     |--------------------------------------------------------------------------
     */
 
     public function hasSkippableSteps(): bool
     {
         return false;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KAYIT SONRASI
+    |--------------------------------------------------------------------------
+    |
+    | Bot oluşturulduğunda müşteriyi direkt düzenleme ekranına değil,
+    | Kurulum Merkezi'ne geri gönderiyoruz.
+    |
+    */
+
+    protected function getRedirectUrl(): string
+    {
+        return route('filament.admin.pages.kurulum-merkezi');
     }
 }
