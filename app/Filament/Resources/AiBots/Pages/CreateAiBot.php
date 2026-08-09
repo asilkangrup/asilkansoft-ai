@@ -70,17 +70,6 @@ class CreateAiBot extends CreateRecord
                         ->tel()
                         ->maxLength(30),
 
-                    TextInput::make('website')
-                        ->label('Web Sitesi')
-                        ->placeholder('https://firmaniz.com')
-                        ->url()
-                        ->maxLength(255),
-
-                    TextInput::make('instagram')
-                        ->label('Instagram')
-                        ->placeholder('@firmaniz')
-                        ->maxLength(255),
-
                     FileUpload::make('logo_path')
                         ->label('Firma Logosu')
                         ->image()

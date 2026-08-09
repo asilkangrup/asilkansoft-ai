@@ -8,6 +8,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 
 class Register extends BaseRegister
 {
@@ -73,11 +74,26 @@ class Register extends BaseRegister
                     ->placeholder('ornek@firma.com')
                     ->email()
                     ->required()
+                    ->maxLength(255)
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function ($state, $set): void {
+                        if (blank($state)) {
+                            return;
+                        }
+
+                        $set(
+                            'email',
+                            Str::lower(trim((string) $state))
+                        );
+                    })
+                    ->dehydrateStateUsing(
+                        fn ($state): string =>
+                            Str::lower(trim((string) $state))
+                    )
                     ->unique(
                         table: 'users',
                         column: 'email'
-                    )
-                    ->maxLength(255),
+                    ),
 
                 TextInput::make('password')
                     ->label('Şifre')
@@ -109,6 +125,8 @@ class Register extends BaseRegister
     protected function handleRegistration(
         array $data
     ): Model {
+        $data['name'] = trim($data['name']);
+        $data['email'] = Str::lower(trim($data['email']));
         $data['is_admin'] = false;
 
         return $this->getUserModel()::create(
