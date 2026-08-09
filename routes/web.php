@@ -2,6 +2,14 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+/*
+|--------------------------------------------------------------------------
+| ANA SAYFA
+|--------------------------------------------------------------------------
+|
+| wai.asilkansoft.com.tr açıldığında kullanıcıyı
+| doğrudan AsilkanSoft AI paneline yönlendir.
+|
+*/
+
+Route::redirect('/', '/admin');
