@@ -22,6 +22,31 @@ class ConversationFollowUp extends Model
         'second_follow_up_sent_at',
 
         'is_active',
+
+        /*
+        |--------------------------------------------------------------------------
+        | İNSAN DEVRALMA
+        |--------------------------------------------------------------------------
+        |
+        | false = Bu müşteriyle AI konuşabilir.
+        | true  = İşletme sahibi bu konuşmayı devraldı, AI sessiz kalır.
+        |
+        */
+
+        'human_takeover',
+
+        /*
+        |--------------------------------------------------------------------------
+        | SON AI MESAJ ID
+        |--------------------------------------------------------------------------
+        |
+        | Evolution API üzerinden AI'ın gönderdiği son mesajın ID'si.
+        | fromMe=true webhook'larında bunun AI mı insan mı olduğunu ayırmak için
+        | kullanılacak.
+        |
+        */
+
+        'last_ai_message_id',
     ];
 
     protected $casts = [
@@ -34,6 +59,7 @@ class ConversationFollowUp extends Model
         'second_follow_up_sent_at' => 'datetime',
 
         'is_active' => 'boolean',
+        'human_takeover' => 'boolean',
     ];
 
     public function user(): BelongsTo
