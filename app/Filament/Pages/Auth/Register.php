@@ -7,9 +7,55 @@ use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 
 class Register extends BaseRegister
 {
+    /*
+    |--------------------------------------------------------------------------
+    | SAYFA BAŞLIĞI
+    |--------------------------------------------------------------------------
+    */
+
+    public function getHeading(): string
+    {
+        return 'WhatsApp Yapay Zekânı Ücretsiz Dene';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ALT BAŞLIK
+    |--------------------------------------------------------------------------
+    */
+
+    public function getSubheading(): string|HtmlString|null
+    {
+        return new HtmlString(
+            '
+            <div style="
+                margin-top: 8px;
+                text-align: center;
+                line-height: 1.7;
+                color: #6b7280;
+                font-size: 14px;
+            ">
+                <strong style="color:#111827;">
+                    30 WhatsApp AI cevabı ücretsiz.
+                </strong>
+                <br>
+                Kredi kartı gerekmez. Hesabını oluştur, yapay zekânı kur,
+                canlı test et ve WhatsApp numaranı bağla.
+            </div>
+            '
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KAYIT FORMU
+    |--------------------------------------------------------------------------
+    */
+
     public function form(Schema $schema): Schema
     {
         return $schema
@@ -54,21 +100,27 @@ class Register extends BaseRegister
             ]);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | KAYIT OLAN HERKES MÜŞTERİ
+    |--------------------------------------------------------------------------
+    */
+
     protected function handleRegistration(
         array $data
     ): Model {
-        /*
-        |--------------------------------------------------------------------------
-        | KAYIT OLAN HERKES MÜŞTERİ
-        |--------------------------------------------------------------------------
-        */
-
         $data['is_admin'] = false;
 
         return $this->getUserModel()::create(
             $data
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KAYIT SONRASI
+    |--------------------------------------------------------------------------
+    */
 
     protected function getRedirectUrl(): string
     {

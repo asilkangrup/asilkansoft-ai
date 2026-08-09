@@ -5,12 +5,20 @@
         display: grid;
         grid-template-columns: minmax(0, 1.55fr) minmax(340px, .85fr);
         gap: 20px;
-        align-items: start;
+
+        /*
+        |--------------------------------------------------------------------------
+        | İKİ KART AYNI YÜKSEKLİK
+        |--------------------------------------------------------------------------
+        */
+
+        align-items: stretch;
     }
 
     .studio-main,
     .studio-side {
         min-width: 0;
+        display: flex;
     }
 
     .studio-hero {
@@ -19,8 +27,17 @@
         border-radius: 22px;
         color: #fff;
         background:
-            radial-gradient(circle at top right, rgba(59,130,246,.35), transparent 30%),
-            linear-gradient(135deg, #111827 0%, #172554 55%, #1e3a8a 100%);
+            radial-gradient(
+                circle at top right,
+                rgba(59,130,246,.35),
+                transparent 30%
+            ),
+            linear-gradient(
+                135deg,
+                #111827 0%,
+                #172554 55%,
+                #1e3a8a 100%
+            );
         box-shadow: 0 16px 40px rgba(15,23,42,.14);
     }
 
@@ -49,8 +66,15 @@
         line-height: 1.7;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ORTAK KART YAPISI
+    |--------------------------------------------------------------------------
+    */
+
     .chat-card,
     .settings-card {
+        width: 100%;
         overflow: hidden;
         border: 1px solid #e5e7eb;
         border-radius: 22px;
@@ -58,7 +82,23 @@
         box-shadow: 0 8px 25px rgba(15,23,42,.06);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | SOL SOHBET KARTI
+    |--------------------------------------------------------------------------
+    |
+    | Sağdaki ayar kartının yüksekliğini otomatik takip eder.
+    |
+    */
+
+    .chat-card {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
     .chat-head {
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -79,6 +119,7 @@
         height: 43px;
         align-items: center;
         justify-content: center;
+        flex-shrink: 0;
         border-radius: 13px;
         background: #eff6ff;
         font-size: 21px;
@@ -108,9 +149,19 @@
         cursor: pointer;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | MESAJ ALANI
+    |--------------------------------------------------------------------------
+    |
+    | Kart ne kadar büyürse bu bölüm boşluğu doldurur.
+    | Çok fazla mesaj olduğunda yalnızca mesaj alanı scroll olur.
+    |
+    */
+
     .messages {
+        flex: 1 1 auto;
         min-height: 470px;
-        max-height: 600px;
         overflow-y: auto;
         padding: 20px;
         background: #f8fafc;
@@ -151,11 +202,19 @@
         color: #1f2937;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | MESAJ YAZMA ALANI
+    |--------------------------------------------------------------------------
+    */
+
     .compose {
+        flex-shrink: 0;
         display: flex;
         gap: 10px;
         padding: 15px;
         border-top: 1px solid #e5e7eb;
+        background: #fff;
     }
 
     .compose-input {
@@ -188,7 +247,20 @@
         cursor: pointer;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | SAĞ AYAR KARTI
+    |--------------------------------------------------------------------------
+    */
+
+    .settings-card {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
     .settings-header {
+        flex-shrink: 0;
         padding: 18px 20px;
         border-bottom: 1px solid #e5e7eb;
         background: #f9fafb;
@@ -208,10 +280,22 @@
         line-height: 1.5;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ÖNEMLİ DEĞİŞİKLİK
+    |--------------------------------------------------------------------------
+    |
+    | Sağ panel artık kendi içinde scroll olmayacak.
+    | Tüm ayarlar normal şekilde aşağı doğru açılacak.
+    |
+    */
+
     .settings-body {
-        max-height: 670px;
-        overflow-y: auto;
+        flex: 1 1 auto;
         padding: 18px;
+
+        max-height: none;
+        overflow: visible;
     }
 
     .field {
@@ -285,7 +369,17 @@
         font-size: 11px;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | SAĞ ALT BUTONLAR
+    |--------------------------------------------------------------------------
+    |
+    | Artık scroll içinde gizlenmeyecek.
+    |
+    */
+
     .settings-actions {
+        flex-shrink: 0;
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -339,17 +433,46 @@
         line-height: 1.6;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | TABLET / MOBİL
+    |--------------------------------------------------------------------------
+    */
+
     @media (max-width: 1000px) {
         .studio-layout {
             grid-template-columns: 1fr;
         }
 
-        .settings-body {
-            max-height: none;
+        .studio-main,
+        .studio-side {
+            display: block;
+        }
+
+        .chat-card,
+        .settings-card {
+            height: auto;
+        }
+
+        .messages {
+            min-height: 420px;
+            max-height: 600px;
         }
     }
 
     @media (max-width: 650px) {
+        .studio-hero {
+            padding: 20px;
+        }
+
+        .studio-title {
+            font-size: 23px;
+        }
+
+        .chat-head {
+            align-items: flex-start;
+        }
+
         .compose {
             flex-direction: column;
         }
@@ -364,6 +487,7 @@
         }
     }
 </style>
+
 
 <div class="studio-hero">
 
@@ -400,6 +524,7 @@
                     </div>
 
                     <div>
+
                         <p class="chat-name">
                             {{ $botName ?: 'Yapay Zekâ Asistanı' }}
                         </p>
@@ -407,6 +532,7 @@
                         <p class="chat-company">
                             {{ $companyName ?: 'Firma bilgisi girilmedi' }}
                         </p>
+
                     </div>
 
                 </div>
@@ -431,17 +557,21 @@
                     @if ($mesajKaydi['rol'] === 'user')
 
                         <div class="message-row user">
+
                             <div class="message user">
                                 {{ $mesajKaydi['metin'] }}
                             </div>
+
                         </div>
 
                     @else
 
                         <div class="message-row bot">
+
                             <div class="message bot">
                                 {{ $mesajKaydi['metin'] }}
                             </div>
+
                         </div>
 
                     @endif
@@ -481,6 +611,7 @@
                     wire:target="mesajGonder"
                     class="send-button"
                 >
+
                     <span
                         wire:loading.remove
                         wire:target="mesajGonder"
@@ -494,6 +625,7 @@
                     >
                         Bekleyin...
                     </span>
+
                 </button>
 
             </form>
@@ -509,6 +641,7 @@
         <div class="settings-card">
 
             <div class="settings-header">
+
                 <h3>
                     ⚙️ Canlı Yapay Zekâ Ayarları
                 </h3>
@@ -516,19 +649,24 @@
                 <p>
                     Değişikliklerinizi kaydedin ve yeni ayarları hemen test edin.
                 </p>
+
             </div>
 
 
             <div class="settings-body">
 
                 <div class="update-info">
+
                     <strong>Nasıl çalışır?</strong><br>
+
                     Bilgileri değiştir → Ayarları Kaydet ve Testi Yenile →
                     sohbet sıfırlansın → yeni ayarlarla tekrar konuş.
+
                 </div>
 
 
                 <div class="field">
+
                     <label class="field-label">
                         Yapay Zekâ Adı
                     </label>
@@ -538,10 +676,12 @@
                         wire:model="botName"
                         class="studio-input"
                     >
+
                 </div>
 
 
                 <div class="field">
+
                     <label class="field-label">
                         Firma Adı
                     </label>
@@ -551,10 +691,12 @@
                         wire:model="companyName"
                         class="studio-input"
                     >
+
                 </div>
 
 
                 <div class="field">
+
                     <label class="field-label">
                         Yapay Zekâ Rolü
                     </label>
@@ -563,6 +705,7 @@
                         wire:model="role"
                         class="studio-select"
                     >
+
                         <option value="sales">
                             Satış Uzmanı
                         </option>
@@ -578,11 +721,14 @@
                         <option value="assistant">
                             Sekreter / Asistan
                         </option>
+
                     </select>
+
                 </div>
 
 
                 <div class="field">
+
                     <label class="field-label">
                         Firma Hakkında
                     </label>
@@ -596,10 +742,12 @@
                     <div class="field-help">
                         Yapay zekâ firmanızı anlatırken bu bilgileri kullanır.
                     </div>
+
                 </div>
 
 
                 <div class="field">
+
                     <label class="field-label">
                         Çalışma Saatleri
                     </label>
@@ -609,10 +757,12 @@
                         class="studio-textarea"
                         rows="3"
                     ></textarea>
+
                 </div>
 
 
                 <div class="field">
+
                     <label class="field-label">
                         Kargo / Teslimat / Hizmet Bölgesi
                     </label>
@@ -622,10 +772,12 @@
                         class="studio-textarea"
                         rows="5"
                     ></textarea>
+
                 </div>
 
 
                 <div class="field">
+
                     <label class="field-label">
                         Ödeme Bilgileri
                     </label>
@@ -635,10 +787,12 @@
                         class="studio-textarea"
                         rows="4"
                     ></textarea>
+
                 </div>
 
 
                 <div class="field">
+
                     <label class="field-label">
                         İade / Değişim / İptal
                     </label>
@@ -648,10 +802,12 @@
                         class="studio-textarea"
                         rows="4"
                     ></textarea>
+
                 </div>
 
 
                 <div class="field">
+
                     <label class="field-label">
                         Özel Firma Kuralları
                     </label>
@@ -666,10 +822,12 @@
                         Örn: Fiyat uydurma, kesin teslimat sözü verme,
                         stok bilgisini tahmin etme.
                     </div>
+
                 </div>
 
 
                 <div class="field">
+
                     <label class="field-label">
                         Konuşma ve Satış Talimatları
                     </label>
@@ -683,6 +841,7 @@
                     <div class="field-help">
                         Yapay zekânın müşterilerle nasıl konuşmasını istediğinizi yazın.
                     </div>
+
                 </div>
 
 
@@ -691,6 +850,7 @@
                     <div class="switch-row">
 
                         <div>
+
                             <div class="switch-title">
                                 Otomatik Takip
                             </div>
@@ -698,6 +858,7 @@
                             <div class="switch-text">
                                 Cevap vermeyen müşterilere hatırlatma gönder.
                             </div>
+
                         </div>
 
                         <input
@@ -713,6 +874,7 @@
                 @if ($followUpEnabled)
 
                     <div class="field">
+
                         <label class="field-label">
                             1. Hatırlatma Süresi
                         </label>
@@ -721,6 +883,7 @@
                             wire:model="firstFollowUpMinutes"
                             class="studio-select"
                         >
+
                             <option value="60">1 Saat</option>
                             <option value="120">2 Saat</option>
                             <option value="180">3 Saat</option>
@@ -731,11 +894,14 @@
                             <option value="4320">3 Gün</option>
                             <option value="7200">5 Gün</option>
                             <option value="10080">7 Gün</option>
+
                         </select>
+
                     </div>
 
 
                     <div class="field">
+
                         <label class="field-label">
                             1. Hatırlatma Mesajı
                         </label>
@@ -745,6 +911,7 @@
                             class="studio-textarea"
                             rows="4"
                         ></textarea>
+
                     </div>
 
 
@@ -753,6 +920,7 @@
                         <div class="switch-row">
 
                             <div>
+
                                 <div class="switch-title">
                                     2. Hatırlatma
                                 </div>
@@ -760,6 +928,7 @@
                                 <div class="switch-text">
                                     İkinci ve son takip mesajını gönder.
                                 </div>
+
                             </div>
 
                             <input
@@ -775,6 +944,7 @@
                     @if ($secondFollowUpEnabled)
 
                         <div class="field">
+
                             <label class="field-label">
                                 2. Hatırlatma Süresi
                             </label>
@@ -783,6 +953,7 @@
                                 wire:model="secondFollowUpMinutes"
                                 class="studio-select"
                             >
+
                                 <option value="1440">1 Gün</option>
                                 <option value="2880">2 Gün</option>
                                 <option value="4320">3 Gün</option>
@@ -791,11 +962,14 @@
                                 <option value="10080">7 Gün</option>
                                 <option value="14400">10 Gün</option>
                                 <option value="20160">14 Gün</option>
+
                             </select>
+
                         </div>
 
 
                         <div class="field">
+
                             <label class="field-label">
                                 2. ve Son Hatırlatma Mesajı
                             </label>
@@ -805,6 +979,7 @@
                                 class="studio-textarea"
                                 rows="4"
                             ></textarea>
+
                         </div>
 
                     @endif
@@ -823,6 +998,7 @@
                     wire:target="ayarlariKaydet"
                     class="save-button"
                 >
+
                     <span
                         wire:loading.remove
                         wire:target="ayarlariKaydet"
@@ -836,6 +1012,7 @@
                     >
                         Ayarlar kaydediliyor...
                     </span>
+
                 </button>
 
 
@@ -846,6 +1023,7 @@
                     wire:target="whatsappBaglantisinaGec"
                     class="approve-button"
                 >
+
                     <span
                         wire:loading.remove
                         wire:target="whatsappBaglantisinaGec"
@@ -859,6 +1037,7 @@
                     >
                         WhatsApp'a geçiliyor...
                     </span>
+
                 </button>
 
             </div>

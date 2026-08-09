@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
 use App\Http\Middleware\RedirectIncompleteSetup;
 use Filament\Http\Middleware\Authenticate;
@@ -32,11 +33,21 @@ class AdminPanelProvider extends PanelProvider
 
             /*
             |--------------------------------------------------------------------------
+            | MARKA
+            |--------------------------------------------------------------------------
+            */
+
+            ->brandName('ASILKANSOFT AI')
+
+            /*
+            |--------------------------------------------------------------------------
             | GİRİŞ / KAYIT
             |--------------------------------------------------------------------------
             */
 
-            ->login()
+            ->login(
+                Login::class
+            )
 
             ->registration(
                 Register::class
