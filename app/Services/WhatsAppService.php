@@ -5,6 +5,7 @@ namespace App\Services;
 use Exception;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class WhatsAppService
 {
@@ -251,6 +252,27 @@ class WhatsAppService
             );
         }
 
-        return $response->json();
+        $data = $response->json();
+
+        /*
+        |--------------------------------------------------------------------------
+        | GEÇİCİ TEST LOGU
+        |--------------------------------------------------------------------------
+        |
+        | Evolution API'nin gönderilen mesaj için hangi yapıda mesaj ID'si
+        | döndürdüğünü tespit etmek amacıyla geçici olarak kullanıyoruz.
+        |
+        | Test tamamlandıktan sonra bu log kaldırılacak.
+        |
+        */
+
+        Log::info(
+            'Evolution sendText test response',
+            [
+                'response' => $data,
+            ]
+        );
+
+        return $data;
     }
 }
