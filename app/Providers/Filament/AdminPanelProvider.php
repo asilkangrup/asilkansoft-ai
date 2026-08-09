@@ -13,6 +13,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -20,6 +21,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -31,19 +33,9 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
 
-            /*
-            |--------------------------------------------------------------------------
-            | MARKA
-            |--------------------------------------------------------------------------
-            */
-
-            ->brandName('ASILKANSOFT AI')
-
-            /*
-            |--------------------------------------------------------------------------
-            | GİRİŞ / KAYIT
-            |--------------------------------------------------------------------------
-            */
+            ->brandName(
+                'ASILKANSOFT AI'
+            )
 
             ->login(
                 Login::class
@@ -53,21 +45,27 @@ class AdminPanelProvider extends PanelProvider
                 Register::class
             )
 
-            /*
-            |--------------------------------------------------------------------------
-            | PANEL RENGİ
-            |--------------------------------------------------------------------------
-            */
-
             ->colors([
                 'primary' => Color::Amber,
             ])
 
             /*
             |--------------------------------------------------------------------------
-            | RESOURCES
+            | GLOBAL DENEME / KREDİ BARI
             |--------------------------------------------------------------------------
+            |
+            | Bot WhatsApp'a bağlandıktan sonra tüm Filament sayfalarının
+            | en üstünde görünür.
+            |
             */
+
+            ->renderHook(
+                PanelsRenderHook::CONTENT_START,
+                fn (): string =>
+                    Blade::render(
+                        "@include('filament.partials.trial-bar')"
+                    )
+            )
 
             ->discoverResources(
                 in: app_path(
@@ -75,12 +73,6 @@ class AdminPanelProvider extends PanelProvider
                 ),
                 for: 'App\Filament\Resources'
             )
-
-            /*
-            |--------------------------------------------------------------------------
-            | SAYFALAR
-            |--------------------------------------------------------------------------
-            */
 
             ->discoverPages(
                 in: app_path(
@@ -92,12 +84,6 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
             ])
-
-            /*
-            |--------------------------------------------------------------------------
-            | WIDGETS
-            |--------------------------------------------------------------------------
-            */
 
             ->discoverWidgets(
                 in: app_path(
@@ -111,12 +97,6 @@ class AdminPanelProvider extends PanelProvider
                 FilamentInfoWidget::class,
             ])
 
-            /*
-            |--------------------------------------------------------------------------
-            | GENEL MIDDLEWARE
-            |--------------------------------------------------------------------------
-            */
-
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -128,12 +108,6 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
-
-            /*
-            |--------------------------------------------------------------------------
-            | AUTH MIDDLEWARE
-            |--------------------------------------------------------------------------
-            */
 
             ->authMiddleware([
                 Authenticate::class,
