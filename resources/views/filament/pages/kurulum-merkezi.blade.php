@@ -714,25 +714,17 @@
 
                         @if ($trialCompleted)
 
-                            <div class="trial-remaining">
-                                Ücretsiz kullanım hakkınız tamamlandı.
-                            </div>
+    <a
+        href="https://wa.me/905392389098?text={{ urlencode('Merhaba, WhatsApp Yapay Zeka paketini satın almak istiyorum. Paketler hakkında bilgi alabilir miyim?') }}"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="buy-button"
+    >
+        Paketi Satın Al
+        <span>→</span>
+    </a>
 
-                            <div class="trial-info">
-                                WhatsApp bağlantınız korunur. Paket aktif edildiğinde yapay zekâ yeniden cevap vermeye başlar.
-                            </div>
-
-                        @else
-
-                            <div class="trial-remaining">
-                                {{ $trialMessagesRemaining }} ücretsiz AI cevabı kaldı
-                            </div>
-
-                            <div class="trial-info">
-                                Sayaç yalnızca WhatsApp üzerinden başarıyla gönderilen yapay zekâ cevaplarında azalır.
-                            </div>
-
-                        @endif
+@endif
 
                     </div>
 
