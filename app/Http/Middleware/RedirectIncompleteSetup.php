@@ -12,8 +12,10 @@ class RedirectIncompleteSetup
     /**
      * Handle an incoming request.
      */
-    public function handle(Request $request, Closure $next): Response
-    {
+    public function handle(
+        Request $request,
+        Closure $next
+    ): Response {
         $user = $request->user();
 
         /*
@@ -28,11 +30,8 @@ class RedirectIncompleteSetup
 
         /*
         |--------------------------------------------------------------------------
-        | ADMINLERİ YÖNLENDİRME
+        | ADMİNLERİ HİÇ YÖNLENDİRME
         |--------------------------------------------------------------------------
-        |
-        | Admin normal dashboard'a gider.
-        |
         */
 
         if ($user->is_admin) {
@@ -41,11 +40,10 @@ class RedirectIncompleteSetup
 
         /*
         |--------------------------------------------------------------------------
-        | SADECE PANEL ANA SAYFASINDA KONTROL ET
+        | SADECE PANEL ANA SAYFASINDA ÇALIŞ
         |--------------------------------------------------------------------------
         |
-        | Böylece müşteri Bot Oluştur, Ürün Ekle veya WhatsApp Bağla
-        | sayfalarına girdiğinde tekrar Kurulum Merkezi'ne atılmaz.
+        | Bot, ürün, sipariş, test sohbeti gibi sayfalara dokunmuyoruz.
         |
         */
 
@@ -55,7 +53,29 @@ class RedirectIncompleteSetup
 
         /*
         |--------------------------------------------------------------------------
-        | MÜŞTERİNİN YAPAY ZEKÂ BOTUNU BUL
+        | BU OTURUMDA YÖNLENDİRME ZATEN YAPILDIYSA PANELİ AÇ
+        |--------------------------------------------------------------------------
+        |
+        | Böylece müşteri Kurulum Merkezi'ne gönderildikten sonra
+        | sol menüden "Panel"e bastığında tekrar yönlendirilmez.
+        |
+        */
+
+        $sessionKey =
+            'setup_redirect_done_user_'.$user->id;
+
+        if (
+            $request->session()->get(
+                $sessionKey,
+                false
+            )
+        ) {
+            return $next($request);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | MÜŞTERİNİN SON BOTUNU BUL
         |--------------------------------------------------------------------------
         */
 
@@ -65,43 +85,52 @@ class RedirectIncompleteSetup
 
         /*
         |--------------------------------------------------------------------------
-        | KURULUM ADIMLARINI KONTROL ET
+        | TEMEL KURULUM DURUMU
         |--------------------------------------------------------------------------
+        |
+        | Ürün ve otomatik takip zorunlu değil.
+        |
+        | Temel kurulum:
+        | - Bot oluşturuldu
+        | - Firma bilgileri tamam
+        | - WhatsApp bağlı
+        |
         */
 
-        $botCreated = (bool) $bot;
+        $botCreated =
+            (bool) $bot;
 
-        $companyCompleted = $bot
+        $companyCompleted =
+            $bot
             && filled($bot->company_name)
             && filled($bot->company_description);
 
-        $whatsappConnected = $bot
+        $whatsappConnected =
+            $bot
             && $bot->whatsapp_status === 'connected';
-
-        $productsAdded = $bot
-            && $bot->products()->exists();
-
-        $followUpConfigured = $bot
-            && $bot->follow_up_enabled
-            && filled($bot->first_follow_up_minutes)
-            && filled($bot->first_follow_up_message);
-
-        /*
-        |--------------------------------------------------------------------------
-        | KURULUM TAMAMLANDI MI?
-        |--------------------------------------------------------------------------
-        */
 
         $setupCompleted =
             $botCreated
             && $companyCompleted
-            && $whatsappConnected
-            && $productsAdded
-            && $followUpConfigured;
+            && $whatsappConnected;
 
         /*
         |--------------------------------------------------------------------------
-        | EKSİKSE KURULUM MERKEZİNE GÖNDER
+        | BU OTURUM İÇİN İLK KONTROL TAMAMLANDI
+        |--------------------------------------------------------------------------
+        |
+        | Bunu redirect'ten ÖNCE kaydediyoruz.
+        |
+        */
+
+        $request->session()->put(
+            $sessionKey,
+            true
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | KURULUM EKSİKSE İLK GİRİŞTE KURULUM MERKEZİNE GÖNDER
         |--------------------------------------------------------------------------
         */
 
@@ -113,7 +142,7 @@ class RedirectIncompleteSetup
 
         /*
         |--------------------------------------------------------------------------
-        | TAMAMSA NORMAL DASHBOARD'A DEVAM
+        | KURULUM TAMAMSA NORMAL PANEL
         |--------------------------------------------------------------------------
         */
 

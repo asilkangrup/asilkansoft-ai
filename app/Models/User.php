@@ -29,17 +29,50 @@ class User extends Authenticatable implements FilamentUser
 
     /*
     |--------------------------------------------------------------------------
+    | MODEL BAŞLATMA
+    |--------------------------------------------------------------------------
+    |
+    | Yeni kullanıcı oluşturulurken is_admin değeri özellikle verilmediyse
+    | otomatik olarak müşteri hesabı oluşturulur.
+    |
+    | Böylece Filament kayıt ekranından kendi hesabını açan kullanıcılar
+    | hiçbir zaman varsayılan olarak admin olmaz.
+    |
+    */
+
+    protected static function booted(): void
+    {
+        static::creating(function (User $user): void {
+            if ($user->is_admin === null) {
+                $user->is_admin = false;
+            }
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | FILAMENT PANEL ERİŞİMİ
     |--------------------------------------------------------------------------
     |
-    | Hem admin hem müşteri paneli kullanabilir.
-    | Hangi verileri görebileceklerini Resource tarafında ayıracağız.
+    | Hem admin hem müşteri aynı Filament paneline giriş yapabilir.
+    | Veri izolasyonu Resource / Query tarafında uygulanır.
     |
     */
 
     public function canAccessPanel(Panel $panel): bool
     {
         return true;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN Mİ?
+    |--------------------------------------------------------------------------
+    */
+
+    public function isAdmin(): bool
+    {
+        return (bool) $this->is_admin;
     }
 
     /*

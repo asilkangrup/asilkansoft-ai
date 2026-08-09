@@ -5,7 +5,7 @@ namespace App\Filament\Resources\Users\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -17,22 +17,28 @@ class UsersTable
             ->columns([
 
                 TextColumn::make('name')
-                    ->label('Ad Soyad / Firma Yetkilisi')
+                    ->label('Ad Soyad')
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('email')
                     ->label('E-posta')
                     ->searchable()
-                    ->copyable()
-                    ->sortable(),
+                    ->sortable()
+                    ->copyable(),
 
-                IconColumn::make('is_admin')
-                    ->label('Yönetici')
-                    ->boolean()
-                    ->trueIcon('heroicon-o-shield-check')
-                    ->falseIcon('heroicon-o-user')
-                    ->sortable(),
+                BadgeColumn::make('is_admin')
+                    ->label('Hesap Türü')
+                    ->formatStateUsing(
+                        fn (bool $state): string =>
+                            $state
+                                ? 'Admin'
+                                : 'Müşteri'
+                    )
+                    ->colors([
+                        'danger' => true,
+                        'success' => false,
+                    ]),
 
                 TextColumn::make('ai_bots_count')
                     ->label('Yapay Zekâ Sayısı')
@@ -45,9 +51,7 @@ class UsersTable
                     ->sortable(),
             ])
 
-            ->filters([
-                //
-            ])
+            ->filters([])
 
             ->recordActions([
                 EditAction::make()
@@ -57,20 +61,13 @@ class UsersTable
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
-                        ->label('Seçilenleri Sil')
-                        ->before(function ($records) {
-                            $adminId = auth()->id();
-
-                            if ($records->contains('id', $adminId)) {
-                                abort(
-                                    403,
-                                    'Kendi yönetici hesabınızı silemezsiniz.'
-                                );
-                            }
-                        }),
+                        ->label('Seçilenleri Sil'),
                 ]),
             ])
 
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort(
+                'created_at',
+                'desc'
+            );
     }
 }

@@ -109,12 +109,6 @@
         transition: width .4s ease;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | DENEME / PAKET KARTI
-    |--------------------------------------------------------------------------
-    */
-
     .trial-card {
         position: relative;
         overflow: hidden;
@@ -292,12 +286,6 @@
         font-weight: 800;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | KURULUM TAMAMLANDI
-    |--------------------------------------------------------------------------
-    */
-
     .setup-complete {
         display: flex;
         gap: 14px;
@@ -332,12 +320,6 @@
         color: #15803d;
         font-size: 13px;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | KURULUM ADIMLARI
-    |--------------------------------------------------------------------------
-    */
 
     .section-heading {
         margin: 4px 0 0;
@@ -472,12 +454,6 @@
         color: #374151 !important;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | DESTEK
-    |--------------------------------------------------------------------------
-    */
-
     .support-card {
         display: flex;
         align-items: center;
@@ -567,10 +543,8 @@
     }
 </style>
 
-
 <div class="setup-wrap">
 
-    {{-- ÜST KARŞILAMA --}}
     <section class="setup-hero">
 
         <div class="setup-hero-inner">
@@ -591,7 +565,6 @@
                 </p>
 
             </div>
-
 
             <div class="progress-card">
 
@@ -630,8 +603,6 @@
 
     </section>
 
-
-    {{-- ÜCRETSİZ DENEME / PAKET --}}
     @if ($bot)
 
         <section
@@ -666,7 +637,6 @@
 
                 </div>
 
-
                 <div class="trial-number">
 
                     @if ($subscriptionActive)
@@ -695,7 +665,6 @@
 
             </div>
 
-
             @if (! $subscriptionActive)
 
                 <div class="trial-progress-track">
@@ -707,32 +676,41 @@
 
                 </div>
 
-
                 <div class="trial-footer">
 
                     <div>
 
                         @if ($trialCompleted)
 
-    <a
-        href="https://wa.me/905392389098?text={{ urlencode('Merhaba, WhatsApp Yapay Zeka paketini satın almak istiyorum. Paketler hakkında bilgi alabilir miyim?') }}"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="buy-button"
-    >
-        Paketi Satın Al
-        <span>→</span>
-    </a>
+                            <div class="trial-remaining">
+                                Ücretsiz kullanım hakkınız tamamlandı.
+                            </div>
 
-@endif
+                            <div class="trial-info">
+                                WhatsApp bağlantınız korunur. Paketinizi aktifleştirdiğinizde
+                                yapay zekâ müşterilerinize yeniden cevap vermeye başlar.
+                            </div>
+
+                        @else
+
+                            <div class="trial-remaining">
+                                {{ $trialMessagesRemaining }} ücretsiz AI cevabı kaldı
+                            </div>
+
+                            <div class="trial-info">
+                                Sayaç yalnızca WhatsApp üzerinden başarıyla gönderilen yapay zekâ cevaplarında azalır.
+                            </div>
+
+                        @endif
 
                     </div>
-
 
                     @if ($trialCompleted)
 
                         <a
-                            href="#"
+                            href="https://wa.me/905382399098?text={{ urlencode('Merhaba, WhatsApp Yapay Zeka paketini satın almak istiyorum. Paketler hakkında bilgi alabilir miyim?') }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
                             class="buy-button"
                         >
                             Paketi Satın Al
@@ -771,8 +749,6 @@
 
     @endif
 
-
-    {{-- KURULUM TAMAMLANDI --}}
     @if ($progress === 100)
 
         <div class="setup-complete">
@@ -797,8 +773,6 @@
 
     @endif
 
-
-    {{-- KURULUM ADIMLARI --}}
     <div class="section-heading">
 
         <h2>
@@ -810,7 +784,6 @@
         </p>
 
     </div>
-
 
     <div class="steps-grid">
 
@@ -830,21 +803,17 @@
 
                 </div>
 
-
                 <div class="step-number">
                     Adım {{ $index + 1 }}
                 </div>
-
 
                 <h3 class="step-title">
                     {{ $step['title'] }}
                 </h3>
 
-
                 <p class="step-description">
                     {{ $step['description'] }}
                 </p>
-
 
                 <a
                     class="step-action"
@@ -863,8 +832,6 @@
 
     </div>
 
-
-    {{-- DESTEK --}}
     <div class="support-card">
 
         <div>

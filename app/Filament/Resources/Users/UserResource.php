@@ -31,71 +31,123 @@ class UserResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 50;
 
     /*
     |--------------------------------------------------------------------------
-    | SADECE ADMIN ERİŞEBİLİR
+    | SADECE ADMIN MENÜDE GÖRSÜN
     |--------------------------------------------------------------------------
     */
 
-    public static function canAccess(): bool
+    public static function shouldRegisterNavigation(): bool
     {
         $user = Filament::auth()->user();
 
-        return (bool) ($user?->is_admin);
+        return $user
+            ? (bool) $user->is_admin
+            : false;
     }
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        return static::canAccess();
-    }
-
-    public static function getEloquentQuery(): Builder
-    {
-        $query = parent::getEloquentQuery();
-
-        if (! static::canAccess()) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        return $query;
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | SADECE ADMIN RESOURCE'A ERİŞSİN
+    |--------------------------------------------------------------------------
+    */
 
     public static function canViewAny(): bool
     {
-        return static::canAccess();
+        $user = Filament::auth()->user();
+
+        return $user
+            ? (bool) $user->is_admin
+            : false;
     }
 
     public static function canCreate(): bool
     {
-        return static::canAccess();
+        $user = Filament::auth()->user();
+
+        return $user
+            ? (bool) $user->is_admin
+            : false;
     }
 
     public static function canEdit($record): bool
     {
-        return static::canAccess();
+        $user = Filament::auth()->user();
+
+        return $user
+            ? (bool) $user->is_admin
+            : false;
     }
 
     public static function canDelete($record): bool
     {
-        return static::canAccess();
+        $user = Filament::auth()->user();
+
+        return $user
+            ? (bool) $user->is_admin
+            : false;
     }
+
+    public static function canDeleteAny(): bool
+    {
+        $user = Filament::auth()->user();
+
+        return $user
+            ? (bool) $user->is_admin
+            : false;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN İSTERSE TÜM KULLANICILARI GÖRÜR
+    |--------------------------------------------------------------------------
+    */
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FORM
+    |--------------------------------------------------------------------------
+    */
 
     public static function form(Schema $schema): Schema
     {
         return UserForm::configure($schema);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | TABLO
+    |--------------------------------------------------------------------------
+    */
+
     public static function table(Table $table): Table
     {
         return UsersTable::configure($table);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | RELATIONS
+    |--------------------------------------------------------------------------
+    */
+
     public static function getRelations(): array
     {
         return [];
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SAYFALAR
+    |--------------------------------------------------------------------------
+    */
 
     public static function getPages(): array
     {

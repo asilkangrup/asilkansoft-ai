@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Register;
 use App\Http\Middleware\RedirectIncompleteSetup;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -28,29 +29,83 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+
+            /*
+            |--------------------------------------------------------------------------
+            | GİRİŞ / KAYIT
+            |--------------------------------------------------------------------------
+            */
+
             ->login()
+
+            ->registration(
+                Register::class
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | PANEL RENGİ
+            |--------------------------------------------------------------------------
+            */
+
             ->colors([
                 'primary' => Color::Amber,
             ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | RESOURCES
+            |--------------------------------------------------------------------------
+            */
+
             ->discoverResources(
-                in: app_path('Filament/Resources'),
+                in: app_path(
+                    'Filament/Resources'
+                ),
                 for: 'App\Filament\Resources'
             )
+
+            /*
+            |--------------------------------------------------------------------------
+            | SAYFALAR
+            |--------------------------------------------------------------------------
+            */
+
             ->discoverPages(
-                in: app_path('Filament/Pages'),
+                in: app_path(
+                    'Filament/Pages'
+                ),
                 for: 'App\Filament\Pages'
             )
+
             ->pages([
                 Dashboard::class,
             ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | WIDGETS
+            |--------------------------------------------------------------------------
+            */
+
             ->discoverWidgets(
-                in: app_path('Filament/Widgets'),
+                in: app_path(
+                    'Filament/Widgets'
+                ),
                 for: 'App\Filament\Widgets'
             )
+
             ->widgets([
                 AccountWidget::class,
                 FilamentInfoWidget::class,
             ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | GENEL MIDDLEWARE
+            |--------------------------------------------------------------------------
+            */
+
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -62,6 +117,13 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | AUTH MIDDLEWARE
+            |--------------------------------------------------------------------------
+            */
+
             ->authMiddleware([
                 Authenticate::class,
                 RedirectIncompleteSetup::class,
