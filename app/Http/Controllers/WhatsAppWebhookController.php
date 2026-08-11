@@ -4,10 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\AiBot;
 use App\Models\ConversationFollowUp;
+use App\Models\FinanceLead;
+use App\Services\FinanceLeadExtractorService;
+use App\Services\FinanceLeadService;
 use App\Services\MemoryService;
 use App\Services\OpenAIService;
 use App\Services\OrderService;
 use App\Services\WhatsAppService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -21,7 +25,9 @@ class WhatsAppWebhookController extends Controller
         MemoryService $memoryService,
         OpenAIService $openAIService,
         WhatsAppService $whatsAppService,
-        OrderService $orderService
+        OrderService $orderService,
+        FinanceLeadService $financeLeadService,
+        FinanceLeadExtractorService $financeLeadExtractorService
     ): JsonResponse {
         try {
             $payload = $request->all();
@@ -174,13 +180,6 @@ class WhatsAppWebhookController extends Controller
             |--------------------------------------------------------------------------
             | ABONELİK / 30 MESAJLIK DENEME KONTROLÜ
             |--------------------------------------------------------------------------
-            |
-            | Test sohbeti burada çalışmadığı için bu sayaç yalnızca gerçek
-            | WhatsApp kullanımında devreye girer.
-            |
-            | Deneme sona erdiyse müşteriye "satın alın" mesajı GÖNDERMİYORUZ.
-            | İşletme sahibine satın alma ekranını panelde göstereceğiz.
-            |
             */
 
             if (
@@ -282,93 +281,221 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | MEVCUT TASLAK SİPARİŞİ BUL
+            | KREDİ REHBERİM / BOT 13 FİNANS BAŞVURU TAKİBİ
             |--------------------------------------------------------------------------
-            */
-
-            $order =
-                $orderService->taslakSiparisiGetir(
-                    aiBotId: $aiBot->id,
-                    sessionId: $sessionId,
-                );
-
-            /*
-            |--------------------------------------------------------------------------
-            | SATIN ALMA NİYETİ VARSA TASLAK OLUŞTUR
-            |--------------------------------------------------------------------------
+            |
+            | Bu bölüm sadece Bot 13 için çalışır.
+            |
+            | Şimdilik yalnızca konuşmayı analiz eder ve finance_leads
+            | tablosuna bilgileri yazar.
+            |
+            | Grup JID bilgileri henüz tanımlı olmadığı için WhatsApp
+            | grubuna mesaj gönderilmez.
+            |
             */
 
             if (
-                ! $order
-                && $this->satinAlmaNiyetiVarMi(
-                    $message
-                )
+                $financeLeadService->aktifMi($aiBot)
             ) {
-                $order =
-                    $orderService
-                        ->taslakSiparisOlustur(
-                            aiBotId:
-                                $aiBot->id,
+                $financeHistory =
+                    $memoryService
+                        ->openAIMesajlariHazirla(
+                            userId:
+                                $aiBot->user_id,
 
                             sessionId:
                                 $sessionId,
 
-                            whatsappNumber:
-                                $phoneNumber,
+                            limit:
+                                30,
                         );
+
+                $extractedFinanceData =
+                    $financeLeadExtractorService
+                        ->extract(
+                            aiBot:
+                                $aiBot,
+
+                            messages:
+                                $financeHistory,
+                        );
+
+                $this->financeLeadKaydet(
+                    aiBot:
+                        $aiBot,
+
+                    sessionId:
+                        $sessionId,
+
+                    whatsappNumber:
+                        $phoneNumber,
+
+                    data:
+                        $extractedFinanceData,
+
+                    financeLeadService:
+                        $financeLeadService,
+                );
             }
 
             /*
             |--------------------------------------------------------------------------
-            | SİPARİŞ AKIŞI
+            | NORMAL SİPARİŞ SİSTEMİ
             |--------------------------------------------------------------------------
+            |
+            | Finans botunda normal ürün / sipariş sistemi çalıştırılmaz.
+            |
+            | Böylece müşterinin:
+            | "limit istiyorum"
+            | "almak istiyorum"
+            | vb. ifadeleri yanlışlıkla ürün siparişi oluşturmaz.
+            |
             */
 
-            if ($order) {
-
+            if (
+                ! $financeLeadService->aktifMi($aiBot)
+            ) {
                 /*
                 |--------------------------------------------------------------------------
-                | GELEN MESAJDAN SİPARİŞ BİLGİLERİNİ YAKALA
+                | MEVCUT TASLAK SİPARİŞİ BUL
                 |--------------------------------------------------------------------------
                 */
 
                 $order =
-                    $orderService
-                        ->mesajdanSiparisiGuncelle(
-                            order: $order,
-                            message: $message,
-                            aiBot: $aiBot,
-                        );
+                    $orderService->taslakSiparisiGetir(
+                        aiBotId:
+                            $aiBot->id,
+
+                        sessionId:
+                            $sessionId,
+                    );
 
                 /*
                 |--------------------------------------------------------------------------
-                | MÜŞTERİ ONAY VERDİYSE
+                | SATIN ALMA NİYETİ VARSA TASLAK OLUŞTUR
                 |--------------------------------------------------------------------------
                 */
 
                 if (
-                    $orderService
-                        ->onayMesajiMi($message)
+                    ! $order
+                    && $this->satinAlmaNiyetiVarMi(
+                        $message
+                    )
                 ) {
+                    $order =
+                        $orderService
+                            ->taslakSiparisOlustur(
+                                aiBotId:
+                                    $aiBot->id,
+
+                                sessionId:
+                                    $sessionId,
+
+                                whatsappNumber:
+                                    $phoneNumber,
+                            );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | SİPARİŞ AKIŞI
+                |--------------------------------------------------------------------------
+                */
+
+                if ($order) {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | GELEN MESAJDAN SİPARİŞ BİLGİLERİNİ YAKALA
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $order =
+                        $orderService
+                            ->mesajdanSiparisiGuncelle(
+                                order:
+                                    $order,
+
+                                message:
+                                    $message,
+
+                                aiBot:
+                                    $aiBot,
+                            );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | MÜŞTERİ ONAY VERDİYSE
+                    |--------------------------------------------------------------------------
+                    */
+
                     if (
                         $orderService
-                            ->siparisTamamlanmayaHazirMi(
-                                $order
+                            ->onayMesajiMi(
+                                $message
                             )
                     ) {
-                        $order =
+                        if (
                             $orderService
-                                ->siparisiOnayla(
-                                    $order
-                                );
-
-                        $answer =
-                            "✅ Siparişiniz başarıyla alındı.\n\n"
-                            .$orderService
-                                ->siparisOzeti(
+                                ->siparisTamamlanmayaHazirMi(
                                     $order
                                 )
-                            ."\n\nSiparişiniz firmaya iletildi.";
+                        ) {
+                            $order =
+                                $orderService
+                                    ->siparisiOnayla(
+                                        $order
+                                    );
+
+                            $answer =
+                                "✅ Siparişiniz başarıyla alındı.\n\n"
+                                .$orderService
+                                    ->siparisOzeti(
+                                        $order
+                                    )
+                                ."\n\nSiparişiniz firmaya iletildi.";
+
+                            $this->cevabiKaydetVeGonder(
+                                memoryService:
+                                    $memoryService,
+
+                                whatsAppService:
+                                    $whatsAppService,
+
+                                aiBot:
+                                    $aiBot,
+
+                                sessionId:
+                                    $sessionId,
+
+                                instanceName:
+                                    $instanceName,
+
+                                phoneNumber:
+                                    $phoneNumber,
+
+                                answer:
+                                    $answer,
+                            );
+
+                            return response()->json([
+                                'success' => true,
+                                'message' =>
+                                    'Sipariş onaylandı.',
+                            ]);
+                        }
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | EKSİK BİLGİ VARKEN ONAY VERDİYSE
+                        |--------------------------------------------------------------------------
+                        */
+
+                        $answer =
+                            $orderService
+                                ->siradakiEksikSoru(
+                                    $order
+                                )
+                            ?? 'Sipariş bilgileriniz henüz tamamlanmadı.';
 
                         $this->cevabiKaydetVeGonder(
                             memoryService:
@@ -396,143 +523,101 @@ class WhatsAppWebhookController extends Controller
                         return response()->json([
                             'success' => true,
                             'message' =>
-                                'Sipariş onaylandı.',
+                                'Eksik sipariş bilgisi istendi.',
                         ]);
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | EKSİK BİLGİ VARKEN ONAY VERDİYSE
+                    | TÜM BİLGİLER TAMAMSA ÖZET GÖNDER
                     |--------------------------------------------------------------------------
                     */
 
-                    $answer =
+                    if (
+                        $orderService
+                            ->siparisTamamlanmayaHazirMi(
+                                $order
+                            )
+                    ) {
+                        $answer =
+                            $orderService
+                                ->siparisOzeti(
+                                    $order
+                                )
+                            ."\n\nBilgiler doğruysa sadece *Onaylıyorum* yazabilirsiniz.";
+
+                        $this->cevabiKaydetVeGonder(
+                            memoryService:
+                                $memoryService,
+
+                            whatsAppService:
+                                $whatsAppService,
+
+                            aiBot:
+                                $aiBot,
+
+                            sessionId:
+                                $sessionId,
+
+                            instanceName:
+                                $instanceName,
+
+                            phoneNumber:
+                                $phoneNumber,
+
+                            answer:
+                                $answer,
+                        );
+
+                        return response()->json([
+                            'success' => true,
+                            'message' =>
+                                'Sipariş özeti gönderildi.',
+                        ]);
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | EKSİK BİLGİ VARSA SADECE SIRADAKİNİ SOR
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $nextQuestion =
                         $orderService
                             ->siradakiEksikSoru(
                                 $order
-                            )
-                        ?? 'Sipariş bilgileriniz henüz tamamlanmadı.';
+                            );
 
-                    $this->cevabiKaydetVeGonder(
-                        memoryService:
-                            $memoryService,
+                    if ($nextQuestion) {
+                        $this->cevabiKaydetVeGonder(
+                            memoryService:
+                                $memoryService,
 
-                        whatsAppService:
-                            $whatsAppService,
+                            whatsAppService:
+                                $whatsAppService,
 
-                        aiBot:
-                            $aiBot,
+                            aiBot:
+                                $aiBot,
 
-                        sessionId:
-                            $sessionId,
+                            sessionId:
+                                $sessionId,
 
-                        instanceName:
-                            $instanceName,
+                            instanceName:
+                                $instanceName,
 
-                        phoneNumber:
-                            $phoneNumber,
+                            phoneNumber:
+                                $phoneNumber,
 
-                        answer:
-                            $answer,
-                    );
-
-                    return response()->json([
-                        'success' => true,
-                        'message' =>
-                            'Eksik sipariş bilgisi istendi.',
-                    ]);
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | TÜM BİLGİLER TAMAMSA ÖZET GÖNDER
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    $orderService
-                        ->siparisTamamlanmayaHazirMi(
-                            $order
-                        )
-                ) {
-                    $answer =
-                        $orderService
-                            ->siparisOzeti(
-                                $order
-                            )
-                        ."\n\nBilgiler doğruysa sadece *Onaylıyorum* yazabilirsiniz.";
-
-                    $this->cevabiKaydetVeGonder(
-                        memoryService:
-                            $memoryService,
-
-                        whatsAppService:
-                            $whatsAppService,
-
-                        aiBot:
-                            $aiBot,
-
-                        sessionId:
-                            $sessionId,
-
-                        instanceName:
-                            $instanceName,
-
-                        phoneNumber:
-                            $phoneNumber,
-
-                        answer:
-                            $answer,
-                    );
-
-                    return response()->json([
-                        'success' => true,
-                        'message' =>
-                            'Sipariş özeti gönderildi.',
-                    ]);
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | EKSİK BİLGİ VARSA SADECE SIRADAKİNİ SOR
-                |--------------------------------------------------------------------------
-                */
-
-                $nextQuestion =
-                    $orderService
-                        ->siradakiEksikSoru(
-                            $order
+                            answer:
+                                $nextQuestion,
                         );
 
-                if ($nextQuestion) {
-                    $this->cevabiKaydetVeGonder(
-                        memoryService:
-                            $memoryService,
-
-                        whatsAppService:
-                            $whatsAppService,
-
-                        aiBot:
-                            $aiBot,
-
-                        sessionId:
-                            $sessionId,
-
-                        instanceName:
-                            $instanceName,
-
-                        phoneNumber:
-                            $phoneNumber,
-
-                        answer:
-                            $nextQuestion,
-                    );
-
-                    return response()->json([
-                        'success' => true,
-                        'message' =>
-                            'Sıradaki sipariş bilgisi istendi.',
-                    ]);
+                        return response()->json([
+                            'success' => true,
+                            'message' =>
+                                'Sıradaki sipariş bilgisi istendi.',
+                        ]);
+                    }
                 }
             }
 
@@ -557,8 +642,11 @@ class WhatsAppWebhookController extends Controller
 
             $answer =
                 $openAIService->cevapVer(
-                    mesajlar: $history,
-                    aiBot: $aiBot,
+                    mesajlar:
+                        $history,
+
+                    aiBot:
+                        $aiBot,
                 );
 
             $this->cevabiKaydetVeGonder(
@@ -591,7 +679,6 @@ class WhatsAppWebhookController extends Controller
             ]);
 
         } catch (Throwable $exception) {
-
             Log::error(
                 'WhatsApp AI webhook hatası',
                 [
@@ -616,6 +703,268 @@ class WhatsAppWebhookController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | BOT 13 FİNANS BAŞVURUSUNU KAYDET / GÜNCELLE
+    |--------------------------------------------------------------------------
+    */
+
+    private function financeLeadKaydet(
+        AiBot $aiBot,
+        string $sessionId,
+        string $whatsappNumber,
+        array $data,
+        FinanceLeadService $financeLeadService
+    ): void {
+        $type =
+            $data['type']
+            ?? null;
+
+        /*
+        |--------------------------------------------------------------------------
+        | BAŞVURU TÜRÜ HENÜZ BELLİ DEĞİL
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            ! is_string($type)
+            || trim($type) === ''
+        ) {
+            return;
+        }
+
+        $type =
+            trim($type);
+
+        /*
+        |--------------------------------------------------------------------------
+        | MEVCUT KAYDI BUL / YENİ KAYIT HAZIRLA
+        |--------------------------------------------------------------------------
+        */
+
+        $lead =
+            FinanceLead::firstOrNew([
+                'ai_bot_id' =>
+                    $aiBot->id,
+
+                'session_id' =>
+                    $sessionId,
+
+                'type' =>
+                    $type,
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | SABİT BİLGİLER
+        |--------------------------------------------------------------------------
+        */
+
+        $lead->user_id =
+            $aiBot->user_id;
+
+        $lead->whatsapp_number =
+            $whatsappNumber;
+
+        /*
+        |--------------------------------------------------------------------------
+        | AI TARAFINDAN ÇIKARILAN BİLGİLER
+        |--------------------------------------------------------------------------
+        |
+        | Null gelen değerlerle daha önce kaydedilmiş doğru bilgileri silmiyoruz.
+        |
+        */
+
+        $fields = [
+            'name',
+            'phone',
+            'city',
+            'line_owner',
+            'mother_maiden_surname',
+            'limit_score',
+            'tc_identity_number',
+            'limit',
+        ];
+
+        foreach ($fields as $field) {
+            $value =
+                $data[$field]
+                ?? null;
+
+            if (
+                $value !== null
+                && trim((string) $value) !== ''
+            ) {
+                $lead->{$field} =
+                    trim(
+                        (string) $value
+                    );
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | DOĞUM TARİHİ
+        |--------------------------------------------------------------------------
+        */
+
+        $birthDate =
+            $this->dogumTarihiniNormalizeEt(
+                $data['birth_date']
+                ?? null
+            );
+
+        if ($birthDate !== null) {
+            $lead->birth_date =
+                $birthDate;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | GRUP JID
+        |--------------------------------------------------------------------------
+        |
+        | QR bağlanana kadar FinanceLeadService null döndürür.
+        |
+        */
+
+        $groupJid =
+            $financeLeadService
+                ->groupJid(
+                    $type
+                );
+
+        if (
+            is_string($groupJid)
+            && trim($groupJid) !== ''
+        ) {
+            $lead->group_jid =
+                trim($groupJid);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | BAŞVURU TAMAM MI?
+        |--------------------------------------------------------------------------
+        */
+
+        $birthDateValue = null;
+
+        if ($lead->birth_date) {
+            try {
+                $birthDateValue =
+                    Carbon::parse(
+                        $lead->birth_date
+                    )->format('d/m/Y');
+            } catch (Throwable) {
+                $birthDateValue = null;
+            }
+        }
+
+        $leadData = [
+            'name' =>
+                $lead->name,
+
+            'phone' =>
+                $lead->phone,
+
+            'city' =>
+                $lead->city,
+
+            'line_owner' =>
+                $lead->line_owner,
+
+            'mother_maiden_surname' =>
+                $lead->mother_maiden_surname,
+
+            'limit_score' =>
+                $lead->limit_score,
+
+            'birth_date' =>
+                $birthDateValue,
+
+            'tc_identity_number' =>
+                $lead->tc_identity_number,
+
+            'limit' =>
+                $lead->limit,
+        ];
+
+        $lead->status =
+            $financeLeadService
+                ->tamamlandiMi(
+                    type:
+                        $type,
+
+                    data:
+                        $leadData,
+                )
+            ? 'ready'
+            : 'collecting';
+
+        $lead->save();
+
+        /*
+        |--------------------------------------------------------------------------
+        | GRUP GÖNDERİMİ ŞİMDİLİK KAPALI
+        |--------------------------------------------------------------------------
+        |
+        | QR bağlandıktan sonra 5 grubun gerçek JID bilgilerini ekleyeceğiz.
+        | Ardından yalnızca status=ready ve sent_to_group_at=null kayıtları
+        | doğru WhatsApp grubuna göndereceğiz.
+        |
+        */
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DOĞUM TARİHİNİ VERİTABANI FORMATINA ÇEVİR
+    |--------------------------------------------------------------------------
+    */
+
+    private function dogumTarihiniNormalizeEt(
+        mixed $value
+    ): ?string {
+        if ($value === null) {
+            return null;
+        }
+
+        $value =
+            trim(
+                (string) $value
+            );
+
+        if ($value === '') {
+            return null;
+        }
+
+        $formats = [
+            'd/m/Y',
+            'd.m.Y',
+            'd-m-Y',
+            'Y-m-d',
+        ];
+
+        foreach ($formats as $format) {
+            try {
+                $date =
+                    Carbon::createFromFormat(
+                        $format,
+                        $value
+                    );
+
+                if ($date !== false) {
+                    return $date
+                        ->format('Y-m-d');
+                }
+            } catch (Throwable) {
+                // Diğer tarih formatını dene.
+            }
+        }
+
+        return null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | CEVABI WHATSAPP'TAN GÖNDER, HAFIZAYA KAYDET VE SAYACI ARTIR
     |--------------------------------------------------------------------------
     */
@@ -633,9 +982,6 @@ class WhatsAppWebhookController extends Controller
         |--------------------------------------------------------------------------
         | ÖNCE WHATSAPP'TAN BAŞARIYLA GÖNDER
         |--------------------------------------------------------------------------
-        |
-        | Mesaj gönderilemezse ücretsiz deneme kotasından düşürmüyoruz.
-        |
         */
 
         $whatsAppService->sendText(
@@ -676,10 +1022,6 @@ class WhatsAppWebhookController extends Controller
         |--------------------------------------------------------------------------
         | ÜCRETSİZ DENEME SAYACINI ARTIR
         |--------------------------------------------------------------------------
-        |
-        | Sadece trial kullanıcılarında çalışır.
-        | Ücretli müşterilerin kullanımını bu sayaç etkilemez.
-        |
         */
 
         if (
