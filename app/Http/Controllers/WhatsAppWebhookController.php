@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -66,6 +67,63 @@ class WhatsAppWebhookController extends Controller
                     'ignored' => true,
                     'reason' => 'from_me',
                 ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | AYNI WHATSAPP MESAJINI SADECE BİR KEZ İŞLE
+            |--------------------------------------------------------------------------
+            */
+
+            $messageId = trim(
+                (string) data_get(
+                    $payload,
+                    'data.key.id',
+                    ''
+                )
+            );
+
+            if ($messageId !== '') {
+                $duplicateCacheKey =
+                    'whatsapp_webhook_message:'
+                    .sha1(
+                        (string) data_get(
+                            $payload,
+                            'instance',
+                            ''
+                        )
+                        .'|'
+                        .$messageId
+                    );
+
+                if (
+                    ! Cache::add(
+                        $duplicateCacheKey,
+                        true,
+                        now()->addHours(24)
+                    )
+                ) {
+                    Log::info(
+                        'Tekrarlanan WhatsApp webhook mesajı engellendi',
+                        [
+                            'message_id' =>
+                                $messageId,
+
+                            'instance' =>
+                                data_get(
+                                    $payload,
+                                    'instance'
+                                ),
+                        ]
+                    );
+
+                    return response()->json([
+                        'success' => true,
+                        'ignored' => true,
+                        'reason' =>
+                            'duplicate_message',
+                    ]);
+                }
             }
 
             /*
