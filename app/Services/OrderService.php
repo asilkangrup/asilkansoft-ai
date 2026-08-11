@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiBot;
 use App\Models\Order;
 use App\Models\Product;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class OrderService
@@ -36,6 +37,43 @@ class OrderService
                 'whatsapp_number' => $whatsappNumber,
             ]
         );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SON KONUŞMADAN SİPARİŞ BİLGİLERİNİ YAKALA
+    |--------------------------------------------------------------------------
+    |
+    | Müşteri ürün/fiyat konuştuktan sonra yalnızca "evet" veya "olur"
+    | diyerek siparişe geçebilir. Taslak o anda oluşursa önceki kullanıcı
+    | mesajlarındaki ürün ve miktarı da taslağa aktarırız.
+    |
+    */
+
+    public function gecmistenSiparisiGuncelle(
+        Order $order,
+        array|Collection $mesajlar,
+        ?AiBot $aiBot = null
+    ): Order {
+        $liste = collect($mesajlar)
+            ->filter(
+                fn ($mesaj): bool =>
+                    is_array($mesaj)
+                    && ($mesaj['role'] ?? null) === 'user'
+                    && trim((string) ($mesaj['content'] ?? '')) !== ''
+            )
+            ->take(-6)
+            ->values();
+
+        foreach ($liste as $mesaj) {
+            $order = $this->mesajdanSiparisiGuncelle(
+                order: $order,
+                message: (string) $mesaj['content'],
+                aiBot: $aiBot,
+            );
+        }
+
+        return $order->fresh();
     }
 
     public function mesajdanSiparisiGuncelle(
@@ -74,7 +112,14 @@ class OrderService
 
                     if ($miktar !== null) {
                         $order->total_amount =
-                            (float) $product->price * $miktar;
+                            $this->toplamTutariHesapla(
+                                product: $product,
+                                quantity: $order->quantity
+                                    ?: $this->miktariMetneCevir(
+                                        $miktar,
+                                        $message
+                                    ),
+                            );
                     }
                 }
             }
@@ -131,7 +176,10 @@ class OrderService
 
                 if ($miktar !== null) {
                     $order->total_amount =
-                        (float) $product->price * $miktar;
+                        $this->toplamTutariHesapla(
+                            product: $product,
+                            quantity: $order->quantity,
+                        );
                 }
             }
         }
@@ -609,6 +657,103 @@ class OrderService
         }
 
         return null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TOPLAM TUTAR HESABI
+    |--------------------------------------------------------------------------
+    |
+    | Ürün adı bir paket miktarı içeriyorsa (ör. "Zeytinyağı 5 lt") ürün
+    | fiyatını paketin fiyatı kabul ederiz. Böylece 5 lt x 1.500 TL = 7.500 TL
+    | gibi yanlış toplam oluşmaz.
+    |
+    */
+
+    private function toplamTutariHesapla(
+        Product $product,
+        ?string $quantity
+    ): ?float {
+        if ($product->price === null || ! $quantity) {
+            return null;
+        }
+
+        $istenen = $this->miktarVeBirimBul($quantity);
+
+        if (! $istenen) {
+            return (float) $product->price;
+        }
+
+        $paket = $this->miktarVeBirimBul((string) $product->name);
+
+        if (
+            $paket
+            && $paket['unit'] === $istenen['unit']
+            && $paket['value'] > 0
+        ) {
+            $paketAdedi = $istenen['value'] / $paket['value'];
+
+            if ($paketAdedi > 0) {
+                return round(
+                    (float) $product->price * $paketAdedi,
+                    2
+                );
+            }
+        }
+
+        return round(
+            (float) $product->price * $istenen['value'],
+            2
+        );
+    }
+
+    private function miktariMetneCevir(
+        float $miktar,
+        string $message
+    ): string {
+        if (
+            preg_match(
+                '/\\b\\d+(?:[.,]\\d+)?\\s*(kg|kilo|adet|litre|lt|l)\\b/ui',
+                $message,
+                $matches
+            )
+        ) {
+            $birim = Str::lower($matches[1]);
+            $birim = match ($birim) {
+                'kilo' => 'kg',
+                'lt', 'l' => 'litre',
+                default => $birim,
+            };
+
+            return $miktar.' '.$birim;
+        }
+
+        return (string) $miktar;
+    }
+
+    private function miktarVeBirimBul(string $text): ?array
+    {
+        if (
+            ! preg_match(
+                '/\\b(\\d+(?:[.,]\\d+)?)\\s*(kg|kilo|adet|litre|lt|l)\\b/ui',
+                $text,
+                $matches
+            )
+        ) {
+            return null;
+        }
+
+        $birim = Str::lower($matches[2]);
+        $birim = match ($birim) {
+            'kilo' => 'kg',
+            'lt', 'l' => 'litre',
+            default => $birim,
+        };
+
+        return [
+            'value' => (float) str_replace(',', '.', $matches[1]),
+            'unit' => $birim,
+        ];
     }
 
     /*

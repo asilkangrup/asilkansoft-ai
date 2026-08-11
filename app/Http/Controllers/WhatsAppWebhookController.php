@@ -434,24 +434,83 @@ class WhatsAppWebhookController extends Controller
                 |--------------------------------------------------------------------------
                 */
 
-                if (
-                    ! $order
-                    && $this->satinAlmaNiyetiVarMi(
-                        $message
-                    )
-                ) {
-                    $order =
-                        $orderService
-                            ->taslakSiparisOlustur(
-                                aiBotId:
-                                    $aiBot->id,
+                if (! $order) {
+                    $siparisBaslat =
+                        $this->satinAlmaNiyetiVarMi(
+                            $message
+                        );
 
-                                sessionId:
-                                    $sessionId,
+                    if (
+                        ! $siparisBaslat
+                        && $this->kisaOlumluCevapMi(
+                            $message
+                        )
+                    ) {
+                        $sonMesajlar =
+                            $memoryService
+                                ->gecmisiGetir(
+                                    userId:
+                                        $aiBot->user_id,
 
-                                whatsappNumber:
-                                    $phoneNumber,
+                                    sessionId:
+                                        $sessionId,
+
+                                    limit:
+                                        8,
+                                );
+
+                        $siparisBaslat =
+                            $this->oncekiAsistanSiparisTeklifiYaptiMi(
+                                $sonMesajlar
                             );
+                    }
+
+                    if ($siparisBaslat) {
+                        $order =
+                            $orderService
+                                ->taslakSiparisOlustur(
+                                    aiBotId:
+                                        $aiBot->id,
+
+                                    sessionId:
+                                        $sessionId,
+
+                                    whatsappNumber:
+                                        $phoneNumber,
+                                );
+
+                        /*
+                         * Taslak yeni oluştuysa son konuşmadaki ürün ve
+                         * miktarı da siparişe aktar. Böylece müşteri
+                         * "evet" dediğinde önceki "5 litre zeytinyağı"
+                         * mesajı kaybolmaz.
+                         */
+                        $siparisGecmisi =
+                            $memoryService
+                                ->openAIMesajlariHazirla(
+                                    userId:
+                                        $aiBot->user_id,
+
+                                    sessionId:
+                                        $sessionId,
+
+                                    limit:
+                                        10,
+                                );
+
+                        $order =
+                            $orderService
+                                ->gecmistenSiparisiGuncelle(
+                                    order:
+                                        $order,
+
+                                    mesajlar:
+                                        $siparisGecmisi,
+
+                                    aiBot:
+                                        $aiBot,
+                                );
+                    }
                 }
 
                 /*
@@ -1152,6 +1211,108 @@ class WhatsAppWebhookController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | KISA OLUMLU CEVAP
+    |--------------------------------------------------------------------------
+    |
+    | "Evet" tek başına her zaman sipariş değildir. Sadece önceki asistan
+    | mesajı sipariş teklifiyse sipariş başlangıcı olarak kullanılır.
+    |
+    */
+
+    private function kisaOlumluCevapMi(string $message): bool
+    {
+        $message = $this->siparisMetniniNormalizeEt($message);
+
+        $ifadeler = [
+            'evet',
+            'evet olur',
+            'evet lutfen',
+            'olur',
+            'olabilir',
+            'tamam',
+            'tamamdir',
+            'tamam olur',
+            'isterim',
+            'istiyorum',
+            'alalim',
+            'olsun',
+            'gonderin',
+            'gonder',
+            'baslayalim',
+            'yapalim',
+        ];
+
+        return in_array($message, $ifadeler, true);
+    }
+
+    private function oncekiAsistanSiparisTeklifiYaptiMi(
+        $mesajlar
+    ): bool {
+        $sonAsistanMesaji = collect($mesajlar)
+            ->filter(
+                fn ($mesaj): bool =>
+                    ($mesaj->role ?? null) === 'assistant'
+                    && trim((string) ($mesaj->message ?? '')) !== ''
+            )
+            ->last();
+
+        if (! $sonAsistanMesaji) {
+            return false;
+        }
+
+        $metin = $this->siparisMetniniNormalizeEt(
+            (string) $sonAsistanMesaji->message
+        );
+
+        $ipuclari = [
+            'siparis vermek ister',
+            'siparis olustur',
+            'siparisinizi olustur',
+            'siparise gec',
+            'siparis gec',
+            'siparis vermeye',
+            'siparisinizi hazirla',
+            'siparisinizi birlikte',
+            'siparis vermek isterseniz',
+            'siparis vermek istersen',
+        ];
+
+        foreach ($ipuclari as $ipucu) {
+            if (str_contains($metin, $ipucu)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function siparisMetniniNormalizeEt(string $message): string
+    {
+        $message = Str::lower(trim($message));
+
+        $message = strtr($message, [
+            'ı' => 'i',
+            'ş' => 's',
+            'ğ' => 'g',
+            'ü' => 'u',
+            'ö' => 'o',
+            'ç' => 'c',
+        ]);
+
+        $message = preg_replace(
+            '/[^\\pL\\pN\\s]+/u',
+            ' ',
+            $message
+        ) ?? $message;
+
+        return trim(
+            preg_replace('/\\s+/u', ' ', $message)
+            ?? $message
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | SATIN ALMA NİYETİ
     |--------------------------------------------------------------------------
     */
@@ -1191,6 +1352,18 @@ class WhatsAppWebhookController extends Controller
 
             'sipariş verelim',
             'siparis verelim',
+
+            'sipariş istiyorum',
+            'siparis istiyorum',
+
+            'bundan istiyorum',
+            'bunu istiyorum',
+
+            'bunu alacağım',
+            'bunu alacagim',
+
+            'gönderin',
+            'gonderin',
         ];
 
         foreach ($ifadeler as $ifade) {
