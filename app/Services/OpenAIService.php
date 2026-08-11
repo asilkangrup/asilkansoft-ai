@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\AiBot;
 use App\Models\Product;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -12,6 +11,12 @@ use Throwable;
 
 class OpenAIService
 {
+    /*
+    |--------------------------------------------------------------------------
+    | ANA CEVAP
+    |--------------------------------------------------------------------------
+    */
+
     public function cevapVer(
         string|array $mesajlar,
         ?AiBot $aiBot = null
@@ -22,19 +27,46 @@ class OpenAIService
             return 'Lütfen bir mesaj yazın.';
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | SADECE SELAMLAŞMA
+        |--------------------------------------------------------------------------
+        |
+        | Basit selamlaşmalarda ürün veritabanını ve uzun ürün promptunu
+        | hazırlamaya gerek yoktur.
+        |
+        */
+
+        $sonKullaniciMesaji =
+            $this->sonKullaniciMesajiniGetir($input);
+
+        if ($this->sadeceSelamlamaMi($sonKullaniciMesaji)) {
+            $firmaAdi =
+                trim((string) ($aiBot?->company_name ?? ''));
+
+            if ($firmaAdi !== '') {
+                return "Merhaba 👋 {$firmaAdi}'ne hoş geldiniz. Size nasıl yardımcı olabilirim?";
+            }
+
+            return 'Merhaba 👋 Hoş geldiniz. Size nasıl yardımcı olabilirim?';
+        }
+
         try {
             $response = OpenAI::responses()->create([
-                'model' => $aiBot?->openai_model ?: 'gpt-5-mini',
+                'model' =>
+                    $aiBot?->openai_model ?: 'gpt-5-mini',
 
-                'instructions' => $this->promptHazirla(
-                    aiBot: $aiBot,
-                    mesajlar: $input,
-                ),
+                'instructions' =>
+                    $this->promptHazirla(
+                        aiBot: $aiBot,
+                        mesajlar: $input,
+                    ),
 
                 'input' => $input,
             ]);
 
-            $cevap = trim($response->outputText ?? '');
+            $cevap =
+                trim($response->outputText ?? '');
 
             return $cevap !== ''
                 ? $cevap
@@ -47,15 +79,28 @@ class OpenAIService
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | PROMPT HAZIRLA
+    |--------------------------------------------------------------------------
+    */
+
     private function promptHazirla(
         ?AiBot $aiBot,
         array $mesajlar
     ): string {
         $rol = match ($aiBot?->role) {
-            'support' => 'profesyonel bir müşteri temsilcisi',
-            'technical' => 'profesyonel bir teknik destek uzmanı',
-            'assistant' => 'profesyonel bir sekreter ve asistan',
-            default => 'deneyimli ve profesyonel bir satış uzmanı',
+            'support' =>
+                'profesyonel bir müşteri temsilcisi',
+
+            'technical' =>
+                'profesyonel bir teknik destek uzmanı',
+
+            'assistant' =>
+                'profesyonel bir sekreter ve asistan',
+
+            default =>
+                'deneyimli ve profesyonel bir satış uzmanı',
         };
 
         $prompt = <<<PROMPT
@@ -66,22 +111,19 @@ TEMEL DAVRANIŞLAR
 - Gerçek bir insan çalışan gibi konuş.
 - Kurumsal fakat sıcak ol.
 - Gereksiz uzun cevaplar verme.
-- Genellikle 2–5 kısa cümle kullan.
+- Genellikle 1–4 kısa cümle kullan.
+- Müşterinin yalnızca sorduğu konuya cevap ver.
 - Müşterinin ihtiyacını anlamaya çalış.
 - Uygun olduğunda konuşmayı satışa yönlendir.
 - Baskıcı veya ısrarcı davranma.
-- Önceki konuşmaları mutlaka dikkate al.
+- Önceki konuşmaları dikkate al.
 - Müşterinin daha önce verdiği bilgileri tekrar sorma.
 - Bilmediğin hiçbir fiyat, ürün, stok, kampanya veya şirket bilgisini uydurma.
 - Sistem sana bilgi vermediyse bunu açıkça belirt.
 - Aynı cümleleri sürekli tekrarlama.
 - Gerektiğinde en fazla 1–2 emoji kullan.
-
-SELAMLAŞMA
-Müşteri yalnızca merhaba, selam veya iyi günler gibi bir mesaj yazarsa kısa ve sıcak karşılık ver.
-
-Örnek:
-“Merhaba 👋 Hoş geldiniz. Size nasıl yardımcı olabilirim?”
+- Müşteri belirli bir soru sorduysa gereksiz karşılama metni yazma.
+- Müşteri sormadıysa ilgisiz kampanya veya ürünlerden bahsetme.
 
 HAFIZA DAVRANIŞI
 - Yeni mesajı önceki mesajların devamı olarak değerlendir.
@@ -121,69 +163,105 @@ PROMPT;
 
         $prompt .= "\n\nFİRMA BİLGİLERİ\n";
 
-        $prompt .= 'Firma Adı: '
+        $prompt .=
+            'Firma Adı: '
             .($aiBot->company_name ?: 'Tanımlanmadı')
             ."\n";
 
-        $prompt .= 'Yapay Zekâ Adı: '
+        $prompt .=
+            'Yapay Zekâ Adı: '
             .($aiBot->name ?: 'Tanımlanmadı')
             ."\n";
 
         if ($aiBot->website) {
-            $prompt .= "Web Sitesi: {$aiBot->website}\n";
+            $prompt .=
+                "Web Sitesi: {$aiBot->website}\n";
         }
 
         if ($aiBot->instagram) {
-            $prompt .= "Instagram: {$aiBot->instagram}\n";
+            $prompt .=
+                "Instagram: {$aiBot->instagram}\n";
         }
 
         if ($aiBot->company_description) {
-            $prompt .= "\nFİRMA HAKKINDA\n{$aiBot->company_description}\n";
+            $prompt .=
+                "\nFİRMA HAKKINDA\n"
+                .$aiBot->company_description
+                ."\n";
         }
 
         if ($aiBot->working_hours) {
-            $prompt .= "\nÇALIŞMA SAATLERİ\n{$aiBot->working_hours}\n";
+            $prompt .=
+                "\nÇALIŞMA SAATLERİ\n"
+                .$aiBot->working_hours
+                ."\n";
         }
 
         if ($aiBot->cargo_information) {
-            $prompt .= "\nKARGO VE TESLİMAT\n{$aiBot->cargo_information}\n";
+            $prompt .=
+                "\nKARGO VE TESLİMAT\n"
+                .$aiBot->cargo_information
+                ."\n";
         }
 
         if ($aiBot->payment_information) {
-            $prompt .= "\nÖDEME BİLGİLERİ\n{$aiBot->payment_information}\n";
+            $prompt .=
+                "\nÖDEME BİLGİLERİ\n"
+                .$aiBot->payment_information
+                ."\n";
         }
 
         if ($aiBot->return_policy) {
-            $prompt .= "\nİADE VE DEĞİŞİM\n{$aiBot->return_policy}\n";
+            $prompt .=
+                "\nİADE VE DEĞİŞİM\n"
+                .$aiBot->return_policy
+                ."\n";
         }
 
         if ($aiBot->company_rules) {
-            $prompt .= "\nÖZEL FİRMA KURALLARI\n{$aiBot->company_rules}\n";
+            $prompt .=
+                "\nÖZEL FİRMA KURALLARI\n"
+                .$aiBot->company_rules
+                ."\n";
         }
 
         if ($aiBot->system_prompt) {
-            $prompt .= "\nÖZEL YAPAY ZEKÂ TALİMATLARI\n{$aiBot->system_prompt}\n";
+            $prompt .=
+                "\nÖZEL YAPAY ZEKÂ TALİMATLARI\n"
+                .$aiBot->system_prompt
+                ."\n";
         }
 
         /*
         |--------------------------------------------------------------------------
         | AKILLI ÜRÜN ARAMA
         |--------------------------------------------------------------------------
+        |
+        | Eski sistem 30 ürün veya daha az olduğunda bütün ürünleri
+        | her mesajda GPT'ye gönderiyordu.
+        |
+        | Yeni sistem müşterinin konuşmasına göre yalnızca en alakalı
+        | ürünleri seçer.
+        |
         */
 
-        $urunler = $this->ilgiliUrunleriGetir(
-            aiBot: $aiBot,
-            mesajlar: $mesajlar,
-        );
+        $urunler =
+            $this->ilgiliUrunleriGetir(
+                aiBot: $aiBot,
+                mesajlar: $mesajlar,
+            );
 
         if ($urunler->isNotEmpty()) {
-            $prompt .= "\n\nMÜŞTERİNİN KONUŞMASIYLA İLGİLİ ÜRÜNLER\n";
+            $prompt .=
+                "\n\nMÜŞTERİNİN KONUŞMASIYLA İLGİLİ ÜRÜNLER\n";
 
             foreach ($urunler as $product) {
-                $prompt .= "\n- Ürün: {$product->name}\n";
+                $prompt .=
+                    "\n- Ürün: {$product->name}\n";
 
                 if ($product->category) {
-                    $prompt .= "  Kategori: {$product->category}\n";
+                    $prompt .=
+                        "  Kategori: {$product->category}\n";
                 }
 
                 if ($product->price !== null) {
@@ -194,20 +272,44 @@ PROMPT;
                         '.'
                     );
 
-                    $prompt .= "  Fiyat: {$fiyat} TL\n";
+                    $prompt .=
+                        "  Fiyat: {$fiyat} TL\n";
                 }
 
-                $stokDurumu = match ($product->stock_status) {
-                    'in_stock' => 'Stokta',
-                    'out_of_stock' => 'Stokta Yok',
-                    'pre_order' => 'Ön Sipariş',
-                    default => $product->stock_status,
-                };
+                $stokDurumu =
+                    match ($product->stock_status) {
+                        'in_stock' =>
+                            'Stokta',
 
-                $prompt .= "  Stok Durumu: {$stokDurumu}\n";
+                        'out_of_stock' =>
+                            'Stokta Yok',
 
+                        'pre_order' =>
+                            'Ön Sipariş',
+
+                        default =>
+                            $product->stock_status,
+                    };
+
+                $prompt .=
+                    "  Stok Durumu: {$stokDurumu}\n";
+
+                /*
+                 * Açıklamalar çok uzun olabiliyor.
+                 * Promptu gereksiz büyütmemek için sınırlandırıyoruz.
+                 */
                 if ($product->description) {
-                    $prompt .= "  Açıklama: {$product->description}\n";
+                    $aciklama =
+                        Str::limit(
+                            trim(
+                                (string) $product->description
+                            ),
+                            350,
+                            '...'
+                        );
+
+                    $prompt .=
+                        "  Açıklama: {$aciklama}\n";
                 }
             }
 
@@ -222,15 +324,17 @@ PROMPT;
 - Müşteri ürün adını tam yazmasa bile konuşma bağlamından doğru ürünü anlamaya çalış.
 - “O ürün”, “1 litre olan”, “mega olan” gibi ifadelerde önceki konuşmayı dikkate al.
 - Birden fazla uygun ürün varsa müşterinin ihtiyacına göre seçenek sun.
-- Müşteri “en ucuz”, “en pahalı” veya benzeri karşılaştırma yaparsa verilen ürünler arasında doğru karşılaştırmayı yap.
+- Müşteri “en ucuz”, “en pahalı” veya benzeri karşılaştırma yaparsa yalnızca verilen ürünler arasında karşılaştırma yap.
 - Bütün ürün listesini gereksiz yere müşteriye gönderme.
+- Müşterinin sormadığı başka ürünleri veya kampanyaları gereksiz yere anlatma.
 PROMPT;
+
         } else {
             $prompt .= <<<PROMPT
 
 
 ÜRÜN ARAMA NOTU
-Müşterinin mesajıyla doğrudan eşleşen ürün bilgisi bulunamadı.
+Müşterinin konuşmasıyla doğrudan eşleşen ürün bilgisi bulunamadı.
 Bu, ürünün kesinlikle olmadığı anlamına gelmez.
 Ürün hakkında bilgi uydurma.
 Gerekirse müşteriden ürün adını veya kategorisini biraz daha net belirtmesini iste.
@@ -254,6 +358,9 @@ PROMPT;
 - Konuşmayı doğal şekilde adım adım ilerlet.
 - Müşterinin önceki mesajlarını unutma.
 - Satış fırsatı varsa doğal biçimde bir sonraki adıma yönlendir.
+- Müşteri belirli bir ürünün fiyatını soruyorsa önce doğrudan o ürünün fiyatını söyle.
+- Müşteri sormadığı sürece ilgisiz kampanya veya ürün tanıtımı yapma.
+- Her mesajı yeniden karşılama mesajıyla başlatma.
 PROMPT;
 
         return $prompt;
@@ -269,113 +376,191 @@ PROMPT;
         AiBot $aiBot,
         array $mesajlar
     ): Collection {
-        /*
-         * Öncelikle toplam aktif ürün sayısını öğreniyoruz.
-         */
-        $aktifUrunSayisi = $aiBot->products()
-            ->where('is_active', true)
-            ->count();
-
-        if ($aktifUrunSayisi === 0) {
-            return collect();
-        }
-
-        /*
-         * Az ürün varsa arama yapmaya gerek yok.
-         *
-         * Örneğin 20 ürünlü bir işletmede hepsini GPT'ye vermek
-         * hem daha güvenli hem de karşılaştırma sorularında daha başarılı.
-         */
-        if ($aktifUrunSayisi <= 30) {
-            return $aiBot->products()
-                ->where('is_active', true)
-                ->orderBy('category')
-                ->orderBy('name')
-                ->get();
-        }
-
-        /*
-         * Büyük kataloglarda müşterinin son birkaç mesajından
-         * arama bağlamı oluşturuyoruz.
-         */
-        $aramaMetni = $this->aramaMetniHazirla($mesajlar);
+        $aramaMetni =
+            $this->aramaMetniHazirla($mesajlar);
 
         if ($aramaMetni === '') {
             return collect();
         }
 
-        $kelimeler = $this->aramaKelimeleriHazirla($aramaMetni);
+        /*
+        |--------------------------------------------------------------------------
+        | GENEL KATALOG SORUSU MU?
+        |--------------------------------------------------------------------------
+        |
+        | "Ürünleriniz neler?"
+        | "Neler satıyorsunuz?"
+        | "Fiyat listesi"
+        |
+        | gibi sorularda daha geniş ürün listesi gerekir.
+        |
+        */
+
+        if ($this->genelUrunSorusuMu($aramaMetni)) {
+            return $aiBot->products()
+                ->where('is_active', true)
+                ->orderBy('category')
+                ->orderBy('name')
+                ->limit(20)
+                ->get();
+        }
+
+        $kelimeler =
+            $this->aramaKelimeleriHazirla(
+                $aramaMetni
+            );
 
         if ($kelimeler === []) {
             return collect();
         }
 
         /*
-         * Veritabanında sadece ilgili ürünleri arıyoruz.
-         */
-        $query = $aiBot->products()
-            ->where('is_active', true);
+        |--------------------------------------------------------------------------
+        | ÜRÜNLERİ ÇEK
+        |--------------------------------------------------------------------------
+        |
+        | Küçük kataloglarda veritabanından aktif ürünleri çekmek ucuzdur.
+        | Fakat GPT'ye tamamını göndermiyoruz.
+        |
+        | Önce PHP tarafında puanlayıp yalnızca en alakalı ürünleri seçiyoruz.
+        |
+        */
 
-        $query->where(function (Builder $query) use ($kelimeler): void {
-            foreach ($kelimeler as $kelime) {
-                $query->orWhere('name', 'like', "%{$kelime}%")
-                    ->orWhere('category', 'like', "%{$kelime}%")
-                    ->orWhere('description', 'like', "%{$kelime}%");
-            }
-        });
-
-        $adaylar = $query
-            ->limit(30)
-            ->get();
+        $adaylar =
+            $aiBot->products()
+                ->where('is_active', true)
+                ->get();
 
         if ($adaylar->isEmpty()) {
             return collect();
         }
 
-        /*
-         * Bulunan ürünlere basit bir uygunluk puanı veriyoruz.
-         * Ürün adındaki eşleşmeler kategori/açıklamadan daha değerlidir.
-         */
-        return $adaylar
-            ->map(function (Product $product) use ($kelimeler) {
-                $puan = 0;
+        $normalizeArama =
+            Str::lower(
+                $this->turkceNormalize(
+                    $aramaMetni
+                )
+            );
 
-                $urunAdi = Str::lower(
-                    $this->turkceNormalize($product->name)
-                );
+        $puanlanan =
+            $adaylar->map(
+                function (Product $product) use (
+                    $kelimeler,
+                    $normalizeArama
+                ) {
+                    $puan = 0;
 
-                $kategori = Str::lower(
-                    $this->turkceNormalize(
-                        (string) $product->category
-                    )
-                );
+                    $urunAdi =
+                        Str::lower(
+                            $this->turkceNormalize(
+                                (string) $product->name
+                            )
+                        );
 
-                $aciklama = Str::lower(
-                    $this->turkceNormalize(
-                        (string) $product->description
-                    )
-                );
+                    $kategori =
+                        Str::lower(
+                            $this->turkceNormalize(
+                                (string) $product->category
+                            )
+                        );
 
-                foreach ($kelimeler as $kelime) {
-                    if (str_contains($urunAdi, $kelime)) {
-                        $puan += 10;
+                    $aciklama =
+                        Str::lower(
+                            $this->turkceNormalize(
+                                (string) $product->description
+                            )
+                        );
+
+                    /*
+                     * Ürün adının tamamına yakın eşleşme çok değerlidir.
+                     */
+                    if (
+                        $urunAdi !== ''
+                        && str_contains(
+                            $normalizeArama,
+                            $urunAdi
+                        )
+                    ) {
+                        $puan += 100;
                     }
 
-                    if (str_contains($kategori, $kelime)) {
-                        $puan += 5;
+                    foreach ($kelimeler as $kelime) {
+                        if (
+                            str_contains(
+                                $urunAdi,
+                                $kelime
+                            )
+                        ) {
+                            $puan += 15;
+                        }
+
+                        if (
+                            str_contains(
+                                $kategori,
+                                $kelime
+                            )
+                        ) {
+                            $puan += 7;
+                        }
+
+                        if (
+                            str_contains(
+                                $aciklama,
+                                $kelime
+                            )
+                        ) {
+                            $puan += 2;
+                        }
                     }
 
-                    if (str_contains($aciklama, $kelime)) {
-                        $puan += 2;
+                    /*
+                     * Sayısal ifadeler ürün seçiminde önemlidir.
+                     * Örnek: 1 litre, 5 litre, 5 kg.
+                     */
+                    preg_match_all(
+                        '/\d+(?:[.,]\d+)?/u',
+                        $normalizeArama,
+                        $aramaSayilari
+                    );
+
+                    foreach (
+                        $aramaSayilari[0] ?? []
+                        as $sayi
+                    ) {
+                        if (
+                            str_contains(
+                                $urunAdi,
+                                $sayi
+                            )
+                        ) {
+                            $puan += 20;
+                        }
                     }
+
+                    $product->setAttribute(
+                        '_arama_puani',
+                        $puan
+                    );
+
+                    return $product;
                 }
+            );
 
-                $product->setAttribute('_arama_puani', $puan);
+        /*
+         * Sıfır puanlı ürünleri GPT'ye göndermiyoruz.
+         *
+         * En fazla 6 alakalı ürün yeterlidir.
+         */
 
-                return $product;
-            })
+        return $puanlanan
+            ->filter(
+                fn (Product $product): bool =>
+                    (int) $product->getAttribute(
+                        '_arama_puani'
+                    ) > 0
+            )
             ->sortByDesc('_arama_puani')
-            ->take(12)
+            ->take(6)
             ->values();
     }
 
@@ -385,17 +570,20 @@ PROMPT;
     |--------------------------------------------------------------------------
     */
 
-    private function aramaMetniHazirla(array $mesajlar): string
-    {
-        $kullaniciMesajlari = collect($mesajlar)
-            ->filter(
-                fn (array $mesaj): bool =>
-                    ($mesaj['role'] ?? null) === 'user'
-            )
-            ->pluck('content')
-            ->filter()
-            ->take(-4)
-            ->implode(' ');
+    private function aramaMetniHazirla(
+        array $mesajlar
+    ): string {
+        $kullaniciMesajlari =
+            collect($mesajlar)
+                ->filter(
+                    fn (array $mesaj): bool =>
+                        ($mesaj['role'] ?? null)
+                        === 'user'
+                )
+                ->pluck('content')
+                ->filter()
+                ->take(-3)
+                ->implode(' ');
 
         return trim($kullaniciMesajlari);
     }
@@ -406,24 +594,30 @@ PROMPT;
     |--------------------------------------------------------------------------
     */
 
-    private function aramaKelimeleriHazirla(string $metin): array
-    {
-        $metin = Str::lower(
-            $this->turkceNormalize($metin)
-        );
+    private function aramaKelimeleriHazirla(
+        string $metin
+    ): array {
+        $metin =
+            Str::lower(
+                $this->turkceNormalize(
+                    $metin
+                )
+            );
 
-        $metin = preg_replace(
-            '/[^\pL\pN\s]+/u',
-            ' ',
-            $metin
-        ) ?? '';
+        $metin =
+            preg_replace(
+                '/[^\pL\pN\s]+/u',
+                ' ',
+                $metin
+            ) ?? '';
 
-        $kelimeler = preg_split(
-            '/\s+/u',
-            $metin,
-            -1,
-            PREG_SPLIT_NO_EMPTY
-        );
+        $kelimeler =
+            preg_split(
+                '/\s+/u',
+                $metin,
+                -1,
+                PREG_SPLIT_NO_EMPTY
+            );
 
         $gereksizKelimeler = [
             'bir',
@@ -446,9 +640,9 @@ PROMPT;
             'fiyat',
             'fiyatı',
             'fiyati',
+            'fiyatini',
+            'fiyatını',
             'var',
-            'mı',
-            'mi',
             'olan',
             'olsun',
             'istiyorum',
@@ -462,19 +656,164 @@ PROMPT;
             'bana',
             'ver',
             'nedir',
+            'acaba',
+            'öğrenebilir',
+            'ogrenebilir',
+            'musunuz',
+            'misiniz',
+            'miyim',
+            'miyim',
         ];
 
         return collect($kelimeler)
-            ->map(fn (string $kelime): string => trim($kelime))
-            ->filter(fn (string $kelime): bool => mb_strlen($kelime) >= 2)
+            ->map(
+                fn (string $kelime): string =>
+                    trim($kelime)
+            )
+            ->filter(
+                fn (string $kelime): bool =>
+                    mb_strlen($kelime) >= 2
+            )
             ->reject(
                 fn (string $kelime): bool =>
-                    in_array($kelime, $gereksizKelimeler, true)
+                    in_array(
+                        $kelime,
+                        $gereksizKelimeler,
+                        true
+                    )
             )
             ->unique()
-            ->take(12)
+            ->take(10)
             ->values()
             ->all();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | GENEL ÜRÜN SORUSU
+    |--------------------------------------------------------------------------
+    */
+
+    private function genelUrunSorusuMu(
+        string $metin
+    ): bool {
+        $metin =
+            Str::lower(
+                $this->turkceNormalize(
+                    $metin
+                )
+            );
+
+        $ifadeler = [
+            'urunleriniz neler',
+            'urunler neler',
+            'neler satiyorsunuz',
+            'ne satiyorsunuz',
+            'hangi urunler',
+            'urun cesitleri',
+            'urun listesi',
+            'fiyat listesi',
+            'tum urunler',
+            'butun urunler',
+            'urunlerinizi goster',
+            'urunleri goster',
+        ];
+
+        foreach ($ifadeler as $ifade) {
+            if (str_contains($metin, $ifade)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SADECE SELAMLAŞMA MI?
+    |--------------------------------------------------------------------------
+    */
+
+    private function sadeceSelamlamaMi(
+        string $mesaj
+    ): bool {
+        if (trim($mesaj) === '') {
+            return false;
+        }
+
+        $mesaj =
+            Str::lower(
+                $this->turkceNormalize(
+                    trim($mesaj)
+                )
+            );
+
+        $mesaj =
+            preg_replace(
+                '/[^\pL\pN\s]+/u',
+                '',
+                $mesaj
+            ) ?? $mesaj;
+
+        $mesaj =
+            trim(
+                preg_replace(
+                    '/\s+/u',
+                    ' ',
+                    $mesaj
+                ) ?? $mesaj
+            );
+
+        $selamlar = [
+            'merhaba',
+            'selam',
+            'selamlar',
+            'slm',
+            'sa',
+            'gunaydin',
+            'iyi gunler',
+            'iyi aksamlar',
+            'iyi geceler',
+            'merhabalar',
+        ];
+
+        return in_array(
+            $mesaj,
+            $selamlar,
+            true
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SON KULLANICI MESAJINI GETİR
+    |--------------------------------------------------------------------------
+    */
+
+    private function sonKullaniciMesajiniGetir(
+        array $mesajlar
+    ): string {
+        for (
+            $i = count($mesajlar) - 1;
+            $i >= 0;
+            $i--
+        ) {
+            if (
+                ($mesajlar[$i]['role'] ?? null)
+                !== 'user'
+            ) {
+                continue;
+            }
+
+            return trim(
+                (string) (
+                    $mesajlar[$i]['content']
+                    ?? ''
+                )
+            );
+        }
+
+        return '';
     }
 
     /*
@@ -483,23 +822,32 @@ PROMPT;
     |--------------------------------------------------------------------------
     */
 
-    private function turkceNormalize(string $metin): string
-    {
-        return strtr($metin, [
-            'İ' => 'i',
-            'I' => 'i',
-            'ı' => 'i',
-            'Ş' => 's',
-            'ş' => 's',
-            'Ğ' => 'g',
-            'ğ' => 'g',
-            'Ü' => 'u',
-            'ü' => 'u',
-            'Ö' => 'o',
-            'ö' => 'o',
-            'Ç' => 'c',
-            'ç' => 'c',
-        ]);
+    private function turkceNormalize(
+        string $metin
+    ): string {
+        return strtr(
+            $metin,
+            [
+                'İ' => 'i',
+                'I' => 'i',
+                'ı' => 'i',
+
+                'Ş' => 's',
+                'ş' => 's',
+
+                'Ğ' => 'g',
+                'ğ' => 'g',
+
+                'Ü' => 'u',
+                'ü' => 'u',
+
+                'Ö' => 'o',
+                'ö' => 'o',
+
+                'Ç' => 'c',
+                'ç' => 'c',
+            ]
+        );
     }
 
     /*
@@ -508,8 +856,9 @@ PROMPT;
     |--------------------------------------------------------------------------
     */
 
-    private function inputHazirla(string|array $mesajlar): array
-    {
+    private function inputHazirla(
+        string|array $mesajlar
+    ): array {
         if (is_string($mesajlar)) {
             $mesaj = trim($mesajlar);
 
@@ -526,16 +875,26 @@ PROMPT;
         $input = [];
 
         foreach ($mesajlar as $mesaj) {
-            $role = $mesaj['role'] ?? null;
-            $content = trim(
-                (string) ($mesaj['content'] ?? '')
-            );
+            $role =
+                $mesaj['role'] ?? null;
 
-            if (! in_array(
-                $role,
-                ['user', 'assistant'],
-                true
-            )) {
+            $content =
+                trim(
+                    (string) (
+                        $mesaj['content'] ?? ''
+                    )
+                );
+
+            if (
+                ! in_array(
+                    $role,
+                    [
+                        'user',
+                        'assistant',
+                    ],
+                    true
+                )
+            ) {
                 continue;
             }
 
@@ -547,6 +906,22 @@ PROMPT;
                 'role' => $role,
                 'content' => $content,
             ];
+        }
+
+        /*
+         * Çok uzun konuşmalarda bütün geçmişi her istekte
+         * tekrar göndermiyoruz.
+         *
+         * Son 12 mesaj günlük WhatsApp satış konuşmaları için
+         * yeterli bağlam sağlar ve token yükünü sınırlar.
+         */
+
+        if (count($input) > 12) {
+            $input =
+                array_slice(
+                    $input,
+                    -12
+                );
         }
 
         return $input;
