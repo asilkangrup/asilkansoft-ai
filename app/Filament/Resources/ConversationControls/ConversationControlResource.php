@@ -2,8 +2,7 @@
 
 namespace App\Filament\Resources\ConversationControls;
 
-use App\Filament\Resources\ConversationControls\Pages\ListConversationControls;
-use App\Filament\Resources\ConversationControls\Schemas\ConversationControlForm;
+use App\Filament\Resources\ConversationControls\Pages\ConversationInbox;
 use App\Filament\Resources\ConversationControls\Tables\ConversationControlsTable;
 use App\Models\ConversationControl;
 use BackedEnum;
@@ -15,7 +14,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ConversationControlResource extends Resource
 {
-    protected static ?string $model = ConversationControl::class;
+    protected static ?string $model =
+        ConversationControl::class;
 
     protected static string|BackedEnum|null $navigationIcon =
         Heroicon::OutlinedChatBubbleLeftRight;
@@ -40,26 +40,29 @@ class ConversationControlResource extends Resource
     | FORM
     |--------------------------------------------------------------------------
     |
-    | Manuel create/edit kullanmıyoruz.
-    | Resource yapısının bozulmaması için form şeması bağlı kalabilir.
+    | Manuel konuşma oluşturma / düzenleme kullanmıyoruz.
     |
     */
 
-    public static function form(Schema $schema): Schema
-    {
-        return ConversationControlForm::configure(
-            $schema
-        );
+    public static function form(
+        Schema $schema
+    ): Schema {
+        return $schema;
     }
 
     /*
     |--------------------------------------------------------------------------
     | TABLO
     |--------------------------------------------------------------------------
+    |
+    | Mevcut tablo sınıfımızı koruyoruz.
+    | Ana sayfa artık WhatsApp Web görünümü olacak.
+    |
     */
 
-    public static function table(Table $table): Table
-    {
+    public static function table(
+        Table $table
+    ): Table {
         return ConversationControlsTable::configure(
             $table
         );
@@ -67,12 +70,8 @@ class ConversationControlResource extends Resource
 
     /*
     |--------------------------------------------------------------------------
-    | KULLANICIYA GÖRE KONUŞMALARI SINIRLA
+    | KULLANICI YETKİLENDİRMESİ
     |--------------------------------------------------------------------------
-    |
-    | Admin bütün müşterilerin konuşmalarını görebilir.
-    | Normal kullanıcı sadece kendi konuşmalarını görür.
-    |
     */
 
     public static function getEloquentQuery(): Builder
@@ -91,23 +90,32 @@ class ConversationControlResource extends Resource
             );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | ADMIN
+        |--------------------------------------------------------------------------
+        |
+        | Eğer is_admin alanı varsa admin bütün konuşmaları görebilir.
+        |
+        */
+
         if (
             (bool) ($user->is_admin ?? false)
         ) {
             return $query;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | NORMAL MÜŞTERİ
+        |--------------------------------------------------------------------------
+        */
+
         return $query->where(
             'user_id',
             $user->id
         );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | RELATIONS
-    |--------------------------------------------------------------------------
-    */
 
     public static function getRelations(): array
     {
@@ -119,7 +127,7 @@ class ConversationControlResource extends Resource
     | SAYFALAR
     |--------------------------------------------------------------------------
     |
-    | Create ve Edit özellikle kaldırıldı.
+    | Konuşmalar menüsüne basıldığında direkt WhatsApp Web ekranı açılır.
     |
     */
 
@@ -127,7 +135,7 @@ class ConversationControlResource extends Resource
     {
         return [
             'index' =>
-                ListConversationControls::route('/'),
+                ConversationInbox::route('/'),
         ];
     }
 }
