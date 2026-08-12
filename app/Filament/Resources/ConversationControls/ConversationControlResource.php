@@ -40,7 +40,7 @@ class ConversationControlResource extends Resource
     | FORM
     |--------------------------------------------------------------------------
     |
-    | Manuel konuşma oluşturma / düzenleme kullanmıyoruz.
+    | Manuel konuşma oluşturma veya düzenleme kullanmıyoruz.
     |
     */
 
@@ -54,10 +54,6 @@ class ConversationControlResource extends Resource
     |--------------------------------------------------------------------------
     | TABLO
     |--------------------------------------------------------------------------
-    |
-    | Mevcut tablo sınıfımızı koruyoruz.
-    | Ana sayfa artık WhatsApp Web görünümü olacak.
-    |
     */
 
     public static function table(
@@ -70,8 +66,14 @@ class ConversationControlResource extends Resource
 
     /*
     |--------------------------------------------------------------------------
-    | KULLANICI YETKİLENDİRMESİ
+    | KONUŞMA YETKİLENDİRMESİ
     |--------------------------------------------------------------------------
+    |
+    | Asilkan ana yönetici hesabı bütün müşterilerin konuşmalarını görür.
+    |
+    | Normal müşteriler yalnızca kendi user_id değerlerine bağlı
+    | konuşmaları görebilir.
+    |
     */
 
     public static function getEloquentQuery(): Builder
@@ -92,15 +94,14 @@ class ConversationControlResource extends Resource
 
         /*
         |--------------------------------------------------------------------------
-        | ADMIN
+        | ANA YÖNETİCİ
         |--------------------------------------------------------------------------
-        |
-        | Eğer is_admin alanı varsa admin bütün konuşmaları görebilir.
-        |
         */
 
         if (
-            (bool) ($user->is_admin ?? false)
+            (int) $user->id === 1
+            || (string) $user->email === 'asilkangrup@gmail.com'
+            || (bool) ($user->is_admin ?? false)
         ) {
             return $query;
         }
@@ -127,7 +128,7 @@ class ConversationControlResource extends Resource
     | SAYFALAR
     |--------------------------------------------------------------------------
     |
-    | Konuşmalar menüsüne basıldığında direkt WhatsApp Web ekranı açılır.
+    | Konuşmalar menüsü doğrudan WhatsApp Web tarzı Inbox ekranını açar.
     |
     */
 

@@ -8,6 +8,7 @@ use App\Models\ConversationControl;
 use App\Services\WhatsAppService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Throwable;
 
@@ -56,7 +57,7 @@ class ConversationInbox extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | MOUNT
+    | SAYFA AÇILIŞI
     |--------------------------------------------------------------------------
     */
 
@@ -75,11 +76,16 @@ class ConversationInbox extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | YETKİLİ KONUŞMA QUERY
+    | YETKİLİ KONUŞMALAR
     |--------------------------------------------------------------------------
+    |
+    | Ana yönetici bütün müşterileri görür.
+    |
+    | Normal müşteriler sadece kendi konuşmalarını görür.
+    |
     */
 
-    protected function conversationQuery()
+    protected function conversationQuery(): Builder
     {
         $user = auth()->user();
 
@@ -95,11 +101,25 @@ class ConversationInbox extends Page
             );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | ANA YÖNETİCİ
+        |--------------------------------------------------------------------------
+        */
+
         if (
-            (bool) ($user->is_admin ?? false)
+            (int) $user->id === 1
+            || (string) $user->email === 'asilkangrup@gmail.com'
+            || (bool) ($user->is_admin ?? false)
         ) {
             return $query;
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | NORMAL MÜŞTERİ
+        |--------------------------------------------------------------------------
+        */
 
         return $query->where(
             'user_id',
@@ -125,7 +145,7 @@ class ConversationInbox extends Page
 
         if ($search !== '') {
             $query->where(
-                function ($query) use ($search) {
+                function (Builder $query) use ($search): void {
                     $query
                         ->where(
                             'whatsapp_number',
@@ -134,7 +154,7 @@ class ConversationInbox extends Page
                         )
                         ->orWhereHas(
                             'aiBot',
-                            function ($botQuery) use ($search) {
+                            function (Builder $botQuery) use ($search): void {
                                 $botQuery
                                     ->where(
                                         'name',
@@ -160,7 +180,7 @@ class ConversationInbox extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | SON MESAJ ÖZETİ
+        | SON MESAJ BİLGİSİ
         |--------------------------------------------------------------------------
         */
 
@@ -225,7 +245,7 @@ class ConversationInbox extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | MESAJLAR
+    | SEÇİLİ KONUŞMANIN MESAJLARI
     |--------------------------------------------------------------------------
     */
 
@@ -312,7 +332,7 @@ class ConversationInbox extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | AI'YE GERİ VER
+    | YAPAY ZEKÂYA GERİ VER
     |--------------------------------------------------------------------------
     */
 
@@ -333,7 +353,7 @@ class ConversationInbox extends Page
                 'Konuşma yapay zekâya geri verildi.'
             )
             ->body(
-                'Müşterinin sonraki mesajına AI yeniden cevap verebilir.'
+                'Müşterinin sonraki mesajına yapay zekâ yeniden cevap verebilir.'
             )
             ->success()
             ->send();
@@ -396,7 +416,7 @@ class ConversationInbox extends Page
         try {
             /*
             |--------------------------------------------------------------------------
-            | MESAJ YAZAN PERSONELSE AI'Yİ DURDUR
+            | PERSONEL MESAJ YAZARSA AI'Yİ DURDUR
             |--------------------------------------------------------------------------
             */
 
@@ -406,7 +426,7 @@ class ConversationInbox extends Page
 
             /*
             |--------------------------------------------------------------------------
-            | WHATSAPP'TAN GÖNDER
+            | WHATSAPP MESAJINI GÖNDER
             |--------------------------------------------------------------------------
             */
 
@@ -425,15 +445,8 @@ class ConversationInbox extends Page
 
             /*
             |--------------------------------------------------------------------------
-            | MESAJI SOHBET GEÇMİŞİNE KAYDET
+            | PANEL MESAJINI VERİTABANINA KAYDET
             |--------------------------------------------------------------------------
-            |
-            | role = assistant:
-            | OpenAI geçmişinde firmanın cevabı olarak görünür.
-            |
-            | sender_type = human:
-            | Panelde bunun personel tarafından yazıldığı anlaşılır.
-            |
             */
 
             ChatMessage::create([
@@ -446,8 +459,20 @@ class ConversationInbox extends Page
                 'session_id' =>
                     $conversation->session_id,
 
+                /*
+                |--------------------------------------------------------------------------
+                | OPENAI GEÇMİŞİNDE FİRMA CEVABI
+                |--------------------------------------------------------------------------
+                */
+
                 'role' =>
                     'assistant',
+
+                /*
+                |--------------------------------------------------------------------------
+                | PANELDE PERSONEL MESAJI
+                |--------------------------------------------------------------------------
+                */
 
                 'sender_type' =>
                     'human',
@@ -461,11 +486,17 @@ class ConversationInbox extends Page
 
             /*
             |--------------------------------------------------------------------------
-            | SON AKTİVİTE
+            | SON AKTİVİTEYİ GÜNCELLE
             |--------------------------------------------------------------------------
             */
 
             $conversation->touch();
+
+            /*
+            |--------------------------------------------------------------------------
+            | MESAJ KUTUSUNU TEMİZLE
+            |--------------------------------------------------------------------------
+            */
 
             $this->messageText = '';
 

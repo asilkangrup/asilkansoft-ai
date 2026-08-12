@@ -1,146 +1,503 @@
 <x-filament-panels::page>
 
-    <div
-        wire:poll.3s
-        class="grid min-h-[72vh] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900 lg:grid-cols-[340px_minmax(0,1fr)]"
-    >
+    <style>
+        .wai-chat-shell {
+            display: grid;
+            grid-template-columns: 340px minmax(0, 1fr);
+            min-height: 72vh;
+            max-height: 78vh;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, .25);
+            border-radius: 16px;
+            background: #ffffff;
+            box-shadow: 0 10px 35px rgba(15, 23, 42, .08);
+        }
 
-        {{-- SOL: KONUŞMALAR --}}
-        <div class="border-b border-gray-200 dark:border-white/10 lg:border-b-0 lg:border-r">
+        .dark .wai-chat-shell {
+            background: #111827;
+            border-color: rgba(255, 255, 255, .10);
+        }
 
-            {{-- ARAMA --}}
-            <div class="border-b border-gray-200 p-4 dark:border-white/10">
+        .wai-sidebar {
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            border-right: 1px solid #e5e7eb;
+            background: #ffffff;
+        }
+
+        .dark .wai-sidebar {
+            background: #111827;
+            border-color: rgba(255, 255, 255, .10);
+        }
+
+        .wai-search {
+            padding: 16px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .dark .wai-search {
+            border-color: rgba(255, 255, 255, .10);
+        }
+
+        .wai-search-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 11px 13px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            background: #f9fafb;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .wai-search-input:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, .12);
+        }
+
+        .dark .wai-search-input {
+            background: #1f2937;
+            border-color: rgba(255, 255, 255, .10);
+            color: #ffffff;
+        }
+
+        .wai-conversation-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .wai-conversation {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 15px 16px;
+            border: 0;
+            border-bottom: 1px solid #f1f5f9;
+            background: transparent;
+            text-align: left;
+            cursor: pointer;
+            transition: .15s ease;
+        }
+
+        .wai-conversation:hover {
+            background: #f8fafc;
+        }
+
+        .wai-conversation.active {
+            background: #eef2ff;
+        }
+
+        .dark .wai-conversation {
+            border-color: rgba(255, 255, 255, .06);
+            color: white;
+        }
+
+        .dark .wai-conversation:hover {
+            background: rgba(255, 255, 255, .05);
+        }
+
+        .dark .wai-conversation.active {
+            background: rgba(99, 102, 241, .13);
+        }
+
+        .wai-conversation-top {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+
+        .wai-phone {
+            overflow: hidden;
+            font-size: 14px;
+            font-weight: 700;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #111827;
+        }
+
+        .dark .wai-phone {
+            color: #ffffff;
+        }
+
+        .wai-company {
+            margin-top: 3px;
+            overflow: hidden;
+            font-size: 12px;
+            color: #64748b;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .wai-preview {
+            margin-top: 9px;
+            display: -webkit-box;
+            overflow: hidden;
+            font-size: 13px;
+            line-height: 1.45;
+            color: #475569;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+
+        .dark .wai-preview {
+            color: #cbd5e1;
+        }
+
+        .wai-time {
+            margin-top: 6px;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        .wai-badge {
+            flex: 0 0 auto;
+            padding: 5px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .wai-badge-ai {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .wai-badge-human {
+            background: #fef3c7;
+            color: #b45309;
+        }
+
+        .wai-main {
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            background: #f8fafc;
+        }
+
+        .dark .wai-main {
+            background: #0f172a;
+        }
+
+        .wai-header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 18px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #ffffff;
+        }
+
+        .dark .wai-header {
+            background: #111827;
+            border-color: rgba(255, 255, 255, .10);
+        }
+
+        .wai-header-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .wai-btn {
+            border: 0;
+            border-radius: 9px;
+            padding: 9px 12px;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .wai-btn-human {
+            background: #f59e0b;
+        }
+
+        .wai-btn-ai {
+            background: #16a34a;
+        }
+
+        .wai-messages {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 22px;
+            background-color: #efeae2;
+            background-image:
+                radial-gradient(rgba(0, 0, 0, .025) 1px, transparent 1px);
+            background-size: 18px 18px;
+        }
+
+        .dark .wai-messages {
+            background-color: #0b141a;
+        }
+
+        .wai-message-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        .wai-message-row.customer {
+            justify-content: flex-start;
+        }
+
+        .wai-message-row.outgoing {
+            justify-content: flex-end;
+        }
+
+        .wai-bubble {
+            max-width: 72%;
+            padding: 9px 11px 7px;
+            border-radius: 10px;
+            box-shadow: 0 1px 1px rgba(0, 0, 0, .08);
+        }
+
+        .wai-bubble.customer {
+            background: #ffffff;
+            color: #111827;
+            border-top-left-radius: 3px;
+        }
+
+        .wai-bubble.ai {
+            background: #d9fdd3;
+            color: #111827;
+            border-top-right-radius: 3px;
+        }
+
+        .wai-bubble.human {
+            background: #dbeafe;
+            color: #111827;
+            border-top-right-radius: 3px;
+        }
+
+        .wai-sender {
+            margin-bottom: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            opacity: .70;
+        }
+
+        .wai-message-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .wai-message-time {
+            margin-top: 4px;
+            text-align: right;
+            font-size: 9px;
+            opacity: .55;
+        }
+
+        .wai-composer {
+            padding: 13px;
+            border-top: 1px solid #e5e7eb;
+            background: #ffffff;
+        }
+
+        .dark .wai-composer {
+            background: #111827;
+            border-color: rgba(255, 255, 255, .10);
+        }
+
+        .wai-composer-row {
+            display: flex;
+            gap: 9px;
+            align-items: flex-end;
+        }
+
+        .wai-textarea {
+            flex: 1;
+            box-sizing: border-box;
+            min-height: 52px;
+            max-height: 130px;
+            resize: vertical;
+            padding: 12px 13px;
+            border: 1px solid #d1d5db;
+            border-radius: 12px;
+            outline: none;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .wai-send {
+            min-height: 52px;
+            padding: 0 20px;
+            border: 0;
+            border-radius: 12px;
+            background: #16a34a;
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .wai-send:disabled {
+            opacity: .5;
+        }
+
+        .wai-note {
+            margin-top: 7px;
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .wai-empty {
+            display: flex;
+            flex: 1;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            text-align: center;
+            color: #64748b;
+        }
+
+        @media (max-width: 900px) {
+            .wai-chat-shell {
+                grid-template-columns: 1fr;
+                max-height: none;
+            }
+
+            .wai-sidebar {
+                max-height: 330px;
+                border-right: 0;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+            .wai-main {
+                min-height: 600px;
+            }
+
+            .wai-bubble {
+                max-width: 88%;
+            }
+        }
+    </style>
+
+    <div class="wai-chat-shell" wire:poll.3s>
+
+        <aside class="wai-sidebar">
+
+            <div class="wai-search">
                 <input
+                    class="wai-search-input"
                     type="text"
                     wire:model.live.debounce.500ms="search"
-                    placeholder="Konuşma ara..."
-                    class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-gray-800"
-                />
+                    placeholder="Telefon veya firma ara..."
+                >
             </div>
 
-            {{-- LİSTE --}}
-            <div class="max-h-[68vh] overflow-y-auto">
+            <div class="wai-conversation-list">
 
                 @forelse ($this->conversations as $conversation)
 
                     <button
                         type="button"
                         wire:click="selectConversation({{ $conversation->id }})"
-                        class="w-full border-b border-gray-100 px-4 py-4 text-left transition hover:bg-gray-50 dark:border-white/5 dark:hover:bg-white/5
-                            {{ $selectedConversationId === $conversation->id
-                                ? 'bg-primary-50 dark:bg-primary-500/10'
-                                : ''
-                            }}"
+                        class="wai-conversation {{ $selectedConversationId === $conversation->id ? 'active' : '' }}"
                     >
 
-                        <div class="flex items-start justify-between gap-3">
+                        <div class="wai-conversation-top">
 
-                            <div class="min-w-0">
-
-                                <div class="truncate font-semibold text-gray-950 dark:text-white">
+                            <div style="min-width:0;">
+                                <div class="wai-phone">
                                     {{ $conversation->whatsapp_number }}
                                 </div>
 
-                                <div class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                                <div class="wai-company">
                                     {{ $conversation->aiBot?->company_name
                                         ?? $conversation->aiBot?->name
-                                        ?? 'Yapay Zekâ'
+                                        ?? 'WhatsApp'
                                     }}
                                 </div>
-
                             </div>
 
                             @if ($conversation->human_takeover)
-
-                                <span class="shrink-0 rounded-full bg-warning-100 px-2 py-1 text-[10px] font-semibold text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">
+                                <span class="wai-badge wai-badge-human">
                                     👤 İnsan
                                 </span>
-
                             @else
-
-                                <span class="shrink-0 rounded-full bg-success-100 px-2 py-1 text-[10px] font-semibold text-success-700 dark:bg-success-500/10 dark:text-success-400">
+                                <span class="wai-badge wai-badge-ai">
                                     🤖 AI
                                 </span>
-
                             @endif
 
                         </div>
 
-                        <div class="mt-3 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">
+                        <div class="wai-preview">
                             {{ $conversation->last_message_preview }}
                         </div>
 
                         @if ($conversation->last_message_at)
-
-                            <div class="mt-2 text-[11px] text-gray-400">
+                            <div class="wai-time">
                                 {{ $conversation->last_message_at->diffForHumans() }}
                             </div>
-
                         @endif
 
                     </button>
 
                 @empty
-
-                    <div class="p-8 text-center text-sm text-gray-500">
+                    <div class="wai-empty">
                         Henüz konuşma bulunmuyor.
                     </div>
-
                 @endforelse
 
             </div>
 
-        </div>
+        </aside>
 
-        {{-- SAĞ: SOHBET --}}
-        <div class="flex min-h-[72vh] min-w-0 flex-col">
+        <main class="wai-main">
 
             @if ($this->selectedConversation)
 
-                {{-- ÜST BAR --}}
-                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 dark:border-white/10">
+                <header class="wai-header">
 
                     <div>
-
-                        <div class="font-semibold text-gray-950 dark:text-white">
+                        <div class="wai-phone">
                             {{ $this->selectedConversation->whatsapp_number }}
                         </div>
 
-                        <div class="mt-1 text-xs text-gray-500">
+                        <div class="wai-company">
                             {{ $this->selectedConversation->aiBot?->company_name
                                 ?? $this->selectedConversation->aiBot?->name
                                 ?? 'WhatsApp'
                             }}
                         </div>
-
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-2">
+                    <div class="wai-header-actions">
 
                         @if ($this->selectedConversation->human_takeover)
 
-                            <span class="rounded-full bg-warning-100 px-3 py-1.5 text-xs font-semibold text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">
+                            <span class="wai-badge wai-badge-human">
                                 👤 İnsan Yönetiyor
                             </span>
 
                             <button
+                                class="wai-btn wai-btn-ai"
                                 type="button"
                                 wire:click="releaseToAi"
-                                class="rounded-lg bg-success-600 px-3 py-2 text-sm font-semibold text-white hover:bg-success-500"
                             >
                                 🤖 AI’ye Geri Ver
                             </button>
 
                         @else
 
-                            <span class="rounded-full bg-success-100 px-3 py-1.5 text-xs font-semibold text-success-700 dark:bg-success-500/10 dark:text-success-400">
+                            <span class="wai-badge wai-badge-ai">
                                 🤖 AI Aktif
                             </span>
 
                             <button
+                                class="wai-btn wai-btn-human"
                                 type="button"
                                 wire:click="takeOver"
-                                class="rounded-lg bg-warning-500 px-3 py-2 text-sm font-semibold text-white hover:bg-warning-400"
                             >
                                 👤 İnsan Devral
                             </button>
@@ -149,14 +506,13 @@
 
                     </div>
 
-                </div>
+                </header>
 
-                {{-- MESAJLAR --}}
-                <div
-                    wire:key="chat-{{ $selectedConversationId }}-{{ $this->messages->count() }}"
+                <section
+                    class="wai-messages"
+                    wire:key="conversation-messages-{{ $selectedConversationId }}-{{ $this->messages->count() }}"
                     x-data
                     x-init="$nextTick(() => { $el.scrollTop = $el.scrollHeight })"
-                    class="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-5 dark:bg-gray-950/40"
                 >
 
                     @forelse ($this->messages as $message)
@@ -171,52 +527,37 @@
                                         : 'customer';
                             }
 
-                            $isCustomer =
-                                $senderType === 'customer';
-
-                            $isHuman =
-                                $senderType === 'human';
+                            $isCustomer = $senderType === 'customer';
+                            $isHuman = $senderType === 'human';
                         @endphp
 
-                        <div
-                            class="flex {{ $isCustomer ? 'justify-start' : 'justify-end' }}"
-                        >
+                        <div class="wai-message-row {{ $isCustomer ? 'customer' : 'outgoing' }}">
 
                             <div
-                                class="max-w-[85%] rounded-2xl px-4 py-3 shadow-sm lg:max-w-[70%]
-                                    @if ($isCustomer)
-                                        bg-white text-gray-900 dark:bg-gray-800 dark:text-white
-                                    @elseif ($isHuman)
-                                        bg-primary-600 text-white
-                                    @else
-                                        bg-success-600 text-white
-                                    @endif
-                                "
+                                class="wai-bubble
+                                {{ $isCustomer
+                                    ? 'customer'
+                                    : ($isHuman ? 'human' : 'ai')
+                                }}"
                             >
 
-                                <div class="mb-1 text-[11px] font-semibold opacity-75">
+                                <div class="wai-sender">
 
                                     @if ($isCustomer)
-
                                         Müşteri
-
                                     @elseif ($isHuman)
-
                                         👤 {{ $message->sentByUser?->name ?? 'Personel' }}
-
                                     @else
-
                                         🤖 Yapay Zekâ
-
                                     @endif
 
                                 </div>
 
-                                <div class="whitespace-pre-wrap break-words text-sm">
+                                <div class="wai-message-text">
                                     {{ $message->message }}
                                 </div>
 
-                                <div class="mt-2 text-right text-[10px] opacity-60">
+                                <div class="wai-message-time">
                                     {{ $message->created_at?->format('H:i') }}
                                 </div>
 
@@ -226,33 +567,32 @@
 
                     @empty
 
-                        <div class="flex h-full items-center justify-center text-sm text-gray-500">
-                            Bu konuşmada henüz mesaj yok.
+                        <div class="wai-empty">
+                            Bu konuşmada henüz mesaj bulunmuyor.
                         </div>
 
                     @endforelse
 
-                </div>
+                </section>
 
-                {{-- MESAJ YAZ --}}
                 <form
+                    class="wai-composer"
                     wire:submit="sendMessage"
-                    class="border-t border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-gray-900"
                 >
 
-                    <div class="flex items-end gap-3">
+                    <div class="wai-composer-row">
 
                         <textarea
+                            class="wai-textarea"
                             wire:model="messageText"
-                            rows="2"
                             placeholder="Mesaj yaz..."
-                            class="min-h-[52px] flex-1 resize-none rounded-xl border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-gray-800"
+                            rows="2"
                         ></textarea>
 
                         <button
+                            class="wai-send"
                             type="submit"
                             wire:loading.attr="disabled"
-                            class="rounded-xl bg-primary-600 px-5 py-3 font-semibold text-white hover:bg-primary-500 disabled:opacity-50"
                         >
                             Gönder
                         </button>
@@ -261,9 +601,9 @@
 
                     @if (! $this->selectedConversation->human_takeover)
 
-                        <div class="mt-2 text-xs text-gray-500">
-                            Mesaj gönderdiğiniz anda bu konuşma otomatik olarak
-                            <strong>İnsan Yönetiyor</strong> moduna geçer.
+                        <div class="wai-note">
+                            Mesaj gönderildiğinde bu konuşma otomatik olarak
+                            <strong>İnsan Yönetiyor</strong> moduna alınır.
                         </div>
 
                     @endif
@@ -272,29 +612,21 @@
 
             @else
 
-                <div class="flex flex-1 items-center justify-center p-10 text-center">
-
+                <div class="wai-empty">
                     <div>
-
-                        <div class="text-4xl">
-                            💬
-                        </div>
-
-                        <div class="mt-4 font-semibold text-gray-950 dark:text-white">
+                        <div style="font-size:42px;">💬</div>
+                        <div style="margin-top:10px;font-weight:700;">
                             Bir konuşma seçin
                         </div>
-
-                        <div class="mt-2 text-sm text-gray-500">
+                        <div style="margin-top:5px;font-size:13px;">
                             Soldaki listeden bir WhatsApp konuşması seçebilirsiniz.
                         </div>
-
                     </div>
-
                 </div>
 
             @endif
 
-        </div>
+        </main>
 
     </div>
 
