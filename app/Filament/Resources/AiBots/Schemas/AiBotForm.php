@@ -23,21 +23,21 @@ class AiBotForm
 
                 /*
                 |--------------------------------------------------------------------------
-                | YAPAY ZEKÃ‚ KONTROLÃœ
+                | YAPAY ZEKÂ KONTROLÜ
                 |--------------------------------------------------------------------------
                 */
 
-                Section::make('Yapay ZekÃ¢ KontrolÃ¼')
+                Section::make('Yapay Zekâ Kontrolü')
                     ->description(
-                        'Yapay zekÃ¢nÄ±n WhatsApp mÃ¼ÅŸterilerine otomatik cevap verip vermeyeceÄŸini yÃ¶netin.'
+                        'Yapay zekânın WhatsApp müşterilerine otomatik cevap verip vermeyeceğini yönetin.'
                     )
                     ->icon('heroicon-o-power')
                     ->schema([
 
                         Toggle::make('ai_enabled')
-                            ->label('Yapay ZekÃ¢ Aktif')
+                            ->label('Yapay Zekâ Aktif')
                             ->helperText(
-                                'KapattÄ±ÄŸÄ±nÄ±zda WhatsApp baÄŸlantÄ±sÄ± ve QR kodu baÄŸlÄ± kalÄ±r, ancak yapay zekÃ¢ mÃ¼ÅŸterilere otomatik cevap vermez.'
+                                'Kapattığınızda WhatsApp bağlantısı ve QR kodu bağlı kalır, ancak yapay zekâ müşterilere otomatik cevap vermez.'
                             )
                             ->default(true)
                             ->onColor('success')
@@ -48,13 +48,13 @@ class AiBotForm
 
                 /*
                 |--------------------------------------------------------------------------
-                | WHATSAPP GRUP YÃ–NLENDÄ°RME
+                | WHATSAPP GRUP YÖNLENDİRME
                 |--------------------------------------------------------------------------
                 */
 
-                Section::make('WhatsApp Grup YÃ¶nlendirme')
+                Section::make('WhatsApp Grup Yönlendirme')
                     ->description(
-                        'Tamamlanan finans baÅŸvurularÄ±nÄ± baÄŸlÄ± WhatsApp hesabÄ±nÄ±zdaki doÄŸru gruplara otomatik yÃ¶nlendirin.'
+                        'Tamamlanan finans başvurularını bağlı WhatsApp hesabınızdaki doğru gruplara otomatik yönlendirin.'
                     )
                     ->icon('heroicon-o-user-group')
                     ->visible(
@@ -65,9 +65,9 @@ class AiBotForm
                     ->schema([
 
                         Toggle::make('group_routing_enabled')
-                            ->label('Grup YÃ¶nlendirmeyi Aktif Et')
+                            ->label('Grup Yönlendirmeyi Aktif Et')
                             ->helperText(
-                                'AÃ§Ä±ldÄ±ÄŸÄ±nda tamamlanan baÅŸvurular aÅŸaÄŸÄ±da seÃ§tiÄŸiniz WhatsApp gruplarÄ±na otomatik gÃ¶nderilir.'
+                                'Açıldığında tamamlanan başvurular aşağıda seçtiğiniz WhatsApp gruplarına otomatik gönderilir.'
                             )
                             ->default(false)
                             ->onColor('success')
@@ -75,10 +75,10 @@ class AiBotForm
                             ->live(),
 
                         Select::make('vodafone_group_jid')
-                            ->label('Vodafone BaÅŸvurularÄ± Grubu')
-                            ->placeholder('WhatsApp grubu seÃ§in')
+                            ->label('Vodafone Başvuruları Grubu')
+                            ->placeholder('WhatsApp grubu seçin')
                             ->helperText(
-                                'Vodafone baÅŸvurularÄ± bu gruba gÃ¶nderilir.'
+                                'Vodafone başvuruları bu gruba gönderilir.'
                             )
                             ->options(
                                 fn (?AiBot $record): array =>
@@ -92,10 +92,10 @@ class AiBotForm
                             ),
 
                         Select::make('turktelekom_group_jid')
-                            ->label('TÃ¼rk Telekom BaÅŸvurularÄ± Grubu')
-                            ->placeholder('WhatsApp grubu seÃ§in')
+                            ->label('Türk Telekom Başvuruları Grubu')
+                            ->placeholder('WhatsApp grubu seçin')
                             ->helperText(
-                                'TÃ¼rk Telekom baÅŸvurularÄ± bu gruba gÃ¶nderilir.'
+                                'Türk Telekom başvuruları bu gruba gönderilir.'
                             )
                             ->options(
                                 fn (?AiBot $record): array =>
@@ -109,10 +109,10 @@ class AiBotForm
                             ),
 
                         Select::make('turkcell_group_jid')
-                            ->label('Turkcell BaÅŸvurularÄ± Grubu')
-                            ->placeholder('WhatsApp grubu seÃ§in')
+                            ->label('Turkcell Başvuruları Grubu')
+                            ->placeholder('WhatsApp grubu seçin')
                             ->helperText(
-                                'Turkcell baÅŸvurularÄ± bu gruba gÃ¶nderilir.'
+                                'Turkcell başvuruları bu gruba gönderilir.'
                             )
                             ->options(
                                 fn (?AiBot $record): array =>
@@ -126,10 +126,10 @@ class AiBotForm
                             ),
 
                         Select::make('findeks_group_jid')
-                            ->label('Findeks BaÅŸvurularÄ± Grubu')
-                            ->placeholder('WhatsApp grubu seÃ§in')
+                            ->label('Findeks Başvuruları Grubu')
+                            ->placeholder('WhatsApp grubu seçin')
                             ->helperText(
-                                'Findeks / banka kredi danÄ±ÅŸmanlÄ±ÄŸÄ± baÅŸvurularÄ± bu gruba gÃ¶nderilir.'
+                                'Findeks / banka kredi danışmanlığı başvuruları bu gruba gönderilir.'
                             )
                             ->options(
                                 fn (?AiBot $record): array =>
@@ -143,10 +143,10 @@ class AiBotForm
                             ),
 
                         Select::make('elden_taksit_group_jid')
-                            ->label('Elden Taksit BaÅŸvurularÄ± Grubu')
-                            ->placeholder('WhatsApp grubu seÃ§in')
+                            ->label('Elden Taksit Başvuruları Grubu')
+                            ->placeholder('WhatsApp grubu seçin')
                             ->helperText(
-                                'BankasÄ±z / kefilsiz elden taksit baÅŸvurularÄ± bu gruba gÃ¶nderilir.'
+                                'Bankasız / kefilsiz elden taksit başvuruları bu gruba gönderilir.'
                             )
                             ->options(
                                 fn (?AiBot $record): array =>
@@ -163,37 +163,37 @@ class AiBotForm
 
                 /*
                 |--------------------------------------------------------------------------
-                | TEMEL BÄ°LGÄ°LER
+                | TEMEL BİLGİLER
                 |--------------------------------------------------------------------------
                 */
 
                 Section::make('Temel Bilgiler')
                     ->description(
-                        'Yapay zekÃ¢nÄ±zÄ±n ve firmanÄ±zÄ±n temel bilgilerini dÃ¼zenleyin.'
+                        'Yapay zekânızın ve firmanızın temel bilgilerini düzenleyin.'
                     )
                     ->icon('heroicon-o-building-office')
                     ->schema([
 
                         TextInput::make('name')
-                            ->label('Yapay ZekÃ¢ AdÄ±')
-                            ->placeholder('Ã–rn: SatÄ±ÅŸ AsistanÄ±m')
+                            ->label('Yapay Zekâ Adı')
+                            ->placeholder('Örn: Satış Asistanım')
                             ->helperText(
-                                'Panelde gÃ¶receÄŸiniz yapay zekÃ¢ adÄ±dÄ±r.'
+                                'Panelde göreceğiniz yapay zekâ adıdır.'
                             )
                             ->required()
                             ->maxLength(255),
 
                         TextInput::make('company_name')
-                            ->label('Firma AdÄ±')
-                            ->placeholder('Ã–rn: ABC Klima')
+                            ->label('Firma Adı')
+                            ->placeholder('Örn: ABC Klima')
                             ->required()
                             ->maxLength(255),
 
                         TextInput::make('whatsapp_number')
-                            ->label('WhatsApp NumarasÄ±')
+                            ->label('WhatsApp Numarası')
                             ->placeholder('905xxxxxxxxx')
                             ->helperText(
-                                'Ãœlke koduyla birlikte yazabilirsiniz.'
+                                'Ülke koduyla birlikte yazabilirsiniz.'
                             )
                             ->tel()
                             ->maxLength(30),
@@ -204,13 +204,13 @@ class AiBotForm
                             ->directory('ai-bot-logos'),
 
                         Select::make('role')
-                            ->label('Yapay ZekÃ¢nÄ±n GÃ¶revi')
+                            ->label('Yapay Zekânın Görevi')
                             ->options([
                                 'sales' =>
-                                    'SatÄ±ÅŸ UzmanÄ±',
+                                    'Satış Uzmanı',
 
                                 'support' =>
-                                    'MÃ¼ÅŸteri Temsilcisi',
+                                    'Müşteri Temsilcisi',
 
                                 'technical' =>
                                     'Teknik Destek',
@@ -227,33 +227,33 @@ class AiBotForm
 
                 /*
                 |--------------------------------------------------------------------------
-                | FÄ°RMA BÄ°LGÄ°LERÄ°
+                | FİRMA BİLGİLERİ
                 |--------------------------------------------------------------------------
                 */
 
                 Section::make('Firma Bilgileri')
                     ->description(
-                        'Yapay zekÃ¢nÄ±n firmanÄ±zÄ± doÄŸru tanÄ±tmasÄ± iÃ§in kullanÄ±lan bilgiler.'
+                        'Yapay zekânın firmanızı doğru tanıtması için kullanılan bilgiler.'
                     )
                     ->icon('heroicon-o-information-circle')
                     ->schema([
 
                         Textarea::make('company_description')
-                            ->label('Firma HakkÄ±nda')
+                            ->label('Firma Hakkında')
                             ->placeholder(
-                                'FirmanÄ±z ne yapÄ±yor? Hangi Ã¼rÃ¼n veya hizmetleri sunuyorsunuz?'
+                                'Firmanız ne yapıyor? Hangi ürün veya hizmetleri sunuyorsunuz?'
                             )
                             ->helperText(
-                                'Yapay zekÃ¢ mÃ¼ÅŸterilere firmanÄ±zÄ± anlatÄ±rken bu bilgileri kullanÄ±r.'
+                                'Yapay zekâ müşterilere firmanızı anlatırken bu bilgileri kullanır.'
                             )
                             ->rows(7)
                             ->required()
                             ->columnSpanFull(),
 
                         Textarea::make('working_hours')
-                            ->label('Ã‡alÄ±ÅŸma Saatleri')
+                            ->label('Çalışma Saatleri')
                             ->placeholder(
-                                'Ã–rn: Pazartesi - Cumartesi 09:00 - 18:00'
+                                'Örn: Pazartesi - Cumartesi 09:00 - 18:00'
                             )
                             ->rows(4)
                             ->columnSpanFull(),
@@ -261,13 +261,13 @@ class AiBotForm
 
                 /*
                 |--------------------------------------------------------------------------
-                | SATIÅ VE HÄ°ZMET
+                | SATIŞ VE HİZMET
                 |--------------------------------------------------------------------------
                 */
 
-                Section::make('SatÄ±ÅŸ ve Hizmet Bilgileri')
+                Section::make('Satış ve Hizmet Bilgileri')
                     ->description(
-                        'Ã–deme, teslimat, kargo ve iade bilgilerini dÃ¼zenleyin.'
+                        'Ödeme, teslimat, kargo ve iade bilgilerini düzenleyin.'
                     )
                     ->icon('heroicon-o-shopping-cart')
                     ->schema([
@@ -275,26 +275,26 @@ class AiBotForm
                         Textarea::make('cargo_information')
                             ->label('Kargo ve Teslimat Bilgileri')
                             ->placeholder(
-                                'Kargo firmasÄ±, teslimat sÃ¼resi, Ã¼cretsiz kargo ÅŸartlarÄ± veya hizmet bÃ¶lgesini yazÄ±n.'
+                                'Kargo firması, teslimat süresi, ücretsiz kargo şartları veya hizmet bölgesini yazın.'
                             )
                             ->helperText(
-                                'Hizmet sektÃ¶rÃ¼ndeyseniz servis bÃ¶lgesi ve randevu bilgilerini yazabilirsiniz.'
+                                'Hizmet sektöründeyseniz servis bölgesi ve randevu bilgilerini yazabilirsiniz.'
                             )
                             ->rows(6),
 
                         Textarea::make('payment_information')
-                            ->label('Ã–deme Bilgileri')
+                            ->label('Ödeme Bilgileri')
                             ->placeholder(
-                                'KapÄ±da nakit, kapÄ±da kart, havale, kredi kartÄ± vb.'
+                                'Kapıda nakit, kapıda kart, havale, kredi kartı vb.'
                             )
                             ->rows(6),
 
                         Textarea::make('return_policy')
                             ->label(
-                                'Ä°ade / DeÄŸiÅŸim / Ä°ptal PolitikasÄ±'
+                                'İade / Değişim / İptal Politikası'
                             )
                             ->placeholder(
-                                'Varsa iade, deÄŸiÅŸim ve iptal koÅŸullarÄ±nÄ±zÄ± yazÄ±n.'
+                                'Varsa iade, değişim ve iptal koşullarınızı yazın.'
                             )
                             ->rows(5)
                             ->columnSpanFull(),
@@ -303,37 +303,37 @@ class AiBotForm
 
                 /*
                 |--------------------------------------------------------------------------
-                | YAPAY ZEKA EÄÄ°TÄ°MÄ°
+                | YAPAY ZEKA EĞİTİMİ
                 |--------------------------------------------------------------------------
                 */
 
-                Section::make('Yapay ZekÃ¢ EÄŸitimi')
+                Section::make('Yapay Zekâ Eğitimi')
                     ->description(
-                        'AsistanÄ±n konuÅŸma ÅŸeklini ve uymasÄ± gereken kurallarÄ± yÃ¶netin.'
+                        'Asistanın konuşma şeklini ve uyması gereken kuralları yönetin.'
                     )
                     ->icon('heroicon-o-academic-cap')
                     ->schema([
 
                         Textarea::make('company_rules')
-                            ->label('Ã–zel Firma KurallarÄ±')
+                            ->label('Özel Firma Kuralları')
                             ->placeholder(
-                                'Ã–rn: BilmediÄŸin fiyatÄ± uydurma. Kesin teslimat sÃ¶zÃ¼ verme. MÃ¼ÅŸteriyi uygun ÅŸekilde satÄ±ÅŸa yÃ¶nlendir.'
+                                'Örn: Bilmediğin fiyatı uydurma. Kesin teslimat sözü verme. Müşteriyi uygun şekilde satışa yönlendir.'
                             )
                             ->helperText(
-                                'Yapay zekÃ¢nÄ±n kesinlikle uymasÄ± gereken firma kurallarÄ±nÄ± yazÄ±n.'
+                                'Yapay zekânın kesinlikle uyması gereken firma kurallarını yazın.'
                             )
                             ->rows(7)
                             ->columnSpanFull(),
 
                         Textarea::make('system_prompt')
                             ->label(
-                                'KonuÅŸma ve SatÄ±ÅŸ TalimatlarÄ±'
+                                'Konuşma ve Satış Talimatları'
                             )
                             ->placeholder(
-                                'Ã–rn: Samimi ve profesyonel konuÅŸ. Ã–nce mÃ¼ÅŸterinin ihtiyacÄ±nÄ± Ã¶ÄŸren. KÄ±sa cevaplar ver.'
+                                'Örn: Samimi ve profesyonel konuş. Önce müşterinin ihtiyacını öğren. Kısa cevaplar ver.'
                             )
                             ->helperText(
-                                'Yapay zekÃ¢nÄ±n mÃ¼ÅŸterilerle nasÄ±l konuÅŸacaÄŸÄ±nÄ± buradan belirleyebilirsiniz.'
+                                'Yapay zekânın müşterilerle nasıl konuşacağını buradan belirleyebilirsiniz.'
                             )
                             ->rows(8)
                             ->columnSpanFull(),
@@ -341,13 +341,13 @@ class AiBotForm
 
                 /*
                 |--------------------------------------------------------------------------
-                | OTOMATÄ°K TAKÄ°P
+                | OTOMATİK TAKİP
                 |--------------------------------------------------------------------------
                 */
 
-                Section::make('Otomatik Takip MesajlarÄ±')
+                Section::make('Otomatik Takip Mesajları')
                     ->description(
-                        'Cevap vermeyen mÃ¼ÅŸterilere gÃ¶nderilecek otomatik mesajlarÄ± yÃ¶netin.'
+                        'Cevap vermeyen müşterilere gönderilecek otomatik mesajları yönetin.'
                     )
                     ->icon('heroicon-o-clock')
                     ->collapsed()
@@ -355,10 +355,10 @@ class AiBotForm
 
                         Toggle::make('follow_up_enabled')
                             ->label(
-                                'Cevap Vermeyen MÃ¼ÅŸterileri Otomatik Takip Et'
+                                'Cevap Vermeyen Müşterileri Otomatik Takip Et'
                             )
                             ->helperText(
-                                'MÃ¼ÅŸteri gÃ¶rÃ¼ÅŸmeyi yarÄ±da bÄ±rakÄ±rsa belirlediÄŸiniz sÃ¼re sonunda otomatik hatÄ±rlatma gÃ¶nderilir.'
+                                'Müşteri görüşmeyi yarıda bırakırsa belirlediğiniz süre sonunda otomatik hatırlatma gönderilir.'
                             )
                             ->default(false)
                             ->live(),
@@ -367,7 +367,7 @@ class AiBotForm
                             'first_follow_up_minutes'
                         )
                             ->label(
-                                '1. HatÄ±rlatma Ne Zaman GÃ¶nderilsin?'
+                                '1. Hatırlatma Ne Zaman Gönderilsin?'
                             )
                             ->options([
                                 60 => '1 Saat Sonra',
@@ -376,10 +376,10 @@ class AiBotForm
                                 360 => '6 Saat Sonra',
                                 720 => '12 Saat Sonra',
                                 1440 => '24 Saat Sonra',
-                                2880 => '2 GÃ¼n Sonra',
-                                4320 => '3 GÃ¼n Sonra',
-                                7200 => '5 GÃ¼n Sonra',
-                                10080 => '7 GÃ¼n Sonra',
+                                2880 => '2 Gün Sonra',
+                                4320 => '3 Gün Sonra',
+                                7200 => '5 Gün Sonra',
+                                10080 => '7 Gün Sonra',
                             ])
                             ->default(1440)
                             ->required()
@@ -394,10 +394,10 @@ class AiBotForm
                             'first_follow_up_message'
                         )
                             ->label(
-                                '1. HatÄ±rlatma MesajÄ±'
+                                '1. Hatırlatma Mesajı'
                             )
                             ->default(
-                                'Merhaba ğŸ‘‹ Daha Ã¶nce gÃ¶rÃ¼ÅŸtÃ¼ÄŸÃ¼mÃ¼z Ã¼rÃ¼nle hÃ¢lÃ¢ ilgileniyor musunuz? Size yardÄ±mcÄ± olabilirim.'
+                                'Merhaba 👋 Daha önce görüştüğümüz ürünle hâlâ ilgileniyor musunuz? Size yardımcı olabilirim.'
                             )
                             ->rows(4)
                             ->columnSpanFull()
@@ -412,7 +412,7 @@ class AiBotForm
                             'second_follow_up_enabled'
                         )
                             ->label(
-                                '2. ve Son HatÄ±rlatma GÃ¶nder'
+                                '2. ve Son Hatırlatma Gönder'
                             )
                             ->default(true)
                             ->live()
@@ -427,17 +427,17 @@ class AiBotForm
                             'second_follow_up_minutes'
                         )
                             ->label(
-                                '2. HatÄ±rlatma Ne Zaman GÃ¶nderilsin?'
+                                '2. Hatırlatma Ne Zaman Gönderilsin?'
                             )
                             ->options([
-                                1440 => '1 GÃ¼n Sonra',
-                                2880 => '2 GÃ¼n Sonra',
-                                4320 => '3 GÃ¼n Sonra',
-                                5760 => '4 GÃ¼n Sonra',
-                                7200 => '5 GÃ¼n Sonra',
-                                10080 => '7 GÃ¼n Sonra',
-                                14400 => '10 GÃ¼n Sonra',
-                                20160 => '14 GÃ¼n Sonra',
+                                1440 => '1 Gün Sonra',
+                                2880 => '2 Gün Sonra',
+                                4320 => '3 Gün Sonra',
+                                5760 => '4 Gün Sonra',
+                                7200 => '5 Gün Sonra',
+                                10080 => '7 Gün Sonra',
+                                14400 => '10 Gün Sonra',
+                                20160 => '14 Gün Sonra',
                             ])
                             ->default(4320)
                             ->required()
@@ -455,10 +455,10 @@ class AiBotForm
                             'second_follow_up_message'
                         )
                             ->label(
-                                '2. ve Son HatÄ±rlatma MesajÄ±'
+                                '2. ve Son Hatırlatma Mesajı'
                             )
                             ->default(
-                                'Merhaba ğŸ‘‹ Daha Ã¶nce gÃ¶rÃ¼ÅŸtÃ¼ÄŸÃ¼mÃ¼z Ã¼rÃ¼nle ilgili yardÄ±mcÄ± olabileceÄŸimiz bir konu var mÄ±? Dilerseniz sipariÅŸinizi birlikte oluÅŸturabiliriz.'
+                                'Merhaba 👋 Daha önce görüştüğümüz ürünle ilgili yardımcı olabileceğimiz bir konu var mı? Dilerseniz siparişinizi birlikte oluşturabiliriz.'
                             )
                             ->rows(4)
                             ->columnSpanFull()
@@ -478,17 +478,17 @@ class AiBotForm
 
     /*
     |--------------------------------------------------------------------------
-    | BAÄLI WHATSAPP HESABININ GRUPLARI
+    | BAĞLI WHATSAPP HESABININ GRUPLARI
     |--------------------------------------------------------------------------
     |
-    | Her bot iÃ§in kendi whatsapp_instance deÄŸeri kullanÄ±lÄ±r.
+    | Her bot için kendi whatsapp_instance değeri kullanılır.
     |
-    | Ã–rneÄŸin:
+    | Örneğin:
     |
-    | Bot A -> bot-a-10 -> sadece Bot A'nÄ±n gruplarÄ±
-    | Bot B -> bot-b-20 -> sadece Bot B'nin gruplarÄ±
+    | Bot A -> bot-a-10 -> sadece Bot A'nın grupları
+    | Bot B -> bot-b-20 -> sadece Bot B'nin grupları
     |
-    | BÃ¶ylece mÃ¼ÅŸterilerin gruplarÄ± birbirine karÄ±ÅŸmaz.
+    | Böylece müşterilerin grupları birbirine karışmaz.
     |
     */
 
