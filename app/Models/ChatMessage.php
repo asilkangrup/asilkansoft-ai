@@ -11,119 +11,67 @@ class ChatMessage extends Model
         'user_id',
         'ai_bot_id',
         'session_id',
-
-        /*
-        |--------------------------------------------------------------------------
-        | OPENAI ROLÜ
-        |--------------------------------------------------------------------------
-        |
-        | user
-        | assistant
-        |
-        */
-
         'role',
-
-        /*
-        |--------------------------------------------------------------------------
-        | MESAJI KİM GÖNDERDİ?
-        |--------------------------------------------------------------------------
-        |
-        | customer = müşteri
-        | ai       = yapay zekâ
-        | human    = paneldeki personel
-        |
-        */
-
         'sender_type',
-
-        /*
-        |--------------------------------------------------------------------------
-        | MESAJI GÖNDEREN PERSONEL
-        |--------------------------------------------------------------------------
-        |
-        | sender_type = human olduğunda hangi panel kullanıcısının
-        | mesajı gönderdiğini burada tutuyoruz.
-        |
-        */
-
         'sent_by_user_id',
-
-        /*
-        |--------------------------------------------------------------------------
-        | MESAJ
-        |--------------------------------------------------------------------------
-        */
-
         'message',
+        'message_type',
+        'media_url',
+        'media_mime_type',
+        'media_filename',
+        'media_caption',
+        'media_duration',
+        'media_size',
+        'whatsapp_message_id',
+        'status',
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | KULLANICI / MÜŞTERİ HESABI
-    |--------------------------------------------------------------------------
-    */
+    protected $casts = [
+        'media_duration' => 'integer',
+        'media_size' => 'integer',
+    ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | YAPAY ZEKÂ BOTU
-    |--------------------------------------------------------------------------
-    */
-
     public function aiBot(): BelongsTo
     {
         return $this->belongsTo(AiBot::class);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | MESAJI GÖNDEREN PERSONEL
-    |--------------------------------------------------------------------------
-    */
-
     public function sentByUser(): BelongsTo
     {
-        return $this->belongsTo(
-            User::class,
-            'sent_by_user_id'
-        );
+        return $this->belongsTo(User::class, 'sent_by_user_id');
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | MESAJ MÜŞTERİDEN Mİ?
-    |--------------------------------------------------------------------------
-    */
 
     public function musteridenMi(): bool
     {
         return $this->sender_type === 'customer';
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | MESAJ AI'DAN MI?
-    |--------------------------------------------------------------------------
-    */
-
     public function yapayZekadanMi(): bool
     {
         return $this->sender_type === 'ai';
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | MESAJ PERSONELDEN Mİ?
-    |--------------------------------------------------------------------------
-    */
-
     public function insandanMi(): bool
     {
         return $this->sender_type === 'human';
+    }
+
+    public function isText(): bool
+    {
+        return ($this->message_type ?: 'text') === 'text';
+    }
+
+    public function isMedia(): bool
+    {
+        return in_array(
+            $this->message_type ?: 'text',
+            ['image', 'video', 'audio', 'document'],
+            true
+        );
     }
 }

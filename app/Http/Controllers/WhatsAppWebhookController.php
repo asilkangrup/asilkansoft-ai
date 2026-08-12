@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\ProcessWhatsAppWebhook;
 use App\Models\AiBot;
+use App\Models\ChatMessage;
 use App\Models\ConversationFollowUp;
 use App\Models\ConversationControl;
 use App\Models\FinanceLead;
@@ -41,10 +42,18 @@ class WhatsAppWebhookController extends Controller
             |--------------------------------------------------------------------------
             */
 
-            if (
-                data_get($payload, 'event')
-                !== 'messages.upsert'
-            ) {
+            $event = strtolower((string) data_get($payload, 'event', ''));
+
+            if ($event === 'messages.update') {
+                $this->handleMessageStatusUpdate($payload);
+
+                return response()->json([
+                    'success' => true,
+                    'status_update' => true,
+                ]);
+            }
+
+            if ($event !== 'messages.upsert') {
                 return response()->json([
                     'success' => true,
                     'ignored' => true,
@@ -240,29 +249,79 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | MESAJ
+            | MESAJ / MEDYA
             |--------------------------------------------------------------------------
             */
 
-            $message =
-                data_get(
-                    $payload,
-                    'data.message.conversation'
-                )
-                ?? data_get(
-                    $payload,
-                    'data.message.extendedTextMessage.text'
-                );
+            $messagePayload = data_get($payload, 'data.message', []);
 
-            $message = trim(
-                (string) $message
+            $message = data_get(
+                $messagePayload,
+                'conversation'
+            )
+            ?? data_get(
+                $messagePayload,
+                'extendedTextMessage.text'
             );
+
+            $messageType = 'text';
+            $mediaUrl = null;
+            $mediaMimeType = null;
+            $mediaFilename = null;
+            $mediaCaption = null;
+
+            if (! is_string($message) || trim($message) === '') {
+                $image = data_get($messagePayload, 'imageMessage');
+
+                if (is_array($image)) {
+                    $messageType = 'image';
+                    $mediaUrl = data_get($image, 'url');
+                    $mediaMimeType = data_get($image, 'mimetype');
+                    $mediaFilename = data_get($image, 'fileName') ?? 'Fotoğraf';
+                    $mediaCaption = data_get($image, 'caption');
+                    $message = $mediaCaption ?: '[Fotoğraf]';
+                }
+
+                $video = data_get($messagePayload, 'videoMessage');
+
+                if ($messageType === 'text' && is_array($video)) {
+                    $messageType = 'video';
+                    $mediaUrl = data_get($video, 'url');
+                    $mediaMimeType = data_get($video, 'mimetype');
+                    $mediaFilename = data_get($video, 'fileName') ?? 'Video';
+                    $mediaCaption = data_get($video, 'caption');
+                    $message = $mediaCaption ?: '[Video]';
+                }
+
+                $document = data_get($messagePayload, 'documentMessage');
+
+                if ($messageType === 'text' && is_array($document)) {
+                    $messageType = 'document';
+                    $mediaUrl = data_get($document, 'url');
+                    $mediaMimeType = data_get($document, 'mimetype');
+                    $mediaFilename = data_get($document, 'fileName') ?? 'Belge';
+                    $mediaCaption = data_get($document, 'caption');
+                    $message = $mediaCaption ?: '[Belge]';
+                }
+
+                $audio = data_get($messagePayload, 'audioMessage');
+
+                if ($messageType === 'text' && is_array($audio)) {
+                    $messageType = 'audio';
+                    $mediaUrl = data_get($audio, 'url');
+                    $mediaMimeType = data_get($audio, 'mimetype');
+                    $mediaFilename = 'Sesli mesaj';
+                    $message = '[Sesli mesaj]';
+                }
+            }
+
+            $message = trim((string) $message);
 
             if ($message === '') {
                 return response()->json([
                     'success' => true,
                     'ignored' => true,
-                    'reason' => 'non_text_message',
+                    'reason' => 'empty_message',
                 ]);
             }
 
@@ -401,6 +460,30 @@ class WhatsAppWebhookController extends Controller
                 now();
 
             $conversationControl->save();
+
+            /*
+            |--------------------------------------------------------------------------
+            | MEDYA MESAJINI PANEL HAFIZASINA KAYDET
+            |--------------------------------------------------------------------------
+            */
+
+            if ($messageType !== 'text') {
+                ChatMessage::create([
+                    'user_id' => $aiBot->user_id,
+                    'ai_bot_id' => $aiBot->id,
+                    'session_id' => $sessionId,
+                    'role' => 'user',
+                    'sender_type' => 'customer',
+                    'message' => $message,
+                    'message_type' => $messageType,
+                    'media_url' => $mediaUrl,
+                    'media_mime_type' => $mediaMimeType,
+                    'media_filename' => $mediaFilename,
+                    'media_caption' => $mediaCaption,
+                    'status' => 'received',
+                    'whatsapp_message_id' => $messageId !== '' ? $messageId : null,
+                ]);
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -958,6 +1041,71 @@ class WhatsAppWebhookController extends Controller
     |--------------------------------------------------------------------------
     */
 
+    private function handleMessageStatusUpdate(array $payload): void
+    {
+        $updates = data_get($payload, 'data', []);
+
+        if (! is_array($updates)) {
+            return;
+        }
+
+        $items = array_is_list($updates)
+            ? $updates
+            : [$updates];
+
+        foreach ($items as $update) {
+            $messageId =
+                data_get($update, 'key.id')
+                ?? data_get($update, 'id')
+                ?? data_get($update, 'messageId');
+
+            if (! is_string($messageId) || trim($messageId) === '') {
+                continue;
+            }
+
+            $rawStatus =
+                data_get($update, 'update.status')
+                ?? data_get($update, 'status')
+                ?? data_get($update, 'message.status');
+
+            if (is_numeric($rawStatus)) {
+                $rawStatus = match ((int) $rawStatus) {
+                    0 => 'error',
+                    1 => 'pending',
+                    2 => 'sent',
+                    3 => 'delivered',
+                    4 => 'read',
+                    5 => 'played',
+                    default => 'sent',
+                };
+            }
+
+            $status = strtolower((string) $rawStatus);
+
+            $status = match ($status) {
+                'pending', 'server_ack' => 'pending',
+                'sent', 'device_ack' => 'sent',
+                'delivered' => 'delivered',
+                'read' => 'read',
+                'played' => 'played',
+                'error', 'failed' => 'error',
+                default => $status !== '' ? $status : 'sent',
+            };
+
+            ChatMessage::query()
+                ->where('whatsapp_message_id', $messageId)
+                ->update([
+                    'status' => $status,
+                ]);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FİNANS BAŞVURUSUNU KAYDET / GÜNCELLE
+    |--------------------------------------------------------------------------
+    */
+
     private function financeLeadKaydet(
         AiBot $aiBot,
         string $sessionId,
@@ -1360,7 +1508,7 @@ class WhatsAppWebhookController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $whatsAppService->sendText(
+        $sendResult = $whatsAppService->sendText(
             instanceName:
                 $instanceName,
 
@@ -1370,6 +1518,27 @@ class WhatsAppWebhookController extends Controller
             text:
                 $answer,
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | PANEL MESAJI / WHATSAPP DURUMU
+        |--------------------------------------------------------------------------
+        */
+
+        ChatMessage::create([
+            'user_id' => $aiBot->user_id,
+            'ai_bot_id' => $aiBot->id,
+            'session_id' => $sessionId,
+            'role' => 'assistant',
+            'sender_type' => 'ai',
+            'message' => $answer,
+            'message_type' => 'text',
+            'whatsapp_message_id' =>
+                data_get($sendResult, 'key.id')
+                ?? data_get($sendResult, 'messageId')
+                ?? data_get($sendResult, 'id'),
+            'status' => 'sent',
+        ]);
 
         /*
         |--------------------------------------------------------------------------
