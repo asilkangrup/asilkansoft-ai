@@ -6,6 +6,7 @@ use App\Models\AiBot;
 use App\Services\WhatsAppService;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -27,11 +28,11 @@ class AiBotForm
                 |--------------------------------------------------------------------------
                 */
 
-                Section::make('Yapay Zekâ Kontrolü')
+                Section::make('Yapay Zekâ Yönetimi')
                     ->description(
-                        'Yapay zekânın WhatsApp müşterilerine otomatik cevap verip vermeyeceğini yönetin.'
+                        'Yapay zekânızın çalışma durumunu, WhatsApp bağlantısını ve paket bilgilerini tek yerden yönetin.'
                     )
-                    ->icon('heroicon-o-power')
+                    ->icon('heroicon-o-cpu-chip')
                     ->schema([
 
                         Toggle::make('ai_enabled')
@@ -44,7 +45,59 @@ class AiBotForm
                             ->offColor('danger')
                             ->live(),
 
-                    ]),
+                        Placeholder::make('whatsapp_connection_status')
+                            ->label('WhatsApp Bağlantısı')
+                            ->content(
+                                fn (?AiBot $record): string =>
+                                    match ((string) ($record?->whatsapp_status ?? '')) {
+                                        'connected' => '🟢 Bağlı',
+                                        'connecting' => '🟡 Bağlanıyor',
+                                        default => '🔴 Bağlı Değil',
+                                    }
+                            ),
+
+                        Placeholder::make('subscription_status_display')
+                            ->label('Paket Durumu')
+                            ->content(
+                                fn (?AiBot $record): string =>
+                                    match ((string) ($record?->subscription_status ?? '')) {
+                                        'active' => '🟢 Aktif',
+                                        'trial' => '🟡 Ücretsiz Deneme',
+                                        'expired' => '🔴 Süresi Dolmuş',
+                                        default => '⚪ Tanımsız',
+                                    }
+                            ),
+
+                        Placeholder::make('message_usage_display')
+                            ->label('Mesaj Kullanımı')
+                            ->content(
+                                function (?AiBot $record): string {
+                                    if (! $record) {
+                                        return '-';
+                                    }
+
+                                    if ($record->subscription_status === 'active') {
+                                        return 'Sınırsız';
+                                    }
+
+                                    if ($record->subscription_status === 'trial') {
+                                        $used = (int) $record->trial_messages_used;
+                                        $limit = (int) $record->trial_message_limit;
+                                        $remaining = max(0, $limit - $used);
+
+                                        return $used
+                                            .' / '
+                                            .$limit
+                                            .' kullanıldı — '
+                                            .$remaining
+                                            .' mesaj kaldı';
+                                    }
+
+                                    return '-';
+                                }
+                            ),
+                    ])
+                    ->columns(2),
 
                 /*
                 |--------------------------------------------------------------------------
