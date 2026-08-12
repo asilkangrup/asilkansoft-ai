@@ -1,0 +1,88 @@
+﻿[phases.setup]
+nixPkgs = ["...", "python311Packages.supervisor"]
+
+[phases.build]
+cmds = [
+    "mkdir -p /etc/supervisor/conf.d/",
+    "cp /assets/supervisord.conf /etc/supervisord.conf",
+    "cp /assets/worker-web.conf /etc/supervisor/conf.d/worker-web.conf",
+    "cp /assets/worker-queue.conf /etc/supervisor/conf.d/worker-queue.conf",
+    "chmod +x /assets/start.sh",
+    "..."
+]
+
+[start]
+cmd = "/assets/start.sh"
+
+[staticAssets]
+
+"start.sh" = '''
+#!/bin/bash
+
+set -e
+
+cd /app
+
+php artisan migrate --force
+
+exec supervisord -c /etc/supervisord.conf -n
+'''
+
+"supervisord.conf" = '''
+[unix_http_server]
+file=/assets/supervisor.sock
+
+[supervisord]
+logfile=/var/log/supervisord.log
+logfile_maxbytes=50MB
+logfile_backups=5
+loglevel=info
+pidfile=/assets/supervisord.pid
+nodaemon=true
+silent=false
+minfds=1024
+minprocs=200
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory=supervisor.rpcinterface:make_main_rpcinterface
+
+[supervisorctl]
+serverurl=unix:///assets/supervisor.sock
+
+[include]
+files=/etc/supervisor/conf.d/*.conf
+'''
+
+"worker-web.conf" = '''
+[program:wai-web]
+process_name=%(program_name)s
+command=php /app/artisan serve --host=0.0.0.0 --port=8080
+directory=/app
+autostart=true
+autorestart=true
+startsecs=2
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
+'''
+
+"worker-queue.conf" = '''
+[program:wai-queue]
+process_name=%(program_name)s_%(process_num)02d
+command=php /app/artisan queue:work database --sleep=1 --tries=3 --timeout=180 --max-time=3600
+directory=/app
+autostart=true
+autorestart=true
+numprocs=5
+startsecs=0
+stopasgroup=true
+killasgroup=true
+stopwaitsecs=190
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
+'''
