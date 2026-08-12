@@ -339,16 +339,12 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | KREDİ REHBERİM / BOT 13 FİNANS BAŞVURU TAKİBİ
+            | FİNANS BAŞVURU TAKİBİ
             |--------------------------------------------------------------------------
             |
-            | Bu bölüm sadece Bot 13 için çalışır.
-            |
-            | Şimdilik yalnızca konuşmayı analiz eder ve finance_leads
-            | tablosuna bilgileri yazar.
-            |
-            | Grup JID bilgileri henüz tanımlı olmadığı için WhatsApp
-            | grubuna mesaj gönderilmez.
+            | Bu bölüm sadece group_routing_enabled = true olan botlarda çalışır.
+            | Konuşmayı analiz eder, finance_leads tablosuna kaydeder ve
+            | tüm zorunlu bilgiler tamamlandığında doğru WhatsApp grubuna yollar.
             |
             */
 
@@ -393,6 +389,9 @@ class WhatsAppWebhookController extends Controller
 
                     financeLeadService:
                         $financeLeadService,
+
+                    whatsAppService:
+                        $whatsAppService,
                 );
             }
 
@@ -820,7 +819,7 @@ class WhatsAppWebhookController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | BOT 13 FİNANS BAŞVURUSUNU KAYDET / GÜNCELLE
+    | FİNANS BAŞVURUSUNU KAYDET / GÜNCELLE
     |--------------------------------------------------------------------------
     */
 
@@ -829,7 +828,8 @@ class WhatsAppWebhookController extends Controller
         string $sessionId,
         string $whatsappNumber,
         array $data,
-        FinanceLeadService $financeLeadService
+        FinanceLeadService $financeLeadService,
+        WhatsAppService $whatsAppService
     ): void {
         $type =
             $data['type']
@@ -938,15 +938,16 @@ class WhatsAppWebhookController extends Controller
         |--------------------------------------------------------------------------
         | GRUP JID
         |--------------------------------------------------------------------------
-        |
-        | QR bağlanana kadar FinanceLeadService null döndürür.
-        |
         */
 
         $groupJid =
             $financeLeadService
                 ->groupJid(
-                    $type
+                    aiBot:
+                        $aiBot,
+
+                    type:
+                        $type
                 );
 
         if (
@@ -1005,7 +1006,7 @@ class WhatsAppWebhookController extends Controller
                 $lead->limit,
         ];
 
-        $lead->status =
+        $basvuruTamamlandi =
             $financeLeadService
                 ->tamamlandiMi(
                     type:
@@ -1013,22 +1014,145 @@ class WhatsAppWebhookController extends Controller
 
                     data:
                         $leadData,
-                )
-            ? 'ready'
-            : 'collecting';
+                );
+
+        /*
+        |--------------------------------------------------------------------------
+        | DURUM
+        |--------------------------------------------------------------------------
+        */
+
+        if ($lead->grubaGonderildiMi()) {
+            $lead->status =
+                'sent';
+        } else {
+            $lead->status =
+                $basvuruTamamlandi
+                    ? 'ready'
+                    : 'collecting';
+        }
 
         $lead->save();
 
         /*
         |--------------------------------------------------------------------------
-        | GRUP GÖNDERİMİ ŞİMDİLİK KAPALI
+        | TAMAMLANAN BAŞVURUYU WHATSAPP GRUBUNA GÖNDER
         |--------------------------------------------------------------------------
         |
-        | QR bağlandıktan sonra 5 grubun gerçek JID bilgilerini ekleyeceğiz.
-        | Ardından yalnızca status=ready ve sent_to_group_at=null kayıtları
-        | doğru WhatsApp grubuna göndereceğiz.
+        | Aynı başvuru sent_to_group_at dolduktan sonra tekrar gönderilmez.
+        | Grup gönderiminde hata olursa müşteriyle normal AI konuşması devam eder.
         |
         */
+
+        if (
+            $lead->status === 'ready'
+            && ! $lead->grubaGonderildiMi()
+            && is_string($lead->group_jid)
+            && trim($lead->group_jid) !== ''
+            && is_string($aiBot->whatsapp_instance)
+            && trim($aiBot->whatsapp_instance) !== ''
+        ) {
+            try {
+                $groupMessage =
+                    $financeLeadService
+                        ->grupMesaji(
+                            type:
+                                $type,
+
+                            data:
+                                $leadData,
+                        );
+
+                $sendResult =
+                    $whatsAppService
+                        ->sendGroupText(
+                            instanceName:
+                                trim(
+                                    $aiBot->whatsapp_instance
+                                ),
+
+                            groupJid:
+                                trim(
+                                    $lead->group_jid
+                                ),
+
+                            text:
+                                $groupMessage,
+                        );
+
+                $groupMessageId =
+                    data_get(
+                        $sendResult,
+                        'key.id'
+                    )
+                    ?? data_get(
+                        $sendResult,
+                        'messageId'
+                    )
+                    ?? data_get(
+                        $sendResult,
+                        'id'
+                    );
+
+                if (
+                    is_string($groupMessageId)
+                    && trim($groupMessageId) !== ''
+                ) {
+                    $lead->group_message_id =
+                        trim($groupMessageId);
+                }
+
+                $lead->sent_to_group_at =
+                    now();
+
+                $lead->status =
+                    'sent';
+
+                $lead->save();
+
+                Log::info(
+                    'Finans başvurusu WhatsApp grubuna gönderildi',
+                    [
+                        'finance_lead_id' =>
+                            $lead->id,
+
+                        'ai_bot_id' =>
+                            $aiBot->id,
+
+                        'type' =>
+                            $type,
+
+                        'group_jid' =>
+                            $lead->group_jid,
+
+                        'group_message_id' =>
+                            $lead->group_message_id,
+                    ]
+                );
+            } catch (Throwable $exception) {
+                Log::error(
+                    'Finans başvurusu WhatsApp grubuna gönderilemedi',
+                    [
+                        'finance_lead_id' =>
+                            $lead->id,
+
+                        'ai_bot_id' =>
+                            $aiBot->id,
+
+                        'type' =>
+                            $type,
+
+                        'group_jid' =>
+                            $lead->group_jid,
+
+                        'error' =>
+                            $exception->getMessage(),
+                    ]
+                );
+
+                report($exception);
+            }
+        }
     }
 
     /*

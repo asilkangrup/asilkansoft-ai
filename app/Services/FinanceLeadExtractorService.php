@@ -9,18 +9,15 @@ use Throwable;
 class FinanceLeadExtractorService
 {
     /**
-     * Bu extractor sadece Kredi Rehberim botunda çalışır.
-     */
-    private const AI_BOT_ID = 13;
-
-    /**
      * Konuşma geçmişinden finans başvuru verilerini yapılandırılmış olarak çıkarır.
+     *
+     * Bu servis yalnızca group_routing_enabled = true olan botlarda çalışır.
      */
     public function extract(
         AiBot $aiBot,
         array $messages
     ): array {
-        if ((int) $aiBot->id !== self::AI_BOT_ID) {
+        if (! (bool) $aiBot->group_routing_enabled) {
             return $this->emptyResult();
         }
 
