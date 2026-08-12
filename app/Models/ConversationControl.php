@@ -24,6 +24,14 @@ class ConversationControl extends Model
 
         /*
         |--------------------------------------------------------------------------
+        | CRM ETİKETLERİ
+        |--------------------------------------------------------------------------
+        */
+
+        'tags',
+
+        /*
+        |--------------------------------------------------------------------------
         | AI / İNSAN KONTROLÜ
         |--------------------------------------------------------------------------
         */
@@ -38,6 +46,7 @@ class ConversationControl extends Model
         'human_takeover' => 'boolean',
         'taken_over_at' => 'datetime',
         'released_at' => 'datetime',
+        'tags' => 'array',
     ];
 
     /*
@@ -128,5 +137,80 @@ class ConversationControl extends Model
         $this->update([
             'unread_count' => 0,
         ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETİKETLERİ GETİR
+    |--------------------------------------------------------------------------
+    */
+
+    public function etiketler(): array
+    {
+        return is_array($this->tags)
+            ? $this->tags
+            : [];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETİKET EKLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function etiketEkle(string $etiket): void
+    {
+        $etiket = trim($etiket);
+
+        if ($etiket === '') {
+            return;
+        }
+
+        $etiketler = $this->etiketler();
+
+        if (! in_array($etiket, $etiketler, true)) {
+            $etiketler[] = $etiket;
+        }
+
+        $this->update([
+            'tags' => array_values($etiketler),
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETİKET SİL
+    |--------------------------------------------------------------------------
+    */
+
+    public function etiketSil(string $etiket): void
+    {
+        $etiketler = $this->etiketler();
+
+        $etiketler = array_values(
+            array_filter(
+                $etiketler,
+                fn ($item) => $item !== $etiket
+            )
+        );
+
+        $this->update([
+            'tags' => $etiketler,
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETİKET VAR MI?
+    |--------------------------------------------------------------------------
+    */
+
+    public function etiketiVarMi(string $etiket): bool
+    {
+        return in_array(
+            $etiket,
+            $this->etiketler(),
+            true
+        );
     }
 }

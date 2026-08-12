@@ -46,6 +46,14 @@ class ConversationInbox extends Page
 
     /*
     |--------------------------------------------------------------------------
+    | YENİ ETİKET
+    |--------------------------------------------------------------------------
+    */
+
+    public string $newTag = '';
+
+    /*
+    |--------------------------------------------------------------------------
     | SAYFA BAŞLIĞI
     |--------------------------------------------------------------------------
     */
@@ -341,6 +349,93 @@ class ConversationInbox extends Page
         */
 
         $this->messageText = '';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETİKET EKLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function addTag(): void
+    {
+        $conversation = $this->selectedConversation;
+
+        if (! $conversation) {
+            return;
+        }
+
+        $tag = trim($this->newTag);
+
+        if ($tag === '') {
+            return;
+        }
+
+        if (mb_strlen($tag) > 40) {
+            Notification::make()
+                ->title('Etiket çok uzun.')
+                ->body('Etiket en fazla 40 karakter olabilir.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $conversation->etiketEkle($tag);
+
+        $this->newTag = '';
+
+        Notification::make()
+            ->title('Etiket eklendi.')
+            ->body('“'.$tag.'” etiketi konuşmaya eklendi.')
+            ->success()
+            ->send();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETİKET SİL
+    |--------------------------------------------------------------------------
+    */
+
+    public function removeTag(string $tag): void
+    {
+        $conversation = $this->selectedConversation;
+
+        if (! $conversation) {
+            return;
+        }
+
+        $conversation->etiketSil($tag);
+
+        Notification::make()
+            ->title('Etiket kaldırıldı.')
+            ->body('“'.$tag.'” etiketi konuşmadan kaldırıldı.')
+            ->success()
+            ->send();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HAZIR ETİKET EKLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function addTagFromPreset(string $tag): void
+    {
+        $tag = trim($tag);
+
+        if ($tag === '') {
+            return;
+        }
+
+        $conversation = $this->selectedConversation;
+
+        if (! $conversation) {
+            return;
+        }
+
+        $conversation->etiketEkle($tag);
     }
 
     /*

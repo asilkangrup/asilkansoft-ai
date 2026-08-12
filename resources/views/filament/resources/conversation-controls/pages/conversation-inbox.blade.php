@@ -1452,15 +1452,145 @@
                 </div>
 
                 <div class="wai-crm-section">
-                    <div class="wai-crm-title">Etiketler</div>
 
-                    <span class="wai-crm-tag">WhatsApp</span>
+                    <div class="wai-crm-title">
+                        Etiketler
+                    </div>
 
-                    @if ($this->selectedConversation->human_takeover)
-                        <span class="wai-crm-tag">İnsan Yönetiyor</span>
-                    @else
-                        <span class="wai-crm-tag">AI Aktif</span>
-                    @endif
+                    @php
+                        $conversationTags =
+                            $this->selectedConversation->etiketler();
+
+                        $availableTags = [
+                            'Yeni Müşteri',
+                            'Sıcak Müşteri',
+                            'Teklif Bekliyor',
+                            'Sipariş',
+                            'VIP',
+                            'Acil',
+                        ];
+                    @endphp
+
+                    <div style="margin-bottom:10px;">
+
+                        @forelse ($conversationTags as $tag)
+
+                            <span
+                                class="wai-crm-tag"
+                                style="padding-right:5px;"
+                            >
+                                {{ $tag }}
+
+                                <button
+                                    type="button"
+                                    wire:click="removeTag(@js($tag))"
+                                    style="
+                                        margin-left:5px;
+                                        border:0;
+                                        background:transparent;
+                                        color:inherit;
+                                        cursor:pointer;
+                                        font-weight:800;
+                                    "
+                                    title="Etiketi kaldır"
+                                >
+                                    ×
+                                </button>
+                            </span>
+
+                        @empty
+
+                            <div class="wai-crm-empty">
+                                Henüz etiket eklenmedi.
+                            </div>
+
+                        @endforelse
+
+                    </div>
+
+
+                    <div
+                        style="
+                            display:flex;
+                            flex-wrap:wrap;
+                            gap:5px;
+                            margin-bottom:10px;
+                        "
+                    >
+
+                        @foreach ($availableTags as $tag)
+
+                            @if (! in_array($tag, $conversationTags, true))
+
+                                <button
+                                    type="button"
+                                    wire:click="addTagFromPreset(@js($tag))"
+                                    style="
+                                        padding:5px 8px;
+                                        border:1px solid #dbe3ec;
+                                        border-radius:7px;
+                                        background:#f8fafc;
+                                        color:#475569;
+                                        font-size:10px;
+                                        font-weight:700;
+                                        cursor:pointer;
+                                    "
+                                >
+                                    + {{ $tag }}
+                                </button>
+
+                            @endif
+
+                        @endforeach
+
+                    </div>
+
+
+                    <form
+                        wire:submit="addTag"
+                        style="
+                            display:flex;
+                            gap:6px;
+                            margin-top:8px;
+                        "
+                    >
+
+                        <input
+                            type="text"
+                            wire:model="newTag"
+                            maxlength="40"
+                            placeholder="Özel etiket..."
+                            style="
+                                min-width:0;
+                                flex:1;
+                                padding:8px 9px;
+                                border:1px solid #d1d5db;
+                                border-radius:8px;
+                                background:#ffffff;
+                                color:#111827;
+                                font-size:11px;
+                                outline:none;
+                            "
+                        >
+
+                        <button
+                            type="submit"
+                            style="
+                                padding:8px 10px;
+                                border:0;
+                                border-radius:8px;
+                                background:#16a34a;
+                                color:#ffffff;
+                                font-size:11px;
+                                font-weight:800;
+                                cursor:pointer;
+                            "
+                        >
+                            Ekle
+                        </button>
+
+                    </form>
+
                 </div>
 
                 <div class="wai-crm-section">
