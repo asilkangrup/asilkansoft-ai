@@ -954,6 +954,159 @@
 
         /*
         |--------------------------------------------------------------------------
+        | WHATSAPP TARZI TARİH / MESAJ META
+        |--------------------------------------------------------------------------
+        */
+
+        .wai-date-separator {
+            display: flex;
+            justify-content: center;
+            margin: 14px 0;
+        }
+
+        .wai-date-separator span {
+            padding: 5px 10px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .82);
+            color: #64748b;
+            font-size: 10px;
+            font-weight: 700;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
+        }
+
+        .dark .wai-date-separator span {
+            background: rgba(31, 41, 55, .90);
+            color: #cbd5e1;
+        }
+
+        .wai-message-meta {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        .wai-message-time {
+            margin-top: 0;
+        }
+
+        .wai-message-checks {
+            color: #64748b;
+            font-size: 10px;
+            letter-spacing: -2px;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | WHATSAPP TARZI MESAJ ARAÇLARI
+        |--------------------------------------------------------------------------
+        */
+
+        .wai-composer-tools {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 7px;
+        }
+
+        .wai-composer-icon {
+            width: 32px;
+            height: 32px;
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+            color: #64748b;
+            font-size: 17px;
+            cursor: pointer;
+        }
+
+        .wai-composer-icon:hover {
+            background: #e5e7eb;
+        }
+
+        .wai-emoji-menu {
+            position: absolute;
+            left: 0;
+            bottom: 38px;
+            z-index: 50;
+            display: grid;
+            grid-template-columns: repeat(6, 38px);
+            gap: 4px;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #ffffff;
+            box-shadow: 0 12px 35px rgba(15, 23, 42, .18);
+        }
+
+        .wai-emoji-item {
+            width: 38px;
+            height: 38px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .wai-emoji-item:hover {
+            background: #f1f5f9;
+        }
+
+        .wai-quick-replies {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 7px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+        }
+
+        .wai-quick-title {
+            flex: 0 0 auto;
+            color: #94a3b8;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .wai-quick-reply {
+            flex: 0 0 auto;
+            max-width: 220px;
+            padding: 6px 9px;
+            border: 1px solid #dbe3ec;
+            border-radius: 999px;
+            background: #ffffff;
+            color: #475569;
+            font-size: 10px;
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .wai-quick-reply:hover {
+            background: #f0fdf4;
+            border-color: #86efac;
+            color: #15803d;
+        }
+
+        .wai-composer-hint {
+            display: flex;
+            gap: 12px;
+            margin-top: 6px;
+            color: #94a3b8;
+            font-size: 9px;
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | MOBİL
         |--------------------------------------------------------------------------
         */
@@ -1050,7 +1203,7 @@
                     <button
                         type="button"
                         class="wai-filter {{ empty($filterTag) ? 'active' : '' }}"
-                        wire:click="$set('filterTag', '')"
+                        wire:click="setFilter('')"
                     >
                         Tümü
                     </button>
@@ -1058,7 +1211,7 @@
                     <button
                         type="button"
                         class="wai-filter {{ $filterTag === '__unread__' ? 'active' : '' }}"
-                        wire:click="$set('filterTag', '__unread__')"
+                        wire:click="setFilter('__unread__')"
                     >
                         🔔 Okunmamış
                     </button>
@@ -1066,7 +1219,7 @@
                     <button
                         type="button"
                         class="wai-filter {{ $filterTag === '__human__' ? 'active' : '' }}"
-                        wire:click="$set('filterTag', '__human__')"
+                        wire:click="setFilter('__human__')"
                     >
                         👤 İnsan
                     </button>
@@ -1074,7 +1227,7 @@
                     <button
                         type="button"
                         class="wai-filter {{ $filterTag === '__ai__' ? 'active' : '' }}"
-                        wire:click="$set('filterTag', '__ai__')"
+                        wire:click="setFilter('__ai__')"
                     >
                         🤖 AI
                     </button>
@@ -1091,7 +1244,7 @@
                         <button
                             type="button"
                             class="wai-filter {{ $filterTag === $tag ? 'active' : '' }}"
-                            wire:click="$set('filterTag', @js($tag))"
+                            wire:click="setFilter(@js($tag))"
                         >
                             @if ($tag === 'Yeni Müşteri')
                                 🟢
@@ -1320,7 +1473,12 @@
                     wire:key="conversation-messages-{{ $selectedConversationId }}-{{ $this->messages->count() }}"
                     x-data
                     x-init="$nextTick(() => { $el.scrollTop = $el.scrollHeight })"
+                    @message.window="$nextTick(() => { $el.scrollTop = $el.scrollHeight })"
                 >
+
+                    @php
+                        $previousMessageDate = null;
+                    @endphp
 
                     @forelse ($this->messages as $message)
 
@@ -1344,7 +1502,24 @@
                             $isHuman =
                                 $senderType === 'human';
 
+                            $messageDate =
+                                $message->created_at?->format('Y-m-d');
+
+                            $showDateSeparator =
+                                $messageDate !== $previousMessageDate;
+
+                            $previousMessageDate =
+                                $messageDate;
+
                         @endphp
+
+                        @if ($showDateSeparator && $message->created_at)
+                            <div class="wai-date-separator">
+                                <span>
+                                    {{ $message->created_at->translatedFormat('d F Y') }}
+                                </span>
+                            </div>
+                        @endif
 
 
                         <div
@@ -1391,12 +1566,19 @@
                                 </div>
 
 
-                                <div class="wai-message-time">
+                                <div class="wai-message-meta">
+                                    <span class="wai-message-time">
+                                        {{ $message->created_at?->format('H:i') }}
+                                    </span>
 
-                                    {{
-                                        $message->created_at?->format('H:i')
-                                    }}
-
+                                    @if (! $isCustomer)
+                                        <span
+                                            class="wai-message-checks"
+                                            title="Gönderildi"
+                                        >
+                                            ✓✓
+                                        </span>
+                                    @endif
                                 </div>
 
                             </div>
@@ -1421,17 +1603,90 @@
                 <form
                     class="wai-composer"
                     wire:submit="sendMessage"
+                    x-data="{
+                        emojiOpen: false,
+                        quickReplies: [
+                            'Merhaba 👋 Size nasıl yardımcı olabilirim?',
+                            'Fiyat bilgisi için hemen yardımcı olabilirim.',
+                            'Bilgilerinizi aldım. Kısa süre içinde dönüş yapacağız.',
+                            'Siparişiniz için gerekli bilgileri paylaşabilir misiniz?'
+                        ],
+                        insertText(text) {
+                            this.$wire.messageText =
+                                this.$wire.messageText
+                                    ? this.$wire.messageText + ' ' + text
+                                    : text;
+                            this.emojiOpen = false;
+                        },
+                        sendOnEnter(event) {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                                event.preventDefault();
+                                this.$wire.sendMessage();
+                            }
+                        }
+                    }"
                 >
+                    <div class="wai-composer-tools">
+                        <button
+                            type="button"
+                            class="wai-composer-icon"
+                            @click="emojiOpen = !emojiOpen"
+                            title="Emoji"
+                        >😊</button>
+
+                        <button
+                            type="button"
+                            class="wai-composer-icon"
+                            @click="insertText('📎')"
+                            title="Ek"
+                        >📎</button>
+
+                        <button
+                            type="button"
+                            class="wai-composer-icon"
+                            @click="insertText('🎤')"
+                            title="Sesli mesaj"
+                        >🎤</button>
+
+                        <div
+                            class="wai-emoji-menu"
+                            x-show="emojiOpen"
+                            x-cloak
+                            @click.outside="emojiOpen = false"
+                        >
+                            @foreach (['😀','😂','😍','👍','🙏','❤️','🔥','🎉','📦','💰','😊','👋'] as $emoji)
+                                <button
+                                    type="button"
+                                    class="wai-emoji-item"
+                                    @click="insertText(@js($emoji))"
+                                >
+                                    {{ $emoji }}
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="wai-quick-replies">
+                        <span class="wai-quick-title">Hızlı yanıt</span>
+
+                        <template x-for="reply in quickReplies" :key="reply">
+                            <button
+                                type="button"
+                                class="wai-quick-reply"
+                                @click="insertText(reply)"
+                                x-text="reply"
+                            ></button>
+                        </template>
+                    </div>
 
                     <div class="wai-composer-row">
-
                         <textarea
                             class="wai-textarea"
                             wire:model="messageText"
                             placeholder="Mesaj yaz..."
                             rows="2"
+                            @keydown="sendOnEnter($event)"
                         ></textarea>
-
 
                         <button
                             class="wai-send"
@@ -1439,7 +1694,6 @@
                             wire:loading.attr="disabled"
                             wire:target="sendMessage"
                         >
-
                             <span
                                 wire:loading.remove
                                 wire:target="sendMessage"
@@ -1453,24 +1707,20 @@
                             >
                                 Gönderiliyor...
                             </span>
-
                         </button>
-
                     </div>
 
+                    <div class="wai-composer-hint">
+                        <span>Enter: Gönder</span>
+                        <span>Shift + Enter: Yeni satır</span>
+                    </div>
 
                     @if (! $this->selectedConversation->human_takeover)
-
                         <div class="wai-note">
-
                             Mesaj gönderdiğiniz anda bu konuşma otomatik olarak
-                            <strong>İnsan Yönetiyor</strong>
-                            moduna geçer.
-
+                            <strong>İnsan Yönetiyor</strong> moduna geçer.
                         </div>
-
                     @endif
-
                 </form>
 
 

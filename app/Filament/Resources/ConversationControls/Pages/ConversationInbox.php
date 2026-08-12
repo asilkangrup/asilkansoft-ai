@@ -46,11 +46,19 @@ class ConversationInbox extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | ETİKET FİLTRESİ
+    | WHATSAPP TARZI FİLTRE
     |--------------------------------------------------------------------------
     */
 
     public string $filterTag = '';
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETİKET FİLTRESİ
+    |--------------------------------------------------------------------------
+    */
+
+    public string $selectedTag = '';
 
     /*
     |--------------------------------------------------------------------------
@@ -158,7 +166,7 @@ class ConversationInbox extends Page
     public function getConversationsProperty(): Collection
     {
         $query =
-            $this->conversationQuery();
+            $this->filteredConversationQuery();
 
         $search =
             trim(
@@ -201,11 +209,24 @@ class ConversationInbox extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | GELEN KUTUSU FİLTRESİ
+        | ETİKET FİLTRESİ
         |--------------------------------------------------------------------------
-        |
-        | Sol taraftaki filtre butonları doğrudan bu sorguya bağlanır.
-        |
+        */
+
+        $selectedTag =
+            trim($this->selectedTag);
+
+        if ($selectedTag !== '') {
+            $query->whereJsonContains(
+                'tags',
+                $selectedTag
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | WHATSAPP TARZI AKILLI FİLTRE
+        |--------------------------------------------------------------------------
         */
 
         $filterTag =
@@ -479,6 +500,152 @@ class ConversationInbox extends Page
         }
 
         $conversation->etiketEkle($tag);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETİKET FİLTRESİNİ SEÇ
+    |--------------------------------------------------------------------------
+    */
+
+    public function filterByTag(string $tag): void
+    {
+        $tag = trim($tag);
+
+        $this->filterTag =
+            $tag;
+
+        $this->selectedTag = '';
+
+        $this->selectedConversationId = null;
+        $this->messageText = '';
+
+        $firstConversation =
+            $this->filteredConversationQuery()
+                ->latest('updated_at')
+                ->first();
+
+        if (! $firstConversation) {
+            return;
+        }
+
+        $this->selectedConversationId =
+            $firstConversation->id;
+
+        $firstConversation
+            ->okunmamisMesajlariSifirla();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | WHATSAPP TARZI FİLTRE SORGUSU
+    |--------------------------------------------------------------------------
+    */
+
+    protected function filteredConversationQuery(): Builder
+    {
+        $query =
+            $this->conversationQuery();
+
+        $filterTag =
+            trim($this->filterTag);
+
+        if ($filterTag === '__unread__') {
+            $query->where(
+                'unread_count',
+                '>',
+                0
+            );
+        } elseif ($filterTag === '__human__') {
+            $query->where(
+                'human_takeover',
+                true
+            );
+        } elseif ($filterTag === '__ai__') {
+            $query->where(
+                'human_takeover',
+                false
+            );
+        } elseif ($filterTag !== '') {
+            $query->whereJsonContains(
+                'tags',
+                $filterTag
+            );
+        }
+
+        return $query;
+    }
+
+    public function setFilter(string $filter): void
+    {
+        $this->filterTag =
+            trim($filter);
+
+        $this->selectedTag = '';
+
+        $this->selectedConversationId = null;
+        $this->messageText = '';
+
+        $firstConversation =
+            $this->filteredConversationQuery()
+                ->latest('updated_at')
+                ->first();
+
+        if ($firstConversation) {
+            $this->selectedConversationId =
+                $firstConversation->id;
+
+            $firstConversation
+                ->okunmamisMesajlariSifirla();
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TÜM KONUŞMALARI GÖSTER
+    |--------------------------------------------------------------------------
+    */
+
+    public function clearTagFilter(): void
+    {
+        $this->selectedTag = '';
+        $this->filterTag = '';
+
+        $this->selectedConversationId = null;
+        $this->messageText = '';
+
+        $firstConversation =
+            $this->conversationQuery()
+                ->latest('updated_at')
+                ->first();
+
+        if (! $firstConversation) {
+            return;
+        }
+
+        $this->selectedConversationId =
+            $firstConversation->id;
+
+        $firstConversation
+            ->okunmamisMesajlariSifirla();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HAZIR ETİKETLER
+    |--------------------------------------------------------------------------
+    */
+
+    public function getPresetTagsProperty(): array
+    {
+        return [
+            'Yeni Müşteri',
+            'Sıcak Müşteri',
+            'Teklif Bekliyor',
+            'Sipariş',
+            'VIP',
+            'Acil',
+        ];
     }
 
     /*
