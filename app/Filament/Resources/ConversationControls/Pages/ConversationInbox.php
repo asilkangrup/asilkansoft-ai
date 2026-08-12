@@ -46,6 +46,14 @@ class ConversationInbox extends Page
 
     /*
     |--------------------------------------------------------------------------
+    | ETİKET FİLTRESİ
+    |--------------------------------------------------------------------------
+    */
+
+    public string $selectedTag = '';
+
+    /*
+    |--------------------------------------------------------------------------
     | YENİ ETİKET
     |--------------------------------------------------------------------------
     */
@@ -188,6 +196,22 @@ class ConversationInbox extends Page
                             }
                         );
                 }
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ETİKET FİLTRESİ
+        |--------------------------------------------------------------------------
+        */
+
+        $selectedTag =
+            trim($this->selectedTag);
+
+        if ($selectedTag !== '') {
+            $query->whereJsonContains(
+                'tags',
+                $selectedTag
             );
         }
 
@@ -436,6 +460,92 @@ class ConversationInbox extends Page
         }
 
         $conversation->etiketEkle($tag);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ETİKET FİLTRESİNİ SEÇ
+    |--------------------------------------------------------------------------
+    */
+
+    public function filterByTag(string $tag): void
+    {
+        $tag = trim($tag);
+
+        if ($tag === '') {
+            $this->selectedTag = '';
+            return;
+        }
+
+        $this->selectedTag =
+            $this->selectedTag === $tag
+                ? ''
+                : $tag;
+
+        $this->selectedConversationId = null;
+        $this->messageText = '';
+
+        $firstConversation =
+            $this->conversationQuery()
+                ->latest('updated_at')
+                ->first();
+
+        if (! $firstConversation) {
+            return;
+        }
+
+        $this->selectedConversationId =
+            $firstConversation->id;
+
+        $firstConversation
+            ->okunmamisMesajlariSifirla();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TÜM KONUŞMALARI GÖSTER
+    |--------------------------------------------------------------------------
+    */
+
+    public function clearTagFilter(): void
+    {
+        $this->selectedTag = '';
+
+        $this->selectedConversationId = null;
+        $this->messageText = '';
+
+        $firstConversation =
+            $this->conversationQuery()
+                ->latest('updated_at')
+                ->first();
+
+        if (! $firstConversation) {
+            return;
+        }
+
+        $this->selectedConversationId =
+            $firstConversation->id;
+
+        $firstConversation
+            ->okunmamisMesajlariSifirla();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HAZIR ETİKETLER
+    |--------------------------------------------------------------------------
+    */
+
+    public function getPresetTagsProperty(): array
+    {
+        return [
+            'Yeni Müşteri',
+            'Sıcak Müşteri',
+            'Teklif Bekliyor',
+            'Sipariş',
+            'VIP',
+            'Acil',
+        ];
     }
 
     /*

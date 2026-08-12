@@ -104,6 +104,81 @@
 
         /*
         |--------------------------------------------------------------------------
+        | ETİKET FİLTRELERİ
+        |--------------------------------------------------------------------------
+        */
+
+        .wai-filters {
+            flex: 0 0 auto;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #ffffff;
+        }
+
+        .dark .wai-filters {
+            background: #111827;
+            border-color: rgba(255, 255, 255, .10);
+        }
+
+        .wai-filter-title {
+            margin: 2px 4px 8px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            color: #94a3b8;
+        }
+
+        .wai-filter-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .wai-filter {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 9px;
+            border: 1px solid #e2e8f0;
+            border-radius: 999px;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: .15s ease;
+        }
+
+        .wai-filter:hover {
+            background: #eef2ff;
+            border-color: #c7d2fe;
+        }
+
+        .wai-filter.active {
+            background: #e0e7ff;
+            border-color: #818cf8;
+            color: #4338ca;
+        }
+
+        .dark .wai-filter {
+            background: #1f2937;
+            border-color: rgba(255, 255, 255, .10);
+            color: #cbd5e1;
+        }
+
+        .dark .wai-filter:hover {
+            background: rgba(99, 102, 241, .15);
+        }
+
+        .dark .wai-filter.active {
+            background: rgba(99, 102, 241, .20);
+            border-color: #818cf8;
+            color: #c7d2fe;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | KONUŞMA LİSTESİ
         |--------------------------------------------------------------------------
         */
@@ -958,6 +1033,86 @@
                     wire:model.live.debounce.500ms="search"
                     placeholder="İsim, telefon veya firma ara..."
                 >
+
+            </div>
+
+
+            {{-- FİLTRELER --}}
+
+            <div class="wai-filters">
+
+                <div class="wai-filter-title">
+                    Konuşmaları Filtrele
+                </div>
+
+                <div class="wai-filter-list">
+
+                    <button
+                        type="button"
+                        class="wai-filter {{ empty($filterTag) ? 'active' : '' }}"
+                        wire:click="$set('filterTag', '')"
+                    >
+                        Tümü
+                    </button>
+
+                    <button
+                        type="button"
+                        class="wai-filter {{ $filterTag === '__unread__' ? 'active' : '' }}"
+                        wire:click="$set('filterTag', '__unread__')"
+                    >
+                        🔔 Okunmamış
+                    </button>
+
+                    <button
+                        type="button"
+                        class="wai-filter {{ $filterTag === '__human__' ? 'active' : '' }}"
+                        wire:click="$set('filterTag', '__human__')"
+                    >
+                        👤 İnsan
+                    </button>
+
+                    <button
+                        type="button"
+                        class="wai-filter {{ $filterTag === '__ai__' ? 'active' : '' }}"
+                        wire:click="$set('filterTag', '__ai__')"
+                    >
+                        🤖 AI
+                    </button>
+
+                    @foreach ([
+                        'Yeni Müşteri',
+                        'Sıcak Müşteri',
+                        'Teklif Bekliyor',
+                        'Sipariş',
+                        'VIP',
+                        'Acil',
+                    ] as $tag)
+
+                        <button
+                            type="button"
+                            class="wai-filter {{ $filterTag === $tag ? 'active' : '' }}"
+                            wire:click="$set('filterTag', @js($tag))"
+                        >
+                            @if ($tag === 'Yeni Müşteri')
+                                🟢
+                            @elseif ($tag === 'Sıcak Müşteri')
+                                🔥
+                            @elseif ($tag === 'Teklif Bekliyor')
+                                💰
+                            @elseif ($tag === 'Sipariş')
+                                📦
+                            @elseif ($tag === 'VIP')
+                                ⭐
+                            @elseif ($tag === 'Acil')
+                                🚨
+                            @endif
+
+                            {{ $tag }}
+                        </button>
+
+                    @endforeach
+
+                </div>
 
             </div>
 
