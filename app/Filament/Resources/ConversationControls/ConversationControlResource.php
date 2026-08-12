@@ -17,20 +17,35 @@ class ConversationControlResource extends Resource
     protected static ?string $model =
         ConversationControl::class;
 
+    /*
+    |--------------------------------------------------------------------------
+    | MENÜ İKONU
+    |--------------------------------------------------------------------------
+    |
+    | Test Sohbeti ile karışmaması için Gelen Kutusu ikonu kullanıyoruz.
+    |
+    */
+
     protected static string|BackedEnum|null $navigationIcon =
-        Heroicon::OutlinedChatBubbleLeftRight;
+        Heroicon::OutlinedInbox;
+
+    /*
+    |--------------------------------------------------------------------------
+    | MENÜ İSMİ
+    |--------------------------------------------------------------------------
+    */
 
     protected static ?string $navigationLabel =
-        'Konuşmalar';
+        'Gelen Kutusu';
 
     protected static ?string $modelLabel =
-        'Konuşma';
+        'Gelen Kutusu';
 
     protected static ?string $pluralModelLabel =
-        'Konuşmalar';
+        'Gelen Kutusu';
 
     protected static ?string $slug =
-        'konusmalar';
+        'gelen-kutusu';
 
     protected static ?string $recordTitleAttribute =
         'whatsapp_number';
@@ -39,9 +54,6 @@ class ConversationControlResource extends Resource
     |--------------------------------------------------------------------------
     | FORM
     |--------------------------------------------------------------------------
-    |
-    | Manuel konuşma oluşturma veya düzenleme kullanmıyoruz.
-    |
     */
 
     public static function form(
@@ -69,10 +81,8 @@ class ConversationControlResource extends Resource
     | KONUŞMA YETKİLENDİRMESİ
     |--------------------------------------------------------------------------
     |
-    | Asilkan ana yönetici hesabı bütün müşterilerin konuşmalarını görür.
-    |
-    | Normal müşteriler yalnızca kendi user_id değerlerine bağlı
-    | konuşmaları görebilir.
+    | Ana yönetici bütün müşterilerin konuşmalarını görebilir.
+    | Normal kullanıcı yalnızca kendi konuşmalarını görebilir.
     |
     */
 
@@ -108,7 +118,7 @@ class ConversationControlResource extends Resource
 
         /*
         |--------------------------------------------------------------------------
-        | NORMAL MÜŞTERİ
+        | NORMAL KULLANICI
         |--------------------------------------------------------------------------
         */
 
@@ -117,6 +127,12 @@ class ConversationControlResource extends Resource
             $user->id
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RELATIONS
+    |--------------------------------------------------------------------------
+    */
 
     public static function getRelations(): array
     {
@@ -127,9 +143,6 @@ class ConversationControlResource extends Resource
     |--------------------------------------------------------------------------
     | SAYFALAR
     |--------------------------------------------------------------------------
-    |
-    | Konuşmalar menüsü doğrudan WhatsApp Web tarzı Inbox ekranını açar.
-    |
     */
 
     public static function getPages(): array

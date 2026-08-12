@@ -52,7 +52,7 @@ class ConversationInbox extends Page
 
     public function getTitle(): string
     {
-        return 'Konuşmalar';
+        return 'Gelen Kutusu';
     }
 
     /*
@@ -80,7 +80,6 @@ class ConversationInbox extends Page
     |--------------------------------------------------------------------------
     |
     | Ana yönetici bütün müşterileri görür.
-    |
     | Normal müşteriler sadece kendi konuşmalarını görür.
     |
     */
@@ -117,7 +116,7 @@ class ConversationInbox extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | NORMAL MÜŞTERİ
+        | NORMAL KULLANICI
         |--------------------------------------------------------------------------
         */
 
@@ -459,20 +458,8 @@ class ConversationInbox extends Page
                 'session_id' =>
                     $conversation->session_id,
 
-                /*
-                |--------------------------------------------------------------------------
-                | OPENAI GEÇMİŞİNDE FİRMA CEVABI
-                |--------------------------------------------------------------------------
-                */
-
                 'role' =>
                     'assistant',
-
-                /*
-                |--------------------------------------------------------------------------
-                | PANELDE PERSONEL MESAJI
-                |--------------------------------------------------------------------------
-                */
 
                 'sender_type' =>
                     'human',
@@ -486,7 +473,7 @@ class ConversationInbox extends Page
 
             /*
             |--------------------------------------------------------------------------
-            | SON AKTİVİTEYİ GÜNCELLE
+            | SON AKTİVİTE
             |--------------------------------------------------------------------------
             */
 
