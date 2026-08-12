@@ -286,6 +286,36 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
+            | KONUŞMA KONTROL KAYDI
+            |--------------------------------------------------------------------------
+            |
+            | Her WhatsApp konuşması için tek bir kontrol kaydı oluşturulur.
+            | Böylece panelden sadece bu müşterinin konuşması devralınabilir.
+            |
+            */
+
+            ConversationControl::firstOrCreate(
+                [
+                    'ai_bot_id' =>
+                        $aiBot->id,
+
+                    'session_id' =>
+                        $sessionId,
+                ],
+                [
+                    'user_id' =>
+                        $aiBot->user_id,
+
+                    'whatsapp_number' =>
+                        $phoneNumber,
+
+                    'human_takeover' =>
+                        false,
+                ]
+            );
+
+            /*
+            |--------------------------------------------------------------------------
             | MÜŞTERİ MESAJINI HAFIZAYA KAYDET
             |--------------------------------------------------------------------------
             */
