@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ProcessWhatsAppWebhook;
 use App\Models\AiBot;
 use App\Models\ConversationFollowUp;
 use App\Models\ConversationControl;
@@ -47,6 +48,36 @@ class WhatsAppWebhookController extends Controller
                 return response()->json([
                     'success' => true,
                     'ignored' => true,
+                ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | WEBHOOK'U HIZLICA QUEUE'YA DEVRET
+            |--------------------------------------------------------------------------
+            |
+            | Evolution API'nin 60 saniye timeout'a düşmemesi için ağır işlemler
+            | (OpenAI, sipariş, finans, WhatsApp gönderimi) queue worker'da çalışır.
+            |
+            | Queue worker aynı controller'ı _wai_queued=true ile yeniden çağırır.
+            | Böylece bu blok ikinci kez job oluşturmaz.
+            |
+            */
+
+            if (
+                ! (bool) data_get(
+                    $payload,
+                    '_wai_queued',
+                    false
+                )
+            ) {
+                ProcessWhatsAppWebhook::dispatch(
+                    $payload
+                );
+
+                return response()->json([
+                    'success' => true,
+                    'queued' => true,
                 ]);
             }
 
