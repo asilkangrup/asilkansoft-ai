@@ -32,7 +32,6 @@
             border-color: rgba(255, 255, 255, .10);
         }
 
-
         /*
         |--------------------------------------------------------------------------
         | SOL TARAF
@@ -58,7 +57,6 @@
             border-color: rgba(255, 255, 255, .10);
         }
 
-
         /*
         |--------------------------------------------------------------------------
         | ARAMA
@@ -67,9 +65,7 @@
 
         .wai-search {
             flex: 0 0 auto;
-
             padding: 16px;
-
             border-bottom: 1px solid #e5e7eb;
         }
 
@@ -79,7 +75,6 @@
 
         .wai-search-input {
             width: 100%;
-
             box-sizing: border-box;
 
             padding: 12px 14px;
@@ -107,7 +102,6 @@
             color: #ffffff;
         }
 
-
         /*
         |--------------------------------------------------------------------------
         | KONUŞMA LİSTESİ
@@ -116,7 +110,6 @@
 
         .wai-conversation-list {
             flex: 1 1 auto;
-
             min-height: 0;
 
             overflow-y: auto;
@@ -127,7 +120,6 @@
             display: block;
 
             width: 100%;
-
             box-sizing: border-box;
 
             padding: 16px;
@@ -176,22 +168,42 @@
 
         .wai-conversation-info {
             min-width: 0;
+            flex: 1;
         }
 
-        .wai-phone {
+        /*
+        |--------------------------------------------------------------------------
+        | MÜŞTERİ ADI / NUMARA
+        |--------------------------------------------------------------------------
+        */
+
+        .wai-customer-name {
             overflow: hidden;
 
             font-size: 14px;
             font-weight: 700;
 
+            color: #111827;
+
             text-overflow: ellipsis;
             white-space: nowrap;
-
-            color: #111827;
         }
 
-        .dark .wai-phone {
+        .dark .wai-customer-name {
             color: #ffffff;
+        }
+
+        .wai-customer-number {
+            margin-top: 2px;
+
+            overflow: hidden;
+
+            font-size: 11px;
+
+            color: #94a3b8;
+
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .wai-company {
@@ -235,10 +247,55 @@
             color: #94a3b8;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | SAĞ ROZETLER
+        |--------------------------------------------------------------------------
+        */
+
+        .wai-side-badges {
+            display: flex;
+
+            flex: 0 0 auto;
+            flex-direction: column;
+
+            gap: 5px;
+
+            align-items: flex-end;
+        }
 
         /*
         |--------------------------------------------------------------------------
-        | DURUM ROZETLERİ
+        | OKUNMAMIŞ MESAJ
+        |--------------------------------------------------------------------------
+        */
+
+        .wai-unread {
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            min-width: 22px;
+            height: 22px;
+
+            padding: 0 6px;
+
+            border-radius: 999px;
+
+            background: #22c55e;
+            color: #ffffff;
+
+            font-size: 11px;
+            font-weight: 800;
+
+            box-shadow:
+                0 2px 6px rgba(34, 197, 94, .25);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | AI / İNSAN ROZETLERİ
         |--------------------------------------------------------------------------
         */
 
@@ -265,7 +322,6 @@
             color: #b45309;
         }
 
-
         /*
         |--------------------------------------------------------------------------
         | SAĞ TARAF
@@ -289,7 +345,6 @@
         .dark .wai-main {
             background: #0f172a;
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -330,7 +385,6 @@
             align-items: center;
         }
 
-
         /*
         |--------------------------------------------------------------------------
         | BUTONLAR
@@ -368,16 +422,10 @@
             background: #15803d;
         }
 
-
         /*
         |--------------------------------------------------------------------------
         | MESAJ ALANI
         |--------------------------------------------------------------------------
-        |
-        | Buradaki min-height:0 çok önemli.
-        | Mesajlar kendi alanında scroll olur.
-        | Composer aşağı itilmez.
-        |
         */
 
         .wai-messages {
@@ -405,7 +453,6 @@
             background-color: #0b141a;
         }
 
-
         /*
         |--------------------------------------------------------------------------
         | MESAJ SATIRI
@@ -427,7 +474,6 @@
         .wai-message-row.outgoing {
             justify-content: flex-end;
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -496,14 +542,10 @@
             opacity: .55;
         }
 
-
         /*
         |--------------------------------------------------------------------------
         | MESAJ YAZMA ALANI
         |--------------------------------------------------------------------------
-        |
-        | flex-shrink:0 sayesinde asla sohbet alanının altına kaçmaz.
-        |
         */
 
         .wai-composer {
@@ -631,7 +673,6 @@
             color: #64748b;
         }
 
-
         /*
         |--------------------------------------------------------------------------
         | BOŞ EKRAN
@@ -652,7 +693,6 @@
 
             color: #64748b;
         }
-
 
         /*
         |--------------------------------------------------------------------------
@@ -706,7 +746,6 @@
                 padding: 0 14px;
             }
         }
-
     </style>
 
 
@@ -729,7 +768,7 @@
                     class="wai-search-input"
                     type="text"
                     wire:model.live.debounce.500ms="search"
-                    placeholder="Telefon veya firma ara..."
+                    placeholder="İsim, telefon veya firma ara..."
                 >
 
             </div>
@@ -751,9 +790,22 @@
 
                             <div class="wai-conversation-info">
 
-                                <div class="wai-phone">
-                                    {{ $conversation->whatsapp_number }}
+                                <div class="wai-customer-name">
+
+                                    {{
+                                        $conversation->customer_name
+                                            ?: $conversation->whatsapp_number
+                                    }}
+
                                 </div>
+
+                                @if ($conversation->customer_name)
+
+                                    <div class="wai-customer-number">
+                                        {{ $conversation->whatsapp_number }}
+                                    </div>
+
+                                @endif
 
                                 <div class="wai-company">
 
@@ -768,19 +820,38 @@
                             </div>
 
 
-                            @if ($conversation->human_takeover)
+                            <div class="wai-side-badges">
 
-                                <span class="wai-badge wai-badge-human">
-                                    👤 İnsan
-                                </span>
+                                @if ((int) $conversation->unread_count > 0)
 
-                            @else
+                                    <span class="wai-unread">
 
-                                <span class="wai-badge wai-badge-ai">
-                                    🤖 AI
-                                </span>
+                                        {{
+                                            (int) $conversation->unread_count > 99
+                                                ? '99+'
+                                                : (int) $conversation->unread_count
+                                        }}
 
-                            @endif
+                                    </span>
+
+                                @endif
+
+
+                                @if ($conversation->human_takeover)
+
+                                    <span class="wai-badge wai-badge-human">
+                                        👤 İnsan
+                                    </span>
+
+                                @else
+
+                                    <span class="wai-badge wai-badge-ai">
+                                        🤖 AI
+                                    </span>
+
+                                @endif
+
+                            </div>
 
                         </div>
 
@@ -830,9 +901,22 @@
 
                     <div>
 
-                        <div class="wai-phone">
-                            {{ $this->selectedConversation->whatsapp_number }}
+                        <div class="wai-customer-name">
+
+                            {{
+                                $this->selectedConversation->customer_name
+                                    ?: $this->selectedConversation->whatsapp_number
+                            }}
+
                         </div>
+
+                        @if ($this->selectedConversation->customer_name)
+
+                            <div class="wai-customer-number">
+                                {{ $this->selectedConversation->whatsapp_number }}
+                            </div>
+
+                        @endif
 
                         <div class="wai-company">
 
@@ -1012,13 +1096,21 @@
                             wire:loading.attr="disabled"
                             wire:target="sendMessage"
                         >
-                            <span wire:loading.remove wire:target="sendMessage">
+
+                            <span
+                                wire:loading.remove
+                                wire:target="sendMessage"
+                            >
                                 Gönder
                             </span>
 
-                            <span wire:loading wire:target="sendMessage">
+                            <span
+                                wire:loading
+                                wire:target="sendMessage"
+                            >
                                 Gönderiliyor...
                             </span>
+
                         </button>
 
                     </div>

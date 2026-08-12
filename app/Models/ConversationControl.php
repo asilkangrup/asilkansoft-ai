@@ -12,12 +12,29 @@ class ConversationControl extends Model
         'ai_bot_id',
         'session_id',
         'whatsapp_number',
+
+        /*
+        |--------------------------------------------------------------------------
+        | MÜŞTERİ BİLGİLERİ
+        |--------------------------------------------------------------------------
+        */
+
+        'customer_name',
+        'unread_count',
+
+        /*
+        |--------------------------------------------------------------------------
+        | AI / İNSAN KONTROLÜ
+        |--------------------------------------------------------------------------
+        */
+
         'human_takeover',
         'taken_over_at',
         'released_at',
     ];
 
     protected $casts = [
+        'unread_count' => 'integer',
         'human_takeover' => 'boolean',
         'taken_over_at' => 'datetime',
         'released_at' => 'datetime',
@@ -82,6 +99,34 @@ class ConversationControl extends Model
         $this->update([
             'human_takeover' => false,
             'released_at' => now(),
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | OKUNMAMIŞ MESAJI ARTIR
+    |--------------------------------------------------------------------------
+    */
+
+    public function okunmamisMesajiArtir(): void
+    {
+        $this->increment('unread_count');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | OKUNMAMIŞ MESAJLARI SIFIRLA
+    |--------------------------------------------------------------------------
+    */
+
+    public function okunmamisMesajlariSifirla(): void
+    {
+        if ((int) $this->unread_count === 0) {
+            return;
+        }
+
+        $this->update([
+            'unread_count' => 0,
         ]);
     }
 }

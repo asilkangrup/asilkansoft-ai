@@ -68,20 +68,27 @@ class ConversationInbox extends Page
                 ->latest('updated_at')
                 ->first();
 
-        if ($firstConversation) {
-            $this->selectedConversationId =
-                $firstConversation->id;
+        if (! $firstConversation) {
+            return;
         }
+
+        $this->selectedConversationId =
+            $firstConversation->id;
+
+        /*
+        |--------------------------------------------------------------------------
+        | AÇILAN KONUŞMAYI OKUNDU YAP
+        |--------------------------------------------------------------------------
+        */
+
+        $firstConversation
+            ->okunmamisMesajlariSifirla();
     }
 
     /*
     |--------------------------------------------------------------------------
     | YETKİLİ KONUŞMALAR
     |--------------------------------------------------------------------------
-    |
-    | Ana yönetici bütün müşterileri görür.
-    | Normal müşteriler sadece kendi konuşmalarını görür.
-    |
     */
 
     protected function conversationQuery(): Builder
@@ -151,6 +158,11 @@ class ConversationInbox extends Page
                             'like',
                             '%'.$search.'%'
                         )
+                        ->orWhere(
+                            'customer_name',
+                            'like',
+                            '%'.$search.'%'
+                        )
                         ->orWhereHas(
                             'aiBot',
                             function (Builder $botQuery) use ($search): void {
@@ -209,6 +221,12 @@ class ConversationInbox extends Page
                 $lastMessage?->created_at
             );
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | EN SON MESAJ GELEN ÜSTE
+        |--------------------------------------------------------------------------
+        */
 
         return $conversations
             ->sortByDesc(
@@ -295,8 +313,32 @@ class ConversationInbox extends Page
             return;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | KONUŞMAYI SEÇ
+        |--------------------------------------------------------------------------
+        */
+
         $this->selectedConversationId =
             $conversation->id;
+
+        /*
+        |--------------------------------------------------------------------------
+        | OKUNMAMIŞ MESAJLARI SIFIRLA
+        |--------------------------------------------------------------------------
+        |
+        | Kullanıcı konuşmayı açtığı anda unread_count sıfırlanır.
+        |
+        */
+
+        $conversation
+            ->okunmamisMesajlariSifirla();
+
+        /*
+        |--------------------------------------------------------------------------
+        | MESAJ KUTUSUNU TEMİZLE
+        |--------------------------------------------------------------------------
+        */
 
         $this->messageText = '';
     }
