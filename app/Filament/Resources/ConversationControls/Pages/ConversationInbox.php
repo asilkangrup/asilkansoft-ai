@@ -46,6 +46,14 @@ class ConversationInbox extends Page
 
     /*
     |--------------------------------------------------------------------------
+    | ETİKET FİLTRESİ
+    |--------------------------------------------------------------------------
+    */
+
+    public string $filterTag = '';
+
+    /*
+    |--------------------------------------------------------------------------
     | YENİ ETİKET
     |--------------------------------------------------------------------------
     */
@@ -188,6 +196,41 @@ class ConversationInbox extends Page
                             }
                         );
                 }
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | GELEN KUTUSU FİLTRESİ
+        |--------------------------------------------------------------------------
+        |
+        | Sol taraftaki filtre butonları doğrudan bu sorguya bağlanır.
+        |
+        */
+
+        $filterTag =
+            trim($this->filterTag);
+
+        if ($filterTag === '__unread__') {
+            $query->where(
+                'unread_count',
+                '>',
+                0
+            );
+        } elseif ($filterTag === '__human__') {
+            $query->where(
+                'human_takeover',
+                true
+            );
+        } elseif ($filterTag === '__ai__') {
+            $query->where(
+                'human_takeover',
+                false
+            );
+        } elseif ($filterTag !== '') {
+            $query->whereJsonContains(
+                'tags',
+                $filterTag
             );
         }
 
@@ -413,6 +456,29 @@ class ConversationInbox extends Page
             ->body('“'.$tag.'” etiketi konuşmadan kaldırıldı.')
             ->success()
             ->send();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HAZIR ETİKET EKLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function addTagFromPreset(string $tag): void
+    {
+        $tag = trim($tag);
+
+        if ($tag === '') {
+            return;
+        }
+
+        $conversation = $this->selectedConversation;
+
+        if (! $conversation) {
+            return;
+        }
+
+        $conversation->etiketEkle($tag);
     }
 
     /*
