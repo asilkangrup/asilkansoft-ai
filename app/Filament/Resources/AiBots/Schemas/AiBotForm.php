@@ -57,6 +57,10 @@ class AiBotForm
                         'Tamamlanan finans başvurularını bağlı WhatsApp hesabınızdaki doğru gruplara otomatik yönlendirin.'
                     )
                     ->icon('heroicon-o-user-group')
+                    ->visible(
+                        fn (?AiBot $record): bool =>
+                            (int) ($record?->id ?? 0) === 30
+                    )
                     ->collapsed()
                     ->schema([
 
