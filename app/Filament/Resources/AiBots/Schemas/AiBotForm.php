@@ -20,6 +20,31 @@ class AiBotForm
 
                 /*
                 |--------------------------------------------------------------------------
+                | YAPAY ZEKÂ KONTROLÜ
+                |--------------------------------------------------------------------------
+                */
+
+                Section::make('Yapay Zekâ Kontrolü')
+                    ->description(
+                        'Yapay zekânın WhatsApp müşterilerine otomatik cevap verip vermeyeceğini yönetin.'
+                    )
+                    ->icon('heroicon-o-power')
+                    ->schema([
+
+                        Toggle::make('ai_enabled')
+                            ->label('Yapay Zekâ Aktif')
+                            ->helperText(
+                                'Kapattığınızda WhatsApp bağlantısı ve QR kodu bağlı kalır, ancak yapay zekâ müşterilere otomatik cevap vermez.'
+                            )
+                            ->default(true)
+                            ->onColor('success')
+                            ->offColor('danger')
+                            ->live(),
+
+                    ]),
+
+                /*
+                |--------------------------------------------------------------------------
                 | TEMEL BİLGİLER
                 |--------------------------------------------------------------------------
                 */
