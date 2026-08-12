@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AiBot;
 use App\Models\ConversationFollowUp;
+use App\Models\ConversationControl;
 use App\Models\FinanceLead;
 use App\Services\FinanceLeadExtractorService;
 use App\Services\FinanceLeadService;
@@ -296,6 +297,41 @@ class WhatsAppWebhookController extends Controller
                 role: 'user',
                 message: $message,
             );
+
+            /*
+            |--------------------------------------------------------------------------
+            | İNSAN DEVRALMA KONTROLÜ
+            |--------------------------------------------------------------------------
+            |
+            | Bu WhatsApp konuşması bir personel tarafından devralındıysa
+            | müşterinin mesajı hafızada kalır fakat yapay zekâ cevap vermez.
+            |
+            */
+
+            $conversationControl = ConversationControl::query()
+                ->where('ai_bot_id', $aiBot->id)
+                ->where('session_id', $sessionId)
+                ->first();
+
+            if (
+                $conversationControl
+                && $conversationControl->human_takeover
+            ) {
+                Log::info(
+                    'Konuşma insan tarafından devralındığı için AI cevap vermedi',
+                    [
+                        'ai_bot_id' => $aiBot->id,
+                        'session_id' => $sessionId,
+                        'phone_number' => $phoneNumber,
+                    ]
+                );
+
+                return response()->json([
+                    'success' => true,
+                    'ignored' => true,
+                    'reason' => 'human_takeover',
+                ]);
+            }
 
             /*
             |--------------------------------------------------------------------------
