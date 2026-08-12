@@ -60,10 +60,11 @@ class AiBot extends Model
 
         /*
         |--------------------------------------------------------------------------
-        | WHATSAPP GRUPLARI
+        | WHATSAPP GRUP YÖNLENDİRME
         |--------------------------------------------------------------------------
         */
 
+        'group_routing_enabled',
         'vodafone_group_jid',
         'turktelekom_group_jid',
         'turkcell_group_jid',
@@ -89,6 +90,14 @@ class AiBot extends Model
     ];
 
     protected $casts = [
+        /*
+        |--------------------------------------------------------------------------
+        | WHATSAPP GRUP YÖNLENDİRME
+        |--------------------------------------------------------------------------
+        */
+
+        'group_routing_enabled' => 'boolean',
+
         /*
         |--------------------------------------------------------------------------
         | OTOMATİK TAKİP
@@ -158,7 +167,6 @@ class AiBot extends Model
     public function kalanDenemeMesaji(): int
     {
         $limit = (int) $this->trial_message_limit;
-
         $used = (int) $this->trial_messages_used;
 
         return max(
@@ -195,12 +203,6 @@ class AiBot extends Model
 
     public function whatsappAiKullanilabilirMi(): bool
     {
-        /*
-        |--------------------------------------------------------------------------
-        | ÜCRETLİ PAKET AKTİF
-        |--------------------------------------------------------------------------
-        */
-
         if (
             $this->subscription_status === 'active'
         ) {
@@ -212,12 +214,6 @@ class AiBot extends Model
                 $this->subscription_ends_at
                 ->isFuture();
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | ÜCRETSİZ DENEME
-        |--------------------------------------------------------------------------
-        */
 
         if (
             $this->subscription_status === 'trial'
