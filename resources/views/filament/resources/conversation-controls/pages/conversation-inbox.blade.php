@@ -9,7 +9,7 @@
 
         .wai-chat-shell {
             display: grid;
-            grid-template-columns: 340px minmax(0, 1fr);
+            grid-template-columns: 340px minmax(0, 1fr) 310px;
 
             width: 100%;
             height: 72vh;
@@ -696,6 +696,189 @@
 
         /*
         |--------------------------------------------------------------------------
+        | MÜŞTERİ BİLGİLERİ / CRM PANELİ
+        |--------------------------------------------------------------------------
+        */
+
+        .wai-customer-panel {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            min-height: 0;
+            overflow-y: auto;
+            border-left: 1px solid #e5e7eb;
+            background: #ffffff;
+        }
+
+        .dark .wai-customer-panel {
+            background: #111827;
+            border-color: rgba(255, 255, 255, .10);
+        }
+
+        .wai-profile {
+            padding: 24px 18px 20px;
+            text-align: center;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .dark .wai-profile {
+            border-color: rgba(255, 255, 255, .10);
+        }
+
+        .wai-profile-avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 76px;
+            height: 76px;
+            margin: 0 auto 12px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .wai-profile-name {
+            overflow: hidden;
+            font-size: 17px;
+            font-weight: 800;
+            color: #111827;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .dark .wai-profile-name { color: #ffffff; }
+
+        .wai-profile-number {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .wai-profile-company {
+            margin-top: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .dark .wai-profile-company { color: #cbd5e1; }
+
+        .wai-crm-section {
+            padding: 16px 18px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .dark .wai-crm-section { border-color: rgba(255, 255, 255, .08); }
+
+        .wai-crm-title {
+            margin-bottom: 10px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .wai-crm-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 8px 0;
+        }
+
+        .wai-crm-label {
+            flex: 0 0 auto;
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .wai-crm-value {
+            min-width: 0;
+            overflow: hidden;
+            font-size: 12px;
+            font-weight: 700;
+            color: #111827;
+            text-align: right;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .dark .wai-crm-value { color: #ffffff; }
+
+        .wai-crm-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 9px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .wai-crm-status.ai {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .wai-crm-status.human {
+            background: #fef3c7;
+            color: #b45309;
+        }
+
+        .wai-crm-tag {
+            display: inline-flex;
+            margin: 3px 3px 0 0;
+            padding: 5px 8px;
+            border-radius: 7px;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .dark .wai-crm-tag {
+            background: #1f2937;
+            color: #cbd5e1;
+        }
+
+        .wai-crm-empty {
+            padding: 10px 12px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 9px;
+            background: #f8fafc;
+            color: #94a3b8;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .dark .wai-crm-empty {
+            background: #0f172a;
+            border-color: rgba(255, 255, 255, .12);
+        }
+
+        .wai-crm-action {
+            width: 100%;
+            margin-top: 10px;
+            padding: 9px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            background: #ffffff;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .dark .wai-crm-action {
+            background: #1f2937;
+            border-color: rgba(255, 255, 255, .10);
+            color: #94a3b8;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | MOBİL
         |--------------------------------------------------------------------------
         */
@@ -722,6 +905,11 @@
             .wai-main {
                 height: 650px;
                 min-height: 650px;
+            }
+
+            .wai-customer-panel {
+                border-left: 0;
+                border-top: 1px solid #e5e7eb;
             }
 
             .wai-bubble {
@@ -1172,6 +1360,136 @@
             @endif
 
         </main>
+
+        @if ($this->selectedConversation)
+
+            @php
+                $selectedCustomerName =
+                    $this->selectedConversation->customer_name
+                    ?: $this->selectedConversation->whatsapp_number;
+
+                $selectedCompany =
+                    $this->selectedConversation->aiBot?->company_name
+                    ?? $this->selectedConversation->aiBot?->name
+                    ?? 'WhatsApp';
+
+                $customerInitial =
+                    mb_strtoupper(
+                        mb_substr(
+                            trim((string) $selectedCustomerName),
+                            0,
+                            1
+                        )
+                    );
+            @endphp
+
+            <aside class="wai-customer-panel">
+
+                <div class="wai-profile">
+                    <div class="wai-profile-avatar">
+                        {{ $customerInitial ?: '👤' }}
+                    </div>
+
+                    <div class="wai-profile-name">
+                        {{ $selectedCustomerName }}
+                    </div>
+
+                    <div class="wai-profile-number">
+                        {{ $this->selectedConversation->whatsapp_number }}
+                    </div>
+
+                    <div class="wai-profile-company">
+                        🏢 {{ $selectedCompany }}
+                    </div>
+                </div>
+
+                <div class="wai-crm-section">
+                    <div class="wai-crm-title">Müşteri Bilgileri</div>
+
+                    <div class="wai-crm-row">
+                        <span class="wai-crm-label">Telefon</span>
+                        <span class="wai-crm-value">
+                            {{ $this->selectedConversation->whatsapp_number }}
+                        </span>
+                    </div>
+
+                    <div class="wai-crm-row">
+                        <span class="wai-crm-label">Firma</span>
+                        <span class="wai-crm-value">{{ $selectedCompany }}</span>
+                    </div>
+
+                    <div class="wai-crm-row">
+                        <span class="wai-crm-label">Son aktivite</span>
+                        <span class="wai-crm-value">
+                            {{
+                                $this->selectedConversation->last_message_at
+                                    ? $this->selectedConversation->last_message_at->diffForHumans()
+                                    : 'Bilinmiyor'
+                            }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="wai-crm-section">
+                    <div class="wai-crm-title">Konuşma Durumu</div>
+
+                    <div class="wai-crm-row">
+                        <span class="wai-crm-label">Yönetim</span>
+
+                        @if ($this->selectedConversation->human_takeover)
+                            <span class="wai-crm-status human">👤 İnsan</span>
+                        @else
+                            <span class="wai-crm-status ai">🤖 AI Aktif</span>
+                        @endif
+                    </div>
+
+                    <div class="wai-crm-row">
+                        <span class="wai-crm-label">Okunmamış</span>
+                        <span class="wai-crm-value">
+                            {{ (int) $this->selectedConversation->unread_count }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="wai-crm-section">
+                    <div class="wai-crm-title">Etiketler</div>
+
+                    <span class="wai-crm-tag">WhatsApp</span>
+
+                    @if ($this->selectedConversation->human_takeover)
+                        <span class="wai-crm-tag">İnsan Yönetiyor</span>
+                    @else
+                        <span class="wai-crm-tag">AI Aktif</span>
+                    @endif
+                </div>
+
+                <div class="wai-crm-section">
+                    <div class="wai-crm-title">Notlar</div>
+
+                    <div class="wai-crm-empty">
+                        Müşteri notları bir sonraki adımda kalıcı olarak eklenecek.
+                    </div>
+
+                    <button
+                        type="button"
+                        class="wai-crm-action"
+                        disabled
+                    >
+                        📝 Not Ekle — Yakında
+                    </button>
+                </div>
+
+                <div class="wai-crm-section">
+                    <div class="wai-crm-title">Siparişler</div>
+
+                    <div class="wai-crm-empty">
+                        Müşterinin sipariş geçmişini burada göstereceğiz.
+                    </div>
+                </div>
+
+            </aside>
+
+        @endif
 
     </div>
 
