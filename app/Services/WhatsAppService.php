@@ -147,10 +147,6 @@ class WhatsAppService
     |--------------------------------------------------------------------------
     | WEBHOOK OTOMATİK AYARLA
     |--------------------------------------------------------------------------
-    |
-    | Her yeni WhatsApp instance oluşturulduğunda Laravel webhook adresini
-    | Evolution API instance'ına otomatik olarak tanımlar.
-    |
     */
 
     public function setWebhook(
@@ -199,7 +195,7 @@ class WhatsAppService
 
     /*
     |--------------------------------------------------------------------------
-    | WHATSAPP MESAJI GÖNDER
+    | BİREYSEL WHATSAPP MESAJI GÖNDER
     |--------------------------------------------------------------------------
     */
 
@@ -252,5 +248,119 @@ class WhatsAppService
         }
 
         return $response->json();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | WHATSAPP GRUBUNA MESAJ GÖNDER
+    |--------------------------------------------------------------------------
+    */
+
+    public function sendGroupText(
+        string $instanceName,
+        string $groupJid,
+        string $text
+    ): array {
+        $instanceName = trim($instanceName);
+        $groupJid = trim($groupJid);
+        $text = trim($text);
+
+        if ($instanceName === '') {
+            throw new Exception(
+                'Instance adı boş olamaz.'
+            );
+        }
+
+        if ($groupJid === '') {
+            throw new Exception(
+                'WhatsApp grup ID boş olamaz.'
+            );
+        }
+
+        if (! str_ends_with($groupJid, '@g.us')) {
+            throw new Exception(
+                'Geçersiz WhatsApp grup ID.'
+            );
+        }
+
+        if ($text === '') {
+            throw new Exception(
+                'Gönderilecek grup mesajı boş olamaz.'
+            );
+        }
+
+        $response = $this->client()->post(
+            "{$this->url}/message/sendText/{$instanceName}",
+            [
+                'number' => $groupJid,
+                'text' => $text,
+            ]
+        );
+
+        if (! $response->successful()) {
+            throw new Exception(
+                'WhatsApp grubuna mesaj gönderilemedi: ' .
+                $response->body()
+            );
+        }
+
+        return $response->json();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | WHATSAPP GRUPLARINI GETİR
+    |--------------------------------------------------------------------------
+    */
+
+    public function fetchGroups(
+        string $instanceName
+    ): array {
+        $instanceName = trim($instanceName);
+
+        if ($instanceName === '') {
+            throw new Exception(
+                'Instance adı boş olamaz.'
+            );
+        }
+
+        $response = $this->client()->get(
+            "{$this->url}/group/fetchAllGroups/{$instanceName}",
+            [
+                'getParticipants' => 'false',
+            ]
+        );
+
+        if (! $response->successful()) {
+            throw new Exception(
+                'WhatsApp grupları alınamadı: ' .
+                $response->body()
+            );
+        }
+
+        $data = $response->json();
+
+        if (! is_array($data)) {
+            return [];
+        }
+
+        return collect($data)
+            ->filter(function ($group) {
+                $id = data_get($group, 'id');
+
+                return is_string($id)
+                    && str_ends_with($id, '@g.us');
+            })
+            ->map(function ($group) {
+                return [
+                    'id' => data_get($group, 'id'),
+                    'name' =>
+                        data_get($group, 'subject')
+                        ?? data_get($group, 'name')
+                        ?? 'İsimsiz Grup',
+                ];
+            })
+            ->values()
+            ->all();
     }
 }
