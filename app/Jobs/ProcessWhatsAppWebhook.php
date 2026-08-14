@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Http\Controllers\WhatsAppWebhookController;
+use App\Services\CrmCustomerExtractorService;
 use App\Services\FinanceLeadExtractorService;
 use App\Services\FinanceLeadService;
 use App\Services\LeadScoringService;
@@ -36,6 +37,7 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         FinanceLeadService $financeLeadService,
         FinanceLeadExtractorService $financeLeadExtractorService,
         LeadScoringService $leadScoringService,
+        CrmCustomerExtractorService $crmCustomerExtractorService,
     ): void {
         /*
         |--------------------------------------------------------------------------
@@ -68,6 +70,7 @@ class ProcessWhatsAppWebhook implements ShouldQueue
             financeLeadService: $financeLeadService,
             financeLeadExtractorService: $financeLeadExtractorService,
             leadScoringService: $leadScoringService,
+            crmCustomerExtractorService: $crmCustomerExtractorService,
         );
     }
 }

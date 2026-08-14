@@ -8,6 +8,7 @@ use App\Models\ChatMessage;
 use App\Models\ConversationFollowUp;
 use App\Models\ConversationControl;
 use App\Models\FinanceLead;
+use App\Services\CrmCustomerExtractorService;
 use App\Services\FinanceLeadExtractorService;
 use App\Services\FinanceLeadService;
 use App\Services\LeadScoringService;
@@ -33,14 +34,15 @@ class WhatsAppWebhookController extends Controller
         OrderService $orderService,
         FinanceLeadService $financeLeadService,
         FinanceLeadExtractorService $financeLeadExtractorService,
-        LeadScoringService $leadScoringService
+        LeadScoringService $leadScoringService,
+        CrmCustomerExtractorService $crmCustomerExtractorService
     ): JsonResponse {
         try {
             $payload = $request->all();
 
             /*
             |--------------------------------------------------------------------------
-            | SADECE YENİ MESAJLARI İŞLE
+            | SADECE YENÄ° MESAJLARI Ä°ÅLE
             |--------------------------------------------------------------------------
             */
 
@@ -67,11 +69,11 @@ class WhatsAppWebhookController extends Controller
             | WEBHOOK'U HIZLICA QUEUE'YA DEVRET
             |--------------------------------------------------------------------------
             |
-            | Evolution API'nin 60 saniye timeout'a düşmemesi için ağır işlemler
-            | (OpenAI, sipariş, finans, WhatsApp gönderimi) queue worker'da çalışır.
+            | Evolution API'nin 60 saniye timeout'a dÃ¼ÅŸmemesi iÃ§in aÄŸÄ±r iÅŸlemler
+            | (OpenAI, sipariÅŸ, finans, WhatsApp gÃ¶nderimi) queue worker'da Ã§alÄ±ÅŸÄ±r.
             |
-            | Queue worker aynı controller'ı _wai_queued=true ile yeniden çağırır.
-            | Böylece bu blok ikinci kez job oluşturmaz.
+            | Queue worker aynÄ± controller'Ä± _wai_queued=true ile yeniden Ã§aÄŸÄ±rÄ±r.
+            | BÃ¶ylece bu blok ikinci kez job oluÅŸturmaz.
             |
             */
 
@@ -94,7 +96,7 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | BOTUN KENDİ MESAJINI TEKRAR CEVAPLAMA
+            | BOTUN KENDÄ° MESAJINI TEKRAR CEVAPLAMA
             |--------------------------------------------------------------------------
             */
 
@@ -114,7 +116,7 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | AYNI WHATSAPP MESAJINI SADECE BİR KEZ İŞLE
+            | AYNI WHATSAPP MESAJINI SADECE BÄ°R KEZ Ä°ÅLE
             |--------------------------------------------------------------------------
             */
 
@@ -147,7 +149,7 @@ class WhatsAppWebhookController extends Controller
                     )
                 ) {
                     Log::info(
-                        'Tekrarlanan WhatsApp webhook mesajı engellendi',
+                        'Tekrarlanan WhatsApp webhook mesajÄ± engellendi',
                         [
                             'message_id' =>
                                 $messageId,
@@ -186,13 +188,13 @@ class WhatsAppWebhookController extends Controller
             if ($instanceName === '') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Instance bulunamadı.',
+                    'message' => 'Instance bulunamadÄ±.',
                 ], 422);
             }
 
             /*
             |--------------------------------------------------------------------------
-            | DOĞRU YAPAY ZEKÂ BOTUNU BUL
+            | DOÄRU YAPAY ZEKÃ‚ BOTUNU BUL
             |--------------------------------------------------------------------------
             */
 
@@ -205,7 +207,7 @@ class WhatsAppWebhookController extends Controller
 
             if (! $aiBot) {
                 Log::warning(
-                    'Webhook için AiBot bulunamadı',
+                    'Webhook iÃ§in AiBot bulunamadÄ±',
                     [
                         'instance' => $instanceName,
                     ]
@@ -214,13 +216,13 @@ class WhatsAppWebhookController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' =>
-                        'Bu instance için yapay zekâ bulunamadı.',
+                        'Bu instance iÃ§in yapay zekÃ¢ bulunamadÄ±.',
                 ], 404);
             }
 
             /*
             |--------------------------------------------------------------------------
-            | MÜŞTERİ NUMARASI
+            | MÃœÅTERÄ° NUMARASI
             |--------------------------------------------------------------------------
             */
 
@@ -279,9 +281,9 @@ class WhatsAppWebhookController extends Controller
                     $messageType = 'image';
                     $mediaUrl = data_get($image, 'url');
                     $mediaMimeType = data_get($image, 'mimetype');
-                    $mediaFilename = data_get($image, 'fileName') ?? 'Fotoğraf';
+                    $mediaFilename = data_get($image, 'fileName') ?? 'FotoÄŸraf';
                     $mediaCaption = data_get($image, 'caption');
-                    $message = $mediaCaption ?: '[Fotoğraf]';
+                    $message = $mediaCaption ?: '[FotoÄŸraf]';
                 }
 
                 $video = data_get($messagePayload, 'videoMessage');
@@ -329,7 +331,7 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | ABONELİK / 30 MESAJLIK DENEME KONTROLÜ
+            | ABONELÄ°K / 30 MESAJLIK DENEME KONTROLÃœ
             |--------------------------------------------------------------------------
             */
 
@@ -337,7 +339,7 @@ class WhatsAppWebhookController extends Controller
                 ! $aiBot->whatsappAiKullanilabilirMi()
             ) {
                 Log::info(
-                    'WhatsApp AI kullanım limiti nedeniyle cevap verilmedi',
+                    'WhatsApp AI kullanÄ±m limiti nedeniyle cevap verilmedi',
                     [
                         'ai_bot_id' =>
                             $aiBot->id,
@@ -378,11 +380,11 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | KONUŞMA KONTROL KAYDI
+            | KONUÅMA KONTROL KAYDI
             |--------------------------------------------------------------------------
             |
-            | Her WhatsApp konuşması için tek bir kontrol kaydı oluşturulur.
-            | Böylece panelden sadece bu müşterinin konuşması devralınabilir.
+            | Her WhatsApp konuÅŸmasÄ± iÃ§in tek bir kontrol kaydÄ± oluÅŸturulur.
+            | BÃ¶ylece panelden sadece bu mÃ¼ÅŸterinin konuÅŸmasÄ± devralÄ±nabilir.
             |
             */
 
@@ -415,7 +417,7 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | MÜŞTERİ MESAJINI HAFIZAYA KAYDET
+            | MÃœÅTERÄ° MESAJINI HAFIZAYA KAYDET
             |--------------------------------------------------------------------------
             */
 
@@ -429,7 +431,7 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | MÜŞTERİ ADI
+            | MÃœÅTERÄ° ADI
             |--------------------------------------------------------------------------
             */
 
@@ -444,14 +446,17 @@ class WhatsAppWebhookController extends Controller
                     )
                 );
 
-            if ($customerName !== '') {
+            if (
+                $customerName !== ''
+                && trim((string) $conversationControl->customer_name) === ''
+            ) {
                 $conversationControl->customer_name =
                     $customerName;
             }
 
             /*
             |--------------------------------------------------------------------------
-            | OKUNMAMIŞ MESAJ
+            | OKUNMAMIÅ MESAJ
             |--------------------------------------------------------------------------
             */
 
@@ -471,11 +476,11 @@ class WhatsAppWebhookController extends Controller
             | WAI SMART LEAD SCORING
             |--------------------------------------------------------------------------
             |
-            | Müşteri mesajındaki satın alma sinyallerini analiz eder.
-            | Ekstra OpenAI çağrısı yapmaz; ana WhatsApp cevap akışını yavaşlatmaz.
+            | MÃ¼ÅŸteri mesajÄ±ndaki satÄ±n alma sinyallerini analiz eder.
+            | Ekstra OpenAI Ã§aÄŸrÄ±sÄ± yapmaz; ana WhatsApp cevap akÄ±ÅŸÄ±nÄ± yavaÅŸlatmaz.
             |
-            | Aynı WhatsApp mesajı yukarıdaki messageId / Cache koruması sayesinde
-            | ikinci kez işlenmediği için lead puanı da iki kez artmaz.
+            | AynÄ± WhatsApp mesajÄ± yukarÄ±daki messageId / Cache korumasÄ± sayesinde
+            | ikinci kez iÅŸlenmediÄŸi iÃ§in lead puanÄ± da iki kez artmaz.
             |
             */
 
@@ -487,6 +492,45 @@ class WhatsAppWebhookController extends Controller
             } catch (Throwable $exception) {
                 Log::warning(
                     'WAI LEAD SCORING FAILED',
+                    [
+                        'conversation_id' =>
+                            $conversationControl->id,
+
+                        'ai_bot_id' =>
+                            $aiBot->id,
+
+                        'session_id' =>
+                            $sessionId,
+
+                        'message' =>
+                            $exception->getMessage(),
+                    ]
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | WAI OTOMATİK CRM MÜŞTERİ BİLGİSİ
+            |--------------------------------------------------------------------------
+            |
+            | Müşterinin kendi mesajında açıkça verdiği ad, e-posta ve firma
+            | bilgilerini ekstra OpenAI çağrısı yapmadan CRM'e işler.
+            |
+            | Hata oluşursa ana WhatsApp cevap akışı kesinlikle durmaz.
+            |
+            */
+
+            try {
+                $crmCustomerExtractorService->process(
+                    conversation: $conversationControl,
+                    message: $message,
+                    pushName: $customerName !== ''
+                        ? $customerName
+                        : null,
+                );
+            } catch (Throwable $exception) {
+                Log::warning(
+                    'WAI CRM CUSTOMER EXTRACTOR FAILED',
                     [
                         'conversation_id' =>
                             $conversationControl->id,
@@ -529,11 +573,11 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | İNSAN DEVRALMA KONTROLÜ
+            | Ä°NSAN DEVRALMA KONTROLÃœ
             |--------------------------------------------------------------------------
             |
-            | Bu WhatsApp konuşması bir personel tarafından devralındıysa
-            | müşterinin mesajı hafızada kalır fakat yapay zekâ cevap vermez.
+            | Bu WhatsApp konuÅŸmasÄ± bir personel tarafÄ±ndan devralÄ±ndÄ±ysa
+            | mÃ¼ÅŸterinin mesajÄ± hafÄ±zada kalÄ±r fakat yapay zekÃ¢ cevap vermez.
             |
             */
 
@@ -542,7 +586,7 @@ class WhatsAppWebhookController extends Controller
                 && $conversationControl->human_takeover
             ) {
                 Log::info(
-                    'Konuşma insan tarafından devralındığı için AI cevap vermedi',
+                    'KonuÅŸma insan tarafÄ±ndan devralÄ±ndÄ±ÄŸÄ± iÃ§in AI cevap vermedi',
                     [
                         'ai_bot_id' => $aiBot->id,
                         'session_id' => $sessionId,
@@ -559,7 +603,7 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | OTOMATİK TAKİP SAYACINI BAŞLAT / SIFIRLA
+            | OTOMATÄ°K TAKÄ°P SAYACINI BAÅLAT / SIFIRLA
             |--------------------------------------------------------------------------
             */
 
@@ -599,12 +643,12 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | FİNANS BAŞVURU TAKİBİ
+            | FÄ°NANS BAÅVURU TAKÄ°BÄ°
             |--------------------------------------------------------------------------
             |
-            | Bu bölüm sadece group_routing_enabled = true olan botlarda çalışır.
-            | Konuşmayı analiz eder, finance_leads tablosuna kaydeder ve
-            | tüm zorunlu bilgiler tamamlandığında doğru WhatsApp grubuna yollar.
+            | Bu bÃ¶lÃ¼m sadece group_routing_enabled = true olan botlarda Ã§alÄ±ÅŸÄ±r.
+            | KonuÅŸmayÄ± analiz eder, finance_leads tablosuna kaydeder ve
+            | tÃ¼m zorunlu bilgiler tamamlandÄ±ÄŸÄ±nda doÄŸru WhatsApp grubuna yollar.
             |
             */
 
@@ -657,15 +701,15 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | NORMAL SİPARİŞ SİSTEMİ
+            | NORMAL SÄ°PARÄ°Å SÄ°STEMÄ°
             |--------------------------------------------------------------------------
             |
-            | Finans botunda normal ürün / sipariş sistemi çalıştırılmaz.
+            | Finans botunda normal Ã¼rÃ¼n / sipariÅŸ sistemi Ã§alÄ±ÅŸtÄ±rÄ±lmaz.
             |
-            | Böylece müşterinin:
+            | BÃ¶ylece mÃ¼ÅŸterinin:
             | "limit istiyorum"
             | "almak istiyorum"
-            | vb. ifadeleri yanlışlıkla ürün siparişi oluşturmaz.
+            | vb. ifadeleri yanlÄ±ÅŸlÄ±kla Ã¼rÃ¼n sipariÅŸi oluÅŸturmaz.
             |
             */
 
@@ -674,7 +718,7 @@ class WhatsAppWebhookController extends Controller
             ) {
                 /*
                 |--------------------------------------------------------------------------
-                | MEVCUT TASLAK SİPARİŞİ BUL
+                | MEVCUT TASLAK SÄ°PARÄ°ÅÄ° BUL
                 |--------------------------------------------------------------------------
                 */
 
@@ -689,7 +733,7 @@ class WhatsAppWebhookController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | SATIN ALMA NİYETİ VARSA TASLAK OLUŞTUR
+                | SATIN ALMA NÄ°YETÄ° VARSA TASLAK OLUÅTUR
                 |--------------------------------------------------------------------------
                 */
 
@@ -739,10 +783,10 @@ class WhatsAppWebhookController extends Controller
                                 );
 
                         /*
-                         * Taslak yeni oluştuysa son konuşmadaki ürün ve
-                         * miktarı da siparişe aktar. Böylece müşteri
-                         * "evet" dediğinde önceki "5 litre zeytinyağı"
-                         * mesajı kaybolmaz.
+                         * Taslak yeni oluÅŸtuysa son konuÅŸmadaki Ã¼rÃ¼n ve
+                         * miktarÄ± da sipariÅŸe aktar. BÃ¶ylece mÃ¼ÅŸteri
+                         * "evet" dediÄŸinde Ã¶nceki "5 litre zeytinyaÄŸÄ±"
+                         * mesajÄ± kaybolmaz.
                          */
                         $siparisGecmisi =
                             $memoryService
@@ -774,14 +818,14 @@ class WhatsAppWebhookController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | SİPARİŞ AKIŞI
+                | SÄ°PARÄ°Å AKIÅI
                 |--------------------------------------------------------------------------
                 */
 
                 if ($order) {
                     /*
                     |--------------------------------------------------------------------------
-                    | GELEN MESAJDAN SİPARİŞ BİLGİLERİNİ YAKALA
+                    | GELEN MESAJDAN SÄ°PARÄ°Å BÄ°LGÄ°LERÄ°NÄ° YAKALA
                     |--------------------------------------------------------------------------
                     */
 
@@ -800,7 +844,7 @@ class WhatsAppWebhookController extends Controller
 
                     /*
                     |--------------------------------------------------------------------------
-                    | MÜŞTERİ ONAY VERDİYSE
+                    | MÃœÅTERÄ° ONAY VERDÄ°YSE
                     |--------------------------------------------------------------------------
                     */
 
@@ -823,12 +867,12 @@ class WhatsAppWebhookController extends Controller
                                     );
 
                             $answer =
-                                "✅ Siparişiniz başarıyla alındı.\n\n"
+                                "âœ… SipariÅŸiniz baÅŸarÄ±yla alÄ±ndÄ±.\n\n"
                                 .$orderService
                                     ->siparisOzeti(
                                         $order
                                     )
-                                ."\n\nSiparişiniz firmaya iletildi.";
+                                ."\n\nSipariÅŸiniz firmaya iletildi.";
 
                             $this->cevabiKaydetVeGonder(
                                 memoryService:
@@ -856,13 +900,13 @@ class WhatsAppWebhookController extends Controller
                             return response()->json([
                                 'success' => true,
                                 'message' =>
-                                    'Sipariş onaylandı.',
+                                    'SipariÅŸ onaylandÄ±.',
                             ]);
                         }
 
                         /*
                         |--------------------------------------------------------------------------
-                        | EKSİK BİLGİ VARKEN ONAY VERDİYSE
+                        | EKSÄ°K BÄ°LGÄ° VARKEN ONAY VERDÄ°YSE
                         |--------------------------------------------------------------------------
                         */
 
@@ -871,7 +915,7 @@ class WhatsAppWebhookController extends Controller
                                 ->siradakiEksikSoru(
                                     $order
                                 )
-                            ?? 'Sipariş bilgileriniz henüz tamamlanmadı.';
+                            ?? 'SipariÅŸ bilgileriniz henÃ¼z tamamlanmadÄ±.';
 
                         $this->cevabiKaydetVeGonder(
                             memoryService:
@@ -899,13 +943,13 @@ class WhatsAppWebhookController extends Controller
                         return response()->json([
                             'success' => true,
                             'message' =>
-                                'Eksik sipariş bilgisi istendi.',
+                                'Eksik sipariÅŸ bilgisi istendi.',
                         ]);
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | TÜM BİLGİLER TAMAMSA ÖZET GÖNDER
+                    | TÃœM BÄ°LGÄ°LER TAMAMSA Ã–ZET GÃ–NDER
                     |--------------------------------------------------------------------------
                     */
 
@@ -920,7 +964,7 @@ class WhatsAppWebhookController extends Controller
                                 ->siparisOzeti(
                                     $order
                                 )
-                            ."\n\nBilgiler doğruysa sadece *Onaylıyorum* yazabilirsiniz.";
+                            ."\n\nBilgiler doÄŸruysa sadece *OnaylÄ±yorum* yazabilirsiniz.";
 
                         $this->cevabiKaydetVeGonder(
                             memoryService:
@@ -948,13 +992,13 @@ class WhatsAppWebhookController extends Controller
                         return response()->json([
                             'success' => true,
                             'message' =>
-                                'Sipariş özeti gönderildi.',
+                                'SipariÅŸ Ã¶zeti gÃ¶nderildi.',
                         ]);
                     }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | EKSİK BİLGİ VARSA SADECE SIRADAKİNİ SOR
+                    | EKSÄ°K BÄ°LGÄ° VARSA SADECE SIRADAKÄ°NÄ° SOR
                     |--------------------------------------------------------------------------
                     */
 
@@ -991,7 +1035,7 @@ class WhatsAppWebhookController extends Controller
                         return response()->json([
                             'success' => true,
                             'message' =>
-                                'Sıradaki sipariş bilgisi istendi.',
+                                'SÄ±radaki sipariÅŸ bilgisi istendi.',
                         ]);
                     }
                 }
@@ -999,7 +1043,7 @@ class WhatsAppWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | NORMAL GPT KONUŞMASI
+            | NORMAL GPT KONUÅMASI
             |--------------------------------------------------------------------------
             */
 
@@ -1051,12 +1095,12 @@ class WhatsAppWebhookController extends Controller
             return response()->json([
                 'success' => true,
                 'message' =>
-                    'Yapay zekâ cevabı gönderildi.',
+                    'Yapay zekÃ¢ cevabÄ± gÃ¶nderildi.',
             ]);
 
         } catch (Throwable $exception) {
             Log::error(
-                'WhatsApp AI webhook hatası',
+                'WhatsApp AI webhook hatasÄ±',
                 [
                     'message' =>
                         $exception->getMessage(),
@@ -1072,14 +1116,14 @@ class WhatsAppWebhookController extends Controller
             return response()->json([
                 'success' => false,
                 'message' =>
-                    'Webhook işlenirken hata oluştu.',
+                    'Webhook iÅŸlenirken hata oluÅŸtu.',
             ], 500);
         }
     }
 
     /*
     |--------------------------------------------------------------------------
-    | FİNANS BAŞVURUSUNU KAYDET / GÜNCELLE
+    | FÄ°NANS BAÅVURUSUNU KAYDET / GÃœNCELLE
     |--------------------------------------------------------------------------
     */
 
@@ -1144,7 +1188,7 @@ class WhatsAppWebhookController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | FİNANS BAŞVURUSUNU KAYDET / GÜNCELLE
+    | FÄ°NANS BAÅVURUSUNU KAYDET / GÃœNCELLE
     |--------------------------------------------------------------------------
     */
 
@@ -1162,7 +1206,7 @@ class WhatsAppWebhookController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | BAŞVURU TÜRÜ HENÜZ BELLİ DEĞİL
+        | BAÅVURU TÃœRÃœ HENÃœZ BELLÄ° DEÄÄ°L
         |--------------------------------------------------------------------------
         */
 
@@ -1178,7 +1222,7 @@ class WhatsAppWebhookController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | MEVCUT KAYDI BUL / YENİ KAYIT HAZIRLA
+        | MEVCUT KAYDI BUL / YENÄ° KAYIT HAZIRLA
         |--------------------------------------------------------------------------
         */
 
@@ -1196,7 +1240,7 @@ class WhatsAppWebhookController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | SABİT BİLGİLER
+        | SABÄ°T BÄ°LGÄ°LER
         |--------------------------------------------------------------------------
         */
 
@@ -1208,10 +1252,10 @@ class WhatsAppWebhookController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | AI TARAFINDAN ÇIKARILAN BİLGİLER
+        | AI TARAFINDAN Ã‡IKARILAN BÄ°LGÄ°LER
         |--------------------------------------------------------------------------
         |
-        | Null gelen değerlerle daha önce kaydedilmiş doğru bilgileri silmiyoruz.
+        | Null gelen deÄŸerlerle daha Ã¶nce kaydedilmiÅŸ doÄŸru bilgileri silmiyoruz.
         |
         */
 
@@ -1244,7 +1288,7 @@ class WhatsAppWebhookController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | DOĞUM TARİHİ
+        | DOÄUM TARÄ°HÄ°
         |--------------------------------------------------------------------------
         */
 
@@ -1285,7 +1329,7 @@ class WhatsAppWebhookController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | BAŞVURU TAMAM MI?
+        | BAÅVURU TAMAM MI?
         |--------------------------------------------------------------------------
         */
 
@@ -1361,11 +1405,11 @@ class WhatsAppWebhookController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | TAMAMLANAN BAŞVURUYU WHATSAPP GRUBUNA GÖNDER
+        | TAMAMLANAN BAÅVURUYU WHATSAPP GRUBUNA GÃ–NDER
         |--------------------------------------------------------------------------
         |
-        | Aynı başvuru sent_to_group_at dolduktan sonra tekrar gönderilmez.
-        | Grup gönderiminde hata olursa müşteriyle normal AI konuşması devam eder.
+        | AynÄ± baÅŸvuru sent_to_group_at dolduktan sonra tekrar gÃ¶nderilmez.
+        | Grup gÃ¶nderiminde hata olursa mÃ¼ÅŸteriyle normal AI konuÅŸmasÄ± devam eder.
         |
         */
 
@@ -1436,7 +1480,7 @@ class WhatsAppWebhookController extends Controller
                 $lead->save();
 
                 Log::info(
-                    'Finans başvurusu WhatsApp grubuna gönderildi',
+                    'Finans baÅŸvurusu WhatsApp grubuna gÃ¶nderildi',
                     [
                         'finance_lead_id' =>
                             $lead->id,
@@ -1456,7 +1500,7 @@ class WhatsAppWebhookController extends Controller
                 );
             } catch (Throwable $exception) {
                 Log::error(
-                    'Finans başvurusu WhatsApp grubuna gönderilemedi',
+                    'Finans baÅŸvurusu WhatsApp grubuna gÃ¶nderilemedi',
                     [
                         'finance_lead_id' =>
                             $lead->id,
@@ -1482,7 +1526,7 @@ class WhatsAppWebhookController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | DOĞUM TARİHİNİ VERİTABANI FORMATINA ÇEVİR
+    | DOÄUM TARÄ°HÄ°NÄ° VERÄ°TABANI FORMATINA Ã‡EVÄ°R
     |--------------------------------------------------------------------------
     */
 
@@ -1522,7 +1566,7 @@ class WhatsAppWebhookController extends Controller
                         ->format('Y-m-d');
                 }
             } catch (Throwable) {
-                // Diğer tarih formatını dene.
+                // DiÄŸer tarih formatÄ±nÄ± dene.
             }
         }
 
@@ -1531,7 +1575,7 @@ class WhatsAppWebhookController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | CEVABI WHATSAPP'TAN GÖNDER, HAFIZAYA KAYDET VE SAYACI ARTIR
+    | CEVABI WHATSAPP'TAN GÃ–NDER, HAFIZAYA KAYDET VE SAYACI ARTIR
     |--------------------------------------------------------------------------
     */
 
@@ -1546,7 +1590,7 @@ class WhatsAppWebhookController extends Controller
     ): void {
         /*
         |--------------------------------------------------------------------------
-        | ÖNCE WHATSAPP'TAN BAŞARIYLA GÖNDER
+        | Ã–NCE WHATSAPP'TAN BAÅARIYLA GÃ–NDER
         |--------------------------------------------------------------------------
         */
 
@@ -1607,7 +1651,7 @@ class WhatsAppWebhookController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | ÜCRETSİZ DENEME SAYACINI ARTIR
+        | ÃœCRETSÄ°Z DENEME SAYACINI ARTIR
         |--------------------------------------------------------------------------
         */
 
@@ -1622,7 +1666,7 @@ class WhatsAppWebhookController extends Controller
             $aiBot->refresh();
 
             Log::info(
-                'Ücretsiz deneme mesajı kullanıldı',
+                'Ãœcretsiz deneme mesajÄ± kullanÄ±ldÄ±',
                 [
                     'ai_bot_id' =>
                         $aiBot->id,
@@ -1666,7 +1710,7 @@ class WhatsAppWebhookController extends Controller
                 ]);
 
                 Log::info(
-                    'Ücretsiz deneme tamamlandı',
+                    'Ãœcretsiz deneme tamamlandÄ±',
                     [
                         'ai_bot_id' =>
                             $aiBot->id,
@@ -1684,8 +1728,8 @@ class WhatsAppWebhookController extends Controller
     | KISA OLUMLU CEVAP
     |--------------------------------------------------------------------------
     |
-    | "Evet" tek başına her zaman sipariş değildir. Sadece önceki asistan
-    | mesajı sipariş teklifiyse sipariş başlangıcı olarak kullanılır.
+    | "Evet" tek baÅŸÄ±na her zaman sipariÅŸ deÄŸildir. Sadece Ã¶nceki asistan
+    | mesajÄ± sipariÅŸ teklifiyse sipariÅŸ baÅŸlangÄ±cÄ± olarak kullanÄ±lÄ±r.
     |
     */
 
@@ -1761,12 +1805,12 @@ class WhatsAppWebhookController extends Controller
         $message = Str::lower(trim($message));
 
         $message = strtr($message, [
-            'ı' => 'i',
-            'ş' => 's',
-            'ğ' => 'g',
-            'ü' => 'u',
-            'ö' => 'o',
-            'ç' => 'c',
+            'Ä±' => 'i',
+            'ÅŸ' => 's',
+            'ÄŸ' => 'g',
+            'Ã¼' => 'u',
+            'Ã¶' => 'o',
+            'Ã§' => 'c',
         ]);
 
         $message = preg_replace(
@@ -1783,7 +1827,7 @@ class WhatsAppWebhookController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | SATIN ALMA NİYETİ
+    | SATIN ALMA NÄ°YETÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -1797,42 +1841,42 @@ class WhatsAppWebhookController extends Controller
 
         $ifadeler = [
             'almak istiyorum',
-            'alacağım',
+            'alacaÄŸÄ±m',
             'alacagim',
-            'alayım',
+            'alayÄ±m',
             'alayim',
 
-            'sipariş vermek istiyorum',
+            'sipariÅŸ vermek istiyorum',
             'siparis vermek istiyorum',
 
-            'sipariş vereceğim',
+            'sipariÅŸ vereceÄŸim',
             'siparis verecegim',
 
-            'sipariş oluştur',
+            'sipariÅŸ oluÅŸtur',
             'siparis olustur',
 
-            'satın almak istiyorum',
+            'satÄ±n almak istiyorum',
             'satin almak istiyorum',
 
-            'ben bunu alayım',
+            'ben bunu alayÄ±m',
             'ben bunu alayim',
 
-            'sipariş geçelim',
+            'sipariÅŸ geÃ§elim',
             'siparis gecelim',
 
-            'sipariş verelim',
+            'sipariÅŸ verelim',
             'siparis verelim',
 
-            'sipariş istiyorum',
+            'sipariÅŸ istiyorum',
             'siparis istiyorum',
 
             'bundan istiyorum',
             'bunu istiyorum',
 
-            'bunu alacağım',
+            'bunu alacaÄŸÄ±m',
             'bunu alacagim',
 
-            'gönderin',
+            'gÃ¶nderin',
             'gonderin',
         ];
 
