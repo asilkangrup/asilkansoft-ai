@@ -73,10 +73,37 @@ class Musteriler extends Page
     |--------------------------------------------------------------------------
     | MOUNT
     |--------------------------------------------------------------------------
+    |
+    | Bildirim veya başka bir ekrandan:
+    | /admin/musteriler?customer=123
+    |
+    | şeklinde gelinirse ilgili müşteri otomatik seçilir.
+    |
     */
 
     public function mount(): void
     {
+        $customerId =
+            request()->integer(
+                'customer'
+            );
+
+        if ($customerId > 0) {
+            $customer = $this->customerQuery()
+                ->whereKey(
+                    $customerId
+                )
+                ->first();
+
+            if ($customer) {
+                $this->selectCustomer(
+                    $customer->id
+                );
+
+                return;
+            }
+        }
+
         $firstCustomer = $this->customerQuery()
             ->latest('updated_at')
             ->first();
@@ -219,7 +246,9 @@ class Musteriler extends Page
         int $customerId
     ): void {
         $customer = $this->customerQuery()
-            ->whereKey($customerId)
+            ->whereKey(
+                $customerId
+            )
             ->first();
 
         if (! $customer) {
@@ -496,7 +525,9 @@ class Musteriler extends Page
     public function getTeamMembersProperty(): Collection
     {
         return User::query()
-            ->orderBy('name')
+            ->orderBy(
+                'name'
+            )
             ->get([
                 'id',
                 'name',
