@@ -10,6 +10,7 @@ use App\Models\ConversationControl;
 use App\Models\FinanceLead;
 use App\Services\FinanceLeadExtractorService;
 use App\Services\FinanceLeadService;
+use App\Services\LeadScoringService;
 use App\Services\MemoryService;
 use App\Services\OpenAIService;
 use App\Services\OrderService;
@@ -31,7 +32,8 @@ class WhatsAppWebhookController extends Controller
         WhatsAppService $whatsAppService,
         OrderService $orderService,
         FinanceLeadService $financeLeadService,
-        FinanceLeadExtractorService $financeLeadExtractorService
+        FinanceLeadExtractorService $financeLeadExtractorService,
+        LeadScoringService $leadScoringService
     ): JsonResponse {
         try {
             $payload = $request->all();
@@ -456,10 +458,50 @@ class WhatsAppWebhookController extends Controller
             $conversationControl->unread_count =
                 (int) $conversationControl->unread_count + 1;
 
+            $conversationControl->last_contact_at =
+                now();
+
             $conversationControl->updated_at =
                 now();
 
             $conversationControl->save();
+
+            /*
+            |--------------------------------------------------------------------------
+            | WAI SMART LEAD SCORING
+            |--------------------------------------------------------------------------
+            |
+            | Müşteri mesajındaki satın alma sinyallerini analiz eder.
+            | Ekstra OpenAI çağrısı yapmaz; ana WhatsApp cevap akışını yavaşlatmaz.
+            |
+            | Aynı WhatsApp mesajı yukarıdaki messageId / Cache koruması sayesinde
+            | ikinci kez işlenmediği için lead puanı da iki kez artmaz.
+            |
+            */
+
+            try {
+                $leadScoringService->puanla(
+                    conversation: $conversationControl,
+                    message: $message,
+                );
+            } catch (Throwable $exception) {
+                Log::warning(
+                    'WAI LEAD SCORING FAILED',
+                    [
+                        'conversation_id' =>
+                            $conversationControl->id,
+
+                        'ai_bot_id' =>
+                            $aiBot->id,
+
+                        'session_id' =>
+                            $sessionId,
+
+                        'message' =>
+                            $exception->getMessage(),
+                    ]
+                );
+            }
 
             /*
             |--------------------------------------------------------------------------

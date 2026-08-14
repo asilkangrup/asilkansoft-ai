@@ -15,11 +15,21 @@ class ConversationControl extends Model
 
         /*
         |--------------------------------------------------------------------------
+        | KANAL
+        |--------------------------------------------------------------------------
+        */
+
+        'channel',
+
+        /*
+        |--------------------------------------------------------------------------
         | MÜŞTERİ BİLGİLERİ
         |--------------------------------------------------------------------------
         */
 
         'customer_name',
+        'customer_email',
+        'company_name',
         'unread_count',
 
         /*
@@ -29,6 +39,51 @@ class ConversationControl extends Model
         */
 
         'tags',
+
+        /*
+        |--------------------------------------------------------------------------
+        | CRM / LEAD
+        |--------------------------------------------------------------------------
+        */
+
+        'lead_status',
+        'lead_score',
+        'lead_temperature',
+
+        /*
+        |--------------------------------------------------------------------------
+        | SORUMLU PERSONEL
+        |--------------------------------------------------------------------------
+        */
+
+        'assigned_user_id',
+
+        /*
+        |--------------------------------------------------------------------------
+        | CRM NOTLARI
+        |--------------------------------------------------------------------------
+        */
+
+        'notes',
+
+        /*
+        |--------------------------------------------------------------------------
+        | TAKİP / İLETİŞİM
+        |--------------------------------------------------------------------------
+        */
+
+        'last_contact_at',
+        'next_follow_up_at',
+
+        /*
+        |--------------------------------------------------------------------------
+        | SATIŞ SONUCU
+        |--------------------------------------------------------------------------
+        */
+
+        'won_at',
+        'lost_at',
+        'lost_reason',
 
         /*
         |--------------------------------------------------------------------------
@@ -43,10 +98,21 @@ class ConversationControl extends Model
 
     protected $casts = [
         'unread_count' => 'integer',
+
+        'tags' => 'array',
+
+        'lead_score' => 'integer',
+
         'human_takeover' => 'boolean',
+
         'taken_over_at' => 'datetime',
         'released_at' => 'datetime',
-        'tags' => 'array',
+
+        'last_contact_at' => 'datetime',
+        'next_follow_up_at' => 'datetime',
+
+        'won_at' => 'datetime',
+        'lost_at' => 'datetime',
     ];
 
     /*
@@ -58,6 +124,20 @@ class ConversationControl extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SORUMLU PERSONEL
+    |--------------------------------------------------------------------------
+    */
+
+    public function assignedUser(): BelongsTo
+    {
+        return $this->belongsTo(
+            User::class,
+            'assigned_user_id'
+        );
     }
 
     /*
@@ -119,7 +199,9 @@ class ConversationControl extends Model
 
     public function okunmamisMesajiArtir(): void
     {
-        $this->increment('unread_count');
+        $this->increment(
+            'unread_count'
+        );
     }
 
     /*
@@ -130,7 +212,9 @@ class ConversationControl extends Model
 
     public function okunmamisMesajlariSifirla(): void
     {
-        if ((int) $this->unread_count === 0) {
+        if (
+            (int) $this->unread_count === 0
+        ) {
             return;
         }
 
@@ -147,7 +231,9 @@ class ConversationControl extends Model
 
     public function etiketler(): array
     {
-        return is_array($this->tags)
+        return is_array(
+            $this->tags
+        )
             ? $this->tags
             : [];
     }
@@ -158,22 +244,35 @@ class ConversationControl extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function etiketEkle(string $etiket): void
-    {
-        $etiket = trim($etiket);
+    public function etiketEkle(
+        string $etiket
+    ): void {
+        $etiket = trim(
+            $etiket
+        );
 
         if ($etiket === '') {
             return;
         }
 
-        $etiketler = $this->etiketler();
+        $etiketler =
+            $this->etiketler();
 
-        if (! in_array($etiket, $etiketler, true)) {
+        if (
+            ! in_array(
+                $etiket,
+                $etiketler,
+                true
+            )
+        ) {
             $etiketler[] = $etiket;
         }
 
         $this->update([
-            'tags' => array_values($etiketler),
+            'tags' =>
+                array_values(
+                    $etiketler
+                ),
         ]);
     }
 
@@ -183,16 +282,20 @@ class ConversationControl extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function etiketSil(string $etiket): void
-    {
-        $etiketler = $this->etiketler();
+    public function etiketSil(
+        string $etiket
+    ): void {
+        $etiketler =
+            $this->etiketler();
 
-        $etiketler = array_values(
-            array_filter(
-                $etiketler,
-                fn ($item) => $item !== $etiket
-            )
-        );
+        $etiketler =
+            array_values(
+                array_filter(
+                    $etiketler,
+                    fn ($item) =>
+                        $item !== $etiket
+                )
+            );
 
         $this->update([
             'tags' => $etiketler,
@@ -205,12 +308,276 @@ class ConversationControl extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function etiketiVarMi(string $etiket): bool
-    {
+    public function etiketiVarMi(
+        string $etiket
+    ): bool {
         return in_array(
             $etiket,
             $this->etiketler(),
             true
         );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | LEAD DURUM ETİKETİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function leadStatusLabel(): string
+    {
+        return match (
+            $this->lead_status
+        ) {
+            'new' =>
+                'Yeni Lead',
+
+            'contacted' =>
+                'Görüşülüyor',
+
+            'qualified' =>
+                'Nitelikli Lead',
+
+            'proposal' =>
+                'Teklif Verildi',
+
+            'won' =>
+                'Kazanıldı',
+
+            'lost' =>
+                'Kaybedildi',
+
+            default =>
+                'Yeni Lead',
+        };
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | LEAD SICAKLIK ETİKETİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function leadTemperatureLabel(): string
+    {
+        return match (
+            $this->lead_temperature
+        ) {
+            'hot' =>
+                'Sıcak',
+
+            'warm' =>
+                'Ilık',
+
+            default =>
+                'Soğuk',
+        };
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | LEAD PUANINI GÜNCELLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function leadSkoruGuncelle(
+        int $score
+    ): void {
+        $score = max(
+            0,
+            min(
+                100,
+                $score
+            )
+        );
+
+        $temperature = match (true) {
+            $score >= 70 =>
+                'hot',
+
+            $score >= 40 =>
+                'warm',
+
+            default =>
+                'cold',
+        };
+
+        $this->update([
+            'lead_score' =>
+                $score,
+
+            'lead_temperature' =>
+                $temperature,
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | LEAD DURUMUNU GÜNCELLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function leadDurumuGuncelle(
+        string $status
+    ): void {
+        $allowed = [
+            'new',
+            'contacted',
+            'qualified',
+            'proposal',
+            'won',
+            'lost',
+        ];
+
+        if (
+            ! in_array(
+                $status,
+                $allowed,
+                true
+            )
+        ) {
+            return;
+        }
+
+        $data = [
+            'lead_status' =>
+                $status,
+        ];
+
+        if ($status === 'won') {
+            $data['won_at'] = now();
+            $data['lost_at'] = null;
+            $data['lost_reason'] = null;
+        }
+
+        if ($status === 'lost') {
+            $data['lost_at'] = now();
+            $data['won_at'] = null;
+        }
+
+        if (
+            ! in_array(
+                $status,
+                [
+                    'won',
+                    'lost',
+                ],
+                true
+            )
+        ) {
+            $data['won_at'] = null;
+            $data['lost_at'] = null;
+        }
+
+        $this->update(
+            $data
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KAZANILDI OLARAK İŞARETLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function kazanildi(): void
+    {
+        $this->leadDurumuGuncelle(
+            'won'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KAYBEDİLDİ OLARAK İŞARETLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function kaybedildi(
+        ?string $reason = null
+    ): void {
+        $this->update([
+            'lead_status' =>
+                'lost',
+
+            'lost_at' =>
+                now(),
+
+            'won_at' =>
+                null,
+
+            'lost_reason' =>
+                $reason
+                    ? trim($reason)
+                    : null,
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SON İLETİŞİMİ GÜNCELLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function sonIletisimiGuncelle(): void
+    {
+        $this->update([
+            'last_contact_at' =>
+                now(),
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TAKİP TARİHİ AYARLA
+    |--------------------------------------------------------------------------
+    */
+
+    public function takipTarihiAyarla(
+        $date
+    ): void {
+        $this->update([
+            'next_follow_up_at' =>
+                $date,
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TAKİBİ TEMİZLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function takibiTemizle(): void
+    {
+        $this->update([
+            'next_follow_up_at' =>
+                null,
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KANAL ETİKETİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function channelLabel(): string
+    {
+        return match (
+            $this->channel
+        ) {
+            'instagram' =>
+                'Instagram',
+
+            'facebook' =>
+                'Facebook',
+
+            'web' =>
+                'Web',
+
+            default =>
+                'WhatsApp',
+        };
     }
 }

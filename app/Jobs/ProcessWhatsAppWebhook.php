@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Http\Controllers\WhatsAppWebhookController;
 use App\Services\FinanceLeadExtractorService;
 use App\Services\FinanceLeadService;
+use App\Services\LeadScoringService;
 use App\Services\MemoryService;
 use App\Services\OpenAIService;
 use App\Services\OrderService;
@@ -33,16 +34,13 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         WhatsAppService $whatsAppService,
         OrderService $orderService,
         FinanceLeadService $financeLeadService,
-        FinanceLeadExtractorService $financeLeadExtractorService
+        FinanceLeadExtractorService $financeLeadExtractorService,
+        LeadScoringService $leadScoringService,
     ): void {
         /*
         |--------------------------------------------------------------------------
         | QUEUE İÇİN YENİ REQUEST OLUŞTUR
         |--------------------------------------------------------------------------
-        |
-        | _wai_queued değeri controller'a bu isteğin zaten queue worker
-        | tarafından işlendiğini bildirir.
-        |
         */
 
         $payload = $this->payload;
@@ -59,10 +57,6 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         |--------------------------------------------------------------------------
         | MEVCUT WEBHOOK AKIŞINI ÇALIŞTIR
         |--------------------------------------------------------------------------
-        |
-        | Finans, sipariş, hafıza, insan devralma ve diğer mevcut sistemler
-        | controller içerisinde aynen çalışmaya devam eder.
-        |
         */
 
         $controller->handle(
@@ -73,6 +67,7 @@ class ProcessWhatsAppWebhook implements ShouldQueue
             orderService: $orderService,
             financeLeadService: $financeLeadService,
             financeLeadExtractorService: $financeLeadExtractorService,
+            leadScoringService: $leadScoringService,
         );
     }
 }
