@@ -100,44 +100,32 @@ class SatisPipeline extends Page
 
     public function getNewLeadsProperty(): Collection
     {
-        return $this->getStageCustomers(
-            'new'
-        );
+        return $this->getStageCustomers('new');
     }
 
     public function getContactedLeadsProperty(): Collection
     {
-        return $this->getStageCustomers(
-            'contacted'
-        );
+        return $this->getStageCustomers('contacted');
     }
 
     public function getQualifiedLeadsProperty(): Collection
     {
-        return $this->getStageCustomers(
-            'qualified'
-        );
+        return $this->getStageCustomers('qualified');
     }
 
     public function getProposalLeadsProperty(): Collection
     {
-        return $this->getStageCustomers(
-            'proposal'
-        );
+        return $this->getStageCustomers('proposal');
     }
 
     public function getWonLeadsProperty(): Collection
     {
-        return $this->getStageCustomers(
-            'won'
-        );
+        return $this->getStageCustomers('won');
     }
 
     public function getLostLeadsProperty(): Collection
     {
-        return $this->getStageCustomers(
-            'lost'
-        );
+        return $this->getStageCustomers('lost');
     }
 
     protected function getStageCustomers(
@@ -174,13 +162,7 @@ class SatisPipeline extends Page
             'lost',
         ];
 
-        if (
-            ! in_array(
-                $status,
-                $allowed,
-                true
-            )
-        ) {
+        if (! in_array($status, $allowed, true)) {
             return;
         }
 
@@ -195,6 +177,14 @@ class SatisPipeline extends Page
             ->first();
 
         if (! $customer) {
+            return;
+        }
+
+        $currentStatus =
+            $customer->lead_status
+            ?: 'new';
+
+        if ($currentStatus === $status) {
             return;
         }
 
@@ -244,7 +234,9 @@ class SatisPipeline extends Page
         );
 
         $this->dispatch(
-            'pipeline-updated'
+            'pipeline-updated',
+            customerId: $customer->id,
+            status: $status,
         );
     }
 
@@ -277,7 +269,9 @@ class SatisPipeline extends Page
         );
 
         $this->dispatch(
-            'pipeline-updated'
+            'pipeline-updated',
+            customerId: $customer->id,
+            status: $customer->lead_status ?: 'new',
         );
     }
 
