@@ -4,12 +4,12 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Dashboard;
 use App\Http\Middleware\RedirectIncompleteSetup;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -30,7 +30,9 @@ class AdminPanelProvider extends PanelProvider
     {
         return $panel
             ->default()
+
             ->id('admin')
+
             ->path('admin')
 
             ->brandName(
@@ -51,6 +53,22 @@ class AdminPanelProvider extends PanelProvider
 
             /*
             |--------------------------------------------------------------------------
+            | WAI PREMIUM SIDEBAR
+            |--------------------------------------------------------------------------
+            |
+            | Sidebar masaüstünde daha kompakt.
+            | Kullanıcı isterse ikon görünümüne küçültebilir.
+            |
+            */
+
+            ->sidebarWidth('15rem')
+
+            ->sidebarCollapsibleOnDesktop()
+
+            ->collapsedSidebarWidth('4.5rem')
+
+            /*
+            |--------------------------------------------------------------------------
             | GLOBAL DENEME / KREDİ BARI
             |--------------------------------------------------------------------------
             |
@@ -67,12 +85,24 @@ class AdminPanelProvider extends PanelProvider
                     )
             )
 
+            /*
+            |--------------------------------------------------------------------------
+            | RESOURCES
+            |--------------------------------------------------------------------------
+            */
+
             ->discoverResources(
                 in: app_path(
                     'Filament/Resources'
                 ),
                 for: 'App\Filament\Resources'
             )
+
+            /*
+            |--------------------------------------------------------------------------
+            | PAGES
+            |--------------------------------------------------------------------------
+            */
 
             ->discoverPages(
                 in: app_path(
@@ -84,6 +114,12 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
             ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | WIDGETS
+            |--------------------------------------------------------------------------
+            */
 
             ->discoverWidgets(
                 in: app_path(
@@ -97,6 +133,12 @@ class AdminPanelProvider extends PanelProvider
                 FilamentInfoWidget::class,
             ])
 
+            /*
+            |--------------------------------------------------------------------------
+            | MIDDLEWARE
+            |--------------------------------------------------------------------------
+            */
+
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -108,6 +150,12 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | AUTH MIDDLEWARE
+            |--------------------------------------------------------------------------
+            */
 
             ->authMiddleware([
                 Authenticate::class,
