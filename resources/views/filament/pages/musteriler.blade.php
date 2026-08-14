@@ -11,18 +11,14 @@
     --green-dark: #087a42;
     --green-deep: #075d35;
     --green-soft: #effcf5;
-
     --ink: #101712;
     --text: #3f4b43;
     --muted: #77827b;
-
     --line: #e5ebe7;
     --soft: #f7f9f8;
     --white: #ffffff;
-
     width: 100%;
 }
-
 
 /* ==========================================================================
    HERO
@@ -30,56 +26,33 @@
 
 .crm-hero {
     position: relative;
-
     margin-bottom: 18px;
     padding: 28px 30px;
-
     overflow: hidden;
-
     display: flex;
     align-items: center;
     justify-content: space-between;
-
     gap: 25px;
-
     border: 1px solid var(--line);
     border-radius: 24px;
-
     background:
-        radial-gradient(
-            circle at 90% 20%,
-            rgba(36,225,127,.12),
-            transparent 28%
-        ),
-        linear-gradient(
-            145deg,
-            #ffffff,
-            #fbfdfc
-        );
-
-    box-shadow:
-        0 18px 55px rgba(10,30,17,.05);
+        radial-gradient(circle at 90% 20%, rgba(36,225,127,.12), transparent 28%),
+        linear-gradient(145deg, #ffffff, #fbfdfc);
+    box-shadow: 0 18px 55px rgba(10,30,17,.05);
 }
 
 .crm-hero::after {
     content: "";
-
     position: absolute;
-
     width: 280px;
     height: 280px;
-
     right: -130px;
     top: -140px;
-
     border-radius: 50%;
-
     border: 1px solid rgba(36,225,127,.13);
-
     box-shadow:
         0 0 0 38px rgba(36,225,127,.025),
         0 0 0 76px rgba(36,225,127,.012);
-
     pointer-events: none;
 }
 
@@ -91,89 +64,61 @@
 .crm-eyebrow {
     display: flex;
     align-items: center;
-
     gap: 9px;
-
     color: var(--green-deep);
-
     font-size: 12px;
     font-weight: 900;
-
     letter-spacing: .8px;
-
     text-transform: uppercase;
 }
 
 .crm-eyebrow-dot {
     width: 8px;
     height: 8px;
-
     border-radius: 50%;
-
     background: var(--green);
-
-    box-shadow:
-        0 0 0 5px rgba(36,225,127,.10);
+    box-shadow: 0 0 0 5px rgba(36,225,127,.10);
 }
 
 .crm-hero h1 {
     margin: 8px 0 0;
-
     color: var(--ink);
-
     font-size: 30px;
     font-weight: 850;
-
     letter-spacing: -1px;
 }
 
 .crm-hero p {
     max-width: 650px;
-
     margin: 8px 0 0;
-
     color: var(--muted);
-
     font-size: 14px;
-
     line-height: 1.65;
 }
 
 .crm-hero-live {
     position: relative;
     z-index: 2;
-
     min-height: 44px;
-
     padding: 0 15px;
-
     display: inline-flex;
     align-items: center;
-
     gap: 8px;
-
     border: 1px solid #ccefd9;
     border-radius: 13px;
-
     color: var(--green-deep);
-
     background: var(--green-soft);
-
     font-size: 12px;
     font-weight: 850;
-
     white-space: nowrap;
 }
 
 .crm-hero-live i {
     width: 8px;
     height: 8px;
-
     border-radius: 50%;
-
     background: var(--green);
 }
-
 
 /* ==========================================================================
    KPI
@@ -181,48 +126,34 @@
 
 .crm-kpis {
     margin-bottom: 18px;
-
     display: grid;
-
-    grid-template-columns:
-        repeat(5, minmax(0,1fr));
-
+    grid-template-columns: repeat(5, minmax(0,1fr));
     gap: 12px;
 }
 
 .crm-kpi {
     min-width: 0;
-
     padding: 18px;
-
     border: 1px solid var(--line);
     border-radius: 18px;
-
     background: #fff;
-
-    box-shadow:
-        0 10px 30px rgba(10,30,17,.035);
+    box-shadow: 0 10px 30px rgba(10,30,17,.035);
 }
 
 .crm-kpi-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-
     gap: 10px;
 }
 
 .crm-kpi-icon {
     width: 42px;
     height: 42px;
-
     display: grid;
     place-items: center;
-
     border-radius: 13px;
-
     color: var(--green-dark);
-
     background: var(--green-soft);
 }
 
@@ -233,24 +164,18 @@
 
 .crm-kpi-number {
     margin-top: 17px;
-
     color: var(--ink);
-
     font-size: 29px;
     font-weight: 900;
-
     letter-spacing: -1px;
 }
 
 .crm-kpi-label {
     margin-top: 4px;
-
     color: var(--muted);
-
     font-size: 12px;
     font-weight: 700;
 }
-
 
 /* ==========================================================================
    FILTER BAR
@@ -259,25 +184,18 @@
 .crm-toolbar {
     margin-bottom: 14px;
     padding: 13px;
-
     display: grid;
-
     grid-template-columns:
         minmax(260px,1fr)
         170px
         160px
         150px
         auto;
-
     gap: 9px;
-
     border: 1px solid var(--line);
     border-radius: 18px;
-
     background: #fff;
-
-    box-shadow:
-        0 8px 26px rgba(10,30,17,.025);
+    box-shadow: 0 8px 26px rgba(10,30,17,.025);
 }
 
 .crm-input-wrap {
@@ -286,191 +204,135 @@
 
 .crm-input-wrap svg {
     position: absolute;
-
     left: 14px;
     top: 50%;
-
     width: 18px;
     height: 18px;
-
     color: #89958d;
-
     transform: translateY(-50%);
 }
 
 .crm-search {
     width: 100%;
     height: 44px;
-
     padding: 0 13px 0 43px;
-
     outline: none;
-
     border: 1px solid #dde5e0;
     border-radius: 12px;
-
     color: #28342c;
-
     background: #fafcfb;
-
     font-size: 13px;
 }
 
 .crm-search:focus,
 .crm-select:focus {
     border-color: #91dfb1;
-
     background: #fff;
-
-    box-shadow:
-        0 0 0 4px rgba(36,225,127,.06);
+    box-shadow: 0 0 0 4px rgba(36,225,127,.06);
 }
 
 .crm-select {
     width: 100%;
     height: 44px;
-
     padding: 0 12px;
-
     outline: none;
-
     border: 1px solid #dde5e0;
     border-radius: 12px;
-
     color: #3b473f;
-
     background: #fafcfb;
-
     font-size: 12px;
     font-weight: 700;
 }
 
 .crm-reset {
     height: 44px;
-
     padding: 0 15px;
-
     border: 1px solid #dde5e0;
     border-radius: 12px;
-
     color: #657168;
-
     background: #fff;
-
     font-size: 12px;
     font-weight: 800;
-
     cursor: pointer;
 }
 
-
 /* ==========================================================================
-   SHELL
+   MAIN SHELL
    ========================================================================== */
 
 .crm-shell {
     display: grid;
-
-    grid-template-columns:
-        minmax(0,1fr)
-        365px;
-
-    min-height: 680px;
-
+    grid-template-columns: minmax(0, 1fr) 390px;
+    min-height: 720px;
+    align-items: stretch;
     overflow: hidden;
-
     border: 1px solid var(--line);
     border-radius: 22px;
-
     background: #fff;
-
-    box-shadow:
-        0 18px 55px rgba(10,30,17,.05);
+    box-shadow: 0 18px 55px rgba(10,30,17,.05);
 }
 
-
 /* ==========================================================================
-   CUSTOMER TABLE
+   CUSTOMER LIST
    ========================================================================== */
 
 .crm-list-area {
     min-width: 0;
-
     overflow: hidden;
+    background: #fff;
 }
 
 .crm-table-head {
-    min-height: 59px;
-
-    padding: 0 17px;
-
+    min-height: 64px;
+    padding: 0 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-
     gap: 12px;
-
     border-bottom: 1px solid var(--line);
 }
 
 .crm-table-title {
     color: var(--ink);
-
     font-size: 16px;
     font-weight: 850;
 }
 
 .crm-result-count {
     min-height: 29px;
-
     padding: 0 9px;
-
     display: inline-flex;
     align-items: center;
-
     border-radius: 999px;
-
     color: var(--green-deep);
-
     background: var(--green-soft);
-
     font-size: 10px;
     font-weight: 900;
 }
 
 .crm-list {
-    max-height: 720px;
-
+    height: 720px;
     overflow-y: auto;
-
     scrollbar-width: thin;
     scrollbar-color: #dce4df transparent;
 }
 
 .customer-row {
     position: relative;
-
-    padding: 16px 17px;
-
+    min-height: 82px;
+    padding: 15px 18px;
     display: grid;
-
     grid-template-columns:
         minmax(220px,1.45fr)
         minmax(130px,.8fr)
         125px
         100px
         85px;
-
     align-items: center;
-
     gap: 14px;
-
     border-bottom: 1px solid #edf1ee;
-
     cursor: pointer;
-
-    transition:
-        background .18s ease;
+    transition: background .18s ease;
 }
 
 .customer-row:hover {
@@ -478,60 +340,37 @@
 }
 
 .customer-row.active {
-    background:
-        linear-gradient(
-            90deg,
-            #effcf5,
-            #fbfefc
-        );
+    background: linear-gradient(90deg, #effcf5, #fbfefc);
 }
 
 .customer-row.active::before {
     content: "";
-
     position: absolute;
-
     left: 0;
     top: 10px;
     bottom: 10px;
-
     width: 3px;
-
     border-radius: 0 4px 4px 0;
-
     background: var(--green);
 }
 
 .customer-main {
     min-width: 0;
-
     display: flex;
     align-items: center;
-
     gap: 12px;
 }
 
 .customer-avatar {
     width: 48px;
     height: 48px;
-
     display: grid;
     place-items: center;
-
     flex: 0 0 48px;
-
     border: 1px solid #ccefd9;
     border-radius: 15px;
-
     color: var(--green-deep);
-
-    background:
-        linear-gradient(
-            145deg,
-            #effcf5,
-            #e7faef
-        );
-
+    background: linear-gradient(145deg, #effcf5, #e7faef);
     font-size: 15px;
     font-weight: 900;
 }
@@ -542,43 +381,30 @@
 
 .customer-name {
     overflow: hidden;
-
     color: #202b24;
-
     font-size: 13px;
     font-weight: 850;
-
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .customer-phone {
     margin-top: 5px;
-
     overflow: hidden;
-
     color: #818c85;
-
     font-size: 11px;
-
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .crm-pill {
     width: fit-content;
-
     min-height: 29px;
-
     padding: 0 9px;
-
     display: inline-flex;
     align-items: center;
-
     gap: 6px;
-
     border-radius: 999px;
-
     font-size: 10px;
     font-weight: 850;
 }
@@ -630,7 +456,6 @@
 
 .channel-pill {
     color: #526159;
-
     background: #f2f6f3;
 }
 
@@ -640,84 +465,61 @@
 
 .score-number {
     color: #27332b;
-
     font-size: 12px;
     font-weight: 900;
 }
 
 .score-bar {
     height: 5px;
-
     margin-top: 6px;
-
     overflow: hidden;
-
     border-radius: 999px;
-
     background: #ebefec;
 }
 
 .score-bar span {
     display: block;
-
     height: 100%;
-
     border-radius: inherit;
-
-    background:
-        linear-gradient(
-            90deg,
-            #67efaa,
-            #20d976
-        );
+    background: linear-gradient(90deg, #67efaa, #20d976);
 }
 
 .crm-date {
     color: #87928b;
-
     font-size: 10px;
     font-weight: 700;
 }
 
 .crm-empty {
     padding: 65px 25px;
-
     text-align: center;
-
     color: #87928b;
-
     font-size: 13px;
 }
 
-
 /* ==========================================================================
-   DETAIL
+   DETAIL PANEL
    ========================================================================== */
 
 .crm-detail {
     min-width: 0;
-
+    height: 784px;
     overflow-y: auto;
-
     border-left: 1px solid var(--line);
-
-    background:
-        linear-gradient(
-            180deg,
-            #ffffff,
-            #fbfcfb
-        );
-
+    background: linear-gradient(180deg, #ffffff, #fbfcfb);
     scrollbar-width: thin;
+    scrollbar-color: #dce4df transparent;
 }
 
 .crm-detail-head {
-    padding: 22px 20px;
-
+    min-height: 190px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-
     border-bottom: 1px solid var(--line);
-
     background:
         radial-gradient(
             circle at 50% 0%,
@@ -729,69 +531,65 @@
 .crm-detail-avatar {
     width: 70px;
     height: 70px;
-
     margin: 0 auto 11px;
-
     display: grid;
     place-items: center;
-
     border: 1px solid #c9ecd6;
     border-radius: 21px;
-
     color: var(--green-deep);
-
     background: var(--green-soft);
-
     font-size: 23px;
     font-weight: 900;
 }
 
 .crm-detail-name {
     color: var(--ink);
-
     font-size: 17px;
     font-weight: 850;
 }
 
 .crm-detail-phone {
     margin-top: 4px;
-
     color: #7b877f;
-
     font-size: 11px;
 }
 
 .crm-detail-badges {
     margin-top: 11px;
-
     display: flex;
     justify-content: center;
     flex-wrap: wrap;
-
     gap: 6px;
 }
 
-.crm-form-section {
-    padding: 18px;
+/* ==========================================================================
+   DETAIL SECTIONS
+   ========================================================================== */
 
+.crm-form-section {
+    padding: 20px 22px;
     border-bottom: 1px solid var(--line);
+    background: #fff;
+}
+
+.crm-form-section.crm-section-standard {
+    min-height: 145px;
 }
 
 .crm-form-title {
-    margin-bottom: 12px;
-
-    color: #6b786f;
-
+    min-height: 18px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    color: #66736b;
     font-size: 10px;
     font-weight: 900;
-
     letter-spacing: .8px;
-
     text-transform: uppercase;
 }
 
 .crm-field {
-    margin-bottom: 12px;
+    margin-bottom: 13px;
 }
 
 .crm-field:last-child {
@@ -800,11 +598,9 @@
 
 .crm-field label {
     display: block;
-
-    margin-bottom: 6px;
-
+    min-height: 17px;
+    margin-bottom: 7px;
     color: #536058;
-
     font-size: 11px;
     font-weight: 800;
 }
@@ -813,34 +609,28 @@
 .crm-field select,
 .crm-field textarea {
     width: 100%;
-
     outline: 0;
-
     border: 1px solid #dce5df;
-    border-radius: 11px;
-
+    border-radius: 12px;
     color: #2e3932;
-
     background: #fff;
-
     font-family: inherit;
     font-size: 12px;
+    transition:
+        border-color .18s ease,
+        box-shadow .18s ease;
 }
 
 .crm-field input,
 .crm-field select {
-    height: 42px;
-
-    padding: 0 11px;
+    height: 52px;
+    padding: 0 14px;
 }
 
 .crm-field textarea {
-    min-height: 100px;
-
-    padding: 11px;
-
+    min-height: 124px;
+    padding: 14px;
     resize: vertical;
-
     line-height: 1.55;
 }
 
@@ -848,87 +638,85 @@
 .crm-field select:focus,
 .crm-field textarea:focus {
     border-color: #91dfb1;
-
-    box-shadow:
-        0 0 0 4px rgba(36,225,127,.055);
+    box-shadow: 0 0 0 4px rgba(36,225,127,.055);
 }
+
+/* ==========================================================================
+   LEAD SCORE
+   ========================================================================== */
 
 .crm-score-row {
     display: grid;
+    grid-template-columns: minmax(0,1fr) 88px;
+    align-items: end;
+    gap: 12px;
+}
 
-    grid-template-columns:
-        1fr 70px;
-
-    gap: 8px;
+.crm-score-row .crm-field {
+    margin-bottom: 0;
 }
 
 .crm-score-range {
     width: 100%;
+    accent-color: #20d976;
 }
+
+/* ==========================================================================
+   STATUS BUTTONS
+   ========================================================================== */
 
 .crm-quick-status {
     display: grid;
-
-    grid-template-columns:
-        repeat(3,1fr);
-
-    gap: 6px;
+    grid-template-columns: repeat(3,1fr);
+    gap: 7px;
 }
 
 .crm-quick-status button {
-    min-height: 37px;
-
-    padding: 5px 7px;
-
+    min-height: 42px;
+    padding: 6px 8px;
     border: 1px solid var(--line);
-    border-radius: 10px;
-
+    border-radius: 11px;
     color: #66736b;
-
     background: #fff;
-
     font-size: 9px;
     font-weight: 800;
-
     cursor: pointer;
+    transition:
+        border-color .18s ease,
+        background .18s ease,
+        color .18s ease;
+}
+
+.crm-quick-status button:hover {
+    border-color: #ccefd9;
+    color: var(--green-deep);
+    background: #fbfefc;
 }
 
 .crm-quick-status button.active {
     border-color: #bfe9cf;
-
     color: var(--green-deep);
-
     background: var(--green-soft);
 }
 
+/* ==========================================================================
+   SAVE + SECONDARY ACTIONS
+   ========================================================================== */
+
 .crm-save {
     width: 100%;
-    height: 46px;
-
+    height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
-
     gap: 8px;
-
     border: 0;
     border-radius: 12px;
-
     color: #07331b;
-
-    background:
-        linear-gradient(
-            135deg,
-            #6bf1a9,
-            #2dde81
-        );
-
-    box-shadow:
-        0 10px 25px rgba(36,225,127,.17);
-
+    background: linear-gradient(135deg, #6bf1a9, #2dde81);
+    box-shadow: 0 10px 25px rgba(36,225,127,.17);
     font-size: 12px;
     font-weight: 900;
-
     cursor: pointer;
 }
 
@@ -938,71 +726,47 @@
 }
 
 .crm-secondary-actions {
-    margin-top: 8px;
-
+    margin-top: 9px;
     display: grid;
-
-    grid-template-columns:
-        1fr 1fr;
-
-    gap: 7px;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
 }
 
 .crm-secondary-actions button,
 .crm-secondary-actions a {
-    min-height: 40px;
-
-    padding: 0 9px;
-
+    min-height: 50px;
+    padding: 0 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-
     border: 1px solid var(--line);
     border-radius: 11px;
-
     color: #5c6961;
-
     background: #fff;
-
     text-decoration: none;
-
     font-size: 10px;
     font-weight: 800;
-
     cursor: pointer;
 }
 
-
 /* ==========================================================================
-   SAVE TOAST
+   TOAST
    ========================================================================== */
 
 .crm-toast {
     position: fixed;
-
     right: 24px;
     bottom: 24px;
-
     z-index: 99999;
-
     padding: 13px 16px;
-
     display: flex;
     align-items: center;
-
     gap: 9px;
-
     border: 1px solid #c9ecd6;
     border-radius: 13px;
-
     color: var(--green-deep);
-
     background: #f1fcf6;
-
-    box-shadow:
-        0 18px 45px rgba(7,40,21,.13);
-
+    box-shadow: 0 18px 45px rgba(7,40,21,.13);
     font-size: 12px;
     font-weight: 850;
 }
@@ -1012,7 +776,6 @@
     height: 18px;
 }
 
-
 /* ==========================================================================
    TABLET
    ========================================================================== */
@@ -1020,24 +783,19 @@
 @media (max-width: 1250px) {
 
     .crm-kpis {
-        grid-template-columns:
-            repeat(3,1fr);
+        grid-template-columns: repeat(3,1fr);
     }
 
     .crm-toolbar {
-        grid-template-columns:
-            1fr 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
     }
 
     .crm-input-wrap {
-        grid-column:
-            1 / -1;
+        grid-column: 1 / -1;
     }
 
     .crm-shell {
-        grid-template-columns:
-            minmax(0,1fr)
-            330px;
+        grid-template-columns: minmax(0,1fr) 350px;
     }
 
     .customer-row {
@@ -1053,7 +811,6 @@
     }
 }
 
-
 /* ==========================================================================
    MOBILE
    ========================================================================== */
@@ -1062,9 +819,7 @@
 
     .crm-hero {
         padding: 20px;
-
         display: block;
-
         border-radius: 19px;
     }
 
@@ -1078,16 +833,12 @@
 
     .crm-hero-live {
         width: 100%;
-
         margin-top: 14px;
-
         justify-content: center;
     }
 
     .crm-kpis {
-        grid-template-columns:
-            repeat(2,1fr);
-
+        grid-template-columns: repeat(2,1fr);
         gap: 9px;
     }
 
@@ -1104,57 +855,44 @@
     }
 
     .crm-toolbar {
-        grid-template-columns:
-            1fr 1fr;
-
+        grid-template-columns: 1fr 1fr;
         padding: 10px;
     }
 
     .crm-input-wrap {
-        grid-column:
-            1 / -1;
+        grid-column: 1 / -1;
     }
 
     .crm-reset {
-        grid-column:
-            1 / -1;
+        grid-column: 1 / -1;
     }
 
     .crm-shell {
         display: block;
-
         min-height: 0;
-
         overflow: visible;
-
         border: 0;
         border-radius: 0;
-
         background: transparent;
-
         box-shadow: none;
     }
 
     .crm-list-area {
         overflow: hidden;
-
         border: 1px solid var(--line);
         border-radius: 19px;
-
         background: #fff;
     }
 
     .crm-list {
+        height: auto;
         max-height: none;
     }
 
     .customer-row {
+        min-height: 76px;
         padding: 14px;
-
-        grid-template-columns:
-            minmax(0,1fr)
-            auto;
-
+        grid-template-columns: minmax(0,1fr) auto;
         gap: 10px;
     }
 
@@ -1167,7 +905,6 @@
     .customer-avatar {
         width: 46px;
         height: 46px;
-
         flex-basis: 46px;
     }
 
@@ -1176,16 +913,28 @@
     }
 
     .crm-detail {
+        height: auto;
         margin-top: 14px;
-
+        overflow: visible;
         border: 1px solid var(--line);
         border-radius: 19px;
-
         background: #fff;
+    }
+
+    .crm-detail-head {
+        min-height: 175px;
     }
 
     .crm-detail-name {
         font-size: 17px;
+    }
+
+    .crm-form-section {
+        padding: 18px;
+    }
+
+    .crm-form-section.crm-section-standard {
+        min-height: auto;
     }
 
     .crm-field input,
@@ -1195,15 +944,17 @@
     }
 
     .crm-quick-status {
-        grid-template-columns:
-            repeat(2,1fr);
+        grid-template-columns: repeat(2,1fr);
+    }
+
+    .crm-score-row {
+        grid-template-columns: 1fr;
     }
 
     .crm-toast {
         left: 12px;
         right: 12px;
         bottom: 12px;
-
         justify-content: center;
     }
 }
@@ -1460,35 +1211,13 @@
             class="crm-select"
             wire:model.live="statusFilter"
         >
-
-            <option value="all">
-                Tüm Durumlar
-            </option>
-
-            <option value="new">
-                Yeni Lead
-            </option>
-
-            <option value="contacted">
-                Görüşülüyor
-            </option>
-
-            <option value="qualified">
-                Nitelikli
-            </option>
-
-            <option value="proposal">
-                Teklif
-            </option>
-
-            <option value="won">
-                Kazanıldı
-            </option>
-
-            <option value="lost">
-                Kaybedildi
-            </option>
-
+            <option value="all">Tüm Durumlar</option>
+            <option value="new">Yeni Lead</option>
+            <option value="contacted">Görüşülüyor</option>
+            <option value="qualified">Nitelikli</option>
+            <option value="proposal">Teklif</option>
+            <option value="won">Kazanıldı</option>
+            <option value="lost">Kaybedildi</option>
         </select>
 
 
@@ -1496,23 +1225,10 @@
             class="crm-select"
             wire:model.live="temperatureFilter"
         >
-
-            <option value="all">
-                Tüm Sıcaklıklar
-            </option>
-
-            <option value="hot">
-                Sıcak
-            </option>
-
-            <option value="warm">
-                Ilık
-            </option>
-
-            <option value="cold">
-                Soğuk
-            </option>
-
+            <option value="all">Tüm Sıcaklıklar</option>
+            <option value="hot">Sıcak</option>
+            <option value="warm">Ilık</option>
+            <option value="cold">Soğuk</option>
         </select>
 
 
@@ -1520,27 +1236,11 @@
             class="crm-select"
             wire:model.live="channelFilter"
         >
-
-            <option value="all">
-                Tüm Kanallar
-            </option>
-
-            <option value="whatsapp">
-                WhatsApp
-            </option>
-
-            <option value="instagram">
-                Instagram
-            </option>
-
-            <option value="facebook">
-                Facebook
-            </option>
-
-            <option value="web">
-                Web
-            </option>
-
+            <option value="all">Tüm Kanallar</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="instagram">Instagram</option>
+            <option value="facebook">Facebook</option>
+            <option value="web">Web</option>
         </select>
 
 
@@ -1561,8 +1261,6 @@
 
     <section class="crm-shell">
 
-        {{-- LIST --}}
-
         <div class="crm-list-area">
 
             <div class="crm-table-head">
@@ -1580,13 +1278,9 @@
 
             <div class="crm-list">
 
-                @forelse (
-                    $this->customers
-                    as $customer
-                )
+                @forelse ($this->customers as $customer)
 
                     @php
-
                         $name =
                             $customer->customer_name
                             ?: $customer->whatsapp_number;
@@ -1616,7 +1310,6 @@
                                     (int) $customer->lead_score
                                 )
                             );
-
                     @endphp
 
 
@@ -1720,9 +1413,7 @@
                 @empty
 
                     <div class="crm-empty">
-
                         Bu filtrelere uygun müşteri bulunamadı.
-
                     </div>
 
                 @endforelse
@@ -1741,7 +1432,6 @@
             @if ($this->selectedCustomer)
 
                 @php
-
                     $selected =
                         $this->selectedCustomer;
 
@@ -1757,7 +1447,6 @@
                                 1
                             )
                         );
-
                 @endphp
 
 
@@ -1821,9 +1510,7 @@
                 </div>
 
 
-                {{-- SALES STAGE --}}
-
-                <div class="crm-form-section">
+                <div class="crm-form-section crm-section-standard">
 
                     <div class="crm-form-title">
                         Satış Aşaması
@@ -1870,8 +1557,6 @@
 
                 </div>
 
-
-                {{-- CUSTOMER INFO --}}
 
                 <div class="crm-form-section">
 
@@ -1927,9 +1612,7 @@
                 </div>
 
 
-                {{-- SCORE --}}
-
-                <div class="crm-form-section">
+                <div class="crm-form-section crm-section-standard">
 
                     <div class="crm-form-title">
                         Lead Puanı
@@ -1976,8 +1659,6 @@
                 </div>
 
 
-                {{-- ASSIGNMENT --}}
-
                 <div class="crm-form-section">
 
                     <div class="crm-form-title">
@@ -1996,14 +1677,9 @@
                             </option>
 
 
-                            @foreach (
-                                $this->teamMembers
-                                as $member
-                            )
+                            @foreach ($this->teamMembers as $member)
 
-                                <option
-                                    value="{{ $member->id }}"
-                                >
+                                <option value="{{ $member->id }}">
                                     {{ $member->name }}
                                 </option>
 
@@ -2035,9 +1711,7 @@
                 </div>
 
 
-                {{-- FOLLOW UP --}}
-
-                <div class="crm-form-section">
+                <div class="crm-form-section crm-section-standard">
 
                     <div class="crm-form-title">
                         Takip
@@ -2059,8 +1733,6 @@
 
                 </div>
 
-
-                {{-- LOST REASON --}}
 
                 @if ($leadStatus === 'lost')
 
@@ -2084,8 +1756,6 @@
                 @endif
 
 
-                {{-- NOTES --}}
-
                 <div class="crm-form-section">
 
                     <div class="crm-form-title">
@@ -2104,8 +1774,6 @@
 
                 </div>
 
-
-                {{-- SAVE --}}
 
                 <div class="crm-form-section">
 
@@ -2180,10 +1848,6 @@
 
     </section>
 
-
-    {{-- =========================================================
-         SAVE TOAST
-    ========================================================== --}}
 
     <div
         class="crm-toast"
