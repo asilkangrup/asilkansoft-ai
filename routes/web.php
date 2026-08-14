@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PublicDemoController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -8,11 +9,29 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | wai.asilkansoft.com.tr
-| Public landing page.
 |
 | Admin panel Filament tarafından /admin altında çalışmaya devam eder.
-| Bu route admin, webhook veya WhatsApp sistemine müdahale etmez.
+| WhatsApp webhook veya mevcut production akışlarına müdahale etmez.
 |
 */
 
-Route::view('/', 'home')->name('home');
+Route::view('/', 'home')
+    ->name('home');
+
+
+/*
+|--------------------------------------------------------------------------
+| WAI PUBLIC LIVE DEMO
+|--------------------------------------------------------------------------
+|
+| Ana sayfadaki üyelik gerektirmeyen demo sohbet endpoint'i.
+|
+| Veritabanına kayıt oluşturmaz.
+| Evolution API kullanmaz.
+| WhatsApp webhook sisteminden tamamen bağımsızdır.
+|
+*/
+
+Route::post('/demo/chat', [PublicDemoController::class, 'chat'])
+    ->middleware('throttle:20,1')
+    ->name('demo.chat');
