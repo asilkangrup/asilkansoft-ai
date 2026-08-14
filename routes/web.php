@@ -4,12 +4,15 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| ANA SAYFA
+| WAI PUBLIC ANA SAYFA
 |--------------------------------------------------------------------------
 |
-| wai.asilkansoft.com.tr açıldığında kullanıcıyı
-| doğrudan AsilkanSoft AI paneline yönlendir.
+| wai.asilkansoft.com.tr
+| Public landing page.
+|
+| Admin panel Filament tarafından /admin altında çalışmaya devam eder.
+| Bu route admin, webhook veya WhatsApp sistemine müdahale etmez.
 |
 */
 
-Route::redirect('/', '/admin');
+Route::view('/', 'home')->name('home');
