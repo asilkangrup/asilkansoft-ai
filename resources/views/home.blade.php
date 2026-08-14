@@ -6,47 +6,49 @@
 
     <title>WAI — WhatsApp Yapay Zeka Satış Asistanı</title>
 
-    <meta name="description"
-          content="WAI, WhatsApp mesajlarınızı 7/24 yanıtlayan, müşterileri takip eden, satış süreçlerini yöneten ve gerektiğinde görüşmeleri ekibinize devreden yapay zeka satış asistanıdır.">
+    <meta
+        name="description"
+        content="WAI ile WhatsApp satışlarınızı yapay zekâ ile yönetin. Müşterilerinize 7/24 cevap verin, satış fırsatlarını takip edin ve tüm görüşmeleri tek panelden yönetin."
+    >
 
-    <meta name="theme-color" content="#070a09">
+    <meta name="theme-color" content="#050806">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
-          rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
 
     <style>
         :root {
-            --black: #070a09;
-            --black-2: #0b0f0d;
-            --black-3: #101613;
+            --bg: #050806;
+            --bg-soft: #080d0a;
+            --bg-card: #0c120e;
+            --bg-card-2: #101812;
 
-            --white: #ffffff;
-            --paper: #f7f9f7;
-            --paper-2: #eef3ef;
+            --white: #f7fff9;
+            --text: #edf7f0;
+            --muted: #8e9b92;
+            --muted-2: #667169;
 
-            --text: #101411;
-            --muted: #69736d;
-            --muted-dark: #9aa59f;
+            --green: #5cff9d;
+            --green-strong: #21e77f;
+            --green-dark: #0d8f4c;
+            --green-deep: #071d11;
 
-            --green: #51f29b;
-            --green-2: #19d978;
-            --green-3: #0db967;
-            --green-soft: rgba(81, 242, 155, .12);
-
-            --line: rgba(14, 25, 19, .09);
-            --line-dark: rgba(255,255,255,.08);
+            --line: rgba(255,255,255,.075);
+            --line-green: rgba(92,255,157,.18);
 
             --shadow:
-                0 30px 80px rgba(3, 14, 8, .10),
-                0 10px 30px rgba(3, 14, 8, .05);
+                0 30px 100px rgba(0,0,0,.45),
+                0 10px 35px rgba(0,0,0,.25);
 
-            --radius-sm: 16px;
-            --radius-md: 24px;
-            --radius-lg: 34px;
-            --radius-xl: 46px;
+            --radius-sm: 14px;
+            --radius-md: 22px;
+            --radius-lg: 32px;
+            --radius-xl: 44px;
 
             --container: 1240px;
         }
@@ -62,10 +64,13 @@
         }
 
         body {
-            font-family: 'DM Sans', sans-serif;
-            background: var(--paper);
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
             color: var(--text);
-            line-height: 1.5;
+            background:
+                radial-gradient(circle at 8% -10%, rgba(92,255,157,.10), transparent 26%),
+                radial-gradient(circle at 90% 5%, rgba(92,255,157,.06), transparent 24%),
+                var(--bg);
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
             text-rendering: optimizeLegibility;
@@ -75,27 +80,22 @@
             overflow: hidden;
         }
 
-        button,
-        input,
-        textarea,
-        select {
-            font: inherit;
-        }
-
-        button,
-        a {
-            -webkit-tap-highlight-color: transparent;
-        }
-
         a {
             color: inherit;
             text-decoration: none;
         }
 
-        img,
+        button {
+            font: inherit;
+        }
+
         svg {
-            max-width: 100%;
             display: block;
+        }
+
+        ::selection {
+            background: var(--green);
+            color: #07100a;
         }
 
         .container {
@@ -103,158 +103,177 @@
             margin: 0 auto;
         }
 
-        .section {
-            padding: 120px 0;
-            position: relative;
+        .noise {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: .025;
+            background-image:
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
         }
 
-        .eyebrow {
+        .grid-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: .24;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+            background-size: 64px 64px;
+            mask-image: linear-gradient(to bottom, #000 0%, transparent 70%);
+        }
+
+        .section-tag {
             display: inline-flex;
             align-items: center;
             gap: 9px;
-            margin-bottom: 20px;
-            font-family: 'Manrope', sans-serif;
-            font-weight: 800;
-            font-size: 12px;
+            color: var(--green);
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 1.6px;
-            color: #087847;
+            letter-spacing: 1.8px;
         }
 
-        .eyebrow::before {
+        .section-tag::before {
             content: "";
-            width: 8px;
-            height: 8px;
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
-            background: var(--green-2);
-            box-shadow: 0 0 0 6px rgba(25, 217, 120, .10);
+            background: var(--green);
+            box-shadow:
+                0 0 0 5px rgba(92,255,157,.08),
+                0 0 22px rgba(92,255,157,.38);
         }
 
-        .section-heading {
+        .section-title {
             max-width: 900px;
+            margin-top: 18px;
             font-family: 'Manrope', sans-serif;
-            font-size: clamp(42px, 5.6vw, 76px);
+            font-size: clamp(42px, 5.5vw, 74px);
             line-height: .98;
-            letter-spacing: -4.2px;
             font-weight: 800;
+            letter-spacing: -4px;
         }
 
-        .section-description {
+        .section-copy {
             max-width: 650px;
-            margin-top: 24px;
-            font-size: 18px;
-            line-height: 1.75;
+            margin-top: 22px;
             color: var(--muted);
+            font-size: 17px;
+            line-height: 1.78;
         }
 
-        /* =========================================================
+        /* ============================================================
            NAVIGATION
-        ========================================================= */
+        ============================================================ */
 
-        .nav-space {
-            height: 92px;
+        .nav-spacer {
+            height: 96px;
         }
 
-        .nav-shell {
+        .nav-wrap {
             position: fixed;
             z-index: 1000;
+            top: 0;
             left: 0;
             right: 0;
-            top: 0;
-            padding: 15px 0;
-            transition: .3s ease;
+            padding-top: 14px;
+            transition: .28s ease;
         }
 
-        .nav-shell.scrolled {
-            padding-top: 9px;
+        .nav-wrap.scrolled {
+            padding-top: 8px;
         }
 
         .navbar {
-            position: relative;
-            min-height: 66px;
+            min-height: 68px;
+            padding: 9px 10px 9px 16px;
+
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 26px;
-            padding: 9px 10px 9px 18px;
+            gap: 28px;
+
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 21px;
 
             background:
                 linear-gradient(
                     180deg,
-                    rgba(255,255,255,.90),
-                    rgba(250,252,250,.78)
+                    rgba(14,20,16,.83),
+                    rgba(7,11,8,.74)
                 );
 
-            border: 1px solid rgba(255,255,255,.85);
-            border-radius: 20px;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
 
             box-shadow:
-                0 18px 50px rgba(9, 24, 15, .08),
-                inset 0 0 0 1px rgba(15, 30, 21, .05);
-
-            backdrop-filter: blur(22px);
-            -webkit-backdrop-filter: blur(22px);
+                0 20px 55px rgba(0,0,0,.32),
+                inset 0 0 0 1px rgba(255,255,255,.025);
         }
 
         .brand {
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 11px;
             flex-shrink: 0;
         }
 
-        .brand-symbol {
+        .brand-logo {
             position: relative;
-            width: 40px;
-            height: 40px;
-            border-radius: 13px;
+            width: 42px;
+            height: 42px;
+            overflow: hidden;
             display: grid;
             place-items: center;
-            overflow: hidden;
 
+            border-radius: 13px;
             background:
-                radial-gradient(circle at 35% 25%, rgba(81,242,155,.35), transparent 34%),
-                #0a0e0c;
+                radial-gradient(circle at 25% 15%, rgba(92,255,157,.35), transparent 35%),
+                #07100a;
+
+            border: 1px solid rgba(92,255,157,.12);
 
             box-shadow:
-                inset 0 0 0 1px rgba(255,255,255,.07),
-                0 10px 25px rgba(6,15,10,.12);
+                inset 0 0 20px rgba(92,255,157,.04),
+                0 10px 30px rgba(0,0,0,.25);
         }
 
-        .brand-symbol::before,
-        .brand-symbol::after {
+        .brand-logo::before,
+        .brand-logo::after {
             content: "";
             position: absolute;
-            width: 17px;
+            width: 18px;
             height: 3px;
-            border-radius: 5px;
+            border-radius: 999px;
             background: var(--green);
         }
 
-        .brand-symbol::before {
+        .brand-logo::before {
             transform: rotate(55deg);
             left: 9px;
         }
 
-        .brand-symbol::after {
+        .brand-logo::after {
             transform: rotate(-55deg);
             right: 9px;
         }
 
-        .brand-text {
+        .brand-name {
             font-family: 'Manrope', sans-serif;
             font-size: 21px;
-            line-height: 1;
             font-weight: 800;
             letter-spacing: -1px;
         }
 
-        .brand-text small {
+        .brand-name small {
             display: block;
-            margin-top: 4px;
-            color: #8b948f;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 8px;
+            margin-top: 2px;
+            color: #67736b;
+            font-family: 'Inter', sans-serif;
+            font-size: 7px;
             font-weight: 700;
             letter-spacing: 1.4px;
             text-transform: uppercase;
@@ -263,36 +282,37 @@
         .nav-links {
             display: flex;
             align-items: center;
-            gap: 30px;
+            gap: 28px;
             margin-left: auto;
         }
 
         .nav-links a {
             position: relative;
-            font-size: 14px;
+            color: #9aa69e;
+            font-size: 13px;
             font-weight: 600;
-            color: #4d5751;
             transition: .2s ease;
         }
 
-        .nav-links a::after {
+        .nav-links a:hover {
+            color: white;
+        }
+
+        .nav-links a::before {
             content: "";
             position: absolute;
-            left: 0;
-            right: 100%;
-            bottom: -7px;
-            height: 2px;
-            background: var(--green-2);
-            border-radius: 5px;
-            transition: .25s ease;
+            left: 50%;
+            bottom: -10px;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--green);
+            transform: translateX(-50%) scale(0);
+            transition: .2s ease;
         }
 
-        .nav-links a:hover {
-            color: #0c100e;
-        }
-
-        .nav-links a:hover::after {
-            right: 0;
+        .nav-links a:hover::before {
+            transform: translateX(-50%) scale(1);
         }
 
         .nav-actions {
@@ -302,814 +322,929 @@
         }
 
         .nav-login {
-            height: 46px;
+            min-height: 46px;
             padding: 0 16px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border-radius: 13px;
-            font-size: 14px;
+            color: #adb8b0;
+            font-size: 13px;
             font-weight: 700;
-            color: #333b36;
+            border-radius: 13px;
             transition: .2s ease;
         }
 
         .nav-login:hover {
-            background: #edf1ee;
+            color: white;
+            background: rgba(255,255,255,.04);
         }
 
         .nav-cta {
-            height: 48px;
-            padding: 0 19px;
+            min-height: 48px;
+            padding: 0 18px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 9px;
 
-            color: white;
-            background: var(--black);
+            color: #06150c;
+            background: var(--green);
 
             border-radius: 13px;
-            font-size: 14px;
-            font-weight: 700;
+
+            font-size: 13px;
+            font-weight: 800;
 
             box-shadow:
-                0 10px 24px rgba(8, 15, 11, .16),
-                inset 0 0 0 1px rgba(255,255,255,.06);
+                0 12px 28px rgba(92,255,157,.12),
+                inset 0 -1px 0 rgba(0,0,0,.15);
 
             transition: .22s ease;
         }
 
         .nav-cta:hover {
             transform: translateY(-2px);
-            background: #111712;
+            background: #79ffae;
+            box-shadow: 0 18px 38px rgba(92,255,157,.18);
         }
 
         .nav-cta svg {
             width: 15px;
         }
 
-        .mobile-menu-button {
+        .menu-button {
             display: none;
-            width: 46px;
-            height: 46px;
-            border: 0;
-            border-radius: 13px;
-            background: #edf1ee;
+            width: 44px;
+            height: 44px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            color: white;
+            background: rgba(255,255,255,.04);
             cursor: pointer;
-            align-items: center;
-            justify-content: center;
         }
 
-        .mobile-menu-button span {
-            position: relative;
-            width: 20px;
-            height: 2px;
-            border-radius: 5px;
-            background: var(--black);
-        }
-
-        .mobile-menu-button span::before,
-        .mobile-menu-button span::after {
-            content: "";
+        .menu-button span,
+        .menu-button span::before,
+        .menu-button span::after {
             position: absolute;
-            left: 0;
-            width: 20px;
+            width: 18px;
             height: 2px;
-            border-radius: 5px;
-            background: var(--black);
+            border-radius: 999px;
+            background: currentColor;
         }
 
-        .mobile-menu-button span::before {
+        .menu-button span {
+            position: relative;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .menu-button span::before,
+        .menu-button span::after {
+            content: "";
+            left: 0;
+        }
+
+        .menu-button span::before {
             top: -6px;
         }
 
-        .mobile-menu-button span::after {
+        .menu-button span::after {
             top: 6px;
         }
 
-        .mobile-nav {
+        .mobile-menu {
             display: none;
         }
 
-        /* =========================================================
+        /* ============================================================
            HERO
-        ========================================================= */
+        ============================================================ */
 
         .hero {
             position: relative;
+            min-height: calc(100vh - 96px);
+            padding: 65px 0 100px;
             overflow: hidden;
-            padding: 58px 0 90px;
         }
 
-        .hero::before {
-            content: "";
+        .hero-light {
             position: absolute;
-            width: 680px;
-            height: 680px;
-            top: -270px;
-            right: -160px;
+            width: 820px;
+            height: 820px;
+            top: -320px;
+            left: 50%;
+            transform: translateX(-50%);
             border-radius: 50%;
             background:
-                radial-gradient(circle, rgba(81,242,155,.15), rgba(81,242,155,0) 67%);
+                radial-gradient(circle,
+                    rgba(92,255,157,.14) 0%,
+                    rgba(92,255,157,.05) 30%,
+                    transparent 68%
+                );
             pointer-events: none;
         }
 
-        .hero::after {
-            content: "";
+        .hero-ray {
             position: absolute;
-            width: 550px;
-            height: 550px;
-            left: -260px;
-            bottom: -260px;
-            border-radius: 50%;
+            width: 1100px;
+            height: 800px;
+            top: -300px;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: .28;
             background:
-                radial-gradient(circle, rgba(25,217,120,.08), transparent 68%);
+                conic-gradient(
+                    from 180deg at 50% 0%,
+                    transparent 0deg,
+                    rgba(92,255,157,.08) 8deg,
+                    transparent 16deg,
+                    transparent 35deg,
+                    rgba(92,255,157,.05) 44deg,
+                    transparent 52deg
+                );
+            mask-image: linear-gradient(to bottom, black, transparent 75%);
             pointer-events: none;
         }
 
         .hero-grid {
+            position: relative;
+            z-index: 2;
             display: grid;
-            grid-template-columns: minmax(0, 1.05fr) minmax(430px, .95fr);
-            gap: 54px;
+            grid-template-columns: minmax(0, .96fr) minmax(490px, 1.04fr);
+            gap: 40px;
             align-items: center;
         }
 
         .hero-copy {
-            position: relative;
-            z-index: 3;
-            padding-top: 24px;
+            padding-top: 25px;
         }
 
-        .hero-badge {
+        .hero-kicker {
             display: inline-flex;
             align-items: center;
             gap: 10px;
             min-height: 38px;
             padding: 0 14px;
-            margin-bottom: 24px;
+
+            border: 1px solid rgba(92,255,157,.12);
             border-radius: 999px;
 
-            border: 1px solid rgba(15, 148, 87, .13);
-            background: rgba(255,255,255,.78);
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(92,255,157,.07),
+                    rgba(255,255,255,.02)
+                );
 
-            box-shadow:
-                inset 0 0 0 1px rgba(255,255,255,.8),
-                0 8px 24px rgba(7, 26, 15, .04);
-
-            color: #267153;
-            font-size: 12px;
+            color: #a6ffca;
+            font-size: 11px;
             font-weight: 700;
+            letter-spacing: .4px;
         }
 
-        .pulse {
+        .live-dot {
             position: relative;
-            width: 9px;
-            height: 9px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: var(--green-2);
+            background: var(--green);
+            box-shadow: 0 0 15px rgba(92,255,157,.65);
         }
 
-        .pulse::after {
+        .live-dot::after {
             content: "";
             position: absolute;
-            inset: -5px;
+            inset: -6px;
+            border: 1px solid rgba(92,255,157,.35);
             border-radius: 50%;
-            border: 1px solid rgba(25, 217, 120, .45);
-            animation: pulseRing 2s infinite;
+            animation: pulse 2s ease-out infinite;
         }
 
-        @keyframes pulseRing {
-            0% {
+        @keyframes pulse {
+            from {
                 opacity: 1;
-                transform: scale(.7);
+                transform: scale(.5);
             }
 
-            70% {
+            to {
                 opacity: 0;
-                transform: scale(1.6);
-            }
-
-            100% {
-                opacity: 0;
+                transform: scale(1.8);
             }
         }
 
         .hero h1 {
-            max-width: 800px;
+            max-width: 780px;
+            margin-top: 25px;
+
             font-family: 'Manrope', sans-serif;
-            font-size: clamp(58px, 6.7vw, 92px);
+            font-size: clamp(59px, 6.6vw, 94px);
             line-height: .91;
-            letter-spacing: -6px;
             font-weight: 800;
+            letter-spacing: -6px;
         }
 
-        .hero h1 .soft {
-            color: #7b857f;
+        .hero h1 .muted {
+            color: #616c64;
         }
 
         .hero h1 .green {
             position: relative;
-            color: #0d995a;
-            white-space: nowrap;
+            display: inline-block;
+            color: var(--green);
+            text-shadow: 0 0 50px rgba(92,255,157,.08);
         }
 
         .hero h1 .green::after {
             content: "";
             position: absolute;
-            height: 13px;
-            left: 1%;
-            right: 0;
-            bottom: 5px;
+            left: 0;
+            right: -4px;
+            bottom: 2px;
+            height: 10px;
             z-index: -1;
-            background: rgba(81,242,155,.28);
-            border-radius: 20px;
-            transform: rotate(-1deg);
+            border-radius: 999px;
+            background: rgba(92,255,157,.13);
+            filter: blur(2px);
         }
 
         .hero-description {
-            max-width: 680px;
-            margin-top: 28px;
-            font-size: 18px;
+            max-width: 640px;
+            margin-top: 27px;
+            color: #929e96;
+            font-size: 17px;
             line-height: 1.75;
-            color: #626e67;
         }
 
         .hero-actions {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-top: 33px;
+            gap: 10px;
+            margin-top: 32px;
         }
 
-        .button-primary,
-        .button-secondary {
+        .button-main,
+        .button-ghost {
             min-height: 58px;
-            padding: 0 24px;
-            border-radius: 16px;
+            padding: 0 23px;
 
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 11px;
 
-            font-size: 15px;
-            font-weight: 700;
+            border-radius: 16px;
 
-            transition: .23s ease;
+            font-size: 14px;
+            font-weight: 800;
+
+            transition: .24s ease;
         }
 
-        .button-primary {
-            background: var(--black);
-            color: white;
+        .button-main {
+            color: #06130b;
+            background: var(--green);
 
             box-shadow:
-                0 18px 38px rgba(7, 14, 10, .18),
-                inset 0 0 0 1px rgba(255,255,255,.07);
+                0 20px 50px rgba(92,255,157,.12),
+                inset 0 -2px 0 rgba(0,0,0,.12);
         }
 
-        .button-primary:hover {
+        .button-main:hover {
             transform: translateY(-3px);
-            box-shadow:
-                0 24px 50px rgba(7, 14, 10, .22),
-                inset 0 0 0 1px rgba(255,255,255,.08);
+            background: #7affae;
+            box-shadow: 0 26px 60px rgba(92,255,157,.20);
         }
 
-        .button-primary .arrow {
+        .button-icon {
             width: 30px;
             height: 30px;
-            border-radius: 10px;
-            background: rgba(255,255,255,.09);
             display: grid;
             place-items: center;
+            border-radius: 9px;
+            background: rgba(4,17,9,.09);
         }
 
-        .button-primary .arrow svg {
+        .button-icon svg {
             width: 14px;
         }
 
-        .button-secondary {
-            color: #26302a;
-            border: 1px solid rgba(13, 25, 18, .10);
-            background: rgba(255,255,255,.72);
-            backdrop-filter: blur(10px);
+        .button-ghost {
+            color: #d8e1da;
+            border: 1px solid rgba(255,255,255,.09);
+            background: rgba(255,255,255,.035);
         }
 
-        .button-secondary:hover {
-            background: white;
+        .button-ghost:hover {
             transform: translateY(-2px);
+            background: rgba(255,255,255,.07);
         }
 
-        .hero-meta {
+        .hero-trust {
             display: flex;
-            align-items: center;
-            gap: 16px;
-            margin-top: 22px;
-            color: #8a948f;
-            font-size: 12px;
+            flex-wrap: wrap;
+            gap: 14px 18px;
+            margin-top: 20px;
+            color: #657168;
+            font-size: 10px;
+            font-weight: 600;
         }
 
-        .hero-meta span {
+        .hero-trust span {
             display: inline-flex;
             align-items: center;
             gap: 6px;
         }
 
-        .hero-meta svg {
-            width: 14px;
-            color: #0cb968;
+        .hero-trust svg {
+            width: 13px;
+            color: var(--green);
         }
 
-        /* =========================================================
-           HERO VISUAL
-        ========================================================= */
+        /* ============================================================
+           HERO PRODUCT VISUAL
+        ============================================================ */
 
         .hero-visual {
             position: relative;
             min-height: 680px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            perspective: 1200px;
+            perspective: 1500px;
         }
 
-        .visual-orbit {
+        .halo {
             position: absolute;
-            width: 550px;
-            height: 550px;
+            width: 540px;
+            height: 540px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
             border-radius: 50%;
 
             background:
-                radial-gradient(circle at center, rgba(81,242,155,.14), rgba(81,242,155,0) 55%);
+                radial-gradient(circle,
+                    rgba(92,255,157,.13),
+                    rgba(92,255,157,.035) 36%,
+                    transparent 68%
+                );
 
-            border: 1px dashed rgba(18, 135, 79, .12);
+            border: 1px solid rgba(92,255,157,.06);
         }
 
-        .visual-orbit::before,
-        .visual-orbit::after {
+        .halo::before,
+        .halo::after {
             content: "";
             position: absolute;
-            inset: 55px;
             border-radius: 50%;
-            border: 1px solid rgba(11, 33, 20, .055);
+            border: 1px solid rgba(92,255,157,.055);
         }
 
-        .visual-orbit::after {
+        .halo::before {
+            inset: 55px;
+        }
+
+        .halo::after {
             inset: 120px;
         }
 
-        .phone {
-            position: relative;
-            z-index: 4;
-            width: 346px;
-            height: 687px;
-            padding: 10px;
-            border-radius: 52px;
+        .dashboard-card {
+            position: absolute;
+            z-index: 3;
+            width: 570px;
+            height: 500px;
+            left: 50%;
+            top: 50%;
+            overflow: hidden;
+
+            transform:
+                translate(-50%, -50%)
+                rotateY(-7deg)
+                rotateX(4deg)
+                rotateZ(1deg);
+
+            border-radius: 27px;
+            border: 1px solid rgba(255,255,255,.08);
 
             background:
-                linear-gradient(145deg, #242b27, #050706 45%, #141916);
+                linear-gradient(145deg, #101712, #090d0a);
 
             box-shadow:
-                0 60px 110px rgba(5, 19, 11, .26),
-                0 18px 40px rgba(6, 20, 12, .12),
-                inset 0 0 0 1px rgba(255,255,255,.08);
+                0 80px 140px rgba(0,0,0,.46),
+                0 25px 60px rgba(0,0,0,.35),
+                inset 0 0 0 1px rgba(255,255,255,.02);
 
-            transform:
-                rotateY(-7deg)
-                rotateX(2deg)
-                rotateZ(1.5deg);
-
-            transition: transform .4s ease;
+            transition: .5s cubic-bezier(.2,.8,.2,1);
         }
 
-        .hero-visual:hover .phone {
+        .hero-visual:hover .dashboard-card {
             transform:
+                translate(-50%, -52%)
                 rotateY(-2deg)
-                rotateX(0deg)
-                rotateZ(.5deg)
-                translateY(-5px);
+                rotateX(1deg)
+                rotateZ(.2deg);
         }
 
-        .phone-side-button {
-            position: absolute;
-            width: 3px;
-            border-radius: 3px;
-            background: #252b28;
-        }
-
-        .phone-side-button.one {
-            height: 50px;
-            left: -3px;
-            top: 120px;
-        }
-
-        .phone-side-button.two {
-            height: 76px;
-            left: -3px;
-            top: 190px;
-        }
-
-        .phone-side-button.three {
-            height: 82px;
-            right: -3px;
-            top: 155px;
-        }
-
-        .phone-screen {
-            position: relative;
-            height: 100%;
-            overflow: hidden;
-            border-radius: 44px;
-
-            background:
-                linear-gradient(rgba(235, 231, 223, .91), rgba(235, 231, 223, .91)),
-                repeating-linear-gradient(
-                    45deg,
-                    rgba(255,255,255,.3) 0,
-                    rgba(255,255,255,.3) 1px,
-                    transparent 1px,
-                    transparent 14px
-                );
-        }
-
-        .dynamic-island {
-            position: absolute;
-            z-index: 10;
-            top: 10px;
-            left: 50%;
-            width: 96px;
-            height: 28px;
-            transform: translateX(-50%);
-            border-radius: 999px;
-            background: #050706;
-        }
-
-        .phone-header {
-            height: 88px;
-            padding: 29px 14px 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-
-            background: rgba(248, 250, 249, .95);
-            border-bottom: 1px solid rgba(15, 28, 20, .08);
-
-            backdrop-filter: blur(12px);
-        }
-
-        .back-arrow {
-            width: 18px;
-            color: #555e59;
-        }
-
-        .chat-avatar {
-            position: relative;
-            width: 42px;
-            height: 42px;
-            flex-shrink: 0;
-
-            display: grid;
-            place-items: center;
-
-            border-radius: 50%;
-            background: #0b100d;
-            color: var(--green);
-
-            font-family: 'Manrope', sans-serif;
-            font-weight: 800;
-            font-size: 14px;
-
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,.1);
-        }
-
-        .chat-avatar::after {
-            content: "";
-            position: absolute;
-            right: 0;
-            bottom: 1px;
-            width: 9px;
-            height: 9px;
-            border-radius: 50%;
-            background: var(--green-2);
-            border: 2px solid white;
-        }
-
-        .chat-person {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .chat-person strong {
-            display: block;
-            font-size: 13px;
-            line-height: 1.25;
-            white-space: nowrap;
-        }
-
-        .chat-person span {
-            display: block;
-            margin-top: 3px;
-            color: #0aab62;
-            font-size: 10px;
-            font-weight: 700;
-        }
-
-        .chat-icons {
-            display: flex;
-            align-items: center;
-            gap: 13px;
-            color: #47514b;
-        }
-
-        .chat-icons svg {
-            width: 17px;
-        }
-
-        .chat-body {
-            height: calc(100% - 148px);
-            overflow: hidden;
-            padding: 21px 12px 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .day-label {
-            align-self: center;
-            padding: 5px 9px;
-            border-radius: 6px;
-            background: rgba(255,255,255,.68);
-            box-shadow: 0 2px 7px rgba(0,0,0,.04);
-            color: #68726c;
-            font-size: 8px;
-            font-weight: 700;
-        }
-
-        .chat-bubble {
-            position: relative;
-            max-width: 82%;
-            padding: 9px 11px 7px;
-            border-radius: 11px;
-            font-size: 11px;
-            line-height: 1.5;
-            box-shadow: 0 2px 5px rgba(0,0,0,.04);
-        }
-
-        .chat-bubble.in {
-            align-self: flex-start;
-            background: white;
-            border-top-left-radius: 3px;
-        }
-
-        .chat-bubble.out {
-            align-self: flex-end;
-            background: #d9fdd3;
-            border-top-right-radius: 3px;
-        }
-
-        .chat-bubble .time {
-            display: inline-flex;
-            align-items: center;
-            float: right;
-            gap: 2px;
-            margin-left: 9px;
-            margin-top: 4px;
-            color: #8b948f;
-            font-size: 7px;
-        }
-
-        .checkmarks {
-            color: #3398e0;
-            font-size: 8px;
-        }
-
-        .typing-bubble {
-            align-self: flex-end;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            min-width: 54px;
-            min-height: 31px;
-            padding: 9px 12px;
-            background: #d9fdd3;
-            border-radius: 11px 3px 11px 11px;
-        }
-
-        .typing-bubble i {
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background: #688173;
-            animation: typingDot 1.25s infinite ease-in-out;
-        }
-
-        .typing-bubble i:nth-child(2) {
-            animation-delay: .14s;
-        }
-
-        .typing-bubble i:nth-child(3) {
-            animation-delay: .28s;
-        }
-
-        @keyframes typingDot {
-            0%, 60%, 100% {
-                opacity: .45;
-                transform: translateY(0);
-            }
-
-            30% {
-                opacity: 1;
-                transform: translateY(-3px);
-            }
-        }
-
-        .phone-composer {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            height: 60px;
-            padding: 8px 8px 10px;
+        .dash-top {
+            height: 51px;
+            padding: 0 15px;
 
             display: flex;
             align-items: center;
             gap: 7px;
 
-            background: rgba(244, 246, 244, .94);
-            border-top: 1px solid rgba(20, 31, 24, .06);
+            border-bottom: 1px solid rgba(255,255,255,.06);
         }
 
-        .composer-input {
-            flex: 1;
-            height: 42px;
-            border-radius: 22px;
-            background: white;
+        .dash-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #303a33;
+        }
+
+        .dash-address {
+            width: 190px;
+            height: 26px;
+            margin-left: 8px;
+            padding: 0 10px;
+
+            display: flex;
+            align-items: center;
+
+            border-radius: 8px;
+            background: rgba(255,255,255,.035);
+
+            color: #536057;
+            font-size: 7px;
+        }
+
+        .dash-grid {
+            height: calc(100% - 51px);
+            display: grid;
+            grid-template-columns: 165px 1fr 150px;
+        }
+
+        .dash-sidebar {
+            padding: 14px 10px;
+            border-right: 1px solid rgba(255,255,255,.055);
+        }
+
+        .dash-logo {
+            height: 31px;
+            margin-bottom: 14px;
+            padding: 0 9px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+
+            border-radius: 9px;
+            color: #c9d5cd;
+            font-size: 8px;
+            font-weight: 700;
+        }
+
+        .dash-logo .mini-w {
+            width: 20px;
+            height: 20px;
+            border-radius: 7px;
+
+            display: grid;
+            place-items: center;
+
+            background: rgba(92,255,157,.12);
+            color: var(--green);
+
+            font-size: 7px;
+        }
+
+        .dash-nav-label {
+            padding: 8px 9px 5px;
+            color: #455148;
+            font-size: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .dash-nav-item {
+            height: 31px;
+            padding: 0 9px;
+            margin-bottom: 3px;
+
+            display: flex;
+            align-items: center;
+            gap: 7px;
+
+            border-radius: 8px;
+
+            color: #667269;
+            font-size: 7px;
+        }
+
+        .dash-nav-item.active {
+            color: #baffd4;
+            background: rgba(92,255,157,.08);
+        }
+
+        .nav-square {
+            width: 17px;
+            height: 17px;
+            display: grid;
+            place-items: center;
+            border-radius: 5px;
+            background: rgba(255,255,255,.035);
+        }
+
+        .dash-nav-item.active .nav-square {
+            background: rgba(92,255,157,.10);
+        }
+
+        .dash-chat {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .dash-chat-header {
+            height: 57px;
             padding: 0 13px;
 
             display: flex;
             align-items: center;
-            gap: 9px;
+            gap: 8px;
 
-            color: #9ca49f;
-            font-size: 9px;
-
-            box-shadow: inset 0 0 0 1px rgba(16,30,21,.05);
+            border-bottom: 1px solid rgba(255,255,255,.055);
         }
 
-        .composer-input svg {
-            width: 16px;
-            color: #808984;
-        }
+        .client-avatar {
+            width: 29px;
+            height: 29px;
+            flex-shrink: 0;
 
-        .voice-button {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
             display: grid;
             place-items: center;
-            background: #1dae6f;
-            color: white;
+
+            border-radius: 9px;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(92,255,157,.17),
+                    rgba(92,255,157,.05)
+                );
+
+            color: #8effb8;
+            font-size: 7px;
+            font-weight: 800;
         }
 
-        .voice-button svg {
-            width: 16px;
+        .client-name {
+            flex: 1;
         }
 
-        .float-card {
+        .client-name strong {
+            display: block;
+            font-size: 8px;
+        }
+
+        .client-name span {
+            display: block;
+            margin-top: 2px;
+            color: #546158;
+            font-size: 5px;
+        }
+
+        .ai-status {
+            height: 24px;
+            padding: 0 7px;
+
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+
+            border-radius: 7px;
+            background: rgba(92,255,157,.08);
+            color: var(--green);
+
+            font-size: 5px;
+            font-weight: 800;
+        }
+
+        .ai-status::before {
+            content: "";
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px rgba(92,255,157,.6);
+        }
+
+        .dash-messages {
+            flex: 1;
+            padding: 19px 13px;
+
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 8px;
+
+            background:
+                radial-gradient(circle at 50% 100%, rgba(92,255,157,.025), transparent 32%);
+        }
+
+        .dash-message {
+            max-width: 78%;
+            padding: 8px 9px;
+
+            border-radius: 9px;
+            font-size: 6.5px;
+            line-height: 1.55;
+        }
+
+        .dash-message.in {
+            align-self: flex-start;
+            color: #a9b5ad;
+            background: rgba(255,255,255,.05);
+            border-top-left-radius: 3px;
+        }
+
+        .dash-message.out {
+            align-self: flex-end;
+            color: #c3ffdb;
+            background: rgba(92,255,157,.09);
+            border: 1px solid rgba(92,255,157,.04);
+            border-top-right-radius: 3px;
+        }
+
+        .dash-message time {
+            display: block;
+            margin-top: 3px;
+            color: #47534a;
+            font-size: 4.5px;
+            text-align: right;
+        }
+
+        .dash-compose {
+            height: 54px;
+            padding: 8px 10px;
+            display: flex;
+            gap: 6px;
+            border-top: 1px solid rgba(255,255,255,.055);
+        }
+
+        .dash-input {
+            flex: 1;
+            height: 34px;
+            padding: 0 10px;
+
+            display: flex;
+            align-items: center;
+
+            border-radius: 9px;
+            background: rgba(255,255,255,.035);
+
+            color: #465149;
+            font-size: 5px;
+        }
+
+        .dash-send {
+            width: 34px;
+            height: 34px;
+
+            display: grid;
+            place-items: center;
+
+            border-radius: 9px;
+            background: var(--green);
+            color: #051209;
+        }
+
+        .dash-send svg {
+            width: 11px;
+        }
+
+        .dash-crm {
+            padding: 13px 10px;
+            border-left: 1px solid rgba(255,255,255,.055);
+        }
+
+        .crm-title {
+            color: #aeb9b1;
+            font-size: 7px;
+            font-weight: 700;
+        }
+
+        .crm-profile {
+            margin-top: 12px;
+            padding: 11px;
+
+            border: 1px solid rgba(255,255,255,.05);
+            border-radius: 11px;
+
+            background: rgba(255,255,255,.02);
+        }
+
+        .crm-profile strong {
+            display: block;
+            font-size: 7px;
+        }
+
+        .crm-profile span {
+            display: block;
+            margin-top: 3px;
+            color: #505c53;
+            font-size: 5px;
+        }
+
+        .crm-divider {
+            height: 1px;
+            margin: 10px 0;
+            background: rgba(255,255,255,.05);
+        }
+
+        .crm-field {
+            margin-top: 9px;
+        }
+
+        .crm-field label {
+            display: block;
+            color: #455047;
+            font-size: 4.5px;
+            text-transform: uppercase;
+            letter-spacing: .7px;
+        }
+
+        .crm-field strong {
+            display: block;
+            margin-top: 4px;
+            color: #9faa9f;
+            font-size: 6px;
+        }
+
+        .hot-tag {
+            display: inline-flex;
+            margin-top: 6px;
+            padding: 4px 6px;
+
+            border-radius: 6px;
+
+            color: #ffd079;
+            background: rgba(255,193,79,.08);
+
+            font-size: 5px;
+            font-weight: 700;
+        }
+
+        .takeover-btn {
+            height: 27px;
+            margin-top: 11px;
+
+            display: grid;
+            place-items: center;
+
+            border-radius: 7px;
+            background: var(--green);
+
+            color: #05150a;
+            font-size: 5px;
+            font-weight: 800;
+        }
+
+        .float-panel {
             position: absolute;
-            z-index: 7;
+            z-index: 8;
 
-            padding: 14px 15px;
+            border: 1px solid rgba(255,255,255,.08);
             border-radius: 17px;
 
-            background: rgba(255,255,255,.89);
-            border: 1px solid rgba(255,255,255,.9);
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(17,25,19,.94),
+                    rgba(8,13,9,.91)
+                );
 
             backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
 
             box-shadow:
-                0 22px 60px rgba(8, 31, 18, .13),
-                inset 0 0 0 1px rgba(8, 25, 15, .05);
+                0 30px 65px rgba(0,0,0,.34),
+                inset 0 0 0 1px rgba(255,255,255,.015);
 
-            animation: floating 5s ease-in-out infinite;
+            animation: float 5s ease-in-out infinite;
         }
 
-        @keyframes floating {
+        @keyframes float {
             0%, 100% {
                 transform: translateY(0);
             }
 
             50% {
-                transform: translateY(-7px);
+                transform: translateY(-8px);
             }
         }
 
-        .float-card.status {
-            width: 180px;
-            right: -15px;
-            top: 105px;
+        .float-panel.lead {
+            width: 190px;
+            top: 71px;
+            right: -5px;
+            padding: 14px;
         }
 
-        .float-card.lead {
-            width: 195px;
-            left: -50px;
-            bottom: 110px;
+        .float-panel.ai {
+            width: 176px;
+            left: -14px;
+            bottom: 89px;
+            padding: 13px;
             animation-delay: -2s;
         }
 
-        .float-card.follow {
+        .float-panel.follow {
             width: 185px;
-            right: -43px;
-            bottom: 56px;
+            right: -18px;
+            bottom: 45px;
+            padding: 13px;
             animation-delay: -1s;
         }
 
-        .float-title {
+        .float-head {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 11px;
-            font-weight: 800;
         }
 
         .float-icon {
-            width: 28px;
-            height: 28px;
-            border-radius: 9px;
-
+            width: 29px;
+            height: 29px;
             display: grid;
             place-items: center;
 
-            background: #e8faef;
-            color: #0bae62;
+            border-radius: 9px;
+
+            background: rgba(92,255,157,.09);
+            color: var(--green);
         }
 
         .float-icon svg {
-            width: 14px;
+            width: 13px;
         }
 
-        .float-card p {
-            margin-top: 6px;
-            padding-left: 36px;
-            color: #78827c;
-            font-size: 9px;
-            line-height: 1.45;
+        .float-head strong {
+            display: block;
+            font-size: 8px;
         }
 
-        /* =========================================================
-           TRUST BAND
-        ========================================================= */
-
-        .trust-section {
-            padding: 20px 0 85px;
+        .float-head span {
+            display: block;
+            margin-top: 2px;
+            color: #58655c;
+            font-size: 5px;
         }
 
-        .trust-shell {
-            position: relative;
+        .mini-meter {
+            height: 4px;
+            margin-top: 11px;
             overflow: hidden;
-            padding: 22px 26px;
-            border: 1px solid rgba(13, 30, 19, .08);
-            border-radius: 24px;
-            background: rgba(255,255,255,.67);
+            border-radius: 999px;
+            background: rgba(255,255,255,.05);
         }
 
-        .trust-shell::before,
-        .trust-shell::after {
-            content: "";
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 100px;
-            z-index: 2;
-            pointer-events: none;
+        .mini-meter i {
+            display: block;
+            width: 76%;
+            height: 100%;
+            border-radius: inherit;
+            background: var(--green);
+            box-shadow: 0 0 10px rgba(92,255,157,.5);
         }
 
-        .trust-shell::before {
-            left: 0;
-            background: linear-gradient(90deg, var(--paper), transparent);
+        /* ============================================================
+           INDUSTRY MARQUEE
+        ============================================================ */
+
+        .industry-strip {
+            padding: 20px 0 95px;
         }
 
-        .trust-shell::after {
-            right: 0;
-            background: linear-gradient(-90deg, var(--paper), transparent);
+        .industry-shell {
+            overflow: hidden;
+            padding: 20px 0;
+
+            border-top: 1px solid var(--line);
+            border-bottom: 1px solid var(--line);
+
+            mask-image:
+                linear-gradient(
+                    90deg,
+                    transparent,
+                    #000 8%,
+                    #000 92%,
+                    transparent
+                );
         }
 
-        .trust-label {
-            margin-bottom: 20px;
-            text-align: center;
-            color: #818c85;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-        }
-
-        .trust-track {
-            display: flex;
+        .industry-track {
             width: max-content;
-            gap: 14px;
-            animation: marquee 28s linear infinite;
+            display: flex;
+            gap: 10px;
+            animation: marquee 33s linear infinite;
         }
 
         @keyframes marquee {
@@ -1122,590 +1257,631 @@
             }
         }
 
-        .industry {
+        .industry-pill {
             min-width: 170px;
-            height: 58px;
-            padding: 0 20px;
+            height: 54px;
+            padding: 0 18px;
 
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 9px;
 
-            border-radius: 16px;
-            border: 1px solid rgba(13, 29, 19, .07);
-            background: #fbfcfb;
+            border: 1px solid rgba(255,255,255,.065);
+            border-radius: 15px;
 
-            font-size: 12px;
+            background: rgba(255,255,255,.022);
+
+            color: #78847b;
+            font-size: 11px;
             font-weight: 700;
-            color: #515c55;
         }
 
-        .industry svg {
-            width: 17px;
-            color: #0ab969;
+        .industry-pill svg {
+            width: 16px;
+            color: var(--green);
         }
 
-        /* =========================================================
+        /* ============================================================
            MANIFESTO
-        ========================================================= */
+        ============================================================ */
 
         .manifesto {
-            padding-top: 135px;
-            padding-bottom: 120px;
+            padding: 125px 0;
         }
 
         .manifesto-grid {
             display: grid;
-            grid-template-columns: .8fr 1.2fr;
-            gap: 80px;
-            align-items: start;
+            grid-template-columns: .85fr 1.15fr;
+            gap: 90px;
         }
 
-        .sticky-copy {
+        .manifesto-copy {
             position: sticky;
             top: 130px;
+            align-self: start;
         }
 
-        .manifesto-big {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+        .manifesto-list {
+            border-top: 1px solid var(--line);
         }
 
-        .manifesto-line {
+        .manifesto-item {
             position: relative;
-            min-height: 152px;
-            display: flex;
+            min-height: 150px;
+            padding: 24px 20px;
+
+            display: grid;
+            grid-template-columns: 70px 1fr;
             align-items: center;
-            padding: 26px 30px;
-            border-bottom: 1px solid var(--line);
+
             overflow: hidden;
+            border-bottom: 1px solid var(--line);
         }
 
-        .manifesto-line::before {
+        .manifesto-item::before {
             content: "";
             position: absolute;
             inset: 0;
-            background:
-                linear-gradient(90deg, rgba(81,242,155,.12), transparent 70%);
+
             opacity: 0;
-            transition: .4s ease;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(92,255,157,.08),
+                    transparent 70%
+                );
+
+            transition: .35s ease;
         }
 
-        .manifesto-line:hover::before {
+        .manifesto-item:hover::before {
             opacity: 1;
         }
 
-        .manifesto-number {
-            width: 70px;
-            flex-shrink: 0;
-            color: #98a29c;
-            font-size: 11px;
-            font-weight: 800;
+        .manifesto-no {
+            position: relative;
+            color: #4c5850;
+            font-size: 10px;
+            font-weight: 700;
         }
 
-        .manifesto-line h3 {
+        .manifesto-item h3 {
             position: relative;
             font-family: 'Manrope', sans-serif;
-            font-size: clamp(28px, 3vw, 44px);
+            font-size: clamp(29px, 3.2vw, 45px);
             line-height: 1.05;
             letter-spacing: -2px;
         }
 
-        .manifesto-line h3 span {
-            color: #8b958f;
+        .manifesto-item h3 span {
+            color: #616d65;
         }
 
-        /* =========================================================
-           DARK PRODUCT SECTION
-        ========================================================= */
+        /* ============================================================
+           COMMAND CENTER
+        ============================================================ */
 
-        .product-section {
+        .command-section {
             position: relative;
             padding: 120px 0;
             overflow: hidden;
-            background:
-                radial-gradient(circle at 75% 5%, rgba(43, 216, 126, .12), transparent 26%),
-                radial-gradient(circle at 20% 70%, rgba(43, 216, 126, .07), transparent 26%),
-                var(--black);
-            color: white;
+            background: #070b08;
         }
 
-        .product-section::before {
+        .command-section::before {
             content: "";
             position: absolute;
-            inset: 0;
-            background-image:
-                linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
-
-            background-size: 58px 58px;
-            mask-image: linear-gradient(to bottom, black, transparent 80%);
-            pointer-events: none;
+            width: 720px;
+            height: 720px;
+            top: -300px;
+            right: -220px;
+            border-radius: 50%;
+            background:
+                radial-gradient(circle, rgba(92,255,157,.09), transparent 67%);
         }
 
-        .product-header {
+        .command-header {
             position: relative;
-            z-index: 2;
             display: grid;
             grid-template-columns: 1.1fr .9fr;
-            gap: 60px;
+            gap: 80px;
             align-items: end;
         }
 
-        .product-section .eyebrow {
-            color: var(--green);
-        }
-
-        .product-section .section-heading {
-            color: white;
-        }
-
-        .product-copy {
-            max-width: 500px;
+        .command-description {
+            max-width: 520px;
             justify-self: end;
-            color: #a5b0aa;
-            font-size: 17px;
+            color: #839087;
+            font-size: 16px;
             line-height: 1.75;
         }
 
-        .workspace {
+        .command-board {
             position: relative;
-            z-index: 2;
-            margin-top: 58px;
-            overflow: hidden;
-            border: 1px solid rgba(255,255,255,.08);
-            border-radius: 30px;
+            margin-top: 60px;
+            padding: 1px;
+            border-radius: 33px;
 
             background:
-                linear-gradient(180deg, #111815, #0b100e);
+                linear-gradient(
+                    135deg,
+                    rgba(92,255,157,.18),
+                    rgba(255,255,255,.055),
+                    rgba(92,255,157,.03)
+                );
 
             box-shadow:
-                0 70px 140px rgba(0,0,0,.38),
-                inset 0 0 0 1px rgba(255,255,255,.025);
+                0 70px 130px rgba(0,0,0,.45);
         }
 
-        .workspace-top {
-            height: 60px;
-            padding: 0 18px;
+        .command-inner {
+            position: relative;
+            min-height: 650px;
+            overflow: hidden;
+            border-radius: 32px;
+            background:
+                linear-gradient(180deg, #101712, #090e0a);
+        }
+
+        .command-inner::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(circle at 65% 100%, rgba(92,255,157,.045), transparent 38%);
+        }
+
+        .command-top {
+            height: 62px;
+            padding: 0 19px;
+
             display: flex;
             align-items: center;
             gap: 8px;
-            border-bottom: 1px solid rgba(255,255,255,.07);
-            background: rgba(255,255,255,.015);
-        }
 
-        .traffic-dot {
-            width: 9px;
-            height: 9px;
-            border-radius: 50%;
-            background: #29312d;
-        }
-
-        .workspace-url {
-            width: 240px;
-            height: 29px;
-            margin-left: 12px;
-            padding: 0 12px;
-            display: flex;
-            align-items: center;
-            border-radius: 8px;
-            background: rgba(255,255,255,.035);
-            color: #67736c;
-            font-size: 9px;
-        }
-
-        .workspace-main {
-            display: grid;
-            grid-template-columns: 240px minmax(0, 1fr) 290px;
-            min-height: 600px;
-        }
-
-        .inbox-list {
-            border-right: 1px solid rgba(255,255,255,.07);
-            background: rgba(255,255,255,.01);
-        }
-
-        .panel-head {
-            height: 62px;
-            padding: 0 17px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
             border-bottom: 1px solid rgba(255,255,255,.06);
         }
 
-        .panel-head strong {
-            font-size: 12px;
+        .command-browser-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #303a33;
         }
 
-        .count-badge {
-            min-width: 24px;
-            height: 22px;
+        .command-url {
+            width: 280px;
+            height: 30px;
+            margin-left: 11px;
+            padding: 0 12px;
+
+            display: flex;
+            align-items: center;
+
+            border-radius: 8px;
+            background: rgba(255,255,255,.035);
+
+            color: #516057;
+            font-size: 8px;
+        }
+
+        .command-grid {
+            display: grid;
+            grid-template-columns: 245px minmax(0,1fr) 275px;
+            min-height: 588px;
+        }
+
+        .conversation-list {
+            border-right: 1px solid rgba(255,255,255,.055);
+        }
+
+        .panel-title {
+            height: 61px;
+            padding: 0 17px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            border-bottom: 1px solid rgba(255,255,255,.05);
+        }
+
+        .panel-title strong {
+            font-size: 11px;
+        }
+
+        .badge-count {
+            min-width: 25px;
+            height: 23px;
             padding: 0 7px;
+
             display: grid;
             place-items: center;
-            border-radius: 8px;
-            background: rgba(81,242,155,.12);
+
+            border-radius: 7px;
             color: var(--green);
-            font-size: 8px;
+            background: rgba(92,255,157,.08);
+
+            font-size: 7px;
             font-weight: 800;
         }
 
-        .filters {
+        .conversation-filters {
             display: flex;
             gap: 5px;
-            padding: 10px 10px 8px;
+            padding: 10px;
             overflow: hidden;
         }
 
-        .filter {
+        .conv-filter {
             min-width: max-content;
             height: 27px;
-            padding: 0 9px;
+            padding: 0 8px;
+
             display: grid;
             place-items: center;
-            border-radius: 8px;
-            background: rgba(255,255,255,.035);
-            color: #748079;
-            font-size: 7px;
+
+            border-radius: 7px;
+
+            color: #59665d;
+            background: rgba(255,255,255,.03);
+
+            font-size: 6px;
             font-weight: 700;
         }
 
-        .filter.active {
-            background: rgba(81,242,155,.12);
+        .conv-filter.active {
             color: var(--green);
+            background: rgba(92,255,157,.08);
         }
 
-        .contact {
-            position: relative;
+        .conversation {
+            padding: 12px 12px;
             display: flex;
             gap: 10px;
-            padding: 12px 13px;
-            border-bottom: 1px solid rgba(255,255,255,.035);
-            transition: .2s ease;
+
+            border-bottom: 1px solid rgba(255,255,255,.03);
         }
 
-        .contact.active {
-            background: rgba(81,242,155,.075);
+        .conversation.active {
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(92,255,157,.075),
+                    rgba(92,255,157,.015)
+                );
         }
 
-        .contact-avatar {
-            position: relative;
-            width: 34px;
-            height: 34px;
+        .conversation-avatar {
+            width: 35px;
+            height: 35px;
             flex-shrink: 0;
 
             display: grid;
             place-items: center;
 
-            border-radius: 11px;
-            background: #1a231e;
+            border-radius: 10px;
+            background: #172019;
 
-            color: #aab4ae;
-            font-size: 9px;
+            color: #89958c;
+            font-size: 8px;
             font-weight: 800;
         }
 
-        .contact.active .contact-avatar {
-            background: #1c5537;
-            color: #a9ffd0;
+        .conversation.active .conversation-avatar {
+            color: #c4ffdc;
+            background: rgba(92,255,157,.12);
         }
 
-        .contact-data {
+        .conversation-content {
             min-width: 0;
             flex: 1;
         }
 
-        .contact-line {
+        .conversation-line {
             display: flex;
             justify-content: space-between;
             gap: 8px;
         }
 
-        .contact-line strong {
-            font-size: 9px;
+        .conversation-line strong {
+            color: #abb6ae;
+            font-size: 8px;
             white-space: nowrap;
         }
 
-        .contact-line span {
-            color: #59655e;
-            font-size: 7px;
+        .conversation-line time {
+            color: #455149;
+            font-size: 5px;
         }
 
-        .contact-data p {
+        .conversation-content p {
             margin-top: 4px;
-            color: #657169;
-            font-size: 7px;
-            white-space: nowrap;
             overflow: hidden;
+            color: #556159;
+            font-size: 6px;
+            white-space: nowrap;
             text-overflow: ellipsis;
         }
 
-        .contact-tag {
+        .conversation-tag {
             display: inline-flex;
             margin-top: 5px;
             padding: 3px 5px;
             border-radius: 5px;
-            background: rgba(242, 180, 58, .09);
-            color: #d5a544;
-            font-size: 6px;
+
+            color: #ffd17a;
+            background: rgba(255,200,91,.07);
+
+            font-size: 5px;
             font-weight: 800;
         }
 
-        .chat-workspace {
+        .main-chat-panel {
             min-width: 0;
             display: flex;
             flex-direction: column;
         }
 
-        .workspace-chat-head {
-            height: 62px;
-            padding: 0 18px;
+        .main-chat-head {
+            height: 61px;
+            padding: 0 16px;
+
             display: flex;
             align-items: center;
             gap: 10px;
-            border-bottom: 1px solid rgba(255,255,255,.06);
+
+            border-bottom: 1px solid rgba(255,255,255,.05);
         }
 
-        .workspace-chat-head .contact-avatar {
-            width: 36px;
-            height: 36px;
-        }
-
-        .workspace-person {
+        .chat-person-data {
             flex: 1;
         }
 
-        .workspace-person strong {
+        .chat-person-data strong {
             display: block;
-            font-size: 10px;
+            font-size: 9px;
         }
 
-        .workspace-person span {
+        .chat-person-data span {
             display: block;
-            margin-top: 3px;
-            color: #66736c;
-            font-size: 7px;
+            margin-top: 2px;
+            color: #526057;
+            font-size: 6px;
         }
 
-        .ai-toggle {
-            height: 30px;
-            padding: 0 10px;
-            display: flex;
+        .main-ai-badge {
+            height: 29px;
+            padding: 0 9px;
+
+            display: inline-flex;
             align-items: center;
             gap: 6px;
-            border-radius: 9px;
-            background: rgba(81,242,155,.08);
+
+            border-radius: 8px;
+
+            background: rgba(92,255,157,.075);
             color: var(--green);
-            font-size: 7px;
+
+            font-size: 6px;
             font-weight: 800;
         }
 
-        .ai-toggle::before {
-            content: "";
+        .main-ai-badge i {
             width: 6px;
             height: 6px;
             border-radius: 50%;
             background: var(--green);
-            box-shadow: 0 0 0 4px rgba(81,242,155,.08);
+            box-shadow: 0 0 11px rgba(92,255,157,.5);
         }
 
-        .workspace-messages {
+        .main-messages {
             flex: 1;
-            padding: 28px 22px;
+            padding: 27px 21px;
+
             display: flex;
             flex-direction: column;
+            justify-content: center;
             gap: 10px;
-
-            background:
-                radial-gradient(circle at 50% 100%, rgba(81,242,155,.035), transparent 30%);
         }
 
-        .workspace-message {
-            max-width: 72%;
+        .main-message {
+            max-width: 73%;
             padding: 10px 11px;
             border-radius: 10px;
-            font-size: 8px;
+
+            font-size: 7.5px;
             line-height: 1.55;
         }
 
-        .workspace-message.left {
+        .main-message.customer {
             align-self: flex-start;
-            background: rgba(255,255,255,.06);
-            color: #ced4d0;
+            color: #aab5ad;
+            background: rgba(255,255,255,.05);
             border-top-left-radius: 3px;
         }
 
-        .workspace-message.right {
+        .main-message.ai {
             align-self: flex-end;
-            background: rgba(81,242,155,.12);
-            color: #c7fce0;
+            color: #c9ffe0;
+            background: rgba(92,255,157,.09);
+            border: 1px solid rgba(92,255,157,.045);
             border-top-right-radius: 3px;
         }
 
-        .workspace-message em {
+        .main-message time {
             display: block;
             margin-top: 4px;
-            color: #64736a;
-            font-style: normal;
-            font-size: 6px;
+            color: #465249;
+            font-size: 5px;
             text-align: right;
         }
 
-        .workspace-compose {
-            height: 64px;
-            padding: 10px 14px;
+        .main-compose {
+            height: 63px;
+            padding: 10px 13px;
+
             display: flex;
-            align-items: center;
-            gap: 8px;
-            border-top: 1px solid rgba(255,255,255,.06);
-        }
+            gap: 7px;
 
-        .workspace-input {
-            height: 39px;
-            flex: 1;
-            padding: 0 12px;
-            display: flex;
-            align-items: center;
-            border-radius: 11px;
-            background: rgba(255,255,255,.045);
-            color: #5f6b64;
-            font-size: 7px;
-        }
-
-        .workspace-send {
-            width: 39px;
-            height: 39px;
-            display: grid;
-            place-items: center;
-            border-radius: 11px;
-            background: var(--green-2);
-            color: #082016;
-        }
-
-        .workspace-send svg {
-            width: 13px;
-        }
-
-        .crm-panel {
-            border-left: 1px solid rgba(255,255,255,.07);
-        }
-
-        .crm-body {
-            padding: 16px;
-        }
-
-        .crm-customer {
-            padding: 15px;
-            border-radius: 14px;
-            background: rgba(255,255,255,.035);
-        }
-
-        .crm-name {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .crm-name .contact-avatar {
-            width: 40px;
-            height: 40px;
-        }
-
-        .crm-name strong {
-            display: block;
-            font-size: 10px;
-        }
-
-        .crm-name span {
-            display: block;
-            margin-top: 3px;
-            color: #66716b;
-            font-size: 7px;
-        }
-
-        .crm-row {
-            margin-top: 12px;
-            padding-top: 12px;
             border-top: 1px solid rgba(255,255,255,.05);
         }
 
-        .crm-row label {
-            display: block;
-            color: #59665e;
+        .main-input {
+            flex: 1;
+            height: 39px;
+            padding: 0 12px;
+
+            display: flex;
+            align-items: center;
+
+            border-radius: 10px;
+            background: rgba(255,255,255,.035);
+
+            color: #46534a;
             font-size: 6px;
-            text-transform: uppercase;
-            letter-spacing: .8px;
         }
 
-        .crm-row strong {
+        .main-send {
+            width: 39px;
+            height: 39px;
+
+            display: grid;
+            place-items: center;
+
+            border-radius: 10px;
+            background: var(--green);
+            color: #05150a;
+        }
+
+        .main-send svg {
+            width: 13px;
+        }
+
+        .customer-panel {
+            border-left: 1px solid rgba(255,255,255,.055);
+        }
+
+        .customer-body {
+            padding: 15px;
+        }
+
+        .customer-card {
+            padding: 14px;
+            border-radius: 13px;
+            border: 1px solid rgba(255,255,255,.05);
+            background: rgba(255,255,255,.02);
+        }
+
+        .customer-name {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .customer-name strong {
             display: block;
-            margin-top: 5px;
-            color: #ced5d0;
             font-size: 8px;
         }
 
-        .crm-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            margin-top: 7px;
+        .customer-name span {
+            display: block;
+            margin-top: 3px;
+            color: #526057;
+            font-size: 5px;
         }
 
-        .crm-tag {
-            padding: 5px 7px;
-            border-radius: 6px;
-            font-size: 6px;
+        .customer-field {
+            margin-top: 12px;
+            padding-top: 11px;
+            border-top: 1px solid rgba(255,255,255,.045);
+        }
+
+        .customer-field label {
+            color: #465249;
+            font-size: 5px;
+            text-transform: uppercase;
+            letter-spacing: .7px;
+        }
+
+        .customer-field strong {
+            display: block;
+            margin-top: 5px;
+            color: #9ea9a1;
+            font-size: 7px;
+        }
+
+        .customer-tags {
+            display: flex;
+            gap: 5px;
+            margin-top: 6px;
+        }
+
+        .customer-tag {
+            padding: 4px 6px;
+            border-radius: 5px;
+            font-size: 5px;
             font-weight: 800;
         }
 
-        .crm-tag.hot {
-            color: #ffbe62;
-            background: rgba(255,190,98,.10);
+        .customer-tag.hot {
+            color: #ffd278;
+            background: rgba(255,200,80,.08);
         }
 
-        .crm-tag.new {
-            color: #6deaa9;
-            background: rgba(81,242,155,.10);
+        .customer-tag.new {
+            color: #8dffb9;
+            background: rgba(92,255,157,.08);
         }
 
-        .takeover {
-            margin-top: 14px;
+        .human-control {
+            margin-top: 12px;
             padding: 13px;
-            border-radius: 13px;
+
+            border-radius: 12px;
+            border: 1px solid rgba(92,255,157,.07);
+
             background:
-                linear-gradient(145deg, rgba(81,242,155,.08), rgba(81,242,155,.02));
-            border: 1px solid rgba(81,242,155,.08);
+                linear-gradient(
+                    145deg,
+                    rgba(92,255,157,.055),
+                    rgba(92,255,157,.012)
+                );
         }
 
-        .takeover strong {
-            font-size: 8px;
+        .human-control strong {
+            font-size: 7px;
         }
 
-        .takeover p {
+        .human-control p {
             margin-top: 5px;
-            color: #617068;
-            font-size: 6px;
+            color: #526057;
+            font-size: 5px;
             line-height: 1.5;
         }
 
-        .takeover-button {
-            margin-top: 10px;
+        .human-button {
             height: 30px;
-            border-radius: 8px;
+            margin-top: 9px;
+
             display: grid;
             place-items: center;
-            background: var(--green-2);
-            color: #082016;
-            font-size: 7px;
+
+            border-radius: 8px;
+
+            background: var(--green);
+            color: #051309;
+
+            font-size: 6px;
             font-weight: 800;
         }
 
-        /* =========================================================
+        /* ============================================================
            BENTO
-        ========================================================= */
+        ============================================================ */
 
         .bento-section {
             padding: 130px 0;
@@ -1714,219 +1890,212 @@
         .bento-header {
             display: flex;
             justify-content: space-between;
-            gap: 70px;
             align-items: end;
-            margin-bottom: 56px;
+            gap: 70px;
+            margin-bottom: 55px;
         }
 
-        .bento-header .section-description {
+        .bento-header .section-copy {
             max-width: 430px;
-            margin: 0;
+            margin-top: 0;
         }
 
-        .bento-grid {
+        .bento {
             display: grid;
-            grid-template-columns: 1.15fr .85fr;
-            grid-template-rows: 380px 330px;
-            gap: 18px;
+            grid-template-columns: 1.1fr .9fr;
+            grid-template-rows: 390px 350px;
+            gap: 16px;
         }
 
         .bento-card {
             position: relative;
             overflow: hidden;
-            padding: 32px;
+            padding: 31px;
+
             border-radius: 28px;
-            border: 1px solid rgba(12, 30, 19, .075);
-            background: white;
-            box-shadow: 0 20px 60px rgba(6, 24, 14, .045);
+            border: 1px solid var(--line);
+
+            background:
+                linear-gradient(145deg, #0d140f, #080d09);
+
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,.01);
         }
 
-        .bento-card.dark {
-            color: white;
+        .bento-card.featured {
             background:
-                radial-gradient(circle at 85% 15%, rgba(81,242,155,.13), transparent 26%),
-                #0a0f0c;
-            border-color: rgba(255,255,255,.06);
+                radial-gradient(circle at 90% 10%, rgba(92,255,157,.12), transparent 30%),
+                linear-gradient(145deg, #0d1710, #08100a);
+            border-color: rgba(92,255,157,.10);
         }
 
-        .bento-card.green {
-            background:
-                linear-gradient(145deg, #d8ffe8, #effff5);
+        .bento-mini {
+            color: var(--green);
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.3px;
         }
 
         .bento-card h3 {
-            max-width: 480px;
+            max-width: 510px;
+            margin-top: 12px;
+
             font-family: 'Manrope', sans-serif;
             font-size: 28px;
-            line-height: 1.07;
-            letter-spacing: -1.4px;
+            line-height: 1.06;
+            letter-spacing: -1.5px;
         }
 
         .bento-card p {
             max-width: 470px;
-            margin-top: 12px;
-            color: #6d7871;
-            font-size: 14px;
+            margin-top: 11px;
+
+            color: #748078;
+            font-size: 13px;
             line-height: 1.65;
         }
 
-        .bento-card.dark p {
-            color: #8d9991;
-        }
-
-        .mini-label {
-            display: inline-flex;
-            align-items: center;
-            gap: 7px;
-            margin-bottom: 14px;
-            color: #138d57;
-            font-size: 9px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-        }
-
-        .bento-card.dark .mini-label {
-            color: var(--green);
-        }
-
-        .mini-label::before {
-            content: "";
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: currentColor;
-        }
-
-        .automation-flow {
+        .flow {
             position: absolute;
-            left: 32px;
-            right: 32px;
-            bottom: 30px;
-            display: flex;
+            left: 31px;
+            right: 31px;
+            bottom: 27px;
+
+            display: grid;
+            grid-template-columns: 1fr 25px 1fr 25px 1fr;
+            gap: 7px;
             align-items: center;
-            gap: 10px;
         }
 
-        .flow-node {
-            flex: 1;
+        .flow-box {
             min-height: 84px;
             padding: 12px;
-            border-radius: 15px;
-            background: rgba(255,255,255,.72);
-            border: 1px solid rgba(11, 29, 18, .07);
+
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,.055);
+
+            background: rgba(255,255,255,.025);
         }
 
-        .flow-node strong {
+        .flow-box strong {
             display: block;
-            font-size: 10px;
+            font-size: 9px;
         }
 
-        .flow-node span {
+        .flow-box span {
             display: block;
             margin-top: 5px;
-            color: #768179;
-            font-size: 8px;
-            line-height: 1.45;
+            color: #56635a;
+            font-size: 6px;
+            line-height: 1.5;
         }
 
         .flow-arrow {
-            width: 22px;
-            flex-shrink: 0;
-            color: #65aa83;
+            color: #356948;
         }
 
-        .human-demo {
+        .flow-arrow svg {
+            width: 20px;
+        }
+
+        .control-demo {
             position: absolute;
-            left: 32px;
-            right: 32px;
+            left: 31px;
+            right: 31px;
             bottom: 28px;
 
             display: grid;
-            grid-template-columns: 1fr 90px 1fr;
-            gap: 12px;
+            grid-template-columns: 1fr 82px 1fr;
+            gap: 10px;
             align-items: center;
         }
 
-        .human-side {
-            padding: 14px;
-            border-radius: 16px;
-            background: rgba(255,255,255,.055);
-            border: 1px solid rgba(255,255,255,.06);
+        .control-side {
+            min-height: 70px;
+            padding: 12px;
+
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,.05);
+            background: rgba(255,255,255,.025);
         }
 
-        .human-side span {
-            display: block;
-            color: #69766e;
-            font-size: 7px;
+        .control-side span {
+            color: #4f5b53;
+            font-size: 5px;
         }
 
-        .human-side strong {
+        .control-side strong {
             display: block;
             margin-top: 4px;
-            font-size: 10px;
+            font-size: 8px;
         }
 
-        .switcher {
-            height: 38px;
+        .toggle {
+            height: 37px;
             padding: 4px;
-            border-radius: 999px;
-            background: rgba(255,255,255,.055);
+
             display: flex;
-            align-items: center;
             justify-content: flex-end;
+            align-items: center;
+
+            border-radius: 999px;
+            background: rgba(92,255,157,.08);
         }
 
-        .switch-knob {
-            width: 30px;
-            height: 30px;
+        .toggle-knob {
+            width: 29px;
+            height: 29px;
+
             border-radius: 50%;
+
             background: var(--green);
-            box-shadow: 0 4px 15px rgba(81,242,155,.25);
+
+            box-shadow: 0 0 20px rgba(92,255,157,.22);
         }
 
-        .memory-items {
+        .memory-grid {
             position: absolute;
-            left: 32px;
-            right: 32px;
-            bottom: 26px;
+            left: 31px;
+            right: 31px;
+            bottom: 28px;
+
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 9px;
+            grid-template-columns: repeat(2,1fr);
+            gap: 8px;
         }
 
-        .memory-item {
-            min-height: 57px;
+        .memory-box {
+            min-height: 58px;
             padding: 11px;
-            border-radius: 13px;
-            background: rgba(255,255,255,.72);
-            border: 1px solid rgba(10, 25, 16, .06);
+
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.045);
+
+            background: rgba(255,255,255,.022);
         }
 
-        .memory-item label {
-            display: block;
-            color: #789084;
-            font-size: 7px;
+        .memory-box label {
+            color: #4d5a51;
+            font-size: 5px;
         }
 
-        .memory-item strong {
+        .memory-box strong {
             display: block;
             margin-top: 5px;
-            font-size: 9px;
-        }
-
-        .followup-demo {
-            position: absolute;
-            left: 32px;
-            right: 32px;
-            bottom: 28px;
+            color: #a4b0a7;
+            font-size: 8px;
         }
 
         .timeline {
-            position: relative;
+            position: absolute;
+            left: 31px;
+            right: 31px;
+            bottom: 33px;
+
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 9px;
+            grid-template-columns: repeat(4,1fr);
+            gap: 8px;
         }
 
         .timeline::before {
@@ -1934,172 +2103,178 @@
             position: absolute;
             left: 10%;
             right: 10%;
-            top: 17px;
+            top: 18px;
             height: 1px;
-            background: rgba(255,255,255,.10);
+            background: rgba(255,255,255,.06);
         }
 
-        .time-step {
+        .timeline-step {
             position: relative;
             z-index: 2;
             text-align: center;
         }
 
-        .time-dot {
-            width: 34px;
-            height: 34px;
+        .timeline-dot {
+            width: 37px;
+            height: 37px;
             margin: 0 auto;
-            border-radius: 50%;
+
             display: grid;
             place-items: center;
-            background: #162019;
-            border: 1px solid rgba(255,255,255,.07);
-            color: #647068;
-            font-size: 8px;
+
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,.06);
+
+            background: #101712;
+            color: #536057;
+
+            font-size: 7px;
             font-weight: 800;
         }
 
-        .time-step.active .time-dot {
+        .timeline-step.active .timeline-dot {
+            color: #041208;
             background: var(--green);
-            color: #061a10;
             border-color: transparent;
+
+            box-shadow: 0 0 25px rgba(92,255,157,.15);
         }
 
-        .time-step strong {
+        .timeline-step strong {
             display: block;
-            margin-top: 9px;
-            font-size: 8px;
+            margin-top: 8px;
+            font-size: 7px;
         }
 
-        .time-step span {
+        .timeline-step span {
             display: block;
             margin-top: 3px;
-            color: #5e6962;
-            font-size: 6px;
+            color: #465249;
+            font-size: 5px;
         }
 
-        /* =========================================================
+        /* ============================================================
            STEPS
-        ========================================================= */
+        ============================================================ */
 
         .steps-section {
             padding: 130px 0;
-            background: white;
+            background: #070b08;
         }
 
         .steps-intro {
             text-align: center;
         }
 
-        .steps-intro .eyebrow {
+        .steps-intro .section-tag {
             justify-content: center;
         }
 
-        .steps-intro .section-heading {
-            margin: 0 auto;
-            max-width: 850px;
-        }
-
-        .steps-intro .section-description {
+        .steps-intro .section-title,
+        .steps-intro .section-copy {
             margin-left: auto;
             margin-right: auto;
         }
 
         .steps-grid {
-            margin-top: 70px;
+            margin-top: 64px;
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 18px;
+            grid-template-columns: repeat(3,1fr);
+            gap: 15px;
         }
 
-        .step-card {
+        .step {
             position: relative;
             min-height: 420px;
             overflow: hidden;
-            padding: 28px;
+            padding: 27px;
 
-            border-radius: 28px;
-            border: 1px solid rgba(12, 30, 19, .075);
+            border-radius: 27px;
+            border: 1px solid var(--line);
 
             background:
-                linear-gradient(180deg, #fafcfa, #f3f7f4);
+                linear-gradient(160deg, #0d140f, #080d09);
         }
 
-        .step-number {
-            width: 44px;
-            height: 44px;
+        .step-no {
+            width: 43px;
+            height: 43px;
+
             display: grid;
             place-items: center;
 
-            border-radius: 14px;
-            background: var(--black);
+            border-radius: 13px;
+
             color: var(--green);
+            background: rgba(92,255,157,.07);
+            border: 1px solid rgba(92,255,157,.08);
 
             font-family: 'Manrope', sans-serif;
-            font-size: 12px;
+            font-size: 10px;
             font-weight: 800;
         }
 
-        .step-card h3 {
-            margin-top: 28px;
+        .step h3 {
+            margin-top: 27px;
+
             font-family: 'Manrope', sans-serif;
-            font-size: 25px;
-            line-height: 1.1;
+            font-size: 24px;
+            line-height: 1.08;
             letter-spacing: -1.2px;
         }
 
-        .step-card p {
-            margin-top: 12px;
-            color: #69746d;
-            font-size: 14px;
+        .step p {
+            margin-top: 11px;
+            color: #6f7b73;
+            font-size: 12px;
             line-height: 1.65;
         }
 
         .step-visual {
             position: absolute;
-            left: 28px;
-            right: 28px;
+            left: 27px;
+            right: 27px;
             bottom: 25px;
-            height: 140px;
+            height: 142px;
         }
 
-        .qr-shell {
+        .qr-area {
             height: 100%;
+            padding: 17px;
+
             display: flex;
             align-items: center;
-            gap: 18px;
-            padding: 18px;
-            border-radius: 19px;
-            background: white;
-            border: 1px solid rgba(10, 28, 17, .07);
+            gap: 17px;
+
+            border-radius: 17px;
+            border: 1px solid rgba(255,255,255,.05);
+            background: rgba(255,255,255,.022);
         }
 
-        .qr-code {
-            width: 86px;
-            height: 86px;
+        .qr {
+            width: 85px;
+            height: 85px;
             flex-shrink: 0;
-            padding: 8px;
-            border-radius: 13px;
+            border-radius: 12px;
+
             background:
-                repeating-linear-gradient(
-                    45deg,
-                    #0a110d 0 4px,
-                    white 4px 8px
-                );
-            box-shadow: inset 0 0 0 7px white;
+                linear-gradient(90deg,#d9ffe8 8px,transparent 8px) 0 0/20px 20px,
+                linear-gradient(#d9ffe8 8px,transparent 8px) 0 0/20px 20px,
+                #0b130e;
+
+            border: 8px solid #e7fff0;
         }
 
-        .qr-copy strong {
-            display: block;
-            font-size: 11px;
+        .qr-text strong {
+            font-size: 9px;
         }
 
-        .qr-copy span {
+        .qr-text span {
             display: block;
             margin-top: 5px;
-            color: #7e8982;
-            font-size: 8px;
-            line-height: 1.45;
+            color: #536057;
+            font-size: 6px;
+            line-height: 1.5;
         }
 
         .knowledge-list {
@@ -2110,245 +2285,270 @@
 
         .knowledge {
             height: 37px;
-            padding: 0 11px;
+            padding: 0 10px;
+
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-radius: 11px;
-            background: white;
-            border: 1px solid rgba(10, 28, 17, .06);
-            font-size: 8px;
+
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.045);
+
+            background: rgba(255,255,255,.022);
+
+            color: #89958d;
+            font-size: 7px;
             font-weight: 700;
         }
 
         .knowledge-check {
             width: 18px;
             height: 18px;
+
             display: grid;
             place-items: center;
+
             border-radius: 6px;
-            background: #e7f9ee;
-            color: #0ab868;
+
+            background: rgba(92,255,157,.08);
+            color: var(--green);
         }
 
         .knowledge-check svg {
-            width: 10px;
+            width: 9px;
         }
 
-        .go-live {
+        .ready-box {
             height: 100%;
+            padding: 20px;
+
             display: flex;
             flex-direction: column;
             justify-content: center;
-            padding: 20px;
-            border-radius: 19px;
-            background: #0b100d;
-            color: white;
+
+            border-radius: 17px;
+            border: 1px solid rgba(92,255,157,.08);
+
+            background:
+                radial-gradient(circle at 90% 10%, rgba(92,255,157,.12), transparent 32%),
+                #09100b;
         }
 
-        .live-line {
+        .ready-status {
             display: flex;
             align-items: center;
             gap: 10px;
         }
 
-        .live-orb {
+        .ready-orb {
             width: 34px;
             height: 34px;
-            border-radius: 50%;
+
             display: grid;
             place-items: center;
-            background: rgba(81,242,155,.12);
-        }
 
-        .live-orb::after {
-            content: "";
-            width: 8px;
-            height: 8px;
             border-radius: 50%;
+            background: rgba(92,255,157,.075);
+        }
+
+        .ready-orb::after {
+            content: "";
+            width: 7px;
+            height: 7px;
+
+            border-radius: 50%;
+
             background: var(--green);
-            box-shadow: 0 0 18px var(--green);
+
+            box-shadow: 0 0 18px rgba(92,255,157,.75);
         }
 
-        .live-line strong {
-            font-size: 11px;
+        .ready-status strong {
+            font-size: 9px;
         }
 
-        .go-live p {
-            margin-top: 12px;
-            color: #76837b;
-            font-size: 8px;
+        .ready-box p {
+            margin-top: 10px;
+            color: #536057;
+            font-size: 6px;
         }
 
-        /* =========================================================
-           USE CASES
-        ========================================================= */
+        /* ============================================================
+           SECTORS
+        ============================================================ */
 
-        .usecases-section {
+        .sectors-section {
             padding: 130px 0;
         }
 
-        .usecases-shell {
-            overflow: hidden;
-            border-radius: 38px;
-            padding: 65px;
+        .sector-shell {
+            padding: 60px;
+
+            border-radius: 36px;
+            border: 1px solid rgba(92,255,157,.07);
+
             background:
-                radial-gradient(circle at 100% 0%, rgba(81,242,155,.14), transparent 30%),
-                var(--black);
-            color: white;
+                radial-gradient(circle at 100% 0%, rgba(92,255,157,.09), transparent 29%),
+                linear-gradient(150deg, #0a110c, #070b08);
         }
 
-        .usecases-top {
+        .sector-top {
             display: grid;
             grid-template-columns: 1.1fr .9fr;
-            gap: 55px;
+            gap: 60px;
             align-items: end;
         }
 
-        .usecases-shell .eyebrow {
-            color: var(--green);
-        }
-
-        .usecases-description {
-            max-width: 480px;
+        .sector-copy {
+            max-width: 500px;
             justify-self: end;
-            color: #96a29b;
-            font-size: 16px;
-            line-height: 1.7;
+            color: #78857c;
+            font-size: 15px;
+            line-height: 1.72;
         }
 
-        .usecase-grid {
-            margin-top: 55px;
+        .sector-grid {
+            margin-top: 50px;
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
+            grid-template-columns: repeat(4,1fr);
+            gap: 9px;
         }
 
-        .usecase {
-            min-height: 220px;
-            padding: 21px;
-            border-radius: 20px;
-            background: rgba(255,255,255,.04);
-            border: 1px solid rgba(255,255,255,.055);
+        .sector {
+            min-height: 205px;
+            padding: 20px;
+
+            border-radius: 19px;
+            border: 1px solid rgba(255,255,255,.05);
+
+            background: rgba(255,255,255,.02);
+
             transition: .25s ease;
         }
 
-        .usecase:hover {
-            background: rgba(81,242,155,.06);
-            transform: translateY(-4px);
+        .sector:hover {
+            transform: translateY(-5px);
+            border-color: rgba(92,255,157,.10);
+            background: rgba(92,255,157,.035);
         }
 
-        .usecase-icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 13px;
+        .sector-icon {
+            width: 41px;
+            height: 41px;
+
             display: grid;
             place-items: center;
-            background: rgba(81,242,155,.09);
+
+            border-radius: 12px;
+
             color: var(--green);
+            background: rgba(92,255,157,.07);
         }
 
-        .usecase-icon svg {
-            width: 19px;
+        .sector-icon svg {
+            width: 18px;
         }
 
-        .usecase h3 {
-            margin-top: 35px;
+        .sector h3 {
+            margin-top: 31px;
             font-family: 'Manrope', sans-serif;
-            font-size: 18px;
+            font-size: 17px;
             letter-spacing: -.6px;
         }
 
-        .usecase p {
-            margin-top: 9px;
-            color: #79867e;
-            font-size: 11px;
+        .sector p {
+            margin-top: 8px;
+
+            color: #5e6a62;
+            font-size: 10px;
             line-height: 1.65;
         }
 
-        /* =========================================================
+        /* ============================================================
            STATS
-        ========================================================= */
+        ============================================================ */
 
-        .numbers {
-            padding: 115px 0;
+        .stats {
+            padding: 110px 0;
         }
 
-        .numbers-grid {
+        .stats-grid {
             display: grid;
-            grid-template-columns: 1.2fr repeat(3, .8fr);
+            grid-template-columns: 1.1fr repeat(3,.9fr);
             border-top: 1px solid var(--line);
             border-bottom: 1px solid var(--line);
         }
 
-        .number-intro,
+        .stat-intro,
         .stat {
-            padding: 42px 30px;
+            padding: 41px 29px;
             border-right: 1px solid var(--line);
+        }
+
+        .stat-intro {
+            padding-left: 0;
         }
 
         .stat:last-child {
             border-right: 0;
         }
 
-        .number-intro {
-            padding-left: 0;
-        }
-
-        .number-intro strong {
+        .stat-intro strong {
+            max-width: 300px;
             display: block;
-            max-width: 280px;
+
             font-family: 'Manrope', sans-serif;
-            font-size: 24px;
+            font-size: 22px;
             line-height: 1.15;
             letter-spacing: -1px;
         }
 
-        .number-intro span {
+        .stat-intro span {
             display: block;
             margin-top: 10px;
-            color: #808b84;
-            font-size: 12px;
+            color: #626f66;
+            font-size: 10px;
         }
 
         .stat strong {
             display: block;
+
             font-family: 'Manrope', sans-serif;
-            font-size: 46px;
+            font-size: 44px;
             line-height: 1;
-            letter-spacing: -2.5px;
+            letter-spacing: -2.2px;
+        }
+
+        .stat strong .green {
+            color: var(--green);
         }
 
         .stat span {
             display: block;
             margin-top: 10px;
-            color: #7e8982;
-            font-size: 11px;
-            line-height: 1.4;
+            color: #657169;
+            font-size: 10px;
+            line-height: 1.5;
         }
 
-        /* =========================================================
+        /* ============================================================
            FAQ
-        ========================================================= */
+        ============================================================ */
 
         .faq-section {
-            padding: 110px 0 135px;
+            padding: 110px 0 130px;
         }
 
         .faq-grid {
             display: grid;
-            grid-template-columns: .75fr 1.25fr;
-            gap: 80px;
-            align-items: start;
+            grid-template-columns: .8fr 1.2fr;
+            gap: 85px;
         }
 
-        .faq-copy {
+        .faq-intro {
             position: sticky;
             top: 130px;
-        }
-
-        .faq-copy .section-heading {
-            font-size: clamp(40px, 4vw, 58px);
+            align-self: start;
         }
 
         .faq-list {
@@ -2362,54 +2562,66 @@
         .faq-question {
             width: 100%;
             min-height: 82px;
-            padding: 0;
-            border: 0;
-            background: transparent;
-            color: var(--text);
 
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 30px;
+            gap: 25px;
 
+            border: 0;
+            background: transparent;
+
+            color: white;
             text-align: left;
             cursor: pointer;
         }
 
-        .faq-question span:first-child {
+        .faq-question strong {
             font-family: 'Manrope', sans-serif;
-            font-size: 18px;
-            font-weight: 700;
-            letter-spacing: -.5px;
+            font-size: 17px;
+            letter-spacing: -.45px;
         }
 
-        .faq-plus {
+        .faq-icon {
             position: relative;
             width: 32px;
             height: 32px;
             flex-shrink: 0;
-            border-radius: 10px;
-            background: #e9eeea;
+
+            border-radius: 9px;
+
+            background: rgba(255,255,255,.035);
         }
 
-        .faq-plus::before,
-        .faq-plus::after {
+        .faq-icon::before,
+        .faq-icon::after {
             content: "";
             position: absolute;
-            width: 12px;
-            height: 2px;
-            left: 10px;
+            width: 11px;
+            height: 1.5px;
+            left: 10.5px;
             top: 15px;
-            border-radius: 2px;
-            background: #49534d;
+
+            border-radius: 999px;
+            background: #88958c;
+
             transition: .25s ease;
         }
 
-        .faq-plus::after {
+        .faq-icon::after {
             transform: rotate(90deg);
         }
 
-        .faq-item.open .faq-plus::after {
+        .faq-item.open .faq-icon {
+            background: rgba(92,255,157,.07);
+        }
+
+        .faq-item.open .faq-icon::before,
+        .faq-item.open .faq-icon::after {
+            background: var(--green);
+        }
+
+        .faq-item.open .faq-icon::after {
             transform: rotate(0);
         }
 
@@ -2421,205 +2633,204 @@
 
         .faq-answer-inner {
             max-width: 700px;
-            padding: 0 50px 26px 0;
-            color: #68736c;
-            font-size: 14px;
-            line-height: 1.7;
+            padding: 0 45px 26px 0;
+
+            color: #6e7a71;
+            font-size: 13px;
+            line-height: 1.72;
         }
 
-        /* =========================================================
-           CTA
-        ========================================================= */
+        /* ============================================================
+           FINAL CTA
+        ============================================================ */
 
-        .final-cta {
-            padding: 30px 0 70px;
+        .final-section {
+            padding: 25px 0 65px;
         }
 
-        .cta-shell {
+        .final-card {
             position: relative;
-            overflow: hidden;
-            min-height: 580px;
-            padding: 75px 60px;
+            min-height: 620px;
+            padding: 65px 40px;
 
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
 
+            overflow: hidden;
+
             border-radius: 42px;
+            border: 1px solid rgba(92,255,157,.09);
+
             text-align: center;
-            color: white;
 
             background:
-                radial-gradient(circle at 50% 100%, rgba(81,242,155,.30), transparent 34%),
-                radial-gradient(circle at 0% 0%, rgba(81,242,155,.11), transparent 25%),
-                #080c0a;
+                radial-gradient(circle at 50% 110%, rgba(92,255,157,.23), transparent 33%),
+                radial-gradient(circle at 0 0, rgba(92,255,157,.06), transparent 25%),
+                #070c08;
         }
 
-        .cta-shell::before {
+        .final-card::before,
+        .final-card::after {
             content: "";
             position: absolute;
-            width: 720px;
-            height: 720px;
             left: 50%;
-            top: 74%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
             border-radius: 50%;
-            border: 1px solid rgba(81,242,155,.12);
-            box-shadow:
-                0 0 0 70px rgba(81,242,155,.025),
-                0 0 0 150px rgba(81,242,155,.018);
+            border: 1px solid rgba(92,255,157,.07);
         }
 
-        .cta-content {
+        .final-card::before {
+            width: 650px;
+            height: 650px;
+            bottom: -410px;
+        }
+
+        .final-card::after {
+            width: 870px;
+            height: 870px;
+            bottom: -560px;
+        }
+
+        .final-content {
             position: relative;
             z-index: 2;
         }
 
-        .cta-mini {
+        .final-kicker {
             display: inline-flex;
             align-items: center;
             gap: 8px;
             margin-bottom: 23px;
+
             color: var(--green);
+
             font-size: 10px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 1.5px;
         }
 
-        .cta-mini::before {
+        .final-kicker::before {
             content: "";
             width: 7px;
             height: 7px;
             border-radius: 50%;
             background: var(--green);
-            box-shadow: 0 0 18px rgba(81,242,155,.7);
+            box-shadow: 0 0 17px rgba(92,255,157,.7);
         }
 
-        .cta-shell h2 {
-            max-width: 920px;
+        .final-card h2 {
+            max-width: 950px;
+
             font-family: 'Manrope', sans-serif;
-            font-size: clamp(50px, 7vw, 92px);
-            line-height: .92;
-            letter-spacing: -5.5px;
+            font-size: clamp(52px, 7.3vw, 96px);
+            line-height: .91;
             font-weight: 800;
+            letter-spacing: -6px;
         }
 
-        .cta-shell h2 span {
+        .final-card h2 span {
             color: var(--green);
         }
 
-        .cta-shell p {
-            max-width: 590px;
+        .final-card p {
+            max-width: 600px;
             margin: 25px auto 0;
-            color: #95a199;
-            font-size: 16px;
-            line-height: 1.7;
+
+            color: #829087;
+
+            font-size: 15px;
+            line-height: 1.72;
         }
 
-        .cta-buttons {
-            margin-top: 32px;
+        .final-actions {
             display: flex;
             justify-content: center;
             gap: 10px;
+            margin-top: 31px;
         }
 
-        .cta-shell .button-primary {
-            background: var(--green);
-            color: #07150d;
-            box-shadow: 0 18px 45px rgba(81,242,155,.17);
-        }
-
-        .cta-shell .button-primary .arrow {
-            background: rgba(7, 20, 12, .10);
-        }
-
-        .cta-shell .button-secondary {
-            border-color: rgba(255,255,255,.10);
-            background: rgba(255,255,255,.05);
-            color: white;
-        }
-
-        .cta-shell .button-secondary:hover {
-            background: rgba(255,255,255,.09);
-        }
-
-        /* =========================================================
+        /* ============================================================
            FOOTER
-        ========================================================= */
+        ============================================================ */
 
         footer {
-            padding: 0 0 35px;
+            padding-bottom: 35px;
         }
 
         .footer-top {
+            padding: 55px 0 48px;
+
             display: grid;
-            grid-template-columns: 1.4fr .6fr .6fr .6fr;
+            grid-template-columns: 1.35fr .65fr .65fr .65fr;
             gap: 60px;
-            padding: 55px 0 50px;
+
             border-bottom: 1px solid var(--line);
         }
 
         .footer-brand p {
             max-width: 340px;
-            margin-top: 17px;
-            color: #758079;
-            font-size: 13px;
+            margin-top: 16px;
+
+            color: #657169;
+
+            font-size: 11px;
             line-height: 1.7;
         }
 
-        .footer-column strong {
+        .footer-col strong {
             display: block;
-            margin-bottom: 16px;
-            font-size: 11px;
+            margin-bottom: 15px;
+
+            color: #a6b0a9;
+
+            font-size: 9px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.1px;
         }
 
-        .footer-column a {
+        .footer-col a {
             display: block;
             width: fit-content;
             margin-top: 10px;
-            color: #717c75;
-            font-size: 12px;
+
+            color: #59665d;
+            font-size: 10px;
+
             transition: .2s ease;
         }
 
-        .footer-column a:hover {
-            color: #0d995a;
+        .footer-col a:hover {
+            color: var(--green);
         }
 
         .footer-bottom {
-            padding-top: 25px;
+            padding-top: 23px;
+
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            gap: 20px;
-            color: #8a948e;
-            font-size: 11px;
-        }
-
-        .made-by {
-            display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 20px;
+
+            color: #505d54;
+            font-size: 9px;
         }
 
-        .made-by strong {
-            color: #49534d;
+        .footer-bottom strong {
+            color: #7a877e;
         }
 
-        /* =========================================================
+        /* ============================================================
            REVEAL
-        ========================================================= */
+        ============================================================ */
 
         .reveal {
             opacity: 0;
-            transform: translateY(24px);
+            transform: translateY(28px);
             transition:
-                opacity .7s ease,
-                transform .7s ease;
+                opacity .72s ease,
+                transform .72s cubic-bezier(.2,.7,.2,1);
         }
 
         .reveal.visible {
@@ -2627,17 +2838,18 @@
             transform: translateY(0);
         }
 
-        /* =========================================================
-           MOBILE
-        ========================================================= */
+        /* ============================================================
+           TABLET
+        ============================================================ */
 
         @media (max-width: 1080px) {
+
             .nav-links {
                 display: none;
             }
 
-            .mobile-menu-button {
-                display: flex;
+            .menu-button {
+                display: block;
             }
 
             .hero-grid {
@@ -2645,6 +2857,8 @@
             }
 
             .hero-copy {
+                max-width: 850px;
+                margin: 0 auto;
                 text-align: center;
             }
 
@@ -2653,11 +2867,8 @@
                 margin-right: auto;
             }
 
-            .hero-actions {
-                justify-content: center;
-            }
-
-            .hero-meta {
+            .hero-actions,
+            .hero-trust {
                 justify-content: center;
             }
 
@@ -2665,56 +2876,57 @@
                 margin-top: 20px;
             }
 
-            .manifesto-grid {
+            .manifesto-grid,
+            .faq-grid {
                 grid-template-columns: 1fr;
-                gap: 35px;
+                gap: 45px;
             }
 
-            .sticky-copy,
-            .faq-copy {
+            .manifesto-copy,
+            .faq-intro {
                 position: static;
             }
 
-            .product-header,
-            .usecases-top {
+            .command-header,
+            .sector-top {
                 grid-template-columns: 1fr;
             }
 
-            .product-copy,
-            .usecases-description {
+            .command-description,
+            .sector-copy {
                 justify-self: start;
             }
 
-            .workspace-main {
+            .command-grid {
                 grid-template-columns: 200px 1fr;
             }
 
-            .crm-panel {
+            .customer-panel {
                 display: none;
             }
 
-            .bento-grid {
+            .bento {
                 grid-template-columns: 1fr;
-                grid-template-rows: repeat(4, 360px);
+                grid-template-rows: repeat(4, 365px);
             }
 
             .steps-grid {
                 grid-template-columns: 1fr;
             }
 
-            .step-card {
-                min-height: 360px;
+            .step {
+                min-height: 365px;
             }
 
-            .usecase-grid {
-                grid-template-columns: repeat(2, 1fr);
+            .sector-grid {
+                grid-template-columns: repeat(2,1fr);
             }
 
-            .numbers-grid {
-                grid-template-columns: 1fr 1fr;
+            .stats-grid {
+                grid-template-columns: repeat(2,1fr);
             }
 
-            .number-intro,
+            .stat-intro,
             .stat {
                 border-bottom: 1px solid var(--line);
             }
@@ -2723,109 +2935,118 @@
                 border-right: 0;
             }
 
-            .faq-grid {
-                grid-template-columns: 1fr;
-                gap: 40px;
-            }
-
             .footer-top {
                 grid-template-columns: 1fr 1fr;
             }
 
-            .mobile-nav {
+            .mobile-menu {
                 position: fixed;
-                z-index: 998;
+                z-index: 999;
+                top: 87px;
                 left: 20px;
                 right: 20px;
-                top: 88px;
 
                 display: block;
-                padding: 13px;
-
-                border-radius: 20px;
-                background: rgba(250,252,250,.97);
-
-                border: 1px solid rgba(255,255,255,.9);
-                box-shadow: 0 25px 70px rgba(8, 24, 15, .15);
-
-                backdrop-filter: blur(20px);
+                padding: 12px;
 
                 opacity: 0;
                 visibility: hidden;
-                transform: translateY(-12px);
-                transition: .25s ease;
+                transform: translateY(-10px);
+
+                border: 1px solid rgba(255,255,255,.08);
+                border-radius: 19px;
+
+                background: rgba(9,14,10,.96);
+
+                backdrop-filter: blur(22px);
+
+                box-shadow: 0 30px 80px rgba(0,0,0,.45);
+
+                transition: .23s ease;
             }
 
-            body.menu-open .mobile-nav {
+            body.menu-open .mobile-menu {
                 opacity: 1;
                 visibility: visible;
                 transform: translateY(0);
             }
 
-            .mobile-nav a {
-                min-height: 49px;
-                padding: 0 13px;
+            .mobile-menu a {
+                min-height: 48px;
+                padding: 0 12px;
+
                 display: flex;
                 align-items: center;
-                border-radius: 12px;
-                font-size: 14px;
+
+                border-radius: 11px;
+
+                color: #a6b2a9;
+
+                font-size: 13px;
                 font-weight: 700;
-                color: #3e4942;
             }
 
-            .mobile-nav a:hover {
-                background: #eef3ef;
+            .mobile-menu a:hover {
+                color: white;
+                background: rgba(255,255,255,.04);
             }
 
-            .mobile-nav-actions {
+            .mobile-menu-actions {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
                 gap: 7px;
-                margin-top: 7px;
-                padding-top: 12px;
+
+                margin-top: 8px;
+                padding-top: 11px;
+
                 border-top: 1px solid var(--line);
             }
 
-            .mobile-nav-actions a {
+            .mobile-menu-actions a {
                 justify-content: center;
             }
 
-            .mobile-nav-actions .primary {
-                background: var(--black);
-                color: white;
+            .mobile-menu-actions .primary {
+                color: #06140b;
+                background: var(--green);
             }
         }
 
+        /* ============================================================
+           MOBILE
+        ============================================================ */
+
         @media (max-width: 720px) {
+
             .container {
                 width: min(100% - 24px, var(--container));
             }
 
-            .nav-space {
-                height: 78px;
+            .nav-spacer {
+                height: 76px;
             }
 
-            .nav-shell {
-                padding-top: 9px;
+            .nav-wrap {
+                padding-top: 8px;
             }
 
             .navbar {
                 min-height: 58px;
-                padding: 7px 7px 7px 12px;
+                padding: 7px 7px 7px 11px;
                 border-radius: 17px;
             }
 
-            .brand-symbol {
+            .brand-logo {
                 width: 36px;
                 height: 36px;
                 border-radius: 11px;
             }
 
-            .brand-text {
-                font-size: 19px;
+            .brand-name {
+                font-size: 18px;
             }
 
-            .brand-text small {
+            .brand-name small {
                 display: none;
             }
 
@@ -2833,121 +3054,143 @@
                 display: none;
             }
 
-            .mobile-menu-button {
+            .menu-button {
                 width: 42px;
                 height: 42px;
-                border-radius: 11px;
             }
 
-            .mobile-nav {
+            .mobile-menu {
                 left: 12px;
                 right: 12px;
-                top: 76px;
+                top: 75px;
             }
 
             .hero {
-                padding: 50px 0 45px;
+                min-height: auto;
+                padding: 46px 0 40px;
             }
 
-            .hero::before {
-                width: 420px;
-                height: 420px;
-                top: -140px;
-                right: -240px;
+            .hero-light {
+                width: 500px;
+                height: 500px;
+                top: -200px;
             }
 
-            .hero-badge {
+            .hero-ray {
+                width: 600px;
+                height: 600px;
+            }
+
+            .hero-kicker {
                 min-height: 35px;
-                font-size: 10px;
-                margin-bottom: 21px;
+                padding: 0 12px;
+                font-size: 9px;
             }
 
             .hero h1 {
-                font-size: clamp(49px, 15vw, 68px);
+                margin-top: 21px;
+
+                font-size: clamp(49px, 15.5vw, 67px);
+                line-height: .93;
                 letter-spacing: -4px;
             }
 
-            .hero h1 .green {
-                white-space: normal;
-            }
-
             .hero-description {
-                max-width: 520px;
-                margin-top: 23px;
-                font-size: 15px;
-                line-height: 1.67;
+                margin-top: 21px;
+                font-size: 14px;
+                line-height: 1.68;
             }
 
             .hero-actions {
-                flex-direction: column;
                 width: 100%;
-                margin-top: 28px;
+                flex-direction: column;
+                margin-top: 26px;
             }
 
-            .button-primary,
-            .button-secondary {
+            .button-main,
+            .button-ghost {
                 width: 100%;
                 min-height: 57px;
             }
 
-            .hero-meta {
-                flex-wrap: wrap;
-                gap: 8px 13px;
-                font-size: 10px;
+            .hero-trust {
+                gap: 8px 12px;
+                font-size: 8px;
             }
 
             .hero-visual {
-                min-height: 570px;
-                margin-top: 38px;
+                min-height: 520px;
+                margin-top: 43px;
             }
 
-            .visual-orbit {
-                width: 400px;
-                height: 400px;
+            .halo {
+                width: 380px;
+                height: 380px;
             }
 
-            .phone {
-                width: 284px;
-                height: 564px;
-                border-radius: 45px;
+            .dashboard-card {
+                width: 385px;
+                height: 425px;
+
+                transform:
+                    translate(-50%, -50%)
+                    rotateY(-3deg)
+                    rotateX(2deg)
+                    rotateZ(.5deg);
             }
 
-            .phone-screen {
-                border-radius: 37px;
+            .hero-visual:hover .dashboard-card {
+                transform:
+                    translate(-50%, -51%)
+                    rotateY(-1deg);
             }
 
-            .phone-header {
-                height: 79px;
-                padding-top: 25px;
+            .dash-grid {
+                grid-template-columns: 100px 1fr;
             }
 
-            .chat-body {
-                height: calc(100% - 137px);
-                padding-top: 17px;
+            .dash-crm {
+                display: none;
             }
 
-            .chat-bubble {
-                font-size: 9.5px;
+            .dash-sidebar {
+                padding-left: 6px;
+                padding-right: 6px;
             }
 
-            .float-card {
-                padding: 11px;
-                border-radius: 14px;
+            .dash-logo {
+                padding-left: 5px;
+                padding-right: 5px;
             }
 
-            .float-card.status {
-                width: 142px;
-                right: -5px;
-                top: 82px;
+            .dash-nav-label {
+                padding-left: 5px;
             }
 
-            .float-card.lead {
-                width: 154px;
-                left: -5px;
-                bottom: 85px;
+            .dash-nav-item {
+                padding: 0 5px;
+                font-size: 5px;
             }
 
-            .float-card.follow {
+            .dash-message {
+                font-size: 5.5px;
+            }
+
+            .float-panel.lead {
+                width: 145px;
+                top: 46px;
+                right: -2px;
+                padding: 10px;
+            }
+
+            .float-panel.ai {
+                width: 140px;
+                left: -2px;
+                bottom: 60px;
+                padding: 10px;
+            }
+
+            .float-panel.follow {
                 display: none;
             }
 
@@ -2956,193 +3199,172 @@
                 height: 24px;
             }
 
-            .float-title {
+            .float-head strong {
+                font-size: 6px;
+            }
+
+            .float-head span {
+                font-size: 4px;
+            }
+
+            .industry-strip {
+                padding-bottom: 70px;
+            }
+
+            .industry-pill {
+                min-width: 145px;
+                height: 50px;
                 font-size: 9px;
             }
 
-            .float-card p {
-                padding-left: 32px;
-                font-size: 7px;
-            }
-
-            .trust-section {
-                padding-top: 0;
-                padding-bottom: 55px;
-            }
-
-            .trust-shell {
-                padding: 18px 0;
-            }
-
-            .industry {
-                min-width: 145px;
-                height: 51px;
-                font-size: 10px;
-            }
-
-            .section {
+            .manifesto,
+            .bento-section,
+            .steps-section,
+            .sectors-section {
                 padding: 85px 0;
             }
 
-            .section-heading {
-                font-size: 43px;
-                line-height: 1;
-                letter-spacing: -2.8px;
+            .section-title {
+                font-size: 42px;
+                letter-spacing: -2.6px;
             }
 
-            .section-description {
-                margin-top: 18px;
-                font-size: 15px;
-                line-height: 1.65;
+            .section-copy {
+                font-size: 14px;
+                line-height: 1.67;
             }
 
-            .manifesto {
-                padding-top: 85px;
-                padding-bottom: 80px;
+            .manifesto-item {
+                min-height: 118px;
+                padding: 18px 2px;
+                grid-template-columns: 43px 1fr;
             }
 
-            .manifesto-line {
-                min-height: 122px;
-                padding: 20px 5px;
-            }
-
-            .manifesto-number {
-                width: 45px;
-            }
-
-            .manifesto-line h3 {
-                font-size: 30px;
+            .manifesto-item h3 {
+                font-size: 29px;
                 letter-spacing: -1.4px;
             }
 
-            .product-section {
+            .command-section {
                 padding: 85px 0;
             }
 
-            .workspace {
+            .command-board {
                 margin-top: 38px;
-                border-radius: 20px;
+                border-radius: 22px;
             }
 
-            .workspace-top {
-                height: 44px;
+            .command-inner {
+                min-height: 455px;
+                border-radius: 21px;
             }
 
-            .workspace-url {
-                width: 160px;
+            .command-top {
+                height: 46px;
             }
 
-            .workspace-main {
-                grid-template-columns: 110px 1fr;
-                min-height: 420px;
+            .command-url {
+                width: 170px;
             }
 
-            .panel-head,
-            .workspace-chat-head {
-                height: 49px;
-                padding: 0 9px;
+            .command-grid {
+                grid-template-columns: 105px 1fr;
+                min-height: 409px;
             }
 
-            .filters {
-                padding-left: 6px;
-                padding-right: 6px;
+            .panel-title,
+            .main-chat-head {
+                height: 48px;
+                padding: 0 8px;
             }
 
-            .filter {
-                height: 23px;
-                padding: 0 6px;
-                font-size: 5px;
+            .conversation-filters {
+                padding: 7px 5px;
             }
 
-            .contact {
-                padding: 9px 7px;
-                gap: 6px;
+            .conv-filter {
+                height: 22px;
+                padding: 0 5px;
+                font-size: 4px;
             }
 
-            .contact-avatar {
+            .conversation {
+                padding: 8px 6px;
+                gap: 5px;
+            }
+
+            .conversation-avatar {
                 display: none;
             }
 
-            .contact-line strong {
-                font-size: 7px;
+            .conversation-line strong {
+                font-size: 6px;
             }
 
-            .contact-data p {
-                font-size: 5px;
+            .conversation-content p {
+                font-size: 4.5px;
             }
 
-            .contact-tag {
-                font-size: 5px;
+            .main-chat-panel .conversation-avatar {
+                display: grid;
+                width: 27px;
+                height: 27px;
             }
 
-            .workspace-person strong {
-                font-size: 8px;
+            .main-ai-badge {
+                height: 24px;
+                font-size: 4px;
             }
 
-            .workspace-person span {
-                font-size: 5px;
+            .main-messages {
+                padding: 16px 8px;
             }
 
-            .ai-toggle {
-                height: 25px;
-                padding: 0 7px;
-                font-size: 5px;
+            .main-message {
+                max-width: 90%;
+                font-size: 5.4px;
             }
 
-            .workspace-messages {
-                padding: 17px 10px;
-            }
-
-            .workspace-message {
-                max-width: 88%;
-                font-size: 6.5px;
-            }
-
-            .workspace-compose {
-                height: 50px;
+            .main-compose {
+                height: 49px;
                 padding: 7px;
             }
 
-            .workspace-input {
+            .main-input,
+            .main-send {
                 height: 33px;
             }
 
-            .workspace-send {
+            .main-send {
                 width: 33px;
-                height: 33px;
-            }
-
-            .bento-section {
-                padding: 85px 0;
             }
 
             .bento-header {
                 display: block;
-                margin-bottom: 38px;
+                margin-bottom: 37px;
             }
 
-            .bento-header .section-description {
+            .bento-header .section-copy {
                 margin-top: 18px;
             }
 
-            .bento-grid {
-                grid-template-rows: 390px 370px 380px 390px;
+            .bento {
+                grid-template-rows: 405px 375px 380px 395px;
             }
 
             .bento-card {
-                padding: 24px;
-                border-radius: 23px;
+                padding: 23px;
+                border-radius: 22px;
             }
 
             .bento-card h3 {
-                font-size: 24px;
+                font-size: 23px;
             }
 
-            .automation-flow {
-                left: 24px;
-                right: 24px;
-                bottom: 24px;
-                display: grid;
+            .flow {
+                left: 23px;
+                right: 23px;
+                bottom: 22px;
                 grid-template-columns: 1fr;
             }
 
@@ -3150,104 +3372,93 @@
                 display: none;
             }
 
-            .flow-node {
-                min-height: 57px;
+            .flow-box {
+                min-height: 56px;
             }
 
-            .human-demo {
-                left: 24px;
-                right: 24px;
+            .control-demo {
+                left: 23px;
+                right: 23px;
                 grid-template-columns: 1fr;
             }
 
-            .switcher {
-                width: 70px;
+            .toggle {
+                width: 72px;
                 justify-self: center;
             }
 
-            .memory-items {
-                left: 24px;
-                right: 24px;
-            }
-
-            .followup-demo {
-                left: 24px;
-                right: 24px;
+            .memory-grid {
+                left: 23px;
+                right: 23px;
             }
 
             .timeline {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 16px 8px;
+                left: 23px;
+                right: 23px;
+                grid-template-columns: repeat(2,1fr);
+                gap: 15px;
             }
 
             .timeline::before {
                 display: none;
             }
 
-            .steps-section {
-                padding: 85px 0;
-            }
-
             .steps-grid {
-                margin-top: 45px;
+                margin-top: 42px;
             }
 
-            .step-card {
-                min-height: 385px;
-                border-radius: 23px;
-                padding: 24px;
+            .step {
+                min-height: 380px;
+                padding: 23px;
+                border-radius: 22px;
             }
 
             .step-visual {
-                left: 24px;
-                right: 24px;
+                left: 23px;
+                right: 23px;
             }
 
-            .usecases-section {
-                padding: 85px 0;
+            .sector-shell {
+                padding: 37px 21px;
+                border-radius: 27px;
             }
 
-            .usecases-shell {
-                padding: 39px 22px;
-                border-radius: 28px;
-            }
-
-            .usecase-grid {
+            .sector-grid {
                 grid-template-columns: 1fr;
-                margin-top: 38px;
+                margin-top: 37px;
             }
 
-            .usecase {
-                min-height: 180px;
+            .sector {
+                min-height: 175px;
             }
 
-            .usecase h3 {
-                margin-top: 27px;
+            .sector h3 {
+                margin-top: 25px;
             }
 
-            .numbers {
-                padding: 80px 0;
+            .stats {
+                padding: 75px 0;
             }
 
-            .numbers-grid {
+            .stats-grid {
                 grid-template-columns: 1fr;
             }
 
-            .number-intro,
+            .stat-intro,
             .stat {
-                padding: 28px 5px;
+                padding: 27px 3px;
                 border-right: 0;
             }
 
             .stat {
                 display: grid;
-                grid-template-columns: 130px 1fr;
+                grid-template-columns: 125px 1fr;
                 align-items: center;
-                gap: 20px;
+                gap: 15px;
             }
 
             .stat strong {
-                font-size: 39px;
+                font-size: 37px;
             }
 
             .stat span {
@@ -3259,50 +3470,74 @@
             }
 
             .faq-question {
-                min-height: 74px;
+                min-height: 73px;
             }
 
-            .faq-question span:first-child {
-                font-size: 15px;
-            }
-
-            .faq-answer-inner {
-                padding-right: 15px;
-                font-size: 13px;
-            }
-
-            .final-cta {
-                padding-bottom: 40px;
-            }
-
-            .cta-shell {
-                min-height: 520px;
-                padding: 55px 20px;
-                border-radius: 30px;
-            }
-
-            .cta-shell h2 {
-                font-size: 53px;
-                letter-spacing: -3.5px;
-            }
-
-            .cta-shell p {
+            .faq-question strong {
                 font-size: 14px;
             }
 
-            .cta-buttons {
-                flex-direction: column;
+            .faq-answer-inner {
+                padding-right: 10px;
+                font-size: 12px;
+            }
+
+            .final-section {
+                padding-bottom: 40px;
+            }
+
+            .final-card {
+                min-height: 540px;
+                padding: 52px 18px;
+                border-radius: 28px;
+            }
+
+            .final-card h2 {
+                font-size: 51px;
+                line-height: .93;
+                letter-spacing: -3.5px;
+            }
+
+            .final-card p {
+                font-size: 13px;
+            }
+
+            .final-actions {
                 width: 100%;
+                flex-direction: column;
             }
 
             .footer-top {
                 grid-template-columns: 1fr;
-                gap: 35px;
+                gap: 34px;
             }
 
             .footer-bottom {
                 flex-direction: column;
                 align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 410px) {
+
+            .hero h1 {
+                font-size: 47px;
+            }
+
+            .dashboard-card {
+                width: 350px;
+            }
+
+            .float-panel.lead {
+                right: -4px;
+            }
+
+            .float-panel.ai {
+                left: -4px;
+            }
+
+            .final-card h2 {
+                font-size: 46px;
             }
         }
 
@@ -3321,19 +3556,25 @@
 
 <body>
 
-<div class="nav-space"></div>
+<div class="noise"></div>
+<div class="grid-overlay"></div>
 
-<header class="nav-shell" id="navbar">
+<div class="nav-spacer"></div>
+
+<header class="nav-wrap" id="navbar">
     <div class="container">
+
         <nav class="navbar">
 
             <a href="/" class="brand">
-                <span class="brand-symbol"></span>
 
-                <span class="brand-text">
+                <span class="brand-logo"></span>
+
+                <span class="brand-name">
                     WAI
                     <small>WhatsApp Intelligence</small>
                 </span>
+
             </a>
 
             <div class="nav-links">
@@ -3345,354 +3586,454 @@
             </div>
 
             <div class="nav-actions">
+
                 <a href="/admin/login" class="nav-login">
                     Giriş Yap
                 </a>
 
                 <a href="/admin/register" class="nav-cta">
+
                     Ücretsiz Başla
 
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
                         <path d="M5 12h14"></path>
                         <path d="m13 6 6 6-6 6"></path>
                     </svg>
+
                 </a>
+
             </div>
 
             <button
-                class="mobile-menu-button"
-                id="mobileMenuButton"
+                class="menu-button"
+                id="menuButton"
                 aria-label="Menüyü aç"
             >
                 <span></span>
             </button>
 
         </nav>
+
     </div>
 </header>
 
-<div class="mobile-nav" id="mobileNav">
+<div class="mobile-menu" id="mobileMenu">
+
     <a href="#urun">Ürün</a>
     <a href="#ozellikler">Özellikler</a>
     <a href="#nasil-calisir">Nasıl Çalışır?</a>
     <a href="#sektorler">Sektörler</a>
     <a href="#sss">SSS</a>
 
-    <div class="mobile-nav-actions">
+    <div class="mobile-menu-actions">
         <a href="/admin/login">Giriş Yap</a>
         <a href="/admin/register" class="primary">Ücretsiz Başla</a>
     </div>
+
 </div>
 
 <main>
 
-    {{-- HERO --}}
+    {{-- =========================================================
+         HERO
+    ========================================================== --}}
+
     <section class="hero">
+
+        <div class="hero-light"></div>
+        <div class="hero-ray"></div>
+
         <div class="container">
 
             <div class="hero-grid">
 
                 <div class="hero-copy">
 
-                    <div class="hero-badge">
-                        <span class="pulse"></span>
-                        WhatsApp satışlarınız artık yapay zekâ ile çalışıyor
+                    <div class="hero-kicker">
+                        <span class="live-dot"></span>
+                        WhatsApp satışlarınız için yeni nesil yapay zekâ
                     </div>
 
                     <h1>
-                        Mesajı müşteriniz atar.
-                        <span class="soft">Satışı</span>
-                        <span class="green">WAI yönetir.</span>
+                        Müşteri yazar.
+                        <span class="muted">WAI anlar.</span>
+                        <span class="green">Satış başlar.</span>
                     </h1>
 
                     <p class="hero-description">
-                        WAI; WhatsApp mesajlarınıza 7/24 cevap verir, işletmenizi öğrenir,
-                        müşterilerinizi tanır, satış fırsatlarını takip eder ve gerektiğinde
-                        görüşmeyi ekibinize devreder.
+                        WAI; WhatsApp mesajlarınıza saniyeler içinde cevap verir,
+                        işletmenizi öğrenir, müşterilerinizi tanır, satış fırsatlarını
+                        takip eder ve gerektiğinde görüşmeyi ekibinize devreder.
                     </p>
 
                     <div class="hero-actions">
 
-                        <a href="/admin/register" class="button-primary">
+                        <a href="/admin/register" class="button-main">
+
                             WAI'yi Ücretsiz Deneyin
 
-                            <span class="arrow">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <span class="button-icon">
+
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
                                     <path d="M5 12h14"></path>
                                     <path d="m13 6 6 6-6 6"></path>
                                 </svg>
+
                             </span>
+
                         </a>
 
-                        <a href="#urun" class="button-secondary">
-                            Ürünü Keşfet
+                        <a href="#urun" class="button-ghost">
+                            WAI'yi Keşfet
                         </a>
 
                     </div>
 
-                    <div class="hero-meta">
+                    <div class="hero-trust">
 
                         <span>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2.2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
                                 <path d="m5 12 4 4L19 6"></path>
                             </svg>
+
                             Kredi kartı gerekmez
+
                         </span>
 
                         <span>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2.2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
                                 <path d="m5 12 4 4L19 6"></path>
                             </svg>
+
                             Dakikalar içinde kurulum
+
                         </span>
 
                         <span>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2.2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
                                 <path d="m5 12 4 4L19 6"></path>
                             </svg>
+
                             AI + insan kontrolü
+
                         </span>
 
                     </div>
 
                 </div>
 
+                {{-- HERO PRODUCT --}}
+
                 <div class="hero-visual">
 
-                    <div class="visual-orbit"></div>
+                    <div class="halo"></div>
 
-                    <div class="phone">
+                    <div class="dashboard-card">
 
-                        <span class="phone-side-button one"></span>
-                        <span class="phone-side-button two"></span>
-                        <span class="phone-side-button three"></span>
+                        <div class="dash-top">
 
-                        <div class="phone-screen">
+                            <span class="dash-dot"></span>
+                            <span class="dash-dot"></span>
+                            <span class="dash-dot"></span>
 
-                            <div class="dynamic-island"></div>
-
-                            <div class="phone-header">
-
-                                <svg class="back-arrow"
-                                     viewBox="0 0 24 24"
-                                     fill="none"
-                                     stroke="currentColor"
-                                     stroke-width="2"
-                                     stroke-linecap="round"
-                                     stroke-linejoin="round">
-                                    <path d="m15 18-6-6 6-6"></path>
-                                </svg>
-
-                                <div class="chat-avatar">
-                                    W
-                                </div>
-
-                                <div class="chat-person">
-                                    <strong>WAI Satış Asistanı</strong>
-                                    <span>çevrimiçi</span>
-                                </div>
-
-                                <div class="chat-icons">
-
-                                    <svg viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="currentColor"
-                                         stroke-width="1.8"
-                                         stroke-linecap="round"
-                                         stroke-linejoin="round">
-                                        <path d="m22 8-6 4 6 4V8Z"></path>
-                                        <rect x="2" y="6" width="14" height="12" rx="2"></rect>
-                                    </svg>
-
-                                    <svg viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="currentColor"
-                                         stroke-width="1.8"
-                                         stroke-linecap="round"
-                                         stroke-linejoin="round">
-                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"></path>
-                                    </svg>
-
-                                </div>
-
+                            <div class="dash-address">
+                                wai.asilkansoft.com.tr/admin
                             </div>
 
-                            <div class="chat-body">
+                        </div>
 
-                                <div class="day-label">
-                                    BUGÜN
+                        <div class="dash-grid">
+
+                            <aside class="dash-sidebar">
+
+                                <div class="dash-logo">
+
+                                    <span class="mini-w">W</span>
+
+                                    WAI Panel
+
                                 </div>
 
-                                <div class="chat-bubble in">
-                                    Merhaba, zeytinyağlarınız hakkında bilgi almak istiyorum.
-                                    <span class="time">14:21</span>
+                                <div class="dash-nav-label">
+                                    Çalışma Alanı
                                 </div>
 
-                                <div class="chat-bubble out">
-                                    Merhaba 👋 Memnuniyetle yardımcı olayım.
-                                    Hangi boy zeytinyağımızla ilgileniyorsunuz?
-                                    <span class="time">
-                                        14:21
-                                        <span class="checkmarks">✓✓</span>
+                                <div class="dash-nav-item active">
+                                    <span class="nav-square">◉</span>
+                                    Gelen Kutusu
+                                </div>
+
+                                <div class="dash-nav-item">
+                                    <span class="nav-square">◇</span>
+                                    AI Botlar
+                                </div>
+
+                                <div class="dash-nav-item">
+                                    <span class="nav-square">◎</span>
+                                    CRM
+                                </div>
+
+                                <div class="dash-nav-item">
+                                    <span class="nav-square">↗</span>
+                                    Takipler
+                                </div>
+
+                                <div class="dash-nav-label">
+                                    Yönetim
+                                </div>
+
+                                <div class="dash-nav-item">
+                                    <span class="nav-square">□</span>
+                                    Ürünler
+                                </div>
+
+                                <div class="dash-nav-item">
+                                    <span class="nav-square">▢</span>
+                                    Siparişler
+                                </div>
+
+                            </aside>
+
+                            <div class="dash-chat">
+
+                                <div class="dash-chat-header">
+
+                                    <div class="client-avatar">
+                                        AY
+                                    </div>
+
+                                    <div class="client-name">
+                                        <strong>Ahmet Yılmaz</strong>
+                                        <span>WhatsApp · az önce</span>
+                                    </div>
+
+                                    <span class="ai-status">
+                                        AI AKTİF
                                     </span>
-                                </div>
-
-                                <div class="chat-bubble in">
-                                    5 litrelik almak istiyorum. Kargo ücretsiz mi?
-                                    <span class="time">14:22</span>
-                                </div>
-
-                                <div class="chat-bubble out">
-                                    Evet 🌿 5 litre ve üzeri zeytinyağı siparişlerinde
-                                    kargo ücretsizdir. İsterseniz siparişinizi birlikte oluşturalım.
-                                    <span class="time">
-                                        14:22
-                                        <span class="checkmarks">✓✓</span>
-                                    </span>
-                                </div>
-
-                                <div class="chat-bubble in">
-                                    Olur.
-                                    <span class="time">14:23</span>
-                                </div>
-
-                                <div class="typing-bubble">
-                                    <i></i>
-                                    <i></i>
-                                    <i></i>
-                                </div>
-
-                            </div>
-
-                            <div class="phone-composer">
-
-                                <div class="composer-input">
-
-                                    <svg viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="currentColor"
-                                         stroke-width="1.8"
-                                         stroke-linecap="round"
-                                         stroke-linejoin="round">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                                        <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                                        <line x1="15" y1="9" x2="15.01" y2="9"></line>
-                                    </svg>
-
-                                    Mesaj
 
                                 </div>
 
-                                <div class="voice-button">
+                                <div class="dash-messages">
 
-                                    <svg viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="currentColor"
-                                         stroke-width="2"
-                                         stroke-linecap="round"
-                                         stroke-linejoin="round">
-                                        <rect x="9" y="2" width="6" height="12" rx="3"></rect>
-                                        <path d="M5 10a7 7 0 0 0 14 0"></path>
-                                        <line x1="12" y1="19" x2="12" y2="22"></line>
-                                    </svg>
+                                    <div class="dash-message in">
+                                        Merhaba, 5 litrelik zeytinyağı
+                                        almak istiyorum. Kargo ücretsiz mi?
+                                        <time>14:22</time>
+                                    </div>
+
+                                    <div class="dash-message out">
+                                        Merhaba 👋 Evet, 5 litre ve üzeri
+                                        zeytinyağı siparişlerinde kargo ücretsizdir.
+                                        İsterseniz siparişinizi birlikte oluşturabiliriz.
+                                        <time>14:22 ✓✓</time>
+                                    </div>
+
+                                    <div class="dash-message in">
+                                        Olur, sipariş vereyim.
+                                        <time>14:23</time>
+                                    </div>
+
+                                    <div class="dash-message out">
+                                        Harika 🌿 Öncelikle adınızı
+                                        ve teslimat ilinizi öğrenebilir miyim?
+                                        <time>14:23 ✓✓</time>
+                                    </div>
+
+                                </div>
+
+                                <div class="dash-compose">
+
+                                    <div class="dash-input">
+                                        Mesaj yazın...
+                                    </div>
+
+                                    <div class="dash-send">
+
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                        >
+                                            <path d="m22 2-7 20-4-9-9-4Z"></path>
+                                            <path d="M22 2 11 13"></path>
+                                        </svg>
+
+                                    </div>
 
                                 </div>
 
                             </div>
+
+                            <aside class="dash-crm">
+
+                                <div class="crm-title">
+                                    Müşteri Profili
+                                </div>
+
+                                <div class="crm-profile">
+
+                                    <strong>Ahmet Yılmaz</strong>
+                                    <span>Yeni müşteri</span>
+
+                                    <div class="crm-divider"></div>
+
+                                    <div class="crm-field">
+                                        <label>Durum</label>
+
+                                        <span class="hot-tag">
+                                            🔥 Sıcak Müşteri
+                                        </span>
+                                    </div>
+
+                                    <div class="crm-field">
+                                        <label>İlgilendiği ürün</label>
+                                        <strong>5L Zeytinyağı</strong>
+                                    </div>
+
+                                    <div class="crm-field">
+                                        <label>Son Görüşme</label>
+                                        <strong>Az önce</strong>
+                                    </div>
+
+                                    <div class="takeover-btn">
+                                        Görüşmeyi Devral
+                                    </div>
+
+                                </div>
+
+                            </aside>
 
                         </div>
 
                     </div>
 
-                    <div class="float-card status">
+                    <div class="float-panel lead">
 
-                        <div class="float-title">
-
-                            <div class="float-icon">
-                                <svg viewBox="0 0 24 24"
-                                     fill="none"
-                                     stroke="currentColor"
-                                     stroke-width="2"
-                                     stroke-linecap="round"
-                                     stroke-linejoin="round">
-                                    <path d="M12 2v4"></path>
-                                    <path d="m16.2 7.8 2.9-2.9"></path>
-                                    <path d="M18 12h4"></path>
-                                    <path d="m16.2 16.2 2.9 2.9"></path>
-                                    <path d="M12 18v4"></path>
-                                    <path d="m4.9 19.1 2.9-2.9"></path>
-                                    <path d="M2 12h4"></path>
-                                    <path d="m4.9 4.9 2.9 2.9"></path>
-                                </svg>
-                            </div>
-
-                            AI aktif
-
-                        </div>
-
-                        <p>
-                            WAI müşterinizle görüşüyor.
-                        </p>
-
-                    </div>
-
-                    <div class="float-card lead">
-
-                        <div class="float-title">
+                        <div class="float-head">
 
                             <div class="float-icon">
-                                <svg viewBox="0 0 24 24"
-                                     fill="none"
-                                     stroke="currentColor"
-                                     stroke-width="2"
-                                     stroke-linecap="round"
-                                     stroke-linejoin="round">
+
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                >
                                     <path d="M20 7h-9"></path>
                                     <path d="M14 17H5"></path>
                                     <circle cx="17" cy="17" r="3"></circle>
                                     <circle cx="7" cy="7" r="3"></circle>
                                 </svg>
+
                             </div>
 
-                            Sıcak müşteri
+                            <div>
+                                <strong>Sıcak müşteri</strong>
+                                <span>Satın alma niyeti yüksek</span>
+                            </div>
 
                         </div>
 
-                        <p>
-                            CRM etiketi otomatik güncellendi.
-                        </p>
+                        <div class="mini-meter">
+                            <i></i>
+                        </div>
 
                     </div>
 
-                    <div class="float-card follow">
+                    <div class="float-panel ai">
 
-                        <div class="float-title">
+                        <div class="float-head">
 
                             <div class="float-icon">
-                                <svg viewBox="0 0 24 24"
-                                     fill="none"
-                                     stroke="currentColor"
-                                     stroke-width="2"
-                                     stroke-linecap="round"
-                                     stroke-linejoin="round">
+
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                >
+                                    <path d="M12 2v4"></path>
+                                    <path d="M12 18v4"></path>
+                                    <path d="M4.93 4.93l2.83 2.83"></path>
+                                    <path d="M16.24 16.24l2.83 2.83"></path>
+                                    <path d="M2 12h4"></path>
+                                    <path d="M18 12h4"></path>
+                                </svg>
+
+                            </div>
+
+                            <div>
+                                <strong>WAI düşünüyor</strong>
+                                <span>Doğru cevabı hazırlıyor</span>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="float-panel follow">
+
+                        <div class="float-head">
+
+                            <div class="float-icon">
+
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                >
                                     <circle cx="12" cy="12" r="9"></circle>
                                     <path d="M12 7v5l3 2"></path>
                                 </svg>
+
                             </div>
 
-                            Takip planlandı
+                            <div>
+                                <strong>Takip hazır</strong>
+                                <span>Cevap gelmezse hatırlat</span>
+                            </div>
 
                         </div>
-
-                        <p>
-                            Yanıt gelmezse otomatik hatırlatma.
-                        </p>
 
                     </div>
 
@@ -3701,169 +4042,150 @@
             </div>
 
         </div>
+
     </section>
 
-    {{-- INDUSTRIES --}}
-    <section class="trust-section">
-        <div class="container">
+    {{-- =========================================================
+         INDUSTRIES
+    ========================================================== --}}
 
-            <div class="trust-shell">
+    <section class="industry-strip">
 
-                <div class="trust-label">
-                    WAI farklı iş modellerine uyum sağlar
-                </div>
+        <div class="industry-shell">
 
-                <div class="trust-track">
+            <div class="industry-track">
 
-                    @for ($i = 0; $i < 2; $i++)
+                @for ($i = 0; $i < 2; $i++)
 
-                        <div class="industry">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M3 9l9-6 9 6v11H3z"></path>
-                                <path d="M9 20v-6h6v6"></path>
-                            </svg>
-                            E-Ticaret
-                        </div>
+                    <div class="industry-pill">
+                        <span>✦</span>
+                        E-Ticaret
+                    </div>
 
-                        <div class="industry">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M4 21V10l8-6 8 6v11"></path>
-                                <path d="M9 21v-6h6v6"></path>
-                            </svg>
-                            Emlak
-                        </div>
+                    <div class="industry-pill">
+                        <span>✦</span>
+                        Klinikler
+                    </div>
 
-                        <div class="industry">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M3 12h18"></path>
-                                <path d="M12 3v18"></path>
-                            </svg>
-                            Klinikler
-                        </div>
+                    <div class="industry-pill">
+                        <span>✦</span>
+                        Emlak
+                    </div>
 
-                        <div class="industry">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <circle cx="12" cy="12" r="9"></circle>
-                                <path d="M8 12h8"></path>
-                            </svg>
-                            Finans
-                        </div>
+                    <div class="industry-pill">
+                        <span>✦</span>
+                        Otomotiv
+                    </div>
 
-                        <div class="industry">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M3 21h18"></path>
-                                <path d="M5 21V8l7-5 7 5v13"></path>
-                            </svg>
-                            Otomotiv
-                        </div>
+                    <div class="industry-pill">
+                        <span>✦</span>
+                        Finans
+                    </div>
 
-                        <div class="industry">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M4 19h16"></path>
-                                <path d="M6 16h12"></path>
-                                <path d="M8 13h8"></path>
-                            </svg>
-                            Turizm
-                        </div>
+                    <div class="industry-pill">
+                        <span>✦</span>
+                        Turizm
+                    </div>
 
-                        <div class="industry">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M4 4h16v16H4z"></path>
-                                <path d="M8 8h8v8H8z"></path>
-                            </svg>
-                            Ajanslar
-                        </div>
+                    <div class="industry-pill">
+                        <span>✦</span>
+                        Ajanslar
+                    </div>
 
-                    @endfor
+                    <div class="industry-pill">
+                        <span>✦</span>
+                        Hizmet Sektörü
+                    </div>
 
-                </div>
+                @endfor
 
             </div>
 
         </div>
+
     </section>
 
-    {{-- MANIFESTO --}}
-    <section class="manifesto section" id="ozellikler">
+    {{-- =========================================================
+         MANIFESTO
+    ========================================================== --}}
+
+    <section class="manifesto" id="ozellikler">
+
         <div class="container">
 
             <div class="manifesto-grid">
 
-                <div class="sticky-copy reveal">
+                <div class="manifesto-copy reveal">
 
-                    <div class="eyebrow">
-                        WAI mantığı
+                    <div class="section-tag">
+                        WAI yaklaşımı
                     </div>
 
-                    <h2 class="section-heading">
-                        Bot değil.
+                    <h2 class="section-title">
+                        Bir chatbot değil.
                         Dijital satış çalışanı.
                     </h2>
 
-                    <p class="section-description">
-                        WAI yalnızca sorulara cevap vermek için değil,
-                        müşteri görüşmesini baştan sona yönetebilmek için tasarlandı.
+                    <p class="section-copy">
+                        WAI yalnızca cevap üretmez. Müşteriyi anlamak,
+                        konuşmayı sürdürmek ve satış fırsatını yönetmek
+                        için tasarlanmış bir yapay zekâ çalışma alanıdır.
                     </p>
 
                 </div>
 
-                <div class="manifesto-big">
+                <div class="manifesto-list">
 
-                    <div class="manifesto-line reveal">
-                        <div class="manifesto-number">01</div>
+                    <div class="manifesto-item reveal">
+
+                        <div class="manifesto-no">
+                            01
+                        </div>
 
                         <h3>
                             İşletmenizi
                             <span>öğrenir.</span>
                         </h3>
+
                     </div>
 
-                    <div class="manifesto-line reveal">
-                        <div class="manifesto-number">02</div>
+                    <div class="manifesto-item reveal">
+
+                        <div class="manifesto-no">
+                            02
+                        </div>
 
                         <h3>
                             Müşterinizi
                             <span>hatırlar.</span>
                         </h3>
+
                     </div>
 
-                    <div class="manifesto-line reveal">
-                        <div class="manifesto-number">03</div>
+                    <div class="manifesto-item reveal">
+
+                        <div class="manifesto-no">
+                            03
+                        </div>
 
                         <h3>
-                            Satış fırsatını
+                            Fırsatı
                             <span>takip eder.</span>
                         </h3>
+
                     </div>
 
-                    <div class="manifesto-line reveal">
-                        <div class="manifesto-number">04</div>
+                    <div class="manifesto-item reveal">
+
+                        <div class="manifesto-no">
+                            04
+                        </div>
 
                         <h3>
                             Gerektiğinde
                             <span>insana devreder.</span>
                         </h3>
+
                     </div>
 
                 </div>
@@ -3871,397 +4193,447 @@
             </div>
 
         </div>
+
     </section>
 
-    {{-- PRODUCT --}}
-    <section class="product-section" id="urun">
+    {{-- =========================================================
+         COMMAND CENTER
+    ========================================================== --}}
+
+    <section class="command-section" id="urun">
+
         <div class="container">
 
-            <div class="product-header reveal">
+            <div class="command-header reveal">
 
                 <div>
 
-                    <div class="eyebrow">
+                    <div class="section-tag">
                         WAI Kontrol Merkezi
                     </div>
 
-                    <h2 class="section-heading">
-                        WhatsApp operasyonunuz.
-                        Tek bir merkezde.
+                    <h2 class="section-title">
+                        WhatsApp operasyonunuz artık tek ekranda.
                     </h2>
 
                 </div>
 
-                <p class="product-copy">
-                    Gelen mesajları görün, yapay zekânın görüşmelerini izleyin,
-                    müşterileri etiketleyin, sıcak lead'leri ayırın ve istediğiniz
-                    konuşmayı anında insan kontrolüne alın.
+                <p class="command-description">
+                    Gelen mesajları yönetin, müşterileri etiketleyin,
+                    yapay zekâyı izleyin, sıcak fırsatları görün ve
+                    istediğiniz görüşmeyi tek tıkla ekibinize devredin.
                 </p>
 
             </div>
 
-            <div class="workspace reveal">
+            <div class="command-board reveal">
 
-                <div class="workspace-top">
-                    <span class="traffic-dot"></span>
-                    <span class="traffic-dot"></span>
-                    <span class="traffic-dot"></span>
+                <div class="command-inner">
 
-                    <div class="workspace-url">
-                        wai.asilkansoft.com.tr/admin/gelen-kutusu
-                    </div>
-                </div>
+                    <div class="command-top">
 
-                <div class="workspace-main">
+                        <span class="command-browser-dot"></span>
+                        <span class="command-browser-dot"></span>
+                        <span class="command-browser-dot"></span>
 
-                    <aside class="inbox-list">
-
-                        <div class="panel-head">
-                            <strong>Gelen Kutusu</strong>
-                            <span class="count-badge">12</span>
-                        </div>
-
-                        <div class="filters">
-                            <span class="filter active">Tümü</span>
-                            <span class="filter">Okunmamış</span>
-                            <span class="filter">İnsan</span>
-                        </div>
-
-                        <div class="contact active">
-
-                            <div class="contact-avatar">
-                                AY
-                            </div>
-
-                            <div class="contact-data">
-
-                                <div class="contact-line">
-                                    <strong>Ahmet Yılmaz</strong>
-                                    <span>14:23</span>
-                                </div>
-
-                                <p>
-                                    5 litrelik almak istiyorum.
-                                </p>
-
-                                <span class="contact-tag">
-                                    SICAK MÜŞTERİ
-                                </span>
-
-                            </div>
-
-                        </div>
-
-                        <div class="contact">
-
-                            <div class="contact-avatar">
-                                EK
-                            </div>
-
-                            <div class="contact-data">
-
-                                <div class="contact-line">
-                                    <strong>Elif Kaya</strong>
-                                    <span>13:51</span>
-                                </div>
-
-                                <p>
-                                    Fiyat bilgisi alabilir miyim?
-                                </p>
-
-                                <span class="contact-tag">
-                                    TEKLİF
-                                </span>
-
-                            </div>
-
-                        </div>
-
-                        <div class="contact">
-
-                            <div class="contact-avatar">
-                                MD
-                            </div>
-
-                            <div class="contact-data">
-
-                                <div class="contact-line">
-                                    <strong>Mehmet Demir</strong>
-                                    <span>12:18</span>
-                                </div>
-
-                                <p>
-                                    Kargo kaç günde gelir?
-                                </p>
-
-                            </div>
-
-                        </div>
-
-                        <div class="contact">
-
-                            <div class="contact-avatar">
-                                SA
-                            </div>
-
-                            <div class="contact-data">
-
-                                <div class="contact-line">
-                                    <strong>Selin Aydın</strong>
-                                    <span>11:42</span>
-                                </div>
-
-                                <p>
-                                    Sipariş vermek istiyorum.
-                                </p>
-
-                            </div>
-
-                        </div>
-
-                        <div class="contact">
-
-                            <div class="contact-avatar">
-                                BY
-                            </div>
-
-                            <div class="contact-data">
-
-                                <div class="contact-line">
-                                    <strong>Burak Yalçın</strong>
-                                    <span>10:15</span>
-                                </div>
-
-                                <p>
-                                    Ürünleriniz nelerdir?
-                                </p>
-
-                            </div>
-
-                        </div>
-
-                    </aside>
-
-                    <div class="chat-workspace">
-
-                        <div class="workspace-chat-head">
-
-                            <div class="contact-avatar">
-                                AY
-                            </div>
-
-                            <div class="workspace-person">
-                                <strong>Ahmet Yılmaz</strong>
-                                <span>+90 5•• ••• •• 21</span>
-                            </div>
-
-                            <div class="ai-toggle">
-                                AI AKTİF
-                            </div>
-
-                        </div>
-
-                        <div class="workspace-messages">
-
-                            <div class="workspace-message left">
-                                Merhaba, zeytinyağlarınız hakkında bilgi
-                                almak istiyorum.
-                                <em>14:21</em>
-                            </div>
-
-                            <div class="workspace-message right">
-                                Merhaba 👋 Memnuniyetle yardımcı olayım.
-                                Hangi boy zeytinyağımızla ilgileniyorsunuz?
-                                <em>14:21 ✓✓</em>
-                            </div>
-
-                            <div class="workspace-message left">
-                                5 litrelik almak istiyorum. Kargo ücretsiz mi?
-                                <em>14:22</em>
-                            </div>
-
-                            <div class="workspace-message right">
-                                Evet 🌿 5 litre ve üzeri siparişlerde
-                                kargo ücretsizdir. İsterseniz siparişinizi
-                                birlikte oluşturabiliriz.
-                                <em>14:22 ✓✓</em>
-                            </div>
-
-                            <div class="workspace-message left">
-                                Olur, sipariş vereyim.
-                                <em>14:23</em>
-                            </div>
-
-                        </div>
-
-                        <div class="workspace-compose">
-
-                            <div class="workspace-input">
-                                Mesaj yazın...
-                            </div>
-
-                            <div class="workspace-send">
-
-                                <svg viewBox="0 0 24 24"
-                                     fill="none"
-                                     stroke="currentColor"
-                                     stroke-width="2">
-                                    <path d="m22 2-7 20-4-9-9-4Z"></path>
-                                    <path d="M22 2 11 13"></path>
-                                </svg>
-
-                            </div>
-
+                        <div class="command-url">
+                            wai.asilkansoft.com.tr/admin/gelen-kutusu
                         </div>
 
                     </div>
 
-                    <aside class="crm-panel">
+                    <div class="command-grid">
 
-                        <div class="panel-head">
-                            <strong>Müşteri</strong>
-                        </div>
+                        <aside class="conversation-list">
 
-                        <div class="crm-body">
+                            <div class="panel-title">
 
-                            <div class="crm-customer">
+                                <strong>Gelen Kutusu</strong>
 
-                                <div class="crm-name">
+                                <span class="badge-count">
+                                    12
+                                </span>
 
-                                    <div class="contact-avatar">
-                                        AY
-                                    </div>
+                            </div>
 
-                                    <div>
+                            <div class="conversation-filters">
+
+                                <span class="conv-filter active">
+                                    Tümü
+                                </span>
+
+                                <span class="conv-filter">
+                                    Okunmamış
+                                </span>
+
+                                <span class="conv-filter">
+                                    İnsan
+                                </span>
+
+                            </div>
+
+                            <div class="conversation active">
+
+                                <div class="conversation-avatar">
+                                    AY
+                                </div>
+
+                                <div class="conversation-content">
+
+                                    <div class="conversation-line">
                                         <strong>Ahmet Yılmaz</strong>
-                                        <span>Yeni müşteri</span>
+                                        <time>14:23</time>
                                     </div>
 
-                                </div>
+                                    <p>
+                                        Sipariş vermek istiyorum...
+                                    </p>
 
-                                <div class="crm-row">
-                                    <label>Durum</label>
+                                    <span class="conversation-tag">
+                                        SICAK MÜŞTERİ
+                                    </span>
 
-                                    <div class="crm-tags">
-                                        <span class="crm-tag hot">
-                                            🔥 Sıcak Müşteri
-                                        </span>
-
-                                        <span class="crm-tag new">
-                                            Yeni
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div class="crm-row">
-                                    <label>İlgilendiği ürün</label>
-                                    <strong>5 L Zeytinyağı</strong>
-                                </div>
-
-                                <div class="crm-row">
-                                    <label>Son görüşme</label>
-                                    <strong>Az önce</strong>
                                 </div>
 
                             </div>
 
-                            <div class="takeover">
+                            <div class="conversation">
 
-                                <strong>İnsan kontrolü</strong>
+                                <div class="conversation-avatar">
+                                    EK
+                                </div>
 
-                                <p>
-                                    İsterseniz görüşmeyi AI'dan devralabilirsiniz.
-                                </p>
+                                <div class="conversation-content">
 
-                                <div class="takeover-button">
-                                    Görüşmeyi Devral
+                                    <div class="conversation-line">
+                                        <strong>Elif Kaya</strong>
+                                        <time>13:51</time>
+                                    </div>
+
+                                    <p>
+                                        Fiyat bilgisi alabilir miyim?
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+                            <div class="conversation">
+
+                                <div class="conversation-avatar">
+                                    MD
+                                </div>
+
+                                <div class="conversation-content">
+
+                                    <div class="conversation-line">
+                                        <strong>Mehmet Demir</strong>
+                                        <time>12:18</time>
+                                    </div>
+
+                                    <p>
+                                        Kargo kaç günde gelir?
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+                            <div class="conversation">
+
+                                <div class="conversation-avatar">
+                                    SA
+                                </div>
+
+                                <div class="conversation-content">
+
+                                    <div class="conversation-line">
+                                        <strong>Selin Aydın</strong>
+                                        <time>11:42</time>
+                                    </div>
+
+                                    <p>
+                                        Hangi ürünleriniz var?
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+                            <div class="conversation">
+
+                                <div class="conversation-avatar">
+                                    BK
+                                </div>
+
+                                <div class="conversation-content">
+
+                                    <div class="conversation-line">
+                                        <strong>Burak Kaya</strong>
+                                        <time>10:17</time>
+                                    </div>
+
+                                    <p>
+                                        Teklif almak istiyorum.
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+                        </aside>
+
+                        <div class="main-chat-panel">
+
+                            <div class="main-chat-head">
+
+                                <div class="conversation-avatar">
+                                    AY
+                                </div>
+
+                                <div class="chat-person-data">
+                                    <strong>Ahmet Yılmaz</strong>
+                                    <span>+90 5•• ••• ••21</span>
+                                </div>
+
+                                <div class="main-ai-badge">
+                                    <i></i>
+                                    AI AKTİF
+                                </div>
+
+                            </div>
+
+                            <div class="main-messages">
+
+                                <div class="main-message customer">
+                                    Merhaba, zeytinyağlarınız hakkında bilgi
+                                    almak istiyorum.
+                                    <time>14:21</time>
+                                </div>
+
+                                <div class="main-message ai">
+                                    Merhaba 👋 Memnuniyetle yardımcı olayım.
+                                    Hangi boy zeytinyağımızla ilgileniyorsunuz?
+                                    <time>14:21 ✓✓</time>
+                                </div>
+
+                                <div class="main-message customer">
+                                    5 litrelik almak istiyorum.
+                                    Kargo ücretsiz mi?
+                                    <time>14:22</time>
+                                </div>
+
+                                <div class="main-message ai">
+                                    Evet 🌿 5 litre ve üzeri siparişlerde
+                                    kargo ücretsizdir. İsterseniz siparişinizi
+                                    birlikte oluşturabiliriz.
+                                    <time>14:22 ✓✓</time>
+                                </div>
+
+                                <div class="main-message customer">
+                                    Olur, sipariş vereyim.
+                                    <time>14:23</time>
+                                </div>
+
+                            </div>
+
+                            <div class="main-compose">
+
+                                <div class="main-input">
+                                    Mesaj yazın...
+                                </div>
+
+                                <div class="main-send">
+
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                    >
+                                        <path d="m22 2-7 20-4-9-9-4Z"></path>
+                                        <path d="M22 2 11 13"></path>
+                                    </svg>
+
                                 </div>
 
                             </div>
 
                         </div>
 
-                    </aside>
+                        <aside class="customer-panel">
+
+                            <div class="panel-title">
+                                <strong>Müşteri</strong>
+                            </div>
+
+                            <div class="customer-body">
+
+                                <div class="customer-card">
+
+                                    <div class="customer-name">
+
+                                        <div class="conversation-avatar">
+                                            AY
+                                        </div>
+
+                                        <div>
+                                            <strong>Ahmet Yılmaz</strong>
+                                            <span>Yeni müşteri</span>
+                                        </div>
+
+                                    </div>
+
+                                    <div class="customer-field">
+
+                                        <label>
+                                            Durum
+                                        </label>
+
+                                        <div class="customer-tags">
+
+                                            <span class="customer-tag hot">
+                                                🔥 Sıcak
+                                            </span>
+
+                                            <span class="customer-tag new">
+                                                Yeni
+                                            </span>
+
+                                        </div>
+
+                                    </div>
+
+                                    <div class="customer-field">
+                                        <label>İlgilendiği ürün</label>
+                                        <strong>5 L Zeytinyağı</strong>
+                                    </div>
+
+                                    <div class="customer-field">
+                                        <label>Son görüşme</label>
+                                        <strong>Az önce</strong>
+                                    </div>
+
+                                </div>
+
+                                <div class="human-control">
+
+                                    <strong>
+                                        İnsan kontrolü
+                                    </strong>
+
+                                    <p>
+                                        İsterseniz görüşmeyi
+                                        yapay zekâdan devralabilirsiniz.
+                                    </p>
+
+                                    <div class="human-button">
+                                        Görüşmeyi Devral
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </aside>
+
+                    </div>
 
                 </div>
 
             </div>
 
         </div>
+
     </section>
 
-    {{-- BENTO --}}
-    <section class="bento-section" id="ozellikler-detay">
+    {{-- =========================================================
+         BENTO FEATURES
+    ========================================================== --}}
+
+    <section class="bento-section">
+
         <div class="container">
 
             <div class="bento-header reveal">
 
                 <div>
 
-                    <div class="eyebrow">
-                        Daha fazlası
+                    <div class="section-tag">
+                        WAI yetenekleri
                     </div>
 
-                    <h2 class="section-heading">
-                        Satışı konuşmanın ötesine taşıyın.
+                    <h2 class="section-title">
+                        Mesajdan satışa kadar tek sistem.
                     </h2>
 
                 </div>
 
-                <p class="section-description">
-                    WAI, müşteriye yalnızca cevap vermek yerine satış
-                    operasyonunuzun parçalarını birbirine bağlar.
+                <p class="section-copy">
+                    Müşteri konuşmasını yalnızca yanıtlamak yerine
+                    satış sürecinin tamamına bağlayın.
                 </p>
 
             </div>
 
-            <div class="bento-grid">
+            <div class="bento">
 
-                <article class="bento-card green reveal">
+                <article class="bento-card featured reveal">
 
-                    <div class="mini-label">
-                        Otomasyon
+                    <div class="bento-mini">
+                        Satış otomasyonu
                     </div>
 
                     <h3>
-                        Mesaj geldiği anda satış akışı başlasın.
+                        Mesaj geldiği anda doğru satış akışı başlasın.
                     </h3>
 
                     <p>
-                        Müşteriyi karşılayın, ihtiyacını anlayın ve doğru satış akışına yönlendirin.
+                        WAI müşterinin ihtiyacını anlar ve görüşmeyi
+                        uygun satış akışında ilerletir.
                     </p>
 
-                    <div class="automation-flow">
+                    <div class="flow">
 
-                        <div class="flow-node">
+                        <div class="flow-box">
                             <strong>Yeni mesaj</strong>
                             <span>Müşteri WhatsApp'tan yazdı.</span>
                         </div>
 
-                        <svg class="flow-arrow"
-                             viewBox="0 0 24 24"
-                             fill="none"
-                             stroke="currentColor"
-                             stroke-width="1.7">
-                            <path d="M5 12h14"></path>
-                            <path d="m13 6 6 6-6 6"></path>
-                        </svg>
+                        <div class="flow-arrow">
 
-                        <div class="flow-node">
-                            <strong>AI görüşmesi</strong>
-                            <span>WAI ihtiyacı anladı.</span>
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            >
+                                <path d="M5 12h14"></path>
+                                <path d="m13 6 6 6-6 6"></path>
+                            </svg>
+
                         </div>
 
-                        <svg class="flow-arrow"
-                             viewBox="0 0 24 24"
-                             fill="none"
-                             stroke="currentColor"
-                             stroke-width="1.7">
-                            <path d="M5 12h14"></path>
-                            <path d="m13 6 6 6-6 6"></path>
-                        </svg>
+                        <div class="flow-box">
+                            <strong>WAI görüşmesi</strong>
+                            <span>İhtiyaç otomatik anlaşıldı.</span>
+                        </div>
 
-                        <div class="flow-node">
+                        <div class="flow-arrow">
+
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            >
+                                <path d="M5 12h14"></path>
+                                <path d="m13 6 6 6-6 6"></path>
+                            </svg>
+
+                        </div>
+
+                        <div class="flow-box">
                             <strong>Satış fırsatı</strong>
                             <span>CRM otomatik güncellendi.</span>
                         </div>
@@ -4270,32 +4642,32 @@
 
                 </article>
 
-                <article class="bento-card dark reveal">
+                <article class="bento-card reveal">
 
-                    <div class="mini-label">
+                    <div class="bento-mini">
                         İnsan devralma
                     </div>
 
                     <h3>
-                        Yapay zekâ çalışsın. Kontrol hep sizde kalsın.
+                        Yapay zekâ çalışsın. Kontrol sizde kalsın.
                     </h3>
 
                     <p>
-                        İstediğiniz konuşmayı saniyeler içinde ekibinize devredin.
+                        İstediğiniz konuşmayı ekibiniz saniyeler içinde devralabilir.
                     </p>
 
-                    <div class="human-demo">
+                    <div class="control-demo">
 
-                        <div class="human-side">
+                        <div class="control-side">
                             <span>Şu anda</span>
                             <strong>WAI konuşuyor</strong>
                         </div>
 
-                        <div class="switcher">
-                            <div class="switch-knob"></div>
+                        <div class="toggle">
+                            <div class="toggle-knob"></div>
                         </div>
 
-                        <div class="human-side">
+                        <div class="control-side">
                             <span>Devralınca</span>
                             <strong>Ekibiniz konuşur</strong>
                         </div>
@@ -4306,37 +4678,37 @@
 
                 <article class="bento-card reveal">
 
-                    <div class="mini-label">
+                    <div class="bento-mini">
                         Konuşma hafızası
                     </div>
 
                     <h3>
-                        Aynı bilgiyi müşteriye ikinci kez sormayın.
+                        Müşteriye aynı bilgiyi tekrar sormayın.
                     </h3>
 
                     <p>
-                        WAI, müşterinin görüşmede verdiği önemli bilgileri hatırlar.
+                        Görüşmede verilen önemli bilgiler müşteri bağlamında korunur.
                     </p>
 
-                    <div class="memory-items">
+                    <div class="memory-grid">
 
-                        <div class="memory-item">
+                        <div class="memory-box">
                             <label>Müşteri</label>
                             <strong>Ahmet Yılmaz</strong>
                         </div>
 
-                        <div class="memory-item">
-                            <label>İlgilendiği ürün</label>
+                        <div class="memory-box">
+                            <label>Ürün</label>
                             <strong>5 L Zeytinyağı</strong>
                         </div>
 
-                        <div class="memory-item">
+                        <div class="memory-box">
                             <label>Satış aşaması</label>
                             <strong>Siparişe hazır</strong>
                         </div>
 
-                        <div class="memory-item">
-                            <label>Son konuşma</label>
+                        <div class="memory-box">
+                            <label>Son görüşme</label>
                             <strong>14:23</strong>
                         </div>
 
@@ -4344,48 +4716,45 @@
 
                 </article>
 
-                <article class="bento-card dark reveal">
+                <article class="bento-card featured reveal">
 
-                    <div class="mini-label">
+                    <div class="bento-mini">
                         Akıllı takip
                     </div>
 
                     <h3>
-                        Cevapsız kalan müşteri kaybolmasın.
+                        Cevapsız kalan müşteri satıştan düşmesin.
                     </h3>
 
                     <p>
-                        WAI, satış fırsatlarını takip ederek gerektiğinde müşteriye tekrar ulaşır.
+                        WAI satış fırsatlarını takip ederek
+                        gerektiğinde müşteriye yeniden ulaşır.
                     </p>
 
-                    <div class="followup-demo">
+                    <div class="timeline">
 
-                        <div class="timeline">
+                        <div class="timeline-step active">
+                            <div class="timeline-dot">✓</div>
+                            <strong>Mesaj</strong>
+                            <span>Şimdi</span>
+                        </div>
 
-                            <div class="time-step active">
-                                <div class="time-dot">✓</div>
-                                <strong>Mesaj</strong>
-                                <span>Şimdi</span>
-                            </div>
+                        <div class="timeline-step">
+                            <div class="timeline-dot">1H</div>
+                            <strong>Bekle</strong>
+                            <span>Kontrol</span>
+                        </div>
 
-                            <div class="time-step">
-                                <div class="time-dot">1h</div>
-                                <strong>Bekle</strong>
-                                <span>Yanıt kontrolü</span>
-                            </div>
+                        <div class="timeline-step">
+                            <div class="timeline-dot">24H</div>
+                            <strong>Takip</strong>
+                            <span>Hatırlatma</span>
+                        </div>
 
-                            <div class="time-step">
-                                <div class="time-dot">24h</div>
-                                <strong>Takip</strong>
-                                <span>Otomatik mesaj</span>
-                            </div>
-
-                            <div class="time-step">
-                                <div class="time-dot">CRM</div>
-                                <strong>Güncelle</strong>
-                                <span>Satış durumu</span>
-                            </div>
-
+                        <div class="timeline-step">
+                            <div class="timeline-dot">CRM</div>
+                            <strong>Güncelle</strong>
+                            <span>Durum</span>
                         </div>
 
                     </div>
@@ -4395,33 +4764,39 @@
             </div>
 
         </div>
+
     </section>
 
-    {{-- HOW IT WORKS --}}
+    {{-- =========================================================
+         HOW IT WORKS
+    ========================================================== --}}
+
     <section class="steps-section" id="nasil-calisir">
+
         <div class="container">
 
             <div class="steps-intro reveal">
 
-                <div class="eyebrow">
-                    3 adım
+                <div class="section-tag">
+                    3 adımda başlayın
                 </div>
 
-                <h2 class="section-heading">
-                    WhatsApp'ınızı yapay zekâya hazırlamak düşündüğünüzden kolay.
+                <h2 class="section-title">
+                    İşletmenizin AI çalışanını birkaç dakikada oluşturun.
                 </h2>
 
-                <p class="section-description">
-                    Teknik ekip gerekmeden birkaç adımda WAI'yi kullanmaya başlayın.
+                <p class="section-copy">
+                    Teknik ekip gerekmeden WhatsApp'ınızı bağlayın,
+                    işletmenizi öğretin ve WAI'yi çalıştırın.
                 </p>
 
             </div>
 
             <div class="steps-grid">
 
-                <article class="step-card reveal">
+                <article class="step reveal">
 
-                    <div class="step-number">
+                    <div class="step-no">
                         01
                     </div>
 
@@ -4435,14 +4810,16 @@
 
                     <div class="step-visual">
 
-                        <div class="qr-shell">
+                        <div class="qr-area">
 
-                            <div class="qr-code"></div>
+                            <div class="qr"></div>
 
-                            <div class="qr-copy">
+                            <div class="qr-text">
                                 <strong>QR kodu okutun</strong>
+
                                 <span>
-                                    WhatsApp bağlantınız birkaç saniye içinde hazırlanır.
+                                    WhatsApp bağlantınız birkaç saniye
+                                    içerisinde hazırlanır.
                                 </span>
                             </div>
 
@@ -4452,9 +4829,9 @@
 
                 </article>
 
-                <article class="step-card reveal">
+                <article class="step reveal">
 
-                    <div class="step-number">
+                    <div class="step-no">
                         02
                     </div>
 
@@ -4463,7 +4840,7 @@
                     </h3>
 
                     <p>
-                        Ürün, fiyat, hizmet ve şirket kurallarınızı WAI'ye tanımlayın.
+                        Ürün, hizmet, fiyat ve firma kurallarınızı WAI'ye tanımlayın.
                     </p>
 
                     <div class="step-visual">
@@ -4471,42 +4848,60 @@
                         <div class="knowledge-list">
 
                             <div class="knowledge">
+
                                 Ürünler ve hizmetler
 
                                 <span class="knowledge-check">
-                                    <svg viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="currentColor"
-                                         stroke-width="2.5">
+
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2.4"
+                                    >
                                         <path d="m5 12 4 4L19 6"></path>
                                     </svg>
+
                                 </span>
+
                             </div>
 
                             <div class="knowledge">
+
                                 Fiyat ve ödeme bilgileri
 
                                 <span class="knowledge-check">
-                                    <svg viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="currentColor"
-                                         stroke-width="2.5">
+
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2.4"
+                                    >
                                         <path d="m5 12 4 4L19 6"></path>
                                     </svg>
+
                                 </span>
+
                             </div>
 
                             <div class="knowledge">
+
                                 Firma kuralları
 
                                 <span class="knowledge-check">
-                                    <svg viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="currentColor"
-                                         stroke-width="2.5">
+
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2.4"
+                                    >
                                         <path d="m5 12 4 4L19 6"></path>
                                     </svg>
+
                                 </span>
+
                             </div>
 
                         </div>
@@ -4515,9 +4910,9 @@
 
                 </article>
 
-                <article class="step-card reveal">
+                <article class="step reveal">
 
-                    <div class="step-number">
+                    <div class="step-no">
                         03
                     </div>
 
@@ -4526,20 +4921,25 @@
                     </h3>
 
                     <p>
-                        Artık müşterileriniz yazdığında yapay zekâ satış ekibiniz hazır.
+                        Artık müşteriniz yazdığında yapay zekâ satış ekibiniz hazır.
                     </p>
 
                     <div class="step-visual">
 
-                        <div class="go-live">
+                        <div class="ready-box">
 
-                            <div class="live-line">
-                                <span class="live-orb"></span>
-                                <strong>WAI yayında</strong>
+                            <div class="ready-status">
+
+                                <span class="ready-orb"></span>
+
+                                <strong>
+                                    WAI yayında
+                                </strong>
+
                             </div>
 
                             <p>
-                                Gelen WhatsApp mesajları otomatik olarak işleniyor.
+                                WhatsApp mesajları otomatik olarak işleniyor.
                             </p>
 
                         </div>
@@ -4551,205 +4951,150 @@
             </div>
 
         </div>
+
     </section>
 
-    {{-- USE CASES --}}
-    <section class="usecases-section" id="sektorler">
+    {{-- =========================================================
+         SECTORS
+    ========================================================== --}}
+
+    <section class="sectors-section" id="sektorler">
+
         <div class="container">
 
-            <div class="usecases-shell">
+            <div class="sector-shell">
 
-                <div class="usecases-top reveal">
+                <div class="sector-top reveal">
 
                     <div>
 
-                        <div class="eyebrow">
+                        <div class="section-tag">
                             Her sektöre uyarlanabilir
                         </div>
 
-                        <h2 class="section-heading">
-                            İşiniz farklı olabilir.
-                            WAI'nin görevi aynı:
-                            müşteriyi kaçırmamak.
+                        <h2 class="section-title">
+                            İşiniz farklı olabilir. WAI müşteriyi kaçırmaz.
                         </h2>
 
                     </div>
 
-                    <p class="usecases-description">
-                        İşletmenizin çalışma biçimini WAI'ye öğreterek sektörünüze özel
-                        bir WhatsApp yapay zekâ çalışanı oluşturabilirsiniz.
+                    <p class="sector-copy">
+                        İşletmenizin çalışma biçimini WAI'ye öğreterek
+                        sektörünüze özel bir WhatsApp yapay zekâ çalışanı oluşturabilirsiniz.
                     </p>
 
                 </div>
 
-                <div class="usecase-grid">
+                <div class="sector-grid">
 
-                    <article class="usecase reveal">
+                    <article class="sector reveal">
 
-                        <div class="usecase-icon">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M3 9l9-6 9 6v11H3z"></path>
-                                <path d="M8 20v-7h8v7"></path>
-                            </svg>
-                        </div>
+                        <div class="sector-icon">🛒</div>
 
-                        <h3>E-Ticaret</h3>
+                        <h3>
+                            E-Ticaret
+                        </h3>
 
                         <p>
-                            Ürün bilgisi, kargo, ödeme, sipariş ve müşteri takibi.
+                            Ürün bilgisi, ödeme, kargo, sipariş ve satış takibi.
                         </p>
 
                     </article>
 
-                    <article class="usecase reveal">
+                    <article class="sector reveal">
 
-                        <div class="usecase-icon">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M3 21h18"></path>
-                                <path d="M6 21V7l6-4 6 4v14"></path>
-                                <path d="M9 11h6"></path>
-                            </svg>
-                        </div>
+                        <div class="sector-icon">🏠</div>
 
-                        <h3>Emlak</h3>
+                        <h3>
+                            Emlak
+                        </h3>
 
                         <p>
-                            Portföy soruları, müşteri ihtiyacı, randevu ve lead toplama.
+                            Portföy soruları, ihtiyaç analizi ve müşteri yönlendirme.
                         </p>
 
                     </article>
 
-                    <article class="usecase reveal">
+                    <article class="sector reveal">
 
-                        <div class="usecase-icon">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <circle cx="12" cy="12" r="9"></circle>
-                                <path d="M12 7v10"></path>
-                                <path d="M7 12h10"></path>
-                            </svg>
-                        </div>
+                        <div class="sector-icon">✚</div>
 
-                        <h3>Klinikler</h3>
+                        <h3>
+                            Klinikler
+                        </h3>
 
                         <p>
-                            Hizmet bilgisi, ön görüşme, randevu talebi ve danışan yönlendirme.
+                            Hizmet bilgisi, randevu talebi ve danışan iletişimi.
                         </p>
 
                     </article>
 
-                    <article class="usecase reveal">
+                    <article class="sector reveal">
 
-                        <div class="usecase-icon">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
-                                <path d="M7 15h3"></path>
-                                <path d="M14 9h3"></path>
-                            </svg>
-                        </div>
+                        <div class="sector-icon">₺</div>
 
-                        <h3>Finans</h3>
+                        <h3>
+                            Finans
+                        </h3>
 
                         <p>
-                            Ön bilgi toplama, akış yönlendirme ve başvuru süreci takibi.
+                            Ön bilgi toplama, başvuru akışı ve müşteri yönlendirme.
                         </p>
 
                     </article>
 
-                    <article class="usecase reveal">
+                    <article class="sector reveal">
 
-                        <div class="usecase-icon">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M3 17h18"></path>
-                                <path d="m5 17 2-7h10l2 7"></path>
-                                <circle cx="7" cy="18" r="2"></circle>
-                                <circle cx="17" cy="18" r="2"></circle>
-                            </svg>
-                        </div>
+                        <div class="sector-icon">◈</div>
 
-                        <h3>Otomotiv</h3>
+                        <h3>
+                            Otomotiv
+                        </h3>
 
                         <p>
-                            Araç bilgisi, servis talepleri, teklif ve müşteri yönlendirme.
+                            Araç bilgisi, servis, teklif ve satış görüşmeleri.
                         </p>
 
                     </article>
 
-                    <article class="usecase reveal">
+                    <article class="sector reveal">
 
-                        <div class="usecase-icon">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M4 20h16"></path>
-                                <path d="M6 16h12"></path>
-                                <path d="M8 12h8"></path>
-                                <path d="M10 8h4"></path>
-                            </svg>
-                        </div>
+                        <div class="sector-icon">✦</div>
 
-                        <h3>Turizm</h3>
+                        <h3>
+                            Turizm
+                        </h3>
 
                         <p>
-                            Rezervasyon soruları, fiyat bilgisi ve müşteri iletişimi.
+                            Rezervasyon soruları, fiyatlar ve müşteri iletişimi.
                         </p>
 
                     </article>
 
-                    <article class="usecase reveal">
+                    <article class="sector reveal">
 
-                        <div class="usecase-icon">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <rect x="4" y="4" width="16" height="16" rx="3"></rect>
-                                <path d="M8 8h8v8H8z"></path>
-                            </svg>
-                        </div>
+                        <div class="sector-icon">⌘</div>
 
-                        <h3>Ajanslar</h3>
+                        <h3>
+                            Ajanslar
+                        </h3>
 
                         <p>
-                            Hizmet tanıtımı, müşteri ön eleme, satış ve destek otomasyonu.
+                            Lead karşılama, müşteri ön eleme ve satış otomasyonu.
                         </p>
 
                     </article>
 
-                    <article class="usecase reveal">
+                    <article class="sector reveal">
 
-                        <div class="usecase-icon">
-                            <svg viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 stroke-width="1.8">
-                                <path d="M4 18h16"></path>
-                                <path d="M6 18V8"></path>
-                                <path d="M18 18V8"></path>
-                                <path d="M8 8h8"></path>
-                                <path d="M10 4h4"></path>
-                            </svg>
-                        </div>
+                        <div class="sector-icon">◆</div>
 
-                        <h3>Hizmet Sektörü</h3>
+                        <h3>
+                            Hizmet Sektörü
+                        </h3>
 
                         <p>
-                            Fiyat talepleri, keşif, randevu ve satış sonrası destek.
+                            Fiyat, keşif, randevu ve satış sonrası destek.
                         </p>
 
                     </article>
@@ -4759,67 +5104,94 @@
             </div>
 
         </div>
+
     </section>
 
-    {{-- NUMBERS --}}
-    <section class="numbers">
+    {{-- =========================================================
+         STATS
+    ========================================================== --}}
+
+    <section class="stats">
+
         <div class="container">
 
-            <div class="numbers-grid reveal">
+            <div class="stats-grid reveal">
 
-                <div class="number-intro">
+                <div class="stat-intro">
+
                     <strong>
                         WhatsApp satış operasyonunu sadeleştirin.
                     </strong>
 
                     <span>
-                        Daha az manuel işlem. Daha hızlı müşteri iletişimi.
+                        Daha az manuel işlem. Daha hızlı iletişim.
                     </span>
+
                 </div>
 
                 <div class="stat">
-                    <strong>7/24</strong>
+
+                    <strong>
+                        <span class="green">7/24</span>
+                    </strong>
+
                     <span>
                         Müşterileriniz için sürekli erişilebilir yapay zekâ.
                     </span>
+
                 </div>
 
                 <div class="stat">
-                    <strong>&lt;10 sn</strong>
+
+                    <strong>
+                        &lt;10 sn
+                    </strong>
+
                     <span>
                         Mesajlara saniyeler içinde otomatik yanıt.
                     </span>
+
                 </div>
 
                 <div class="stat">
-                    <strong>1 Panel</strong>
+
+                    <strong>
+                        1 Panel
+                    </strong>
+
                     <span>
                         AI, CRM, gelen kutusu ve insan devralma tek yerde.
                     </span>
+
                 </div>
 
             </div>
 
         </div>
+
     </section>
 
-    {{-- FAQ --}}
+    {{-- =========================================================
+         FAQ
+    ========================================================== --}}
+
     <section class="faq-section" id="sss">
+
         <div class="container">
 
             <div class="faq-grid">
 
-                <div class="faq-copy reveal">
+                <div class="faq-intro reveal">
 
-                    <div class="eyebrow">
-                        Merak edilenler
+                    <div class="section-tag">
+                        Sık sorulanlar
                     </div>
 
-                    <h2 class="section-heading">
+                    <h2 class="section-title">
                         WAI hakkında kısa cevaplar.
                     </h2>
 
-                    <p class="section-description">
+                    <p class="section-copy">
                         Başlamadan önce en çok merak edilen konuları burada topladık.
                     </p>
 
@@ -4830,19 +5202,23 @@
                     <div class="faq-item open">
 
                         <button class="faq-question">
-                            <span>
+
+                            <strong>
                                 WAI normal bir chatbot mu?
-                            </span>
+                            </strong>
 
-                            <span class="faq-plus"></span>
+                            <span class="faq-icon"></span>
+
                         </button>
 
                         <div class="faq-answer">
+
                             <div class="faq-answer-inner">
-                                Hayır. WAI yalnızca hazır cevap gönderen bir chatbot mantığıyla çalışmaz.
-                                İşletmenizin verdiği bilgiler, konuşma geçmişi ve belirlenen kurallar üzerinden
-                                müşterilerinizle doğal bir satış görüşmesi yürütmek için tasarlanmıştır.
+                                Hayır. WAI yalnızca hazır cevap gönderen bir chatbot değildir.
+                                İşletmenizin bilgileri, belirlediğiniz kurallar ve konuşma bağlamı
+                                üzerinden müşterilerinizle doğal şekilde görüşmek için tasarlanmıştır.
                             </div>
+
                         </div>
 
                     </div>
@@ -4850,18 +5226,22 @@
                     <div class="faq-item">
 
                         <button class="faq-question">
-                            <span>
+
+                            <strong>
                                 Mevcut WhatsApp numaramı kullanabilir miyim?
-                            </span>
+                            </strong>
 
-                            <span class="faq-plus"></span>
+                            <span class="faq-icon"></span>
+
                         </button>
 
                         <div class="faq-answer">
+
                             <div class="faq-answer-inner">
-                                Uygun bağlantı yöntemiyle mevcut işletme WhatsApp numaranızı WAI sistemine
-                                bağlayabilirsiniz. Bağlantı durumu panel üzerinden yönetilir.
+                                Uygun bağlantı yöntemiyle işletme WhatsApp numaranızı
+                                WAI sistemine bağlayabilir ve bağlantıyı panel üzerinden yönetebilirsiniz.
                             </div>
+
                         </div>
 
                     </div>
@@ -4869,19 +5249,23 @@
                     <div class="faq-item">
 
                         <button class="faq-question">
-                            <span>
-                                Yapay zekânın verdiği cevapları kontrol edebilir miyim?
-                            </span>
 
-                            <span class="faq-plus"></span>
+                            <strong>
+                                Yapay zekânın ne söyleyeceğini belirleyebilir miyim?
+                            </strong>
+
+                            <span class="faq-icon"></span>
+
                         </button>
 
                         <div class="faq-answer">
+
                             <div class="faq-answer-inner">
-                                Evet. WAI'ye firma açıklamanızı, çalışma saatlerinizi, ürün ve hizmetlerinizi,
-                                ödeme ve kargo bilgilerinizi, firma kurallarınızı ve özel konuşma talimatlarınızı
-                                tanımlayabilirsiniz.
+                                Evet. Firma açıklamanızı, ürünlerinizi, hizmetlerinizi,
+                                çalışma saatlerinizi, ödeme ve kargo bilgilerinizi,
+                                şirket kurallarınızı ve özel konuşma talimatlarınızı tanımlayabilirsiniz.
                             </div>
+
                         </div>
 
                     </div>
@@ -4889,19 +5273,22 @@
                     <div class="faq-item">
 
                         <button class="faq-question">
-                            <span>
-                                Bir görüşmeyi çalışanım devralabilir mi?
-                            </span>
 
-                            <span class="faq-plus"></span>
+                            <strong>
+                                Çalışanım görüşmeyi devralabilir mi?
+                            </strong>
+
+                            <span class="faq-icon"></span>
+
                         </button>
 
                         <div class="faq-answer">
+
                             <div class="faq-answer-inner">
-                                Evet. Gelen Kutusu üzerinden istediğiniz müşterinin görüşmesini AI'dan
-                                devralabilir, manuel şekilde mesaj gönderebilir ve daha sonra kontrolü
-                                tekrar yapay zekâya bırakabilirsiniz.
+                                Evet. Gelen Kutusu üzerinden istediğiniz görüşmeyi
+                                yapay zekâdan devralabilir ve müşteriye manuel mesaj gönderebilirsiniz.
                             </div>
+
                         </div>
 
                     </div>
@@ -4909,19 +5296,23 @@
                     <div class="faq-item">
 
                         <button class="faq-question">
-                            <span>
-                                WAI müşteriyi daha sonra tekrar takip edebilir mi?
-                            </span>
 
-                            <span class="faq-plus"></span>
+                            <strong>
+                                Cevap vermeyen müşteriler takip edilebilir mi?
+                            </strong>
+
+                            <span class="faq-icon"></span>
+
                         </button>
 
                         <div class="faq-answer">
+
                             <div class="faq-answer-inner">
-                                WAI'de otomatik takip özellikleri bulunur. İşletmenizin belirlediği
-                                senaryolara göre cevapsız kalan veya satış süreci yarım kalan müşteriler
-                                tekrar takip edilebilir.
+                                WAI'nin otomatik takip sistemi sayesinde satış süreci yarım kalan
+                                veya yanıt vermeyen müşteriler belirlenen senaryolara göre yeniden
+                                takip edilebilir.
                             </div>
+
                         </div>
 
                     </div>
@@ -4929,18 +5320,22 @@
                     <div class="faq-item">
 
                         <button class="faq-question">
-                            <span>
+
+                            <strong>
                                 Teknik bilgiye ihtiyacım var mı?
-                            </span>
+                            </strong>
 
-                            <span class="faq-plus"></span>
+                            <span class="faq-icon"></span>
+
                         </button>
 
                         <div class="faq-answer">
+
                             <div class="faq-answer-inner">
-                                Hayır. WAI, işletmelerin teknik ekip olmadan kullanabilmesi için
-                                panel üzerinden yönetilebilecek şekilde tasarlanmıştır.
+                                Hayır. WAI işletmelerin teknik ekip olmadan kullanabilmesi için
+                                panel üzerinden yönetilebilir şekilde geliştirilmiştir.
                             </div>
+
                         </div>
 
                     </div>
@@ -4950,18 +5345,23 @@
             </div>
 
         </div>
+
     </section>
 
-    {{-- FINAL CTA --}}
-    <section class="final-cta">
+    {{-- =========================================================
+         FINAL CTA
+    ========================================================== --}}
+
+    <section class="final-section">
+
         <div class="container">
 
-            <div class="cta-shell reveal">
+            <div class="final-card reveal">
 
-                <div class="cta-content">
+                <div class="final-content">
 
-                    <div class="cta-mini">
-                        WAI'yi deneyin
+                    <div class="final-kicker">
+                        WAI ile başlayın
                     </div>
 
                     <h2>
@@ -4971,29 +5371,35 @@
                     </h2>
 
                     <p>
-                        Yapay zekâ satış asistanınızı oluşturun.
-                        WAI işletmenizi öğrensin, müşterilerinizle konuşmaya başlasın.
+                        İşletmenizin yapay zekâ satış asistanını oluşturun.
+                        WAI sizi öğrensin, müşterilerinizle konuşmaya başlasın.
                     </p>
 
-                    <div class="cta-buttons">
+                    <div class="final-actions">
 
-                        <a href="/admin/register" class="button-primary">
+                        <a href="/admin/register" class="button-main">
+
                             Ücretsiz Hesap Oluştur
 
-                            <span class="arrow">
-                                <svg viewBox="0 0 24 24"
-                                     fill="none"
-                                     stroke="currentColor"
-                                     stroke-width="2"
-                                     stroke-linecap="round"
-                                     stroke-linejoin="round">
+                            <span class="button-icon">
+
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
                                     <path d="M5 12h14"></path>
                                     <path d="m13 6 6 6-6 6"></path>
                                 </svg>
+
                             </span>
+
                         </a>
 
-                        <a href="/admin/login" class="button-secondary">
+                        <a href="/admin/login" class="button-ghost">
                             Zaten hesabım var
                         </a>
 
@@ -5004,11 +5410,13 @@
             </div>
 
         </div>
+
     </section>
 
 </main>
 
 <footer>
+
     <div class="container">
 
         <div class="footer-top">
@@ -5016,12 +5424,14 @@
             <div class="footer-brand">
 
                 <a href="/" class="brand">
-                    <span class="brand-symbol"></span>
 
-                    <span class="brand-text">
+                    <span class="brand-logo"></span>
+
+                    <span class="brand-name">
                         WAI
                         <small>WhatsApp Intelligence</small>
                     </span>
+
                 </a>
 
                 <p>
@@ -5031,26 +5441,56 @@
 
             </div>
 
-            <div class="footer-column">
-                <strong>Ürün</strong>
+            <div class="footer-col">
 
-                <a href="#urun">Gelen Kutusu</a>
-                <a href="#ozellikler">Yapay Zeka</a>
-                <a href="#nasil-calisir">Nasıl Çalışır?</a>
+                <strong>
+                    Ürün
+                </strong>
+
+                <a href="#urun">
+                    Kontrol Merkezi
+                </a>
+
+                <a href="#ozellikler">
+                    Yapay Zeka
+                </a>
+
+                <a href="#nasil-calisir">
+                    Nasıl Çalışır?
+                </a>
+
             </div>
 
-            <div class="footer-column">
-                <strong>Hesap</strong>
+            <div class="footer-col">
 
-                <a href="/admin/login">Giriş Yap</a>
-                <a href="/admin/register">Ücretsiz Başla</a>
+                <strong>
+                    Hesap
+                </strong>
+
+                <a href="/admin/login">
+                    Giriş Yap
+                </a>
+
+                <a href="/admin/register">
+                    Ücretsiz Başla
+                </a>
+
             </div>
 
-            <div class="footer-column">
-                <strong>WAI</strong>
+            <div class="footer-col">
 
-                <a href="#sektorler">Sektörler</a>
-                <a href="#sss">SSS</a>
+                <strong>
+                    WAI
+                </strong>
+
+                <a href="#sektorler">
+                    Sektörler
+                </a>
+
+                <a href="#sss">
+                    SSS
+                </a>
+
             </div>
 
         </div>
@@ -5061,49 +5501,46 @@
                 © {{ date('Y') }} WAI. Tüm hakları saklıdır.
             </span>
 
-            <span class="made-by">
+            <span>
                 Bir <strong>AsilkanSoft</strong> teknolojisidir.
             </span>
 
         </div>
 
     </div>
+
 </footer>
 
 <script>
-    /*
-    |--------------------------------------------------------------------------
-    | WAI PUBLIC LANDING PAGE
-    |--------------------------------------------------------------------------
-    |
-    | Bu script yalnızca landing page arayüz davranışlarını yönetir.
-    | Laravel, Filament, webhook, queue veya WhatsApp işlemlerine müdahale etmez.
-    |
-    */
-
     document.addEventListener('DOMContentLoaded', () => {
 
         /*
         |--------------------------------------------------------------------------
-        | Sticky Navbar
+        | Navbar
         |--------------------------------------------------------------------------
         */
 
         const navbar = document.getElementById('navbar');
 
         const updateNavbar = () => {
-            if (window.scrollY > 20) {
+
+            if (window.scrollY > 18) {
                 navbar.classList.add('scrolled');
             } else {
                 navbar.classList.remove('scrolled');
             }
+
         };
 
         updateNavbar();
 
-        window.addEventListener('scroll', updateNavbar, {
-            passive: true
-        });
+        window.addEventListener(
+            'scroll',
+            updateNavbar,
+            {
+                passive: true
+            }
+        );
 
 
         /*
@@ -5112,17 +5549,19 @@
         |--------------------------------------------------------------------------
         */
 
-        const mobileMenuButton = document.getElementById('mobileMenuButton');
-        const mobileLinks = document.querySelectorAll('#mobileNav a');
+        const menuButton = document.getElementById('menuButton');
+        const mobileMenuLinks = document.querySelectorAll('#mobileMenu a');
 
-        mobileMenuButton?.addEventListener('click', () => {
+        menuButton?.addEventListener('click', () => {
             document.body.classList.toggle('menu-open');
         });
 
-        mobileLinks.forEach(link => {
+        mobileMenuLinks.forEach(link => {
+
             link.addEventListener('click', () => {
                 document.body.classList.remove('menu-open');
             });
+
         });
 
 
@@ -5132,11 +5571,12 @@
         |--------------------------------------------------------------------------
         */
 
-        const revealItems = document.querySelectorAll('.reveal');
+        const revealElements = document.querySelectorAll('.reveal');
 
         if ('IntersectionObserver' in window) {
 
-            const revealObserver = new IntersectionObserver(
+            const observer = new IntersectionObserver(
+
                 entries => {
 
                     entries.forEach(entry => {
@@ -5146,25 +5586,28 @@
                         }
 
                         entry.target.classList.add('visible');
-                        revealObserver.unobserve(entry.target);
+
+                        observer.unobserve(entry.target);
 
                     });
 
                 },
+
                 {
-                    threshold: 0.12,
-                    rootMargin: '0px 0px -40px 0px'
+                    threshold: 0.10,
+                    rootMargin: '0px 0px -35px 0px'
                 }
+
             );
 
-            revealItems.forEach(item => {
-                revealObserver.observe(item);
+            revealElements.forEach(element => {
+                observer.observe(element);
             });
 
         } else {
 
-            revealItems.forEach(item => {
-                item.classList.add('visible');
+            revealElements.forEach(element => {
+                element.classList.add('visible');
             });
 
         }
@@ -5178,7 +5621,7 @@
 
         const faqItems = document.querySelectorAll('.faq-item');
 
-        const setFaqHeight = item => {
+        const updateFaqHeight = item => {
 
             const answer = item.querySelector('.faq-answer');
 
@@ -5198,20 +5641,26 @@
 
             const button = item.querySelector('.faq-question');
 
-            setFaqHeight(item);
+            updateFaqHeight(item);
 
             button?.addEventListener('click', () => {
 
-                const isOpen = item.classList.contains('open');
+                const alreadyOpen = item.classList.contains('open');
 
                 faqItems.forEach(otherItem => {
+
                     otherItem.classList.remove('open');
-                    setFaqHeight(otherItem);
+
+                    updateFaqHeight(otherItem);
+
                 });
 
-                if (!isOpen) {
+                if (!alreadyOpen) {
+
                     item.classList.add('open');
-                    setFaqHeight(item);
+
+                    updateFaqHeight(item);
+
                 }
 
             });
@@ -5221,7 +5670,7 @@
         window.addEventListener('resize', () => {
 
             faqItems.forEach(item => {
-                setFaqHeight(item);
+                updateFaqHeight(item);
             });
 
         });
