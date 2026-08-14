@@ -175,13 +175,13 @@ class Musteriler extends Page
                     )
             )
             ->orderByRaw(
-                '
+                "
                 CASE
-                    WHEN lead_temperature = "hot" THEN 1
-                    WHEN lead_temperature = "warm" THEN 2
+                    WHEN lead_temperature = 'hot' THEN 1
+                    WHEN lead_temperature = 'warm' THEN 2
                     ELSE 3
                 END
-                '
+                "
             )
             ->orderByDesc('lead_score')
             ->orderByDesc('last_contact_at')
