@@ -21,3 +21,21 @@ Artisan::command('inspire', function () {
 Schedule::command('app:send-conversation-follow-ups')
     ->everyFiveMinutes()
     ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| WAI CRM TAKİP BİLDİRİMLERİ
+|--------------------------------------------------------------------------
+|
+| CRM içerisinde takip zamanı gelen müşterileri her dakika kontrol eder.
+| Zamanı gelen görev için ilgili kullanıcıya Filament database notification
+| gönderilir.
+|
+| Command kendi içinde aynı takip tarihi için tekrar bildirim oluşmasını
+| engellediği için scheduler her dakika güvenle çalışabilir.
+|
+*/
+
+Schedule::command('wai:send-follow-up-notifications')
+    ->everyMinute()
+    ->withoutOverlapping();

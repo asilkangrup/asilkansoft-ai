@@ -135,6 +135,19 @@ class AdminPanelProvider extends PanelProvider
 
             /*
             |--------------------------------------------------------------------------
+            | DATABASE NOTIFICATIONS
+            |--------------------------------------------------------------------------
+            |
+            | Sağ üst bildirim zilini aktif eder.
+            | Takip zamanı gelen müşteriler için oluşturacağımız bildirimler
+            | burada kullanıcıya gösterilecektir.
+            |
+            */
+
+            ->databaseNotifications()
+
+            /*
+            |--------------------------------------------------------------------------
             | MIDDLEWARE
             |--------------------------------------------------------------------------
             */
