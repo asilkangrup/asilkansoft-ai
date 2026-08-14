@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\ConversationControl;
+use App\Services\CrmActivityService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Pages\Page;
@@ -28,6 +29,19 @@ class Gorevler extends Page
     public string $temperatureFilter = 'all';
 
     public string $channelFilter = 'all';
+
+    /*
+    |--------------------------------------------------------------------------
+    | CRM AKTİVİTE SERVİSİ
+    |--------------------------------------------------------------------------
+    */
+
+    protected function activityService(): CrmActivityService
+    {
+        return app(
+            CrmActivityService::class
+        );
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -233,9 +247,25 @@ class Gorevler extends Page
             return;
         }
 
+        $oldFollowUp =
+            $customer->next_follow_up_at
+                ? $customer->next_follow_up_at->copy()
+                : null;
+
         $customer->update([
-            'next_follow_up_at' => null,
+            'next_follow_up_at' =>
+                null,
         ]);
+
+        $customer->refresh();
+
+        $this->activityService()
+            ->followUpChanged(
+                conversation: $customer,
+                oldDate: $oldFollowUp,
+                newDate: null,
+                performedBy: auth()->user(),
+            );
 
         $this->dispatch(
             'task-updated'
@@ -265,19 +295,35 @@ class Gorevler extends Page
             return;
         }
 
+        $oldFollowUp =
+            $customer->next_follow_up_at
+                ? $customer->next_follow_up_at->copy()
+                : null;
+
         $current =
             $customer->next_follow_up_at
-            ?: now();
+                ?: now();
 
-        $newTime = Carbon::parse(
-            $current
-        )
-            ->addDay();
+        $newTime =
+            Carbon::parse(
+                $current
+            )
+                ->addDay();
 
         $customer->update([
             'next_follow_up_at' =>
                 $newTime,
         ]);
+
+        $customer->refresh();
+
+        $this->activityService()
+            ->followUpChanged(
+                conversation: $customer,
+                oldDate: $oldFollowUp,
+                newDate: $customer->next_follow_up_at,
+                performedBy: auth()->user(),
+            );
 
         $this->dispatch(
             'task-updated'
@@ -307,19 +353,35 @@ class Gorevler extends Page
             return;
         }
 
+        $oldFollowUp =
+            $customer->next_follow_up_at
+                ? $customer->next_follow_up_at->copy()
+                : null;
+
         $current =
             $customer->next_follow_up_at
-            ?: now();
+                ?: now();
 
-        $newTime = Carbon::parse(
-            $current
-        )
-            ->addHour();
+        $newTime =
+            Carbon::parse(
+                $current
+            )
+                ->addHour();
 
         $customer->update([
             'next_follow_up_at' =>
                 $newTime,
         ]);
+
+        $customer->refresh();
+
+        $this->activityService()
+            ->followUpChanged(
+                conversation: $customer,
+                oldDate: $oldFollowUp,
+                newDate: $customer->next_follow_up_at,
+                performedBy: auth()->user(),
+            );
 
         $this->dispatch(
             'task-updated'

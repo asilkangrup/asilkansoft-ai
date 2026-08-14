@@ -10,79 +10,92 @@ class LeadScoringService
 {
     /*
     |--------------------------------------------------------------------------
+    | CRM AKTİVİTE SERVİSİ
+    |--------------------------------------------------------------------------
+    */
+
+    protected function activityService(): CrmActivityService
+    {
+        return app(
+            CrmActivityService::class
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | WAI SMART LEAD SCORING
     |--------------------------------------------------------------------------
     |
-    | Bu servis müşteri mesajlarını hızlı şekilde analiz eder.
+    | Bu servis mÃ¼ÅŸteri mesajlarÄ±nÄ± hÄ±zlÄ± ÅŸekilde analiz eder.
     |
-    | ÖNEMLİ:
-    | Burada ekstra OpenAI isteği yapılmaz.
-    | Bu nedenle WhatsApp cevap süresini yavaşlatmaz.
+    | Ã–NEMLÄ°:
+    | Burada ekstra OpenAI isteÄŸi yapÄ±lmaz.
+    | Bu nedenle WhatsApp cevap sÃ¼resini yavaÅŸlatmaz.
     |
     */
 
     /*
     |--------------------------------------------------------------------------
-    | ÇOK GÜÇLÜ SATIN ALMA SİNYALLERİ
+    | Ã‡OK GÃœÃ‡LÃœ SATIN ALMA SÄ°NYALLERÄ°
     |--------------------------------------------------------------------------
     */
 
     private const VERY_HIGH_INTENT = [
-        'satın almak istiyorum',
+        'satÄ±n almak istiyorum',
         'satin almak istiyorum',
 
-        'sipariş vermek istiyorum',
+        'sipariÅŸ vermek istiyorum',
         'siparis vermek istiyorum',
 
-        'sipariş oluşturalım',
+        'sipariÅŸ oluÅŸturalÄ±m',
         'siparis olusturalim',
 
-        'başvuru yapmak istiyorum',
+        'baÅŸvuru yapmak istiyorum',
         'basvuru yapmak istiyorum',
 
-        'başvuru yapalım',
+        'baÅŸvuru yapalÄ±m',
         'basvuru yapalim',
 
         'randevu almak istiyorum',
 
-        'randevu oluşturalım',
+        'randevu oluÅŸturalÄ±m',
         'randevu olusturalim',
 
         'hemen almak istiyorum',
 
-        'nasıl satın alabilirim',
+        'nasÄ±l satÄ±n alabilirim',
         'nasil satin alabilirim',
 
-        'ödeme yapmak istiyorum',
+        'Ã¶deme yapmak istiyorum',
         'odeme yapmak istiyorum',
 
-        'satın alıyorum',
+        'satÄ±n alÄ±yorum',
         'satin aliyorum',
 
-        'sipariş veriyorum',
+        'sipariÅŸ veriyorum',
         'siparis veriyorum',
     ];
 
     /*
     |--------------------------------------------------------------------------
-    | GÜÇLÜ SATIŞ SİNYALLERİ
+    | GÃœÃ‡LÃœ SATIÅ SÄ°NYALLERÄ°
     |--------------------------------------------------------------------------
     */
 
     private const HIGH_INTENT = [
         'fiyat nedir',
-        'fiyatı nedir',
+        'fiyatÄ± nedir',
         'fiyati nedir',
 
         'fiyat ne kadar',
 
-        'kaç tl',
+        'kaÃ§ tl',
         'kac tl',
 
-        'ücreti nedir',
+        'Ã¼creti nedir',
         'ucreti nedir',
 
-        'ücreti ne kadar',
+        'Ã¼creti ne kadar',
         'ucreti ne kadar',
 
         'teklif',
@@ -91,7 +104,7 @@ class LeadScoringService
         'kampanya',
         'indirim',
 
-        'ödeme',
+        'Ã¶deme',
         'odeme',
 
         'taksit',
@@ -102,56 +115,56 @@ class LeadScoringService
         'teslimat',
         'kargo',
 
-        'başvuru',
+        'baÅŸvuru',
         'basvuru',
 
         'randevu',
 
-        'satın alma',
+        'satÄ±n alma',
         'satin alma',
 
-        'sipariş',
+        'sipariÅŸ',
         'siparis',
     ];
 
     /*
     |--------------------------------------------------------------------------
-    | ORTA SEVİYE İLGİ SİNYALLERİ
+    | ORTA SEVÄ°YE Ä°LGÄ° SÄ°NYALLERÄ°
     |--------------------------------------------------------------------------
     */
 
     private const MEDIUM_INTENT = [
         'bilgi almak istiyorum',
 
-        'detaylı bilgi',
+        'detaylÄ± bilgi',
         'detayli bilgi',
 
-        'nasıl oluyor',
+        'nasÄ±l oluyor',
         'nasil oluyor',
 
-        'nasıl çalışıyor',
+        'nasÄ±l Ã§alÄ±ÅŸÄ±yor',
         'nasil calisiyor',
 
-        'şartlar',
+        'ÅŸartlar',
         'sartlar',
 
-        'koşullar',
+        'koÅŸullar',
         'kosullar',
 
-        'seçenekler',
+        'seÃ§enekler',
         'secenekler',
 
-        'hangi ürün',
+        'hangi Ã¼rÃ¼n',
         'hangi urun',
 
         'hangi hizmet',
 
-        'ürünler',
+        'Ã¼rÃ¼nler',
         'urunler',
 
         'hizmetler',
 
-        'yardımcı olur musunuz',
+        'yardÄ±mcÄ± olur musunuz',
         'yardimci olur musunuz',
 
         'ilgileniyorum',
@@ -159,7 +172,7 @@ class LeadScoringService
 
     /*
     |--------------------------------------------------------------------------
-    | ACİLİYET SİNYALLERİ
+    | ACÄ°LÄ°YET SÄ°NYALLERÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -168,35 +181,35 @@ class LeadScoringService
 
         'hemen',
 
-        'bugün',
+        'bugÃ¼n',
         'bugun',
 
-        'şimdi',
+        'ÅŸimdi',
         'simdi',
 
-        'en kısa sürede',
+        'en kÄ±sa sÃ¼rede',
         'en kisa surede',
 
-        'yarın',
+        'yarÄ±n',
         'yarin',
     ];
 
     /*
     |--------------------------------------------------------------------------
-    | İLETİŞİM / DÖNÜŞ SİNYALLERİ
+    | Ä°LETÄ°ÅÄ°M / DÃ–NÃœÅ SÄ°NYALLERÄ°
     |--------------------------------------------------------------------------
     */
 
     private const CONTACT_INTENT = [
-        'beni arayın',
+        'beni arayÄ±n',
         'beni arayin',
 
         'arayabilir misiniz',
 
-        'telefonla görüşelim',
+        'telefonla gÃ¶rÃ¼ÅŸelim',
         'telefonla goruselim',
 
-        'iletişime geçin',
+        'iletiÅŸime geÃ§in',
         'iletisime gecin',
 
         'numaram',
@@ -209,7 +222,7 @@ class LeadScoringService
 
     /*
     |--------------------------------------------------------------------------
-    | OLUMSUZ / SATIŞTAN UZAKLAŞMA SİNYALLERİ
+    | OLUMSUZ / SATIÅTAN UZAKLAÅMA SÄ°NYALLERÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -218,31 +231,31 @@ class LeadScoringService
 
         'ilgilenmiyorum',
 
-        'vazgeçtim',
+        'vazgeÃ§tim',
         'vazgectim',
 
-        'çok pahalı',
+        'Ã§ok pahalÄ±',
         'cok pahali',
 
-        'bütçemi aşıyor',
+        'bÃ¼tÃ§emi aÅŸÄ±yor',
         'butcemi asiyor',
 
-        'almayacağım',
+        'almayacaÄŸÄ±m',
         'almayacagim',
 
-        'başvuru yapmayacağım',
+        'baÅŸvuru yapmayacaÄŸÄ±m',
         'basvuru yapmayacagim',
 
-        'teşekkürler istemiyorum',
+        'teÅŸekkÃ¼rler istemiyorum',
         'tesekkurler istemiyorum',
 
-        'bir daha yazmayın',
+        'bir daha yazmayÄ±n',
         'bir daha yazmayin',
     ];
 
     /*
     |--------------------------------------------------------------------------
-    | BASİT SOSYAL MESAJLAR
+    | BASÄ°T SOSYAL MESAJLAR
     |--------------------------------------------------------------------------
     */
 
@@ -310,10 +323,10 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | BASİT SOSYAL MESAJ
+        | BASÄ°T SOSYAL MESAJ
         |--------------------------------------------------------------------------
         |
-        | Merhaba yazan bir kişiyi doğrudan sıcak lead yapmıyoruz.
+        | Merhaba yazan bir kiÅŸiyi doÄŸrudan sÄ±cak lead yapmÄ±yoruz.
         |
         */
 
@@ -339,7 +352,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | ÇOK GÜÇLÜ SATIN ALMA NİYETİ
+        | Ã‡OK GÃœÃ‡LÃœ SATIN ALMA NÄ°YETÄ°
         |--------------------------------------------------------------------------
         */
 
@@ -357,7 +370,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | GÜÇLÜ SATIŞ NİYETİ
+        | GÃœÃ‡LÃœ SATIÅ NÄ°YETÄ°
         |--------------------------------------------------------------------------
         */
 
@@ -375,7 +388,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | ORTA SEVİYE İLGİ
+        | ORTA SEVÄ°YE Ä°LGÄ°
         |--------------------------------------------------------------------------
         */
 
@@ -393,7 +406,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | ACİLİYET
+        | ACÄ°LÄ°YET
         |--------------------------------------------------------------------------
         */
 
@@ -411,7 +424,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | İNSANLA İLETİŞİM TALEBİ
+        | Ä°NSANLA Ä°LETÄ°ÅÄ°M TALEBÄ°
         |--------------------------------------------------------------------------
         */
 
@@ -429,7 +442,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | TELEFON NUMARASI PAYLAŞILDI MI?
+        | TELEFON NUMARASI PAYLAÅILDI MI?
         |--------------------------------------------------------------------------
         */
 
@@ -447,7 +460,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | E-POSTA PAYLAŞILDI MI?
+        | E-POSTA PAYLAÅILDI MI?
         |--------------------------------------------------------------------------
         */
 
@@ -467,10 +480,10 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | MESAJ UZUNLUĞU / DETAYLI İLGİ
+        | MESAJ UZUNLUÄU / DETAYLI Ä°LGÄ°
         |--------------------------------------------------------------------------
         |
-        | Çok kısa olmayan gerçek bir soru müşterinin aktif ilgisini gösterir.
+        | Ã‡ok kÄ±sa olmayan gerÃ§ek bir soru mÃ¼ÅŸterinin aktif ilgisini gÃ¶sterir.
         |
         */
 
@@ -487,7 +500,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | OLUMSUZ NİYET
+        | OLUMSUZ NÄ°YET
         |--------------------------------------------------------------------------
         */
 
@@ -525,10 +538,10 @@ class LeadScoringService
     ): array {
         /*
         |--------------------------------------------------------------------------
-        | TEKRAR MESAJLARDA PUANIN ÇILGINCA ARTMASINI ENGELLE
+        | TEKRAR MESAJLARDA PUANIN Ã‡ILGINCA ARTMASINI ENGELLE
         |--------------------------------------------------------------------------
         |
-        | Tek mesajda maksimum +40 / -40 değişim.
+        | Tek mesajda maksimum +40 / -40 deÄŸiÅŸim.
         |
         */
 
@@ -560,6 +573,10 @@ class LeadScoringService
             $conversation->lead_status
             ?: 'new';
 
+        $oldTemperature =
+            $conversation->lead_temperature
+            ?: 'cold';
+
         $newStatus =
             $this->determineStatus(
                 conversation: $conversation,
@@ -569,7 +586,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | KAZANILDI / KAYBEDİLDİ DURUMLARINI OTOMATİK BOZMA
+        | KAZANILDI / KAYBEDÄ°LDÄ° DURUMLARINI OTOMATÄ°K BOZMA
         |--------------------------------------------------------------------------
         */
 
@@ -612,7 +629,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | OTOMATİK CRM ETİKETLERİ
+        | OTOMATÄ°K CRM ETÄ°KETLERÄ°
         |--------------------------------------------------------------------------
         */
 
@@ -620,6 +637,43 @@ class LeadScoringService
             conversation: $conversation,
             score: $newScore,
             signals: $signals,
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | CRM AKTİVİTE GEÇMİŞİ
+        |--------------------------------------------------------------------------
+        |
+        | Bu değişiklikler müşteri mesajı analizinden otomatik geldiği için
+        | performedBy null bırakılır. Timeline actorName() bunu WAI Yapay Zekâ
+        | olarak gösterir.
+        |
+        */
+
+        $conversation->refresh();
+
+        $activityService =
+            $this->activityService();
+
+        $activityService->leadScoreChanged(
+            conversation: $conversation,
+            oldScore: $oldScore,
+            newScore: (int) $conversation->lead_score,
+            performedBy: null,
+        );
+
+        $activityService->temperatureChanged(
+            conversation: $conversation,
+            oldTemperature: $oldTemperature,
+            newTemperature: $conversation->lead_temperature ?: 'cold',
+            performedBy: null,
+        );
+
+        $activityService->leadStatusChanged(
+            conversation: $conversation,
+            oldStatus: $oldStatus,
+            newStatus: $conversation->lead_status ?: 'new',
+            performedBy: null,
         );
 
         Log::info(
@@ -677,14 +731,14 @@ class LeadScoringService
 
     /*
     |--------------------------------------------------------------------------
-    | PIPELINE DURUMUNU BELİRLE
+    | PIPELINE DURUMUNU BELÄ°RLE
     |--------------------------------------------------------------------------
     |
-    | Burada WAI satış pipeline'ını otomatik ilerletebilir.
+    | Burada WAI satÄ±ÅŸ pipeline'Ä±nÄ± otomatik ilerletebilir.
     |
     | Ancak kritik nokta:
-    | "Kazanıldı" hiçbir zaman otomatik yapılmaz.
-    | Gerçek satış tamamlandığında kullanıcı veya sipariş sistemi yapar.
+    | "KazanÄ±ldÄ±" hiÃ§bir zaman otomatik yapÄ±lmaz.
+    | GerÃ§ek satÄ±ÅŸ tamamlandÄ±ÄŸÄ±nda kullanÄ±cÄ± veya sipariÅŸ sistemi yapar.
     |
     */
 
@@ -699,7 +753,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | SATIN ALMA / BAŞVURU / RANDEVU NİYETİ ÇOK GÜÇLÜ
+        | SATIN ALMA / BAÅVURU / RANDEVU NÄ°YETÄ° Ã‡OK GÃœÃ‡LÃœ
         |--------------------------------------------------------------------------
         */
 
@@ -745,7 +799,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | AKTİF İLGİ
+        | AKTÄ°F Ä°LGÄ°
         |--------------------------------------------------------------------------
         */
 
@@ -814,7 +868,7 @@ class LeadScoringService
 
     /*
     |--------------------------------------------------------------------------
-    | OTOMATİK ETİKETLER
+    | OTOMATÄ°K ETÄ°KETLER
     |--------------------------------------------------------------------------
     */
 
@@ -825,15 +879,15 @@ class LeadScoringService
     ): void {
         /*
         |--------------------------------------------------------------------------
-        | SICAKLIK ETİKETLERİNİ TEMİZLE
+        | SICAKLIK ETÄ°KETLERÄ°NÄ° TEMÄ°ZLE
         |--------------------------------------------------------------------------
         */
 
         foreach (
             [
-                'Sıcak Lead',
-                'Ilık Lead',
-                'Soğuk Lead',
+                'SÄ±cak Lead',
+                'IlÄ±k Lead',
+                'SoÄŸuk Lead',
             ]
             as $tag
         ) {
@@ -850,27 +904,27 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | YENİ SICAKLIK ETİKETİ
+        | YENÄ° SICAKLIK ETÄ°KETÄ°
         |--------------------------------------------------------------------------
         */
 
         if ($score >= 70) {
             $conversation->etiketEkle(
-                'Sıcak Lead'
+                'SÄ±cak Lead'
             );
         } elseif ($score >= 40) {
             $conversation->etiketEkle(
-                'Ilık Lead'
+                'IlÄ±k Lead'
             );
         } else {
             $conversation->etiketEkle(
-                'Soğuk Lead'
+                'SoÄŸuk Lead'
             );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | SATIN ALMA NİYETİ
+        | SATIN ALMA NÄ°YETÄ°
         |--------------------------------------------------------------------------
         */
 
@@ -888,13 +942,13 @@ class LeadScoringService
             )
         ) {
             $conversation->etiketEkle(
-                'Satın Alma Niyeti'
+                'SatÄ±n Alma Niyeti'
             );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | ACİL
+        | ACÄ°L
         |--------------------------------------------------------------------------
         */
 
@@ -912,7 +966,7 @@ class LeadScoringService
 
         /*
         |--------------------------------------------------------------------------
-        | GERİ ARAMA
+        | GERÄ° ARAMA
         |--------------------------------------------------------------------------
         */
 
@@ -931,7 +985,7 @@ class LeadScoringService
 
     /*
     |--------------------------------------------------------------------------
-    | HERHANGİ BİR İFADE VAR MI?
+    | HERHANGÄ° BÄ°R Ä°FADE VAR MI?
     |--------------------------------------------------------------------------
     */
 
@@ -979,7 +1033,7 @@ class LeadScoringService
 
     /*
     |--------------------------------------------------------------------------
-    | NORMALİZE ET
+    | NORMALÄ°ZE ET
     |--------------------------------------------------------------------------
     */
 
@@ -990,24 +1044,24 @@ class LeadScoringService
             strtr(
                 $text,
                 [
-                    'İ' => 'i',
+                    'Ä°' => 'i',
                     'I' => 'i',
-                    'ı' => 'i',
+                    'Ä±' => 'i',
 
-                    'Ş' => 's',
-                    'ş' => 's',
+                    'Å' => 's',
+                    'ÅŸ' => 's',
 
-                    'Ğ' => 'g',
-                    'ğ' => 'g',
+                    'Ä' => 'g',
+                    'ÄŸ' => 'g',
 
-                    'Ü' => 'u',
-                    'ü' => 'u',
+                    'Ãœ' => 'u',
+                    'Ã¼' => 'u',
 
-                    'Ö' => 'o',
-                    'ö' => 'o',
+                    'Ã–' => 'o',
+                    'Ã¶' => 'o',
 
-                    'Ç' => 'c',
-                    'ç' => 'c',
+                    'Ã‡' => 'c',
+                    'Ã§' => 'c',
                 ]
             )
         );
@@ -1032,7 +1086,7 @@ class LeadScoringService
 
     /*
     |--------------------------------------------------------------------------
-    | E-POSTA ÇIKAR
+    | E-POSTA Ã‡IKAR
     |--------------------------------------------------------------------------
     */
 
@@ -1051,7 +1105,7 @@ class LeadScoringService
 
     /*
     |--------------------------------------------------------------------------
-    | DEĞİŞİKLİK YOKSA SONUÇ
+    | DEÄÄ°ÅÄ°KLÄ°K YOKSA SONUÃ‡
     |--------------------------------------------------------------------------
     */
 

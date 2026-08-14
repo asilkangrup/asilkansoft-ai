@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\ConversationControl;
+use App\Services\CrmActivityService;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -27,6 +28,19 @@ class SatisPipeline extends Page
     public string $temperatureFilter = 'all';
 
     public string $channelFilter = 'all';
+
+    /*
+    |--------------------------------------------------------------------------
+    | CRM AKTİVİTE SERVİSİ
+    |--------------------------------------------------------------------------
+    */
+
+    protected function activityService(): CrmActivityService
+    {
+        return app(
+            CrmActivityService::class
+        );
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -100,32 +114,44 @@ class SatisPipeline extends Page
 
     public function getNewLeadsProperty(): Collection
     {
-        return $this->getStageCustomers('new');
+        return $this->getStageCustomers(
+            'new'
+        );
     }
 
     public function getContactedLeadsProperty(): Collection
     {
-        return $this->getStageCustomers('contacted');
+        return $this->getStageCustomers(
+            'contacted'
+        );
     }
 
     public function getQualifiedLeadsProperty(): Collection
     {
-        return $this->getStageCustomers('qualified');
+        return $this->getStageCustomers(
+            'qualified'
+        );
     }
 
     public function getProposalLeadsProperty(): Collection
     {
-        return $this->getStageCustomers('proposal');
+        return $this->getStageCustomers(
+            'proposal'
+        );
     }
 
     public function getWonLeadsProperty(): Collection
     {
-        return $this->getStageCustomers('won');
+        return $this->getStageCustomers(
+            'won'
+        );
     }
 
     public function getLostLeadsProperty(): Collection
     {
-        return $this->getStageCustomers('lost');
+        return $this->getStageCustomers(
+            'lost'
+        );
     }
 
     protected function getStageCustomers(
@@ -162,7 +188,13 @@ class SatisPipeline extends Page
             'lost',
         ];
 
-        if (! in_array($status, $allowed, true)) {
+        if (
+            ! in_array(
+                $status,
+                $allowed,
+                true
+            )
+        ) {
             return;
         }
 
@@ -180,11 +212,11 @@ class SatisPipeline extends Page
             return;
         }
 
-        $currentStatus =
+        $oldStatus =
             $customer->lead_status
             ?: 'new';
 
-        if ($currentStatus === $status) {
+        if ($oldStatus === $status) {
             return;
         }
 
@@ -233,6 +265,49 @@ class SatisPipeline extends Page
             $data
         );
 
+        $customer->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | CRM AKTİVİTE KAYDI
+        |--------------------------------------------------------------------------
+        |
+        | Kart sürükle-bırak veya hızlı aksiyon ile başka kolona taşındığında
+        | müşteri geçmişine satış aşaması değişikliği yazılır.
+        |
+        */
+
+        $this->activityService()
+            ->leadStatusChanged(
+                conversation: $customer,
+                oldStatus: $oldStatus,
+                newStatus: $customer->lead_status ?: 'new',
+                performedBy: auth()->user(),
+            );
+
+        if (
+            $oldStatus !== 'won'
+            && $customer->lead_status === 'won'
+        ) {
+            $this->activityService()
+                ->won(
+                    conversation: $customer,
+                    performedBy: auth()->user(),
+                );
+        }
+
+        if (
+            $oldStatus !== 'lost'
+            && $customer->lead_status === 'lost'
+        ) {
+            $this->activityService()
+                ->lost(
+                    conversation: $customer,
+                    reason: $customer->lost_reason,
+                    performedBy: auth()->user(),
+                );
+        }
+
         $this->dispatch(
             'pipeline-updated',
             customerId: $customer->id,
@@ -264,8 +339,34 @@ class SatisPipeline extends Page
             return;
         }
 
+        $oldScore =
+            (int) $customer->lead_score;
+
+        $oldTemperature =
+            $customer->lead_temperature
+            ?: 'cold';
+
         $customer->leadSkoruGuncelle(
             $score
+        );
+
+        $customer->refresh();
+
+        $activityService =
+            $this->activityService();
+
+        $activityService->leadScoreChanged(
+            conversation: $customer,
+            oldScore: $oldScore,
+            newScore: (int) $customer->lead_score,
+            performedBy: auth()->user(),
+        );
+
+        $activityService->temperatureChanged(
+            conversation: $customer,
+            oldTemperature: $oldTemperature,
+            newTemperature: $customer->lead_temperature ?: 'cold',
+            performedBy: auth()->user(),
         );
 
         $this->dispatch(

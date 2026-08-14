@@ -750,6 +750,192 @@
 }
 
 /* ==========================================================================
+   TIMELINE FILTERS
+   ========================================================================== */
+
+.crm-timeline-filters {
+    margin-bottom: 15px;
+
+    display: flex;
+    flex-wrap: wrap;
+
+    gap: 7px;
+}
+
+.crm-timeline-filter {
+    min-height: 32px;
+
+    padding: 0 10px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid #dfe7e2;
+    border-radius: 999px;
+
+    color: #6d7971;
+    background: #fff;
+
+    font-size: 9px;
+    font-weight: 850;
+
+    cursor: pointer;
+
+    transition:
+        border-color .18s ease,
+        color .18s ease,
+        background .18s ease;
+}
+
+.crm-timeline-filter:hover {
+    border-color: #c7ead5;
+
+    color: #087a42;
+
+    background: #f8fdf9;
+}
+
+.crm-timeline-filter.active {
+    border-color: #bfe9cf;
+
+    color: #087a42;
+
+    background: #effcf5;
+}
+
+/* ==========================================================================
+   CRM TIMELINE
+   ========================================================================== */
+
+.crm-timeline {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.crm-timeline-item {
+    position: relative;
+    padding: 0 0 18px 30px;
+}
+
+.crm-timeline-item:last-child {
+    padding-bottom: 0;
+}
+
+.crm-timeline-item::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 18px;
+    bottom: -2px;
+    width: 1px;
+    background: #e3ebe6;
+}
+
+.crm-timeline-item:last-child::before {
+    display: none;
+}
+
+.crm-timeline-dot {
+    position: absolute;
+    left: 2px;
+    top: 5px;
+    width: 13px;
+    height: 13px;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    background: #9ba79f;
+    box-shadow: 0 0 0 1px #dce5df;
+}
+
+.crm-timeline-dot.ai_score,
+.crm-timeline-dot.ai_status,
+.crm-timeline-dot.ai_action {
+    background: #24e17f;
+}
+
+.crm-timeline-dot.lead_status,
+.crm-timeline-dot.lead_score,
+.crm-timeline-dot.lead_temperature {
+    background: #5d8ed8;
+}
+
+.crm-timeline-dot.assignment {
+    background: #8b68c7;
+}
+
+.crm-timeline-dot.follow_up {
+    background: #d79a25;
+}
+
+.crm-timeline-dot.note {
+    background: #6d7c73;
+}
+
+.crm-timeline-dot.human_takeover {
+    background: #c35d5d;
+}
+
+.crm-timeline-dot.ai_release {
+    background: #24b87a;
+}
+
+.crm-timeline-dot.won {
+    background: #24b86c;
+}
+
+.crm-timeline-dot.lost {
+    background: #d05b5b;
+}
+
+.crm-timeline-content {
+    min-width: 0;
+}
+
+.crm-timeline-title {
+    color: #263229;
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1.4;
+}
+
+.crm-timeline-description {
+    margin-top: 4px;
+    color: #758078;
+    font-size: 10px;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.crm-timeline-meta {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    color: #9aa39d;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.crm-timeline-actor {
+    color: #607168;
+}
+
+.crm-timeline-empty {
+    padding: 18px 14px;
+    border: 1px dashed #dce5df;
+    border-radius: 12px;
+    color: #8a958e;
+    background: #fafcfb;
+    text-align: center;
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+/* ==========================================================================
    TOAST
    ========================================================================== */
 
@@ -1769,6 +1955,120 @@
                             wire:model="notes"
                             placeholder="Müşteri hakkında ekibiniz için not bırakın..."
                         ></textarea>
+
+                    </div>
+
+                </div>
+
+
+                <div class="crm-form-section">
+
+                    <div class="crm-form-title">
+                        Müşteri Geçmişi
+                    </div>
+
+                    <div class="crm-timeline-filters">
+
+                        @php
+                            $activityFilters = [
+                                'all' => 'Tümü',
+                                'ai' => 'AI',
+                                'staff' => 'Personel',
+                                'sales' => 'Satış',
+                                'follow_up' => 'Takip',
+                                'notes' => 'Notlar',
+                                'control' => 'Kontrol',
+                            ];
+                        @endphp
+
+                        @foreach ($activityFilters as $key => $label)
+
+                            <button
+                                type="button"
+
+                                wire:click="
+                                    setActivityFilter(
+                                        '{{ $key }}'
+                                    )
+                                "
+
+                                class="
+                                    crm-timeline-filter
+                                    {{
+                                        $activityFilter === $key
+                                            ? 'active'
+                                            : ''
+                                    }}
+                                "
+                            >
+                                {{ $label }}
+                            </button>
+
+                        @endforeach
+
+                    </div>
+
+                    <div class="crm-timeline">
+
+                        @forelse ($this->selectedActivities as $activity)
+
+                            <div
+                                class="crm-timeline-item"
+                                wire:key="crm-activity-{{ $activity->id }}"
+                            >
+
+                                <span
+                                    class="
+                                        crm-timeline-dot
+                                        {{ $activity->type }}
+                                    "
+                                ></span>
+
+                                <div class="crm-timeline-content">
+
+                                    <div class="crm-timeline-title">
+                                        {{ $activity->title }}
+                                    </div>
+
+                                    @if ($activity->description)
+
+                                        <div class="crm-timeline-description">
+                                            {{ $activity->description }}
+                                        </div>
+
+                                    @endif
+
+                                    <div class="crm-timeline-meta">
+
+                                        <span class="crm-timeline-actor">
+                                            {{ $activity->actorName() }}
+                                        </span>
+
+                                        <span>
+                                            ·
+                                        </span>
+
+                                        <span>
+                                            {{ $activity->created_at?->format('d.m.Y H:i') }}
+                                        </span>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        @empty
+
+                            <div class="crm-timeline-empty">
+                                {{
+                                    $activityFilter === 'all'
+                                        ? 'Bu müşteri için henüz CRM aktivitesi oluşmadı.'
+                                        : 'Bu filtreye uygun aktivite bulunamadı.'
+                                }}
+                            </div>
+
+                        @endforelse
 
                     </div>
 

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Log;
 
 class ConversationControl extends Model
 {
@@ -97,22 +99,35 @@ class ConversationControl extends Model
     ];
 
     protected $casts = [
-        'unread_count' => 'integer',
+        'unread_count' =>
+            'integer',
 
-        'tags' => 'array',
+        'tags' =>
+            'array',
 
-        'lead_score' => 'integer',
+        'lead_score' =>
+            'integer',
 
-        'human_takeover' => 'boolean',
+        'human_takeover' =>
+            'boolean',
 
-        'taken_over_at' => 'datetime',
-        'released_at' => 'datetime',
+        'taken_over_at' =>
+            'datetime',
 
-        'last_contact_at' => 'datetime',
-        'next_follow_up_at' => 'datetime',
+        'released_at' =>
+            'datetime',
 
-        'won_at' => 'datetime',
-        'lost_at' => 'datetime',
+        'last_contact_at' =>
+            'datetime',
+
+        'next_follow_up_at' =>
+            'datetime',
+
+        'won_at' =>
+            'datetime',
+
+        'lost_at' =>
+            'datetime',
     ];
 
     /*
@@ -123,7 +138,9 @@ class ConversationControl extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(
+            User::class
+        );
     }
 
     /*
@@ -148,7 +165,23 @@ class ConversationControl extends Model
 
     public function aiBot(): BelongsTo
     {
-        return $this->belongsTo(AiBot::class);
+        return $this->belongsTo(
+            AiBot::class
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CRM AKTİVİTELERİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(
+            CrmActivity::class
+        )
+            ->latest();
     }
 
     /*
@@ -170,11 +203,63 @@ class ConversationControl extends Model
 
     public function insanDevral(): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | ZATEN İNSANDA İSE TEKRAR KAYIT OLUŞTURMA
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->human_takeover) {
+            return;
+        }
+
         $this->update([
-            'human_takeover' => true,
-            'taken_over_at' => now(),
-            'released_at' => null,
+            'human_takeover' =>
+                true,
+
+            'taken_over_at' =>
+                now(),
+
+            'released_at' =>
+                null,
         ]);
+
+        $this->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | CRM TIMELINE
+        |--------------------------------------------------------------------------
+        |
+        | Aktivite kaydı başarısız olsa bile ana insan devralma işlemi bozulmaz.
+        |
+        */
+
+        try {
+            app(
+                \App\Services\CrmActivityService::class
+            )->humanTakeover(
+                conversation: $this,
+                performedBy: auth()->user(),
+            );
+        } catch (\Throwable $exception) {
+            Log::warning(
+                'CRM HUMAN TAKEOVER ACTIVITY FAILED',
+                [
+                    'conversation_control_id' =>
+                        $this->id,
+
+                    'user_id' =>
+                        $this->user_id,
+
+                    'ai_bot_id' =>
+                        $this->ai_bot_id,
+
+                    'message' =>
+                        $exception->getMessage(),
+                ]
+            );
+        }
     }
 
     /*
@@ -185,10 +270,57 @@ class ConversationControl extends Model
 
     public function yapayZekayaGeriVer(): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | ZATEN AI'DA İSE TEKRAR KAYIT OLUŞTURMA
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $this->human_takeover) {
+            return;
+        }
+
         $this->update([
-            'human_takeover' => false,
-            'released_at' => now(),
+            'human_takeover' =>
+                false,
+
+            'released_at' =>
+                now(),
         ]);
+
+        $this->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | CRM TIMELINE
+        |--------------------------------------------------------------------------
+        */
+
+        try {
+            app(
+                \App\Services\CrmActivityService::class
+            )->aiReleased(
+                conversation: $this,
+                performedBy: auth()->user(),
+            );
+        } catch (\Throwable $exception) {
+            Log::warning(
+                'CRM AI RELEASE ACTIVITY FAILED',
+                [
+                    'conversation_control_id' =>
+                        $this->id,
+
+                    'user_id' =>
+                        $this->user_id,
+
+                    'ai_bot_id' =>
+                        $this->ai_bot_id,
+
+                    'message' =>
+                        $exception->getMessage(),
+                ]
+            );
+        }
     }
 
     /*
@@ -219,7 +351,8 @@ class ConversationControl extends Model
         }
 
         $this->update([
-            'unread_count' => 0,
+            'unread_count' =>
+                0,
         ]);
     }
 
@@ -247,9 +380,10 @@ class ConversationControl extends Model
     public function etiketEkle(
         string $etiket
     ): void {
-        $etiket = trim(
-            $etiket
-        );
+        $etiket =
+            trim(
+                $etiket
+            );
 
         if ($etiket === '') {
             return;
@@ -265,7 +399,8 @@ class ConversationControl extends Model
                 true
             )
         ) {
-            $etiketler[] = $etiket;
+            $etiketler[] =
+                $etiket;
         }
 
         $this->update([
@@ -298,7 +433,8 @@ class ConversationControl extends Model
             );
 
         $this->update([
-            'tags' => $etiketler,
+            'tags' =>
+                $etiketler,
         ]);
     }
 
@@ -329,9 +465,6 @@ class ConversationControl extends Model
         return match (
             $this->lead_status
         ) {
-            'new' =>
-                'Yeni Lead',
-
             'contacted' =>
                 'Görüşülüyor',
 
@@ -383,24 +516,26 @@ class ConversationControl extends Model
     public function leadSkoruGuncelle(
         int $score
     ): void {
-        $score = max(
-            0,
-            min(
-                100,
-                $score
-            )
-        );
+        $score =
+            max(
+                0,
+                min(
+                    100,
+                    $score
+                )
+            );
 
-        $temperature = match (true) {
-            $score >= 70 =>
-                'hot',
+        $temperature =
+            match (true) {
+                $score >= 70 =>
+                    'hot',
 
-            $score >= 40 =>
-                'warm',
+                $score >= 40 =>
+                    'warm',
 
-            default =>
-                'cold',
-        };
+                default =>
+                    'cold',
+            };
 
         $this->update([
             'lead_score' =>
@@ -445,14 +580,22 @@ class ConversationControl extends Model
         ];
 
         if ($status === 'won') {
-            $data['won_at'] = now();
-            $data['lost_at'] = null;
-            $data['lost_reason'] = null;
+            $data['won_at'] =
+                now();
+
+            $data['lost_at'] =
+                null;
+
+            $data['lost_reason'] =
+                null;
         }
 
         if ($status === 'lost') {
-            $data['lost_at'] = now();
-            $data['won_at'] = null;
+            $data['lost_at'] =
+                now();
+
+            $data['won_at'] =
+                null;
         }
 
         if (
@@ -465,8 +608,11 @@ class ConversationControl extends Model
                 true
             )
         ) {
-            $data['won_at'] = null;
-            $data['lost_at'] = null;
+            $data['won_at'] =
+                null;
+
+            $data['lost_at'] =
+                null;
         }
 
         $this->update(

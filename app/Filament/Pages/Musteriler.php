@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\ConversationControl;
 use App\Models\User;
+use App\Services\CrmActivityService;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -22,6 +23,19 @@ class Musteriler extends Page
         Heroicon::OutlinedUsers;
 
     protected static ?int $navigationSort = 31;
+
+    /*
+    |--------------------------------------------------------------------------
+    | CRM AKTİVİTE SERVİSİ
+    |--------------------------------------------------------------------------
+    */
+
+    protected function activityService(): CrmActivityService
+    {
+        return app(
+            CrmActivityService::class
+        );
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -44,6 +58,14 @@ class Musteriler extends Page
     */
 
     public ?int $selectedCustomerId = null;
+
+    /*
+    |--------------------------------------------------------------------------
+    | AKTİVİTE FİLTRESİ
+    |--------------------------------------------------------------------------
+    */
+
+    public string $activityFilter = 'all';
 
     /*
     |--------------------------------------------------------------------------
@@ -73,12 +95,6 @@ class Musteriler extends Page
     |--------------------------------------------------------------------------
     | MOUNT
     |--------------------------------------------------------------------------
-    |
-    | Bildirim veya başka bir ekrandan:
-    | /admin/musteriler?customer=123
-    |
-    | şeklinde gelinirse ilgili müşteri otomatik seçilir.
-    |
     */
 
     public function mount(): void
@@ -238,6 +254,126 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
+    | SEÇİLİ MÜŞTERİ AKTİVİTELERİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function getSelectedActivitiesProperty(): Collection
+    {
+        $customer =
+            $this->selectedCustomer;
+
+        if (! $customer) {
+            return collect();
+        }
+
+        $query =
+            $customer
+                ->activities()
+                ->with([
+                    'performedByUser',
+                ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | TIMELINE FİLTRELERİ
+        |--------------------------------------------------------------------------
+        */
+
+        match ($this->activityFilter) {
+            'ai' =>
+                $query->whereIn(
+                    'type',
+                    [
+                        'ai_score',
+                        'ai_status',
+                        'ai_action',
+                    ]
+                ),
+
+            'staff' =>
+                $query->whereNotNull(
+                    'performed_by_user_id'
+                ),
+
+            'sales' =>
+                $query->whereIn(
+                    'type',
+                    [
+                        'lead_status',
+                        'won',
+                        'lost',
+                        'lead_score',
+                        'lead_temperature',
+                    ]
+                ),
+
+            'follow_up' =>
+                $query->where(
+                    'type',
+                    'follow_up'
+                ),
+
+            'notes' =>
+                $query->where(
+                    'type',
+                    'note'
+                ),
+
+            'control' =>
+                $query->whereIn(
+                    'type',
+                    [
+                        'human_takeover',
+                        'ai_release',
+                        'assignment',
+                    ]
+                ),
+
+            default =>
+                null,
+        };
+
+        return $query
+            ->limit(50)
+            ->get();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AKTİVİTE FİLTRESİ AYARLA
+    |--------------------------------------------------------------------------
+    */
+
+    public function setActivityFilter(
+        string $filter
+    ): void {
+        $allowed = [
+            'all',
+            'ai',
+            'staff',
+            'sales',
+            'follow_up',
+            'notes',
+            'control',
+        ];
+
+        if (
+            ! in_array(
+                $filter,
+                $allowed,
+                true
+            )
+        ) {
+            return;
+        }
+
+        $this->activityFilter =
+            $filter;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | MÜŞTERİ SEÇ
     |--------------------------------------------------------------------------
     */
@@ -300,12 +436,51 @@ class Musteriler extends Page
 
     public function saveCustomer(): void
     {
+        $activityService =
+            $this->activityService();
+
         $customer =
             $this->selectedCustomer;
 
         if (! $customer) {
             return;
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | ESKİ DEĞERLERİ AL
+        |--------------------------------------------------------------------------
+        */
+
+        $oldStatus =
+            $customer->lead_status
+            ?: 'new';
+
+        $oldScore =
+            (int) $customer->lead_score;
+
+        $oldTemperature =
+            $customer->lead_temperature
+            ?: 'cold';
+
+        $oldAssignedUserId =
+            $customer->assigned_user_id
+                ? (int) $customer->assigned_user_id
+                : null;
+
+        $oldNotes =
+            (string) $customer->notes;
+
+        $oldFollowUp =
+            $customer->next_follow_up_at
+                ? $customer->next_follow_up_at->copy()
+                : null;
+
+        /*
+        |--------------------------------------------------------------------------
+        | YENİ PUAN / SICAKLIK
+        |--------------------------------------------------------------------------
+        */
 
         $score = max(
             0,
@@ -325,6 +500,12 @@ class Musteriler extends Page
             default =>
                 'cold',
         };
+
+        /*
+        |--------------------------------------------------------------------------
+        | KAYIT VERİSİ
+        |--------------------------------------------------------------------------
+        */
 
         $data = [
             'customer_name' =>
@@ -400,9 +581,100 @@ class Musteriler extends Page
             $data['lost_reason'] = null;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | CRM KAYDI
+        |--------------------------------------------------------------------------
+        */
+
         $customer->update(
             $data
         );
+
+        $customer->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | CRM AKTİVİTE GEÇMİŞİ
+        |--------------------------------------------------------------------------
+        |
+        | Sadece gerçekten değişen değerler activity tablosuna yazılır.
+        |
+        */
+
+        $performedBy =
+            auth()->user();
+
+        $activityService->leadStatusChanged(
+            conversation: $customer,
+            oldStatus: $oldStatus,
+            newStatus: $customer->lead_status ?: 'new',
+            performedBy: $performedBy,
+        );
+
+        if (
+            $oldStatus !== 'won'
+            && $customer->lead_status === 'won'
+        ) {
+            $activityService->won(
+                conversation: $customer,
+                performedBy: $performedBy,
+            );
+        }
+
+        if (
+            $oldStatus !== 'lost'
+            && $customer->lead_status === 'lost'
+        ) {
+            $activityService->lost(
+                conversation: $customer,
+                reason: $customer->lost_reason,
+                performedBy: $performedBy,
+            );
+        }
+
+        $activityService->leadScoreChanged(
+            conversation: $customer,
+            oldScore: $oldScore,
+            newScore: (int) $customer->lead_score,
+            performedBy: $performedBy,
+        );
+
+        $activityService->temperatureChanged(
+            conversation: $customer,
+            oldTemperature: $oldTemperature,
+            newTemperature: $customer->lead_temperature ?: 'cold',
+            performedBy: $performedBy,
+        );
+
+        $activityService->assignmentChanged(
+            conversation: $customer,
+            oldUserId: $oldAssignedUserId,
+            newUserId: $customer->assigned_user_id
+                ? (int) $customer->assigned_user_id
+                : null,
+            performedBy: $performedBy,
+        );
+
+        $activityService->followUpChanged(
+            conversation: $customer,
+            oldDate: $oldFollowUp,
+            newDate: $customer->next_follow_up_at,
+            performedBy: $performedBy,
+        );
+
+        $activityService->notesChanged(
+            conversation: $customer,
+            oldNotes: $oldNotes,
+            newNotes: (string) $customer->notes,
+            performedBy: $performedBy,
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | FORMU YENİLE
+        |--------------------------------------------------------------------------
+        */
 
         $this->selectCustomer(
             $customer->id
