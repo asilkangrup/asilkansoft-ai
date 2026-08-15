@@ -4,6 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Models\ConversationControl;
 use App\Services\CrmAnalyticsService;
+use App\Services\CrmForecastService;
+use App\Services\CrmManagerSummaryService;
+use App\Services\CrmSalesGoalService;
+use App\Services\CrmStaffSalesGoalService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Pages\Page;
@@ -23,9 +27,56 @@ class Raporlar extends Page
     public string $channelFilter = 'all';
     public string $botFilter = 'all';
 
+    public string $monthlySalesTarget = '';
+
+    public array $staffSalesTargets = [];
+
     protected function analytics(): CrmAnalyticsService
     {
         return app(CrmAnalyticsService::class);
+    }
+
+    protected function forecastService(): CrmForecastService
+    {
+        return app(CrmForecastService::class);
+    }
+
+    protected function managerSummaryService(): CrmManagerSummaryService
+    {
+        return app(
+            CrmManagerSummaryService::class
+        );
+    }
+
+    protected function salesGoalService(): CrmSalesGoalService
+    {
+        return app(CrmSalesGoalService::class);
+    }
+
+    protected function staffSalesGoalService(): CrmStaffSalesGoalService
+    {
+        return app(CrmStaffSalesGoalService::class);
+    }
+
+    public function mount(): void
+    {
+        $target =
+            (float) (
+                auth()->user()?->monthly_sales_target
+                ?? 0
+            );
+
+        $this->monthlySalesTarget =
+            $target > 0
+                ? number_format(
+                    $target,
+                    2,
+                    '.',
+                    ''
+                )
+                : '';
+
+        $this->loadStaffSalesTargets();
     }
 
     protected function startDate(): Carbon
@@ -110,6 +161,125 @@ class Raporlar extends Page
                 fn (Builder $query) => $query->where('ai_bot_id', (int) $this->botFilter)
             )
             ->count();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FİNANSAL PERFORMANS
+    |--------------------------------------------------------------------------
+    */
+
+    public function getOpenPipelineValueProperty(): float
+    {
+        return round(
+            (float) $this->baseQuery()
+                ->whereNotIn('lead_status', ['won', 'lost'])
+                ->whereNotNull('estimated_value')
+                ->sum('estimated_value'),
+            2
+        );
+    }
+
+    public function getWeightedPipelineValueProperty(): float
+    {
+        return round(
+            $this->baseQuery()
+                ->whereNotIn('lead_status', ['won', 'lost'])
+                ->whereNotNull('estimated_value')
+                ->where('estimated_value', '>', 0)
+                ->get()
+                ->sum(
+                    fn (ConversationControl $conversation): float =>
+                        $this->forecastService()->weightedValue($conversation)
+                ),
+            2
+        );
+    }
+
+    public function getRealizedRevenueProperty(): float
+    {
+        return round(
+            (float) $this->baseQuery()
+                ->where('lead_status', 'won')
+                ->whereNotNull('actual_value')
+                ->sum('actual_value'),
+            2
+        );
+    }
+
+    public function getAverageSaleValueProperty(): float
+    {
+        return round(
+            (float) $this->baseQuery()
+                ->where('lead_status', 'won')
+                ->whereNotNull('actual_value')
+                ->where('actual_value', '>', 0)
+                ->avg('actual_value'),
+            2
+        );
+    }
+
+    public function getForecastComparisonProperty(): array
+    {
+        $sales = $this->baseQuery()
+            ->where('lead_status', 'won')
+            ->whereNotNull('estimated_value')
+            ->whereNotNull('actual_value')
+            ->get([
+                'estimated_value',
+                'actual_value',
+            ]);
+
+        if ($sales->isEmpty()) {
+            return [
+                'estimated' => 0.0,
+                'actual' => 0.0,
+                'difference' => 0.0,
+                'accuracy' => null,
+                'count' => 0,
+            ];
+        }
+
+        $estimated = round(
+            (float) $sales->sum('estimated_value'),
+            2
+        );
+
+        $actual = round(
+            (float) $sales->sum('actual_value'),
+            2
+        );
+
+        $difference = round(
+            $actual - $estimated,
+            2
+        );
+
+        $accuracy = null;
+
+        if ($estimated > 0) {
+            $accuracy = (int) round(
+                max(
+                    0,
+                    min(
+                        100,
+                        100 - (
+                            abs($actual - $estimated)
+                            / $estimated
+                            * 100
+                        )
+                    )
+                )
+            );
+        }
+
+        return [
+            'estimated' => $estimated,
+            'actual' => $actual,
+            'difference' => $difference,
+            'accuracy' => $accuracy,
+            'count' => $sales->count(),
+        ];
     }
 
     public function getAiMessageCountProperty(): int
@@ -240,6 +410,193 @@ class Raporlar extends Page
         return $rows;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | SATIŞ HUNİSİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function getSalesFunnelProperty(): array
+    {
+        $stages = [
+            'new' => 'Yeni',
+            'contacted' => 'Görüşülüyor',
+            'qualified' => 'Nitelikli',
+            'proposal' => 'Teklif',
+            'won' => 'Kazanıldı',
+            'lost' => 'Kaybedildi',
+        ];
+
+        $total =
+            max(
+                1,
+                $this->totalLeads
+            );
+
+        $rows = [];
+
+        foreach ($stages as $key => $label) {
+            $count =
+                $this->baseQuery()
+                    ->where(
+                        'lead_status',
+                        $key
+                    )
+                    ->count();
+
+            $rows[] = [
+                'key' =>
+                    $key,
+
+                'label' =>
+                    $label,
+
+                'count' =>
+                    $count,
+
+                'percent' =>
+                    round(
+                        (
+                            $count
+                            / $total
+                        )
+                        * 100,
+                        1
+                    ),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KAYIP NEDENLERİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function getLostReasonStatsProperty(): Collection
+    {
+        return $this->baseQuery()
+            ->where(
+                'lead_status',
+                'lost'
+            )
+            ->selectRaw(
+                "
+                COALESCE(NULLIF(TRIM(lost_reason), ''), 'Belirtilmemiş') as reason,
+                COUNT(*) as total
+                "
+            )
+            ->groupBy(
+                'reason'
+            )
+            ->orderByDesc(
+                'total'
+            )
+            ->limit(10)
+            ->get();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KANAL BAZLI CİRO
+    |--------------------------------------------------------------------------
+    */
+
+    public function getChannelRevenueStatsProperty(): array
+    {
+        $channels = [
+            'whatsapp' => 'WhatsApp',
+            'instagram' => 'Instagram',
+            'facebook' => 'Facebook',
+            'web' => 'Web',
+        ];
+
+        $rows = [];
+
+        foreach ($channels as $key => $label) {
+            $won =
+                $this->baseQuery()
+                    ->where(
+                        'channel',
+                        $key
+                    )
+                    ->where(
+                        'lead_status',
+                        'won'
+                    );
+
+            $revenue =
+                round(
+                    (float) (
+                        clone $won
+                    )
+                        ->whereNotNull(
+                            'actual_value'
+                        )
+                        ->sum(
+                            'actual_value'
+                        ),
+                    2
+                );
+
+            $sales =
+                (clone $won)
+                    ->count();
+
+            $leads =
+                $this->baseQuery()
+                    ->where(
+                        'channel',
+                        $key
+                    )
+                    ->count();
+
+            $conversion =
+                $leads > 0
+                    ? round(
+                        (
+                            $sales
+                            / $leads
+                        )
+                        * 100,
+                        1
+                    )
+                    : 0;
+
+            $rows[] = [
+                'key' =>
+                    $key,
+
+                'label' =>
+                    $label,
+
+                'leads' =>
+                    $leads,
+
+                'sales' =>
+                    $sales,
+
+                'revenue' =>
+                    $revenue,
+
+                'conversion' =>
+                    $conversion,
+            ];
+        }
+
+        usort(
+            $rows,
+            fn (array $a, array $b): int =>
+                $b['revenue']
+                <=>
+                $a['revenue']
+        );
+
+        return $rows;
+    }
+
     public function getBotStatsProperty(): Collection
     {
         return ConversationControl::query()
@@ -248,7 +605,27 @@ class Raporlar extends Page
                 ai_bot_id,
                 COUNT(*) as total_leads,
                 SUM(CASE WHEN lead_status = 'won' THEN 1 ELSE 0 END) as won_leads,
-                SUM(CASE WHEN lead_temperature = 'hot' THEN 1 ELSE 0 END) as hot_leads
+                SUM(CASE WHEN lead_temperature = 'hot' THEN 1 ELSE 0 END) as hot_leads,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN lead_status NOT IN ('won', 'lost')
+                            THEN estimated_value
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) as pipeline_value,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN lead_status = 'won'
+                            THEN actual_value
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) as realized_revenue
                 "
             )
             ->where('user_id', auth()->id())
@@ -279,6 +656,255 @@ class Raporlar extends Page
             ->unique('id')
             ->sortBy('name')
             ->values();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AYLIK SATIŞ HEDEFİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function getMonthlyGoalProgressProperty(): array
+    {
+        $user =
+            auth()->user();
+
+        if (! $user) {
+            return [
+                'target' => 0.0,
+                'realized' => 0.0,
+                'remaining' => 0.0,
+                'exceeded' => 0.0,
+                'percent' => 0.0,
+                'completed' => false,
+            ];
+        }
+
+        return $this->salesGoalService()
+            ->progress(
+                $user
+            );
+    }
+
+    public function saveMonthlySalesTarget(): void
+    {
+        $user =
+            auth()->user();
+
+        if (! $user) {
+            return;
+        }
+
+        $target =
+            trim(
+                $this->monthlySalesTarget
+            );
+
+        $value =
+            $target !== ''
+                ? max(
+                    0,
+                    (float) str_replace(
+                        ',',
+                        '.',
+                        $target
+                    )
+                )
+                : null;
+
+        $this->salesGoalService()
+            ->saveTarget(
+                user: $user,
+                target: $value,
+            );
+
+        $user->refresh();
+
+        $this->monthlySalesTarget =
+            $value !== null
+                ? number_format(
+                    $value,
+                    2,
+                    '.',
+                    ''
+                )
+                : '';
+
+        $this->dispatch(
+            'monthly-sales-target-saved'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PERSONEL SATIŞ HEDEFLERİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function getStaffGoalRowsProperty(): Collection
+    {
+        return $this->staffSalesGoalService()
+            ->rows(
+                auth()->id()
+            );
+    }
+
+    protected function loadStaffSalesTargets(): void
+    {
+        $this->staffSalesTargets = [];
+
+        foreach (
+            $this->staffSalesGoalService()
+                ->rows(
+                    auth()->id()
+                )
+            as $row
+        ) {
+            $staffId =
+                (int) $row['staff_user_id'];
+
+            $target =
+                (float) $row['target'];
+
+            $this->staffSalesTargets[
+                $staffId
+            ] =
+                $target > 0
+                    ? number_format(
+                        $target,
+                        2,
+                        '.',
+                        ''
+                    )
+                    : '';
+        }
+    }
+
+    public function saveStaffSalesTarget(
+        int $staffUserId
+    ): void {
+        $raw =
+            trim(
+                (string) (
+                    $this->staffSalesTargets[
+                        $staffUserId
+                    ]
+                    ?? ''
+                )
+            );
+
+        $value =
+            $raw !== ''
+                ? max(
+                    0,
+                    (float) str_replace(
+                        ',',
+                        '.',
+                        $raw
+                    )
+                )
+                : 0;
+
+        $saved =
+            $this->staffSalesGoalService()
+                ->saveTarget(
+                    ownerUserId:
+                        auth()->id(),
+
+                    staffUserId:
+                        $staffUserId,
+
+                    target:
+                        $value,
+                );
+
+        if (! $saved) {
+            return;
+        }
+
+        $this->staffSalesTargets[
+            $staffUserId
+        ] =
+            $value > 0
+                ? number_format(
+                    $value,
+                    2,
+                    '.',
+                    ''
+                )
+                : '';
+
+        $this->dispatch(
+            'staff-sales-target-saved'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | WAI YÖNETİCİ ÖZETİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function getManagerSummaryProperty()
+    {
+        $summary =
+            $this->managerSummaryService()
+                ->latest(
+                    auth()->id()
+                );
+
+        if (
+            ! $summary
+            || ! $summary->summary_date
+            || ! $summary->summary_date->isToday()
+        ) {
+            try {
+                $summary =
+                    $this->managerSummaryService()
+                        ->generate(
+                            auth()->user()
+                        );
+            } catch (\Throwable $exception) {
+                report(
+                    $exception
+                );
+            }
+        }
+
+        return $summary;
+    }
+
+    public function refreshManagerSummary(): void
+    {
+        $user =
+            auth()->user();
+
+        if (! $user) {
+            return;
+        }
+
+        try {
+            $this->managerSummaryService()
+                ->generate(
+                    $user
+                );
+
+            unset(
+                $this->managerSummary
+            );
+
+            $this->dispatch(
+                'manager-summary-refreshed'
+            );
+        } catch (\Throwable $exception) {
+            report(
+                $exception
+            );
+
+            $this->dispatch(
+                'manager-summary-failed'
+            );
+        }
     }
 
     public function resetFilters(): void
