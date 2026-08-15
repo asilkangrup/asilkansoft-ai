@@ -1,3 +1,6 @@
+
+
+
 <x-filament-panels::page>
 
 <style>
@@ -584,11 +587,190 @@
     }
 }
 
+
+/* WAI PREMIUM LIVE KPI FINAL */
+.wai-live-card{position:relative;overflow:hidden;border:0!important;color:#fff!important;box-shadow:0 14px 32px rgba(15,23,42,.11)}
+.wai-live-card::after{content:"";position:absolute;width:135px;height:135px;right:-58px;top:-62px;border-radius:999px;background:rgba(255,255,255,.09)}
+.wai-live-card.blue{background:linear-gradient(135deg,#3b82f6,#2563eb 52%,#1d4ed8)!important}
+.wai-live-card.orange{background:linear-gradient(135deg,#fb923c,#f97316 52%,#ea580c)!important}
+.wai-live-card.purple{background:linear-gradient(135deg,#8b5cf6,#7c3aed 52%,#6d28d9)!important}
+.wai-live-card.green{background:linear-gradient(135deg,#34d399,#10b981 52%,#059669)!important}
+.wai-live-card.red{background:linear-gradient(135deg,#f87171,#ef4444 52%,#dc2626)!important}
+.wai-live-card.indigo{background:linear-gradient(135deg,#6366f1,#4f46e5 52%,#4338ca)!important}
+.wai-live-card.amber{background:linear-gradient(135deg,#fbbf24,#f59e0b 52%,#d97706)!important}
+.wai-live-card.slate{background:linear-gradient(135deg,#64748b,#475569 52%,#334155)!important}
+.wai-live-card *{position:relative;z-index:2}.wai-live-card strong,.wai-live-card span,.wai-live-card [class*="number"],.wai-live-card [class*="label"]{color:#fff!important}
+.wai-live-trend{position:absolute!important;z-index:4!important;right:11px;top:11px;padding:5px 8px;border:1px solid rgba(255,255,255,.18);border-radius:999px;color:#fff!important;background:rgba(255,255,255,.13);font-size:10px!important;font-weight:900}
+.wai-live-trend.up::before{content:"↗ "}.wai-live-trend.down::before{content:"↘ "}.wai-live-trend.flat::before{content:"→ "}
+.wai-live-spark{position:absolute!important;z-index:3!important;right:12px;bottom:9px;width:92px;height:38px}.wai-live-spark svg{width:100%;height:100%;overflow:visible}.wai-live-spark polyline{fill:none;stroke:rgba(255,255,255,.96);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+
+
+/* ==========================================================================
+   GÖREVLER — PREMIUM REFINED FINAL
+   ========================================================================== */
+
+.tasks-kpis .tasks-kpi {
+    min-height: 165px;
+    padding: 20px;
+    border-radius: 22px;
+}
+
+.tasks-kpis .tasks-kpi:nth-child(1) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(252,165,165,.26), transparent 32%),
+        linear-gradient(135deg,#f87171 0%,#ef4444 52%,#dc2626 100%) !important;
+}
+.tasks-kpis .tasks-kpi:nth-child(2) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(253,186,116,.28), transparent 32%),
+        linear-gradient(135deg,#fb923c 0%,#f97316 52%,#ea580c 100%) !important;
+}
+.tasks-kpis .tasks-kpi:nth-child(3) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(147,197,253,.28), transparent 32%),
+        linear-gradient(135deg,#60a5fa 0%,#3b82f6 52%,#2563eb 100%) !important;
+}
+.tasks-kpis .tasks-kpi:nth-child(4) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(196,181,253,.28), transparent 32%),
+        linear-gradient(135deg,#8b5cf6 0%,#7c3aed 52%,#6d28d9 100%) !important;
+}
+
+.tasks-kpis .tasks-kpi-number {
+    margin-top: 24px;
+    font-size: 34px !important;
+}
+.tasks-kpis .tasks-kpi-label {
+    margin-top: 8px;
+    max-width: calc(100% - 88px);
+    font-size: 13px !important;
+    font-weight: 850;
+}
+
+.tasks-kpis .wai-live-spark {
+    right: 14px;
+    bottom: 17px;
+    width: 82px;
+    height: 34px;
+}
+.tasks-kpis .wai-live-trend {
+    right: 14px;
+    top: 14px;
+}
+
+/* Sadece kolon başlıkları renkli */
+.task-column {
+    border: 1px solid #e2e8e4 !important;
+    background: #f8faf9 !important;
+}
+.task-card {
+    background: #fff !important;
+    border: 1px solid #e2e8e4 !important;
+}
+
+.task-column.overdue .task-column-head {
+    background: linear-gradient(135deg,#ef4444,#dc2626) !important;
+}
+.task-column.today .task-column-head {
+    background: linear-gradient(135deg,#f59e0b,#f97316) !important;
+}
+.task-column.upcoming .task-column-head {
+    background: linear-gradient(135deg,#3b82f6,#2563eb) !important;
+}
+
+.task-column-head .task-column-title,
+.task-column-head .task-column-count {
+    color: #fff !important;
+}
+
+.task-column-head .task-column-count {
+    background: rgba(255,255,255,.18) !important;
+}
+
+.task-name { font-size: 13px !important; }
+.task-time,
+.task-phone,
+.task-owner,
+.task-pill,
+.task-actions button,
+.task-actions a {
+    font-size: 11px !important;
+}
+
+
+/* ==========================================================================
+   GÖREVLER — FINAL COLOR ORDER
+   Kırmızı / Sarı / Mavi / Yeşil
+   ========================================================================== */
+
+.tasks-kpis .tasks-kpi:nth-child(1) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(252,165,165,.26), transparent 32%),
+        linear-gradient(135deg,#f87171 0%,#ef4444 52%,#dc2626 100%) !important;
+}
+
+.tasks-kpis .tasks-kpi:nth-child(2) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(253,224,71,.30), transparent 32%),
+        linear-gradient(135deg,#facc15 0%,#eab308 52%,#ca8a04 100%) !important;
+}
+
+.tasks-kpis .tasks-kpi:nth-child(3) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(147,197,253,.28), transparent 32%),
+        linear-gradient(135deg,#60a5fa 0%,#3b82f6 52%,#2563eb 100%) !important;
+}
+
+.tasks-kpis .tasks-kpi:nth-child(4) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(110,231,183,.28), transparent 32%),
+        linear-gradient(135deg,#34d399 0%,#10b981 52%,#059669 100%) !important;
+}
+
+/* Kolon başlıkları da aynı renk mantığında */
+.task-column.overdue .task-column-head {
+    background: linear-gradient(135deg,#ef4444,#dc2626) !important;
+}
+
+.task-column.today .task-column-head {
+    background: linear-gradient(135deg,#facc15,#eab308) !important;
+}
+
+.task-column.upcoming .task-column-head {
+    background: linear-gradient(135deg,#3b82f6,#2563eb) !important;
+}
+
+/* Sarı başlıkta okunabilirlik için koyu yazı */
+.task-column.today .task-column-title,
+.task-column.today .task-column-count {
+    color: #422006 !important;
+}
+
+.task-column.today .task-column-count {
+    background: rgba(255,255,255,.32) !important;
+    border: 1px solid rgba(255,255,255,.28);
+}
+
+/* Kırmızı ve mavi başlıklarda beyaz yazı */
+.task-column.overdue .task-column-title,
+.task-column.overdue .task-column-count,
+.task-column.upcoming .task-column-title,
+.task-column.upcoming .task-column-count {
+    color: #fff !important;
+}
+
+.task-column.overdue .task-column-count,
+.task-column.upcoming .task-column-count {
+    background: rgba(255,255,255,.18) !important;
+}
+
 </style>
 
 
 <div
     class="wai-tasks"
+
+    wire:poll.60s
 
     x-data="{
         updated: false
@@ -633,43 +815,53 @@
     </section>
 
 
-    <section class="tasks-kpis">
+        @php $live=$this->liveKpiTrends; @endphp
 
-        <div class="tasks-kpi">
+<section class="tasks-kpis">
+
+        <div class="tasks-kpi wai-live-card red">
             <div class="tasks-kpi-number">
                 {{ $this->overdueCount }}
             </div>
             <div class="tasks-kpi-label">
                 Geciken
             </div>
-        </div>
+        <div class="wai-live-trend {{ $live['overdue']['trend_direction'] }}">{{ $live['overdue']['trend_label'] }}</div>
+<div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['overdue']['points'] }}"/></svg></div>
+</div>
 
-        <div class="tasks-kpi">
+        <div class="tasks-kpi wai-live-card orange">
             <div class="tasks-kpi-number">
                 {{ $this->todayCount }}
             </div>
             <div class="tasks-kpi-label">
                 Bugün
             </div>
-        </div>
+        <div class="wai-live-trend {{ $live['today']['trend_direction'] }}">{{ $live['today']['trend_label'] }}</div>
+<div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['today']['points'] }}"/></svg></div>
+</div>
 
-        <div class="tasks-kpi">
+        <div class="tasks-kpi wai-live-card blue">
             <div class="tasks-kpi-number">
                 {{ $this->upcomingCount }}
             </div>
             <div class="tasks-kpi-label">
                 Yaklaşan
             </div>
-        </div>
+        <div class="wai-live-trend {{ $live['upcoming']['trend_direction'] }}">{{ $live['upcoming']['trend_label'] }}</div>
+<div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['upcoming']['points'] }}"/></svg></div>
+</div>
 
-        <div class="tasks-kpi">
+        <div class="tasks-kpi wai-live-card purple">
             <div class="tasks-kpi-number">
                 {{ $this->hotFollowUps }}
             </div>
             <div class="tasks-kpi-label">
                 Sıcak Lead Takibi
             </div>
-        </div>
+        <div class="wai-live-trend {{ $live['hot']['trend_direction'] }}">{{ $live['hot']['trend_label'] }}</div>
+<div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['hot']['points'] }}"/></svg></div>
+</div>
 
     </section>
 

@@ -2072,10 +2072,384 @@
     }
 }
 
+
+/* WAI PREMIUM LIVE KPI FINAL */
+.wai-live-card{position:relative;overflow:hidden;border:0!important;color:#fff!important;box-shadow:0 14px 32px rgba(15,23,42,.11)}
+.wai-live-card::after{content:"";position:absolute;width:135px;height:135px;right:-58px;top:-62px;border-radius:999px;background:rgba(255,255,255,.09)}
+.wai-live-card.blue{background:linear-gradient(135deg,#3b82f6,#2563eb 52%,#1d4ed8)!important}
+.wai-live-card.orange{background:linear-gradient(135deg,#fb923c,#f97316 52%,#ea580c)!important}
+.wai-live-card.purple{background:linear-gradient(135deg,#8b5cf6,#7c3aed 52%,#6d28d9)!important}
+.wai-live-card.green{background:linear-gradient(135deg,#34d399,#10b981 52%,#059669)!important}
+.wai-live-card.red{background:linear-gradient(135deg,#f87171,#ef4444 52%,#dc2626)!important}
+.wai-live-card.indigo{background:linear-gradient(135deg,#6366f1,#4f46e5 52%,#4338ca)!important}
+.wai-live-card.amber{background:linear-gradient(135deg,#fbbf24,#f59e0b 52%,#d97706)!important}
+.wai-live-card.slate{background:linear-gradient(135deg,#64748b,#475569 52%,#334155)!important}
+.wai-live-card *{position:relative;z-index:2}.wai-live-card strong,.wai-live-card span,.wai-live-card [class*="number"],.wai-live-card [class*="label"]{color:#fff!important}
+.wai-live-trend{position:absolute!important;z-index:4!important;right:11px;top:11px;padding:5px 8px;border:1px solid rgba(255,255,255,.18);border-radius:999px;color:#fff!important;background:rgba(255,255,255,.13);font-size:10px!important;font-weight:900}
+.wai-live-trend.up::before{content:"↗ "}.wai-live-trend.down::before{content:"↘ "}.wai-live-trend.flat::before{content:"→ "}
+.wai-live-spark{position:absolute!important;z-index:3!important;right:12px;bottom:9px;width:92px;height:38px}.wai-live-spark svg{width:100%;height:100%;overflow:visible}.wai-live-spark polyline{fill:none;stroke:rgba(255,255,255,.96);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+
+
+/* ==========================================================================
+   RAPORLAR — PREMIUM REFINED FINAL
+   ========================================================================== */
+
+.report-kpis .report-kpi {
+    min-height: 155px;
+    padding: 20px;
+    border-radius: 22px;
+}
+
+.report-kpis .report-kpi:nth-child(1) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(147,197,253,.28), transparent 32%),
+        linear-gradient(135deg,#60a5fa 0%,#3b82f6 52%,#2563eb 100%) !important;
+}
+.report-kpis .report-kpi:nth-child(2) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(148,163,184,.25), transparent 32%),
+        linear-gradient(135deg,#64748b 0%,#475569 52%,#334155 100%) !important;
+}
+.report-kpis .report-kpi:nth-child(3) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(253,186,116,.28), transparent 32%),
+        linear-gradient(135deg,#fb923c 0%,#f97316 52%,#ea580c 100%) !important;
+}
+.report-kpis .report-kpi:nth-child(4) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(196,181,253,.28), transparent 32%),
+        linear-gradient(135deg,#8b5cf6 0%,#7c3aed 52%,#6d28d9 100%) !important;
+}
+
+.report-kpis .wai-live-spark {
+    right: 14px;
+    bottom: 14px;
+    width: 80px;
+    height: 33px;
+}
+
+/* Yönetici özeti beyaz premium */
+.report-manager-card,
+.report-manager-summary {
+    background: #fff !important;
+    border: 1px solid #cfe9da !important;
+    box-shadow: 0 10px 26px rgba(5,120,66,.05);
+}
+
+/* Alarm özeti beyaz + kırmızı vurgu */
+.report-alarm-card,
+.report-alarm-section {
+    background: #fff !important;
+    border: 1px solid #f0cdcd !important;
+    box-shadow: 0 10px 26px rgba(185,28,28,.045);
+}
+
+/* İç metinler okunaklı */
+.report-kpi-label,
+.report-alarm-kpi span,
+.report-manager-meta,
+.report-alarm-sub {
+    font-size: 11px !important;
+}
+.report-manager-text,
+.report-insight-text,
+.report-alarm-item {
+    font-size: 12px !important;
+    line-height: 1.55;
+}
+
+
+/* ==========================================================================
+   RAPORLAR — FINAL PREMIUM COLOR SYSTEM
+   Mavi / Sarı / Yeşil / Mor
+   ========================================================================== */
+
+.report-kpis .report-kpi:nth-child(1) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(147,197,253,.28), transparent 32%),
+        linear-gradient(135deg,#60a5fa 0%,#3b82f6 52%,#2563eb 100%) !important;
+}
+
+.report-kpis .report-kpi:nth-child(2) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(253,224,71,.30), transparent 32%),
+        linear-gradient(135deg,#facc15 0%,#eab308 52%,#ca8a04 100%) !important;
+}
+
+.report-kpis .report-kpi:nth-child(3) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(110,231,183,.28), transparent 32%),
+        linear-gradient(135deg,#34d399 0%,#10b981 52%,#059669 100%) !important;
+}
+
+.report-kpis .report-kpi:nth-child(4) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(196,181,253,.28), transparent 32%),
+        linear-gradient(135deg,#8b5cf6 0%,#7c3aed 52%,#6d28d9 100%) !important;
+}
+
+/* Sarı kartta okunabilirlik */
+.report-kpis .report-kpi:nth-child(2) *,
+.report-kpis .report-kpi:nth-child(2) .wai-live-trend {
+    color: #422006 !important;
+}
+
+.report-kpis .report-kpi:nth-child(2) .wai-live-trend {
+    background: rgba(255,255,255,.35) !important;
+    border-color: rgba(255,255,255,.32) !important;
+}
+
+.report-kpis .report-kpi:nth-child(2) .wai-live-spark polyline {
+    stroke: rgba(66,32,6,.88) !important;
+}
+
+/* Diğer KPI metinleri beyaz */
+.report-kpis .report-kpi:nth-child(1) *,
+.report-kpis .report-kpi:nth-child(3) *,
+.report-kpis .report-kpi:nth-child(4) * {
+    color: #fff !important;
+}
+
+/* KPI boyut ve boşluk */
+.report-kpis .report-kpi {
+    min-height: 162px;
+    padding: 20px;
+    border-radius: 22px;
+}
+
+.report-kpis .report-kpi-number {
+    margin-top: 24px;
+    font-size: 33px !important;
+    line-height: 1;
+}
+
+.report-kpis .report-kpi-label {
+    margin-top: 8px;
+    max-width: calc(100% - 86px);
+    font-size: 13px !important;
+    font-weight: 850;
+}
+
+.report-kpis .wai-live-trend {
+    right: 14px;
+    top: 14px;
+}
+
+.report-kpis .wai-live-spark {
+    right: 14px;
+    bottom: 15px;
+    width: 80px;
+    height: 33px;
+}
+
+/* Yönetici Özeti */
+.report-manager-card,
+.report-manager-summary {
+    background: #fff !important;
+    border: 1px solid #cce9d8 !important;
+    border-top: 4px solid #10b981 !important;
+    box-shadow: 0 10px 26px rgba(5,120,66,.05);
+}
+
+/* Alarm özeti */
+.report-alarm-card,
+.report-alarm-section {
+    background: #fff !important;
+    border: 1px solid #efcccc !important;
+    border-top: 4px solid #ef4444 !important;
+    box-shadow: 0 10px 26px rgba(185,28,28,.045);
+}
+
+/* Diğer rapor kartları beyaz ve sakin */
+.report-section,
+.report-card,
+.report-table-card {
+    background: #fff;
+    border-color: #e2e8e4;
+    box-shadow: 0 8px 24px rgba(15,23,42,.035);
+}
+
+/* Okunabilirlik */
+.report-manager-text,
+.report-insight-text,
+.report-alarm-item,
+.report-table td {
+    font-size: 12px !important;
+    line-height: 1.55;
+}
+
+.report-kpi-label,
+.report-manager-meta,
+.report-alarm-sub,
+.report-table th {
+    font-size: 11px !important;
+}
+
+
+/* ==========================================================================
+   RAPORLAR — FINAL READABILITY LOCK
+   Küçük yazı bırakma: ana metin 13px+, yardımcı metin 12px+.
+   ========================================================================== */
+
+.wai-reports {
+    font-size: 14px !important;
+}
+
+/* Yönetici özeti */
+.wai-reports .report-manager-title,
+.wai-reports .report-section-title,
+.wai-reports .report-alarm-title {
+    font-size: 20px !important;
+    line-height: 1.3 !important;
+    font-weight: 900 !important;
+}
+
+.wai-reports .report-manager-meta,
+.wai-reports .report-manager-date,
+.wai-reports .report-subtitle,
+.wai-reports .report-alarm-sub {
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+    font-weight: 700 !important;
+}
+
+.wai-reports .report-manager-text,
+.wai-reports .report-manager-summary,
+.wai-reports .report-insight-text,
+.wai-reports .report-description {
+    font-size: 14px !important;
+    line-height: 1.7 !important;
+}
+
+/* KPI kartları */
+.wai-reports .report-kpi-number,
+.wai-reports .report-alarm-kpi strong {
+    font-size: 27px !important;
+    line-height: 1.05 !important;
+    font-weight: 950 !important;
+}
+
+.wai-reports .report-kpi-label,
+.wai-reports .report-alarm-kpi span {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    font-weight: 800 !important;
+}
+
+/* Yönetici özetinin içindeki küçük istatistik kartları */
+.wai-reports .report-manager-card strong,
+.wai-reports .report-manager-stat strong,
+.wai-reports .manager-kpi strong {
+    font-size: 24px !important;
+    line-height: 1.1 !important;
+}
+
+.wai-reports .report-manager-card span,
+.wai-reports .report-manager-stat span,
+.wai-reports .manager-kpi span {
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+    font-weight: 750 !important;
+}
+
+/* Alarm bölümü */
+.wai-reports .report-alarm-item,
+.wai-reports .report-alarm-list,
+.wai-reports .report-alarm-name,
+.wai-reports .report-alarm-text {
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+}
+
+.wai-reports .report-alarm-badge,
+.wai-reports .report-badge,
+.wai-reports .report-pill {
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    font-weight: 850 !important;
+}
+
+/* Tablolar */
+.wai-reports table th,
+.wai-reports .report-table th {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    font-weight: 900 !important;
+}
+
+.wai-reports table td,
+.wai-reports .report-table td {
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+}
+
+/* Form, filtre ve butonlar */
+.wai-reports button,
+.wai-reports a,
+.wai-reports input,
+.wai-reports select,
+.wai-reports textarea {
+    font-size: 13px !important;
+}
+
+.wai-reports .report-button,
+.wai-reports .report-action,
+.wai-reports .report-refresh {
+    font-size: 13px !important;
+    font-weight: 850 !important;
+}
+
+/* Genel küçük etiketleri de güvenli alt sınıra çek */
+.wai-reports small,
+.wai-reports label {
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+}
+
+/* Inline class'larda kalmış 8-11px yazıları yakala */
+.wai-reports [style*="font-size: 8px"],
+.wai-reports [style*="font-size:8px"],
+.wai-reports [style*="font-size: 9px"],
+.wai-reports [style*="font-size:9px"],
+.wai-reports [style*="font-size: 10px"],
+.wai-reports [style*="font-size:10px"],
+.wai-reports [style*="font-size: 11px"],
+.wai-reports [style*="font-size:11px"] {
+    font-size: 12px !important;
+}
+
+/* Mobilde de küçültme */
+@media (max-width: 800px) {
+    .wai-reports {
+        font-size: 13px !important;
+    }
+
+    .wai-reports .report-manager-title,
+    .wai-reports .report-section-title,
+    .wai-reports .report-alarm-title {
+        font-size: 18px !important;
+    }
+
+    .wai-reports .report-manager-text,
+    .wai-reports .report-insight-text,
+    .wai-reports table td {
+        font-size: 13px !important;
+    }
+
+    .wai-reports .report-kpi-label,
+    .wai-reports .report-alarm-kpi span,
+    .wai-reports small,
+    .wai-reports label {
+        font-size: 12px !important;
+    }
+}
+
 </style>
 
 <div
     class="wai-reports"
+
+    wire:poll.60s
     x-data="{ targetSaved: false, staffTargetSaved: false, managerSummaryRefreshed: false, managerSummaryFailed: false }"
     x-on:monthly-sales-target-saved.window="
         targetSaved = true;
@@ -2412,27 +2786,29 @@
     </section>
 
 
-    <section class="report-kpis">
+        @php $live=$this->liveKpiTrends; @endphp
 
-        <div class="report-kpi">
+<section class="report-kpis">
+
+        <div class="report-kpi wai-live-card blue">
             <div class="report-kpi-number">{{ $this->totalLeads }}</div>
             <div class="report-kpi-label">Toplam Lead</div>
-        </div>
+        <div class="wai-live-trend {{ $live['total']['trend_direction'] }}">{{ $live['total']['trend_label'] }}</div><div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['total']['points'] }}"/></svg></div></div>
 
-        <div class="report-kpi">
+        <div class="report-kpi wai-live-card slate">
             <div class="report-kpi-number">{{ $this->openLeads }}</div>
             <div class="report-kpi-label">Açık Fırsat</div>
-        </div>
+        <div class="wai-live-trend {{ $live['open']['trend_direction'] }}">{{ $live['open']['trend_label'] }}</div><div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['open']['points'] }}"/></svg></div></div>
 
-        <div class="report-kpi">
+        <div class="report-kpi wai-live-card orange">
             <div class="report-kpi-number">{{ $this->hotLeads }}</div>
             <div class="report-kpi-label">Sıcak Lead</div>
-        </div>
+        <div class="wai-live-trend {{ $live['hot']['trend_direction'] }}">{{ $live['hot']['trend_label'] }}</div><div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['hot']['points'] }}"/></svg></div></div>
 
-        <div class="report-kpi">
+        <div class="report-kpi wai-live-card purple">
             <div class="report-kpi-number">{{ $this->proposalLeads }}</div>
             <div class="report-kpi-label">Teklif</div>
-        </div>
+        <div class="wai-live-trend {{ $live['proposal']['trend_direction'] }}">{{ $live['proposal']['trend_label'] }}</div><div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['proposal']['points'] }}"/></svg></div></div>
 
         <div class="report-kpi">
             <div class="report-kpi-number">{{ $this->wonLeads }}</div>

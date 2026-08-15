@@ -733,9 +733,206 @@
     }
 }
 
+
+/* WAI PREMIUM LIVE KPI FINAL */
+.wai-live-card{position:relative;overflow:hidden;border:0!important;color:#fff!important;box-shadow:0 14px 32px rgba(15,23,42,.11)}
+.wai-live-card::after{content:"";position:absolute;width:135px;height:135px;right:-58px;top:-62px;border-radius:999px;background:rgba(255,255,255,.09)}
+.wai-live-card.blue{background:linear-gradient(135deg,#3b82f6,#2563eb 52%,#1d4ed8)!important}
+.wai-live-card.orange{background:linear-gradient(135deg,#fb923c,#f97316 52%,#ea580c)!important}
+.wai-live-card.purple{background:linear-gradient(135deg,#8b5cf6,#7c3aed 52%,#6d28d9)!important}
+.wai-live-card.green{background:linear-gradient(135deg,#34d399,#10b981 52%,#059669)!important}
+.wai-live-card.red{background:linear-gradient(135deg,#f87171,#ef4444 52%,#dc2626)!important}
+.wai-live-card.indigo{background:linear-gradient(135deg,#6366f1,#4f46e5 52%,#4338ca)!important}
+.wai-live-card.amber{background:linear-gradient(135deg,#fbbf24,#f59e0b 52%,#d97706)!important}
+.wai-live-card.slate{background:linear-gradient(135deg,#64748b,#475569 52%,#334155)!important}
+.wai-live-card *{position:relative;z-index:2}.wai-live-card strong,.wai-live-card span,.wai-live-card [class*="number"],.wai-live-card [class*="label"]{color:#fff!important}
+.wai-live-trend{position:absolute!important;z-index:4!important;right:11px;top:11px;padding:5px 8px;border:1px solid rgba(255,255,255,.18);border-radius:999px;color:#fff!important;background:rgba(255,255,255,.13);font-size:10px!important;font-weight:900}
+.wai-live-trend.up::before{content:"↗ "}.wai-live-trend.down::before{content:"↘ "}.wai-live-trend.flat::before{content:"→ "}
+.wai-live-spark{position:absolute!important;z-index:3!important;right:12px;bottom:9px;width:92px;height:38px}.wai-live-spark svg{width:100%;height:100%;overflow:visible}.wai-live-spark polyline{fill:none;stroke:rgba(255,255,255,.96);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+
+
+/* ==========================================================================
+   ALARM MERKEZİ — PREMIUM REFINED FINAL
+   ========================================================================== */
+
+.alarm-kpis .alarm-kpi {
+    min-height: 155px;
+    padding: 20px;
+    border-radius: 22px;
+}
+
+.alarm-kpis .alarm-kpi:nth-child(1) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(252,165,165,.25), transparent 32%),
+        linear-gradient(135deg,#f87171 0%,#ef4444 52%,#dc2626 100%) !important;
+}
+.alarm-kpis .alarm-kpi:nth-child(2) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(253,186,116,.27), transparent 32%),
+        linear-gradient(135deg,#fb923c 0%,#f97316 52%,#ea580c 100%) !important;
+}
+.alarm-kpis .alarm-kpi:nth-child(3) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(110,231,183,.26), transparent 32%),
+        linear-gradient(135deg,#34d399 0%,#10b981 52%,#059669 100%) !important;
+}
+.alarm-kpis .alarm-kpi:nth-child(4) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(165,180,252,.27), transparent 32%),
+        linear-gradient(135deg,#6366f1 0%,#4f46e5 52%,#4338ca 100%) !important;
+}
+
+.alarm-kpis .alarm-kpi strong {
+    margin-top: 26px;
+    font-size: 33px !important;
+}
+.alarm-kpis .alarm-kpi span {
+    font-size: 12px !important;
+}
+
+.alarm-kpis .wai-live-spark {
+    right: 14px;
+    bottom: 14px;
+    width: 78px;
+    height: 32px;
+}
+
+/* SLA kartları beyaz + üst vurgu */
+.alarm-sla-card {
+    border: 1px solid #e2e8e4 !important;
+    background: #fff !important;
+    box-shadow: 0 9px 24px rgba(15,23,42,.04);
+}
+.alarm-sla-card:nth-child(1) { border-top: 4px solid #ef4444 !important; }
+.alarm-sla-card:nth-child(2) { border-top: 4px solid #3b82f6 !important; }
+.alarm-sla-card:nth-child(3) { border-top: 4px solid #f59e0b !important; }
+
+.alarm-sla-card strong { color: #111a14 !important; }
+.alarm-sla-card span { color: #748078 !important; }
+
+/* Risk ve personel kartları beyaz */
+.risk-customers-card,
+.alarm-staff-card {
+    background: #fff !important;
+    box-shadow: 0 9px 24px rgba(15,23,42,.04);
+}
+.risk-customers-card { border: 1px solid #f0caca !important; }
+.alarm-staff-card { border: 1px solid #d8e4f0 !important; }
+
+.risk-customers-title { color: #b91c1c !important; }
+.alarm-staff-title { color: #1d4ed8 !important; }
+
+
+/* ==========================================================================
+   ALARM MERKEZİ — FINAL COLOR ORDER
+   Kırmızı / Sarı / Yeşil / Mavi
+   ========================================================================== */
+
+.alarm-kpis .alarm-kpi:nth-child(1) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(252,165,165,.26), transparent 32%),
+        linear-gradient(135deg,#f87171 0%,#ef4444 52%,#dc2626 100%) !important;
+}
+
+.alarm-kpis .alarm-kpi:nth-child(2) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(253,224,71,.30), transparent 32%),
+        linear-gradient(135deg,#facc15 0%,#eab308 52%,#ca8a04 100%) !important;
+}
+
+.alarm-kpis .alarm-kpi:nth-child(3) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(110,231,183,.28), transparent 32%),
+        linear-gradient(135deg,#34d399 0%,#10b981 52%,#059669 100%) !important;
+}
+
+.alarm-kpis .alarm-kpi:nth-child(4) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(147,197,253,.28), transparent 32%),
+        linear-gradient(135deg,#60a5fa 0%,#3b82f6 52%,#2563eb 100%) !important;
+}
+
+/* Sarı kritik kartta koyu yazı */
+.alarm-kpis .alarm-kpi:nth-child(2) strong,
+.alarm-kpis .alarm-kpi:nth-child(2) span,
+.alarm-kpis .alarm-kpi:nth-child(2) .wai-live-trend {
+    color: #422006 !important;
+}
+
+.alarm-kpis .alarm-kpi:nth-child(2) .wai-live-trend {
+    background: rgba(255,255,255,.34) !important;
+    border-color: rgba(255,255,255,.30) !important;
+}
+
+.alarm-kpis .alarm-kpi:nth-child(2) .wai-live-spark polyline {
+    stroke: rgba(66,32,6,.86) !important;
+}
+
+/* Diğer KPI'lar beyaz metin */
+.alarm-kpis .alarm-kpi:nth-child(1) strong,
+.alarm-kpis .alarm-kpi:nth-child(1) span,
+.alarm-kpis .alarm-kpi:nth-child(3) strong,
+.alarm-kpis .alarm-kpi:nth-child(3) span,
+.alarm-kpis .alarm-kpi:nth-child(4) strong,
+.alarm-kpis .alarm-kpi:nth-child(4) span {
+    color: #fff !important;
+}
+
+/* SLA kartları nötr ve premium */
+.alarm-sla-card {
+    background: #fff !important;
+    border: 1px solid #e2e8e4 !important;
+    box-shadow: 0 10px 26px rgba(15,23,42,.045);
+}
+
+.alarm-sla-card:nth-child(1) {
+    border-top: 4px solid #ef4444 !important;
+}
+
+.alarm-sla-card:nth-child(2) {
+    border-top: 4px solid #3b82f6 !important;
+}
+
+.alarm-sla-card:nth-child(3) {
+    border-top: 4px solid #f59e0b !important;
+}
+
+.alarm-sla-card strong {
+    color: #111a14 !important;
+}
+
+.alarm-sla-card span {
+    color: #748078 !important;
+}
+
+/* Riskli müşteriler ve personel performansı beyaz */
+.risk-customers-card,
+.alarm-staff-card {
+    background: #fff !important;
+    box-shadow: 0 10px 26px rgba(15,23,42,.045);
+}
+
+.risk-customers-card {
+    border: 1px solid #f0cccc !important;
+}
+
+.alarm-staff-card {
+    border: 1px solid #d8e4f0 !important;
+}
+
+.risk-customers-title {
+    color: #b91c1c !important;
+}
+
+.alarm-staff-title {
+    color: #1d4ed8 !important;
+}
+
 </style>
 
-<div class="wai-alarm-center">
+<div class="wai-alarm-center"
+
+    wire:poll.60s>
 
     <section class="alarm-hero">
         <h1>WAI Alarm Merkezi</h1>
@@ -747,27 +944,37 @@
     </section>
 
 
-    <section class="alarm-kpis">
+        @php $live=$this->liveKpiTrends; @endphp
 
-        <div class="alarm-kpi">
+<section class="alarm-kpis">
+
+        <div class="alarm-kpi wai-live-card red">
             <strong>{{ $this->activeCount }}</strong>
             <span>Aktif Alarm</span>
         </div>
 
-        <div class="alarm-kpi">
+        <div class="alarm-kpi wai-live-card orange">
             <strong>{{ $this->criticalCount }}</strong>
             <span>Kritik Alarm</span>
-        </div>
+        <div class="wai-live-trend {{ $live['active']['trend_direction'] }}">{{ $live['active']['trend_label'] }}</div>
+<div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['active']['points'] }}"/></svg><div class="wai-live-trend {{ $live['critical']['trend_direction'] }}">{{ $live['critical']['trend_label'] }}</div>
+<div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['critical']['points'] }}"/></svg></div>
+</div>
+</div>
 
-        <div class="alarm-kpi">
+        <div class="alarm-kpi wai-live-card green">
             <strong>{{ $this->resolvedTodayCount }}</strong>
             <span>Bugün Çözülen</span>
         </div>
 
-        <div class="alarm-kpi">
+        <div class="alarm-kpi wai-live-card indigo">
             <strong>{{ $this->snoozedCount }}</strong>
             <span>Ertelenen Alarm</span>
-        </div>
+        <div class="wai-live-trend {{ $live['resolved']['trend_direction'] }}">{{ $live['resolved']['trend_label'] }}</div>
+<div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['resolved']['points'] }}"/></svg><div class="wai-live-trend {{ $live['snoozed']['trend_direction'] }}">{{ $live['snoozed']['trend_label'] }}</div>
+<div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['snoozed']['points'] }}"/></svg></div>
+</div>
+</div>
 
     </section>
 

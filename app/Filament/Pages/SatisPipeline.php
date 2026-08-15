@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\ConversationControl;
 use App\Services\CrmActivityService;
 use BackedEnum;
+use Carbon\Carbon;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
@@ -444,6 +445,495 @@ class SatisPipeline extends Page
                 'won'
             )
             ->count();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | GERÇEK ZAMANLI KPI MİNİ GRAFİKLERİ
+    |--------------------------------------------------------------------------
+    |
+    | Grafikler dekoratif değildir.
+    |
+    | Açık Fırsat:
+    |   Son 7 günde oluşturulmuş ve şu anda açık olan fırsatlar.
+    |
+    | Sıcak Lead:
+    |   Son 7 günde oluşturulmuş ve şu anda sıcak olan açık lead'ler.
+    |
+    | Teklif:
+    |   Son 7 günde oluşturulmuş ve şu anda teklif aşamasında olan lead'ler.
+    |
+    | Kazanılan:
+    |   Son 7 günde gerçekten kazanılmış satışlar (won_at).
+    |
+    | Sayfa wire:poll ile 60 saniyede bir tekrar render edildiği için grafik
+    | verileri de veritabanından yeniden okunur.
+    |
+    */
+
+    public function getKpiTrendDataProperty(): array
+    {
+        $start =
+            now()
+                ->subDays(6)
+                ->startOfDay();
+
+        $days =
+            collect(
+                range(
+                    0,
+                    6
+                )
+            )
+                ->map(
+                    fn (int $offset): Carbon =>
+                        $start
+                            ->copy()
+                            ->addDays(
+                                $offset
+                            )
+                );
+
+        /*
+        |--------------------------------------------------------------------------
+        | SON 7 GÜNDE OLUŞTURULAN MEVCUT LEAD'LER
+        |--------------------------------------------------------------------------
+        */
+
+        $recentCustomers =
+            $this->baseQuery()
+                ->where(
+                    'created_at',
+                    '>=',
+                    $start
+                )
+                ->get([
+                    'id',
+                    'created_at',
+                    'lead_status',
+                    'lead_temperature',
+                ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | SON 7 GÜNDE KAZANILANLAR
+        |--------------------------------------------------------------------------
+        */
+
+        $recentWon =
+            $this->baseQuery()
+                ->where(
+                    'lead_status',
+                    'won'
+                )
+                ->whereNotNull(
+                    'won_at'
+                )
+                ->where(
+                    'won_at',
+                    '>=',
+                    $start
+                )
+                ->get([
+                    'id',
+                    'won_at',
+                ]);
+
+        $openValues =
+            $days
+                ->map(
+                    fn (Carbon $day): int =>
+                        $recentCustomers
+                            ->filter(
+                                fn (ConversationControl $customer): bool =>
+                                    ! in_array(
+                                        $customer->lead_status,
+                                        [
+                                            'won',
+                                            'lost',
+                                        ],
+                                        true
+                                    )
+                                    && $customer
+                                        ->created_at
+                                        ?->isSameDay(
+                                            $day
+                                        )
+                            )
+                            ->count()
+                )
+                ->values()
+                ->all();
+
+        $hotValues =
+            $days
+                ->map(
+                    fn (Carbon $day): int =>
+                        $recentCustomers
+                            ->filter(
+                                fn (ConversationControl $customer): bool =>
+                                    $customer->lead_temperature === 'hot'
+                                    && ! in_array(
+                                        $customer->lead_status,
+                                        [
+                                            'won',
+                                            'lost',
+                                        ],
+                                        true
+                                    )
+                                    && $customer
+                                        ->created_at
+                                        ?->isSameDay(
+                                            $day
+                                        )
+                            )
+                            ->count()
+                )
+                ->values()
+                ->all();
+
+        $proposalValues =
+            $days
+                ->map(
+                    fn (Carbon $day): int =>
+                        $recentCustomers
+                            ->filter(
+                                fn (ConversationControl $customer): bool =>
+                                    $customer->lead_status === 'proposal'
+                                    && $customer
+                                        ->created_at
+                                        ?->isSameDay(
+                                            $day
+                                        )
+                            )
+                            ->count()
+                )
+                ->values()
+                ->all();
+
+        $wonValues =
+            $days
+                ->map(
+                    fn (Carbon $day): int =>
+                        $recentWon
+                            ->filter(
+                                fn (ConversationControl $customer): bool =>
+                                    $customer
+                                        ->won_at
+                                        ?->isSameDay(
+                                            $day
+                                        )
+                            )
+                            ->count()
+                )
+                ->values()
+                ->all();
+
+        $labels =
+            $days
+                ->map(
+                    fn (Carbon $day): string =>
+                        $day->format(
+                            'd.m'
+                        )
+                )
+                ->values()
+                ->all();
+
+        return [
+            'open' =>
+                $this->makeTrendSeries(
+                    $openValues,
+                    $labels
+                ),
+
+            'hot' =>
+                $this->makeTrendSeries(
+                    $hotValues,
+                    $labels
+                ),
+
+            'proposal' =>
+                $this->makeTrendSeries(
+                    $proposalValues,
+                    $labels
+                ),
+
+            'won' =>
+                $this->makeTrendSeries(
+                    $wonValues,
+                    $labels
+                ),
+        ];
+    }
+
+    protected function makeTrendSeries(
+        array $values,
+        array $labels
+    ): array {
+        $values =
+            array_map(
+                fn ($value): int =>
+                    max(
+                        0,
+                        (int) $value
+                    ),
+                $values
+            );
+
+        $lastIndex =
+            count(
+                $values
+            )
+            - 1;
+
+        $today =
+            $lastIndex >= 0
+                ? (
+                    $values[
+                        $lastIndex
+                    ]
+                    ?? 0
+                )
+                : 0;
+
+        $yesterday =
+            $lastIndex >= 1
+                ? (
+                    $values[
+                        $lastIndex - 1
+                    ]
+                    ?? 0
+                )
+                : 0;
+
+        $trend =
+            $this->trendChange(
+                $today,
+                $yesterday
+            );
+
+        return [
+            'values' =>
+                $values,
+
+            'labels' =>
+                $labels,
+
+            'points' =>
+                $this->sparklinePoints(
+                    $values
+                ),
+
+            'today' =>
+                $today,
+
+            'seven_day_total' =>
+                array_sum(
+                    $values
+                ),
+
+            'trend_label' =>
+                $trend['label'],
+
+            'trend_direction' =>
+                $trend['direction'],
+        ];
+    }
+
+    protected function trendChange(
+        int $today,
+        int $yesterday
+    ): array {
+        if (
+            $today === 0
+            && $yesterday === 0
+        ) {
+            return [
+                'label' =>
+                    '0%',
+
+                'direction' =>
+                    'flat',
+            ];
+        }
+
+        if ($yesterday === 0) {
+            return [
+                'label' =>
+                    $today > 0
+                        ? '+100%'
+                        : '0%',
+
+                'direction' =>
+                    $today > 0
+                        ? 'up'
+                        : 'flat',
+            ];
+        }
+
+        $percentage =
+            (int) round(
+                (
+                    (
+                        $today
+                        - $yesterday
+                    )
+                    / $yesterday
+                )
+                * 100
+            );
+
+        return [
+            'label' =>
+                (
+                    $percentage > 0
+                        ? '+'
+                        : ''
+                )
+                .$percentage
+                .'%',
+
+            'direction' =>
+                match (true) {
+                    $percentage > 0 =>
+                        'up',
+
+                    $percentage < 0 =>
+                        'down',
+
+                    default =>
+                        'flat',
+                },
+        ];
+    }
+
+    protected function sparklinePoints(
+        array $values,
+        int $width = 108,
+        int $height = 42
+    ): string {
+        $count =
+            count(
+                $values
+            );
+
+        if ($count === 0) {
+            return '';
+        }
+
+        if ($count === 1) {
+            return '4,21 104,21';
+        }
+
+        $min =
+            min(
+                $values
+            );
+
+        $max =
+            max(
+                $values
+            );
+
+        $isFlat =
+            $min === $max;
+
+        $range =
+            max(
+                1,
+                $max - $min
+            );
+
+        $paddingX =
+            4;
+
+        $paddingY =
+            5;
+
+        $usableWidth =
+            $width
+            - (
+                $paddingX
+                * 2
+            );
+
+        $usableHeight =
+            $height
+            - (
+                $paddingY
+                * 2
+            );
+
+        return collect(
+            $values
+        )
+            ->map(
+                function (
+                    int $value,
+                    int $index
+                ) use (
+                    $count,
+                    $paddingX,
+                    $paddingY,
+                    $usableWidth,
+                    $usableHeight,
+                    $min,
+                    $range,
+                    $isFlat
+                ): string {
+                    $x =
+                        $paddingX
+                        + (
+                            $index
+                            * (
+                                $usableWidth
+                                / (
+                                    $count - 1
+                                )
+                            )
+                        );
+
+                    if ($isFlat) {
+                        $y =
+                            $paddingY
+                            + (
+                                $usableHeight
+                                / 2
+                            );
+                    } else {
+                        $normalized =
+                            (
+                                $value
+                                - $min
+                            )
+                            / $range;
+
+                        $y =
+                            $paddingY
+                            + (
+                                (
+                                    1
+                                    - $normalized
+                                )
+                                * $usableHeight
+                            );
+                    }
+
+                    return round(
+                        $x,
+                        1
+                    )
+                        .','
+                        .round(
+                            $y,
+                            1
+                        );
+                }
+            )
+            ->implode(
+                ' '
+            );
     }
 
     /*

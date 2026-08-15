@@ -37,97 +37,9 @@ class AlarmMerkezi extends Page
     public string $typeFilter =
         'all';
 
-    public string $search = '';
-
     public array $customSnoozeUntil = [];
 
     public array $expandedHistories = [];
-
-    /*
-    |--------------------------------------------------------------------------
-    | MENÜ ROZETİ
-    |--------------------------------------------------------------------------
-    */
-
-    public static function getNavigationBadge(): ?string
-    {
-        if (! auth()->check()) {
-            return null;
-        }
-
-        $count =
-            CrmAlarm::query()
-                ->where(
-                    'user_id',
-                    auth()->id()
-                )
-                ->where(
-                    'is_resolved',
-                    false
-                )
-                ->where(
-                    function (
-                        Builder $query
-                    ): void {
-                        $query
-                            ->whereNull(
-                                'snoozed_until'
-                            )
-                            ->orWhere(
-                                'snoozed_until',
-                                '<=',
-                                now()
-                            );
-                    }
-                )
-                ->count();
-
-        return $count > 0
-            ? (string) $count
-            : null;
-    }
-
-    public static function getNavigationBadgeColor(): string|array|null
-    {
-        if (! auth()->check()) {
-            return null;
-        }
-
-        $critical =
-            CrmAlarm::query()
-                ->where(
-                    'user_id',
-                    auth()->id()
-                )
-                ->where(
-                    'is_resolved',
-                    false
-                )
-                ->where(
-                    'severity',
-                    'critical'
-                )
-                ->where(
-                    function (
-                        Builder $query
-                    ): void {
-                        $query
-                            ->whereNull(
-                                'snoozed_until'
-                            )
-                            ->orWhere(
-                                'snoozed_until',
-                                '<=',
-                                now()
-                            );
-                    }
-                )
-                ->exists();
-
-        return $critical
-            ? 'danger'
-            : 'warning';
-    }
 
     protected function baseQuery(): Builder
     {
@@ -205,57 +117,6 @@ class AlarmMerkezi extends Page
                         'type',
                         $this->typeFilter
                     )
-            )
-            ->when(
-                trim($this->search) !== '',
-                function (
-                    Builder $query
-                ): void {
-                    $search =
-                        trim(
-                            $this->search
-                        );
-
-                    $query->where(
-                        function (
-                            Builder $query
-                        ) use (
-                            $search
-                        ): void {
-                            $query
-                                ->where(
-                                    'title',
-                                    'like',
-                                    '%'.$search.'%'
-                                )
-                                ->orWhere(
-                                    'message',
-                                    'like',
-                                    '%'.$search.'%'
-                                )
-                                ->orWhereHas(
-                                    'conversation',
-                                    function (
-                                        Builder $query
-                                    ) use (
-                                        $search
-                                    ): void {
-                                        $query
-                                            ->where(
-                                                'customer_name',
-                                                'like',
-                                                '%'.$search.'%'
-                                            )
-                                            ->orWhere(
-                                                'whatsapp_number',
-                                                'like',
-                                                '%'.$search.'%'
-                                            );
-                                    }
-                                );
-                        }
-                    );
-                }
             );
     }
 
@@ -1389,9 +1250,37 @@ class AlarmMerkezi extends Page
 
         $this->typeFilter =
             'all';
+    }
 
-        $this->search =
-            '';
+
+    public function getLiveKpiTrendsProperty(): array
+    {
+        $s=now()->subDays(6)->startOfDay();
+        $rows=CrmAlarm::query()->where('user_id',auth()->id())->where(fn(Builder $q)=>$q->where('created_at','>=',$s)->orWhere('resolved_at','>=',$s))->get(['created_at','resolved_at','severity','snoozed_until']);
+        $days=collect(range(0,6))->map(fn($i)=>$s->copy()->addDays($i));
+        return [
+            'active'=>$this->liveSeries($days->map(fn($d)=>$rows->filter(fn(CrmAlarm $a)=>$a->created_at?->isSameDay($d)&&!$a->resolved_at)->count())->all()),
+            'critical'=>$this->liveSeries($days->map(fn($d)=>$rows->filter(fn(CrmAlarm $a)=>$a->created_at?->isSameDay($d)&&$a->severity==='critical')->count())->all()),
+            'resolved'=>$this->liveSeries($days->map(fn($d)=>$rows->filter(fn(CrmAlarm $a)=>$a->resolved_at?->isSameDay($d))->count())->all()),
+            'snoozed'=>$this->liveSeries($days->map(fn($d)=>$rows->filter(fn(CrmAlarm $a)=>$a->snoozed_until?->isSameDay($d))->count())->all()),
+        ];
+    }
+
+
+    protected function liveSeries(array $v): array
+    {
+        while (count($v)<7) array_unshift($v,0);
+        $v=array_slice(array_map('intval',$v),-7);
+        $a=$v[6]??0; $b=$v[5]??0;
+        if($a===0&&$b===0){$pct=0;$dir='flat';}
+        elseif($b===0){$pct=$a>0?100:0;$dir=$a>0?'up':'flat';}
+        else{$pct=(int)round((($a-$b)/$b)*100);$dir=$pct>0?'up':($pct<0?'down':'flat');}
+        $min=min($v);$max=max($v);$flat=$min===$max;$range=max(1,$max-$min);
+        $pts=collect($v)->map(function($n,$i)use($min,$range,$flat){
+            $x=4+$i*(100/6);$y=$flat?21:5+(1-(($n-$min)/$range))*32;
+            return round($x,1).','.round($y,1);
+        })->implode(' ');
+        return ['points'=>$pts,'trend_label'=>($pct>0?'+':'').$pct.'%','trend_direction'=>$dir];
     }
 
     public function getHeading(): string

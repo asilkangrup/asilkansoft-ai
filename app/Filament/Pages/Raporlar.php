@@ -1070,6 +1070,38 @@ class Raporlar extends Page
         $this->botFilter = 'all';
     }
 
+
+    public function getLiveKpiTrendsProperty(): array
+    {
+        $s=now()->subDays(6)->startOfDay();
+        $rows=ConversationControl::query()->where('user_id',auth()->id())->where('created_at','>=',$s)->get(['created_at','lead_status','lead_temperature']);
+        $days=collect(range(0,6))->map(fn($i)=>$s->copy()->addDays($i));
+        $daily=fn($f)=>$days->map(fn($d)=>$rows->filter(fn(ConversationControl $c)=>$c->created_at?->isSameDay($d)&&$f($c))->count())->all();
+        return [
+            'total'=>$this->liveSeries($daily(fn(ConversationControl $c)=>true)),
+            'open'=>$this->liveSeries($daily(fn(ConversationControl $c)=>!in_array($c->lead_status,['won','lost'],true))),
+            'hot'=>$this->liveSeries($daily(fn(ConversationControl $c)=>$c->lead_temperature==='hot')),
+            'proposal'=>$this->liveSeries($daily(fn(ConversationControl $c)=>$c->lead_status==='proposal')),
+        ];
+    }
+
+
+    protected function liveSeries(array $v): array
+    {
+        while (count($v)<7) array_unshift($v,0);
+        $v=array_slice(array_map('intval',$v),-7);
+        $a=$v[6]??0; $b=$v[5]??0;
+        if($a===0&&$b===0){$pct=0;$dir='flat';}
+        elseif($b===0){$pct=$a>0?100:0;$dir=$a>0?'up':'flat';}
+        else{$pct=(int)round((($a-$b)/$b)*100);$dir=$pct>0?'up':($pct<0?'down':'flat');}
+        $min=min($v);$max=max($v);$flat=$min===$max;$range=max(1,$max-$min);
+        $pts=collect($v)->map(function($n,$i)use($min,$range,$flat){
+            $x=4+$i*(100/6);$y=$flat?21:5+(1-(($n-$min)/$range))*32;
+            return round($x,1).','.round($y,1);
+        })->implode(' ');
+        return ['points'=>$pts,'trend_label'=>($pct>0?'+':'').$pct.'%','trend_direction'=>$dir];
+    }
+
     public function getHeading(): string
     {
         return '';

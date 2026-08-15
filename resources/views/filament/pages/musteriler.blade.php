@@ -1588,11 +1588,377 @@
     }
 }
 
+
+/* WAI PREMIUM LIVE KPI FINAL */
+.wai-live-card{position:relative;overflow:hidden;border:0!important;color:#fff!important;box-shadow:0 14px 32px rgba(15,23,42,.11)}
+.wai-live-card::after{content:"";position:absolute;width:135px;height:135px;right:-58px;top:-62px;border-radius:999px;background:rgba(255,255,255,.09)}
+.wai-live-card.blue{background:linear-gradient(135deg,#3b82f6,#2563eb 52%,#1d4ed8)!important}
+.wai-live-card.orange{background:linear-gradient(135deg,#fb923c,#f97316 52%,#ea580c)!important}
+.wai-live-card.purple{background:linear-gradient(135deg,#8b5cf6,#7c3aed 52%,#6d28d9)!important}
+.wai-live-card.green{background:linear-gradient(135deg,#34d399,#10b981 52%,#059669)!important}
+.wai-live-card.red{background:linear-gradient(135deg,#f87171,#ef4444 52%,#dc2626)!important}
+.wai-live-card.indigo{background:linear-gradient(135deg,#6366f1,#4f46e5 52%,#4338ca)!important}
+.wai-live-card.amber{background:linear-gradient(135deg,#fbbf24,#f59e0b 52%,#d97706)!important}
+.wai-live-card.slate{background:linear-gradient(135deg,#64748b,#475569 52%,#334155)!important}
+.wai-live-card *{position:relative;z-index:2}.wai-live-card strong,.wai-live-card span,.wai-live-card [class*="number"],.wai-live-card [class*="label"]{color:#fff!important}
+.wai-live-trend{position:absolute!important;z-index:4!important;right:11px;top:11px;padding:5px 8px;border:1px solid rgba(255,255,255,.18);border-radius:999px;color:#fff!important;background:rgba(255,255,255,.13);font-size:10px!important;font-weight:900}
+.wai-live-trend.up::before{content:"↗ "}.wai-live-trend.down::before{content:"↘ "}.wai-live-trend.flat::before{content:"→ "}
+.wai-live-spark{position:absolute!important;z-index:3!important;right:12px;bottom:9px;width:92px;height:38px}.wai-live-spark svg{width:100%;height:100%;overflow:visible}.wai-live-spark polyline{fill:none;stroke:rgba(255,255,255,.96);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+
+
+/* ==========================================================================
+   MÜŞTERİLER — PREMIUM REFINED FINAL
+   Pipeline ile aynı premium denge.
+   ========================================================================== */
+
+/* KPI alanı daha ferah */
+.crm-kpis {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 14px;
+}
+
+/* Tüm kartları eşit ve daha premium yap */
+.crm-kpi {
+    min-height: 178px;
+    padding: 22px 20px;
+    border-radius: 22px;
+    box-shadow: 0 12px 30px rgba(15,23,42,.06);
+}
+
+/* İlk dört ana KPI */
+.crm-kpis .crm-kpi:nth-child(1) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(147,197,253,.26), transparent 32%),
+        linear-gradient(135deg,#3b82f6 0%,#2563eb 52%,#1d4ed8 100%) !important;
+}
+
+.crm-kpis .crm-kpi:nth-child(2) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(253,186,116,.28), transparent 32%),
+        linear-gradient(135deg,#fb923c 0%,#f97316 52%,#ea580c 100%) !important;
+}
+
+.crm-kpis .crm-kpi:nth-child(3) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(110,231,183,.28), transparent 32%),
+        linear-gradient(135deg,#34d399 0%,#10b981 52%,#059669 100%) !important;
+}
+
+/* Riskli lead yeşil değil kırmızı */
+.crm-kpis .crm-kpi:nth-child(4) {
+    background:
+        radial-gradient(circle at 92% 8%, rgba(252,165,165,.26), transparent 32%),
+        linear-gradient(135deg,#f87171 0%,#ef4444 52%,#dc2626 100%) !important;
+}
+
+/* İlk 4 kart metinleri */
+.crm-kpis .crm-kpi:nth-child(-n+4) .crm-kpi-number,
+.crm-kpis .crm-kpi:nth-child(-n+4) .crm-kpi-label {
+    color: #fff !important;
+}
+
+.crm-kpis .crm-kpi:nth-child(-n+4) .crm-kpi-number {
+    margin-top: 25px;
+    font-size: 34px !important;
+    line-height: 1;
+}
+
+.crm-kpis .crm-kpi:nth-child(-n+4) .crm-kpi-label {
+    margin-top: 8px;
+    max-width: calc(100% - 92px);
+    font-size: 13px !important;
+    font-weight: 850;
+}
+
+/* Premium icon kutusu */
+.crm-kpis .crm-kpi:nth-child(-n+4) .crm-kpi-icon {
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgba(255,255,255,.34);
+    border-radius: 15px;
+    color: #fff !important;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,.30),
+            rgba(255,255,255,.14)
+        ) !important;
+    box-shadow:
+        0 9px 18px rgba(0,0,0,.09),
+        inset 0 1px 0 rgba(255,255,255,.24);
+}
+
+.crm-kpis .crm-kpi:nth-child(-n+4) .crm-kpi-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+/* Gerçek zamanlı yüzde etiketi */
+.crm-kpis .crm-kpi:nth-child(-n+4) .wai-live-trend {
+    right: 16px;
+    top: 16px;
+    min-height: 29px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    border-color: rgba(255,255,255,.24);
+    background: rgba(255,255,255,.14);
+    font-size: 11px !important;
+}
+
+/* Grafik artık yazının üzerinden geçmez */
+.crm-kpis .crm-kpi:nth-child(-n+4) .wai-live-spark {
+    right: 14px;
+    bottom: 18px;
+    width: 82px;
+    height: 36px;
+}
+
+.crm-kpis .crm-kpi:nth-child(-n+4) .wai-live-spark polyline {
+    stroke-width: 2.2;
+}
+
+/* Son üç KPI tamamen nötr */
+.crm-kpis .crm-kpi:nth-child(n+5) {
+    min-height: 178px;
+    border: 1px solid #e2e8e4 !important;
+    color: #17211b !important;
+    background: #fff !important;
+    box-shadow: 0 10px 26px rgba(15,23,42,.045);
+}
+
+.crm-kpis .crm-kpi:nth-child(5) {
+    border-top: 4px solid #7c3aed !important;
+}
+
+.crm-kpis .crm-kpi:nth-child(6) {
+    border-top: 4px solid #10b981 !important;
+}
+
+.crm-kpis .crm-kpi:nth-child(7) {
+    border-top: 4px solid #3b82f6 !important;
+}
+
+.crm-kpis .crm-kpi:nth-child(n+5) .crm-kpi-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 15px;
+    color: #087a42 !important;
+    background: #ecfaf2 !important;
+}
+
+.crm-kpis .crm-kpi:nth-child(n+5) .crm-kpi-number {
+    margin-top: 25px;
+    color: #111a14 !important;
+    font-size: 34px !important;
+}
+
+.crm-kpis .crm-kpi:nth-child(n+5) .crm-kpi-label {
+    margin-top: 8px;
+    color: #748078 !important;
+    font-size: 13px !important;
+    font-weight: 800;
+}
+
+/* Ciro ve forecast bölümü beyaz, küçük renk vurguları */
+.crm-revenue-card,
+.crm-forecast-card {
+    border: 1px solid #e2e8e4 !important;
+    background: #fff !important;
+    box-shadow: 0 10px 26px rgba(15,23,42,.04);
+}
+
+.crm-revenue-card:nth-child(1) { border-top: 4px solid #10b981 !important; }
+.crm-revenue-card:nth-child(2) { border-top: 4px solid #2563eb !important; }
+.crm-revenue-card:nth-child(3) { border-top: 4px solid #7c3aed !important; }
+.crm-revenue-card:nth-child(4) { border-top: 4px solid #f59e0b !important; }
+
+.crm-forecast-card:nth-child(1) { border-top: 4px solid #2563eb !important; }
+.crm-forecast-card:nth-child(2) { border-top: 4px solid #4f46e5 !important; }
+.crm-forecast-card:nth-child(3) { border-top: 4px solid #10b981 !important; }
+
+.crm-revenue-value,
+.crm-forecast-value {
+    color: #111a14 !important;
+}
+
+.crm-revenue-label,
+.crm-forecast-label {
+    color: #748078 !important;
+}
+
+/* Günlük satış merkezi: sadece headerlar renkli, içerik beyaz */
+.crm-daily-card {
+    border: 1px solid #e2e8e4 !important;
+    background: #fff !important;
+}
+
+.crm-daily-card:nth-child(1) .crm-daily-card-head {
+    background: linear-gradient(135deg,#3b82f6,#2563eb) !important;
+}
+.crm-daily-card:nth-child(2) .crm-daily-card-head {
+    background: linear-gradient(135deg,#f59e0b,#f97316) !important;
+}
+.crm-daily-card:nth-child(3) .crm-daily-card-head {
+    background: linear-gradient(135deg,#6366f1,#4f46e5) !important;
+}
+.crm-daily-card:nth-child(4) .crm-daily-card-head {
+    background: linear-gradient(135deg,#10b981,#059669) !important;
+}
+
+.crm-daily-card-head .crm-daily-card-title,
+.crm-daily-card-head .crm-daily-count {
+    color: #fff !important;
+}
+
+.crm-daily-card-head .crm-daily-count {
+    background: rgba(255,255,255,.17) !important;
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+    .crm-kpis {
+        grid-template-columns: repeat(4, minmax(0,1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .crm-kpis {
+        grid-template-columns: repeat(2, minmax(0,1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .crm-kpis {
+        grid-template-columns: 1fr;
+    }
+
+    .crm-kpi {
+        min-height: 158px;
+    }
+}
+
+
+/* ==========================================================================
+   MÜŞTERİLER — PREMIUM ICON SYSTEM FINAL
+   ========================================================================== */
+
+.crm-kpi-icon {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.crm-kpi-icon::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    z-index: -1;
+    border-radius: inherit;
+    background:
+        radial-gradient(
+            circle at 30% 20%,
+            rgba(255,255,255,.34),
+            transparent 52%
+        );
+    pointer-events: none;
+}
+
+.crm-kpis .crm-kpi:nth-child(-n+4) .crm-kpi-icon {
+    width: 54px;
+    height: 54px;
+    border: 1px solid rgba(255,255,255,.40);
+    border-radius: 17px;
+    color: #fff !important;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,.30),
+            rgba(255,255,255,.12)
+        ) !important;
+    box-shadow:
+        0 10px 22px rgba(0,0,0,.10),
+        inset 0 1px 0 rgba(255,255,255,.34),
+        inset 0 -1px 0 rgba(255,255,255,.08);
+    backdrop-filter: blur(12px);
+}
+
+.crm-kpis .crm-kpi:nth-child(-n+4) .crm-kpi-icon svg {
+    width: 29px;
+    height: 29px;
+    overflow: visible;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.09));
+}
+
+.crm-kpi-icon .icon-soft {
+    fill: currentColor;
+    opacity: .13;
+    stroke: none;
+}
+
+.crm-kpi-icon .icon-main {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.crm-kpi-icon .icon-accent {
+    fill: currentColor;
+    stroke: none;
+}
+
+/* Son üç kart ikonları da kendi anlamına göre renkli */
+.crm-kpis .crm-kpi:nth-child(5) .crm-kpi-icon {
+    color: #7c3aed !important;
+    background: linear-gradient(145deg,#f7f2ff,#eee5ff) !important;
+    border: 1px solid #e3d4ff;
+}
+
+.crm-kpis .crm-kpi:nth-child(6) .crm-kpi-icon {
+    color: #059669 !important;
+    background: linear-gradient(145deg,#effcf6,#e2f8ec) !important;
+    border: 1px solid #c9efd9;
+}
+
+.crm-kpis .crm-kpi:nth-child(7) .crm-kpi-icon {
+    color: #2563eb !important;
+    background: linear-gradient(145deg,#f1f7ff,#e5f0ff) !important;
+    border: 1px solid #cee0ff;
+}
+
+.crm-kpis .crm-kpi:nth-child(n+5) .crm-kpi-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 17px;
+    box-shadow:
+        0 8px 18px rgba(15,23,42,.06),
+        inset 0 1px 0 rgba(255,255,255,.65);
+}
+
+.crm-kpis .crm-kpi:nth-child(n+5) .crm-kpi-icon svg {
+    width: 28px;
+    height: 28px;
+}
+
+@media (max-width: 560px) {
+    .crm-kpi-icon,
+    .crm-kpis .crm-kpi:nth-child(-n+4) .crm-kpi-icon,
+    .crm-kpis .crm-kpi:nth-child(n+5) .crm-kpi-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 16px;
+    }
+}
+
 </style>
 
 
 <div
     class="wai-crm"
+
+    wire:poll.60s
 
     x-data="{
         saved: false,
@@ -1665,24 +2031,25 @@
          KPI
     ========================================================== --}}
 
-    <section class="crm-kpis">
+        @php $live=$this->liveKpiTrends; @endphp
 
-        <div class="crm-kpi">
+<section class="crm-kpis">
+
+        <div class="crm-kpi wai-live-card slate">
 
             <div class="crm-kpi-top">
 
                 <div class="crm-kpi-icon">
 
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                    >
-                        <circle cx="9" cy="8" r="3"/>
-                        <circle cx="17" cy="10" r="2"/>
-                        <path d="M3 20c.6-4 2.8-6 6-6s5.4 2 6 6"/>
-                        <path d="M15 15c3 0 5 1.5 6 4"/>
+                    
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <circle class="icon-soft" cx="11" cy="11" r="7"/>
+                        <circle class="icon-soft" cx="22" cy="13" r="5"/>
+                        <path class="icon-main" d="M5.5 25.5c.7-5.1 3.7-7.8 8-7.8s7.2 2.7 8 7.8"/>
+                        <circle class="icon-main" cx="13.5" cy="10.5" r="4.1"/>
+                        <path class="icon-main" d="M20.5 18.6c3.4.4 5.5 2.6 6 6"/>
+                        <circle class="icon-main" cx="22.2" cy="12.2" r="3.1"/>
+                        <circle class="icon-accent" cx="25.5" cy="7" r="1.7"/>
                     </svg>
 
                 </div>
@@ -1697,22 +2064,21 @@
                 Toplam Müşteri
             </div>
 
-        </div>
+        <div class="wai-live-trend {{ $live['new']['trend_direction'] }}">{{ $live['new']['trend_label'] }}</div><div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['new']['points'] }}"/></svg></div></div>
 
 
-        <div class="crm-kpi">
+        <div class="crm-kpi wai-live-card orange">
 
             <div class="crm-kpi-top">
 
                 <div class="crm-kpi-icon">
 
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                    >
-                        <path d="M13 2 5 13h6l-1 9 9-13h-6V2Z"/>
+                    
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <path class="icon-soft" d="M18.7 2.8 7.4 17.1h7.1l-1.2 12.1 11.3-16.1h-7.2Z"/>
+                        <path class="icon-main" d="M18.7 2.8 7.4 17.1h7.1l-1.2 12.1 11.3-16.1h-7.2Z"/>
+                        <path class="icon-main" d="M20.6 6.8 17.5 13h4.7"/>
+                        <circle class="icon-accent" cx="24.8" cy="6.2" r="1.5"/>
                     </svg>
 
                 </div>
@@ -1727,15 +2093,23 @@
                 Sıcak Lead
             </div>
 
-        </div>
+        <div class="wai-live-trend {{ $live['hot']['trend_direction'] }}">{{ $live['hot']['trend_label'] }}</div><div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['hot']['points'] }}"/></svg></div></div>
 
 
-        <div class="crm-kpi">
+        <div class="crm-kpi wai-live-card purple">
 
             <div class="crm-kpi-top">
 
                 <div class="crm-kpi-icon">
-                    🔥
+                    
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <circle class="icon-soft" cx="16" cy="16" r="11"/>
+                        <circle class="icon-main" cx="16" cy="16" r="10"/>
+                        <circle class="icon-main" cx="16" cy="16" r="5.6"/>
+                        <circle class="icon-accent" cx="16" cy="16" r="2.2"/>
+                        <path class="icon-main" d="m19.9 12.1 7.3-7.3"/>
+                        <path class="icon-main" d="M23.5 4.8h3.7v3.7"/>
+                    </svg>
                 </div>
 
             </div>
@@ -1748,15 +2122,22 @@
                 Öncelikli Lead
             </div>
 
-        </div>
+        <div class="wai-live-trend {{ $live['proposal']['trend_direction'] }}">{{ $live['proposal']['trend_label'] }}</div><div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['proposal']['points'] }}"/></svg></div></div>
 
 
-        <div class="crm-kpi">
+        <div class="crm-kpi wai-live-card green">
 
             <div class="crm-kpi-top">
 
                 <div class="crm-kpi-icon">
-                    ⚠️
+                    
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <path class="icon-soft" d="M16 3.3 29 26.2H3Z"/>
+                        <path class="icon-main" d="M16 3.3 29 26.2H3Z"/>
+                        <path class="icon-main" d="M16 10.5v7.8"/>
+                        <circle class="icon-accent" cx="16" cy="22.3" r="1.6"/>
+                        <path class="icon-main" d="M10.3 25.9h11.4"/>
+                    </svg>
                 </div>
 
             </div>
@@ -1769,7 +2150,7 @@
                 Riskli Lead
             </div>
 
-        </div>
+        <div class="wai-live-trend {{ $live['won']['trend_direction'] }}">{{ $live['won']['trend_label'] }}</div><div class="wai-live-spark"><svg viewBox="0 0 108 42"><polyline points="{{ $live['won']['points'] }}"/></svg></div></div>
 
 
         <div class="crm-kpi">
@@ -1778,14 +2159,13 @@
 
                 <div class="crm-kpi-icon">
 
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                    >
-                        <path d="M5 4h14v16H5z"/>
-                        <path d="M8 8h8M8 12h8M8 16h5"/>
+                    
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <rect class="icon-soft" x="6" y="4.5" width="20" height="23" rx="3"/>
+                        <rect class="icon-main" x="6" y="4.5" width="20" height="23" rx="3"/>
+                        <path class="icon-main" d="M11 10h10M11 15h10M11 20h6.5"/>
+                        <path class="icon-main" d="m20.3 21.5 2 2 4-4"/>
+                        <circle class="icon-accent" cx="10" cy="7.8" r="1.2"/>
                     </svg>
 
                 </div>
@@ -1809,14 +2189,13 @@
 
                 <div class="crm-kpi-icon">
 
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                    >
-                        <path d="m5 13 4 4L19 7"/>
-                        <circle cx="12" cy="12" r="9"/>
+                    
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <circle class="icon-soft" cx="16" cy="16" r="11"/>
+                        <circle class="icon-main" cx="16" cy="16" r="10.5"/>
+                        <path class="icon-main" d="m10.2 16.2 3.8 3.9 8-8.4"/>
+                        <path class="icon-main" d="M9 7.2a13.5 13.5 0 0 1 14.7-.8"/>
+                        <circle class="icon-accent" cx="24.7" cy="8.1" r="1.5"/>
                     </svg>
 
                 </div>
@@ -1840,14 +2219,13 @@
 
                 <div class="crm-kpi-icon">
 
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                    >
-                        <circle cx="12" cy="12" r="8"/>
-                        <path d="M12 7v5l3 2"/>
+                    
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <circle class="icon-soft" cx="16" cy="16" r="11"/>
+                        <circle class="icon-main" cx="16" cy="16" r="10.5"/>
+                        <path class="icon-main" d="M16 9.2v7.2l4.7 2.8"/>
+                        <path class="icon-main" d="M7.5 5.7 5 8.4M24.5 5.7 27 8.4"/>
+                        <circle class="icon-accent" cx="16" cy="16" r="1.5"/>
                     </svg>
 
                 </div>

@@ -628,11 +628,492 @@
     }
 }
 
+
+
+
+/* ==========================================================================
+   WAI SALES PIPELINE — PREMIUM WHITE FINAL
+   ========================================================================== */
+
+.wai-pipeline {
+    --premium-blue: #2563eb;
+    --premium-blue-dark: #1d4ed8;
+    --premium-orange: #f97316;
+    --premium-orange-dark: #ea580c;
+    --premium-indigo: #4f46e5;
+    --premium-indigo-dark: #4338ca;
+    --premium-purple: #7c3aed;
+    --premium-purple-dark: #6d28d9;
+    --premium-green: #10b981;
+    --premium-green-dark: #059669;
+    --premium-red: #ef4444;
+    --premium-red-dark: #dc2626;
+    background: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   PREMIUM KPI
+   -------------------------------------------------------------------------- */
+
+.premium-kpis {
+    gap: 16px;
+}
+
+.premium-kpi {
+    position: relative;
+    min-height: 150px;
+    padding: 20px 22px;
+    overflow: hidden;
+    border: 0 !important;
+    border-radius: 20px;
+    color: #ffffff;
+    box-shadow:
+        0 14px 32px rgba(15, 23, 42, .12),
+        inset 0 1px 0 rgba(255, 255, 255, .13);
+}
+
+.premium-kpi::before {
+    content: "";
+    position: absolute;
+    width: 170px;
+    height: 170px;
+    right: -75px;
+    top: -75px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.09);
+}
+
+.premium-kpi::after {
+    content: "";
+    position: absolute;
+    width: 110px;
+    height: 110px;
+    right: -30px;
+    bottom: -70px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.055);
+}
+
+.premium-kpi-blue {
+    background:
+        radial-gradient(circle at 95% 10%, rgba(96,165,250,.28), transparent 30%),
+        linear-gradient(135deg, #3b82f6 0%, #2563eb 48%, #1d4ed8 100%);
+}
+
+.premium-kpi-orange {
+    background:
+        radial-gradient(circle at 95% 10%, rgba(253,186,116,.30), transparent 30%),
+        linear-gradient(135deg, #fb923c 0%, #f97316 48%, #ea580c 100%);
+}
+
+.premium-kpi-purple {
+    background:
+        radial-gradient(circle at 95% 10%, rgba(196,181,253,.28), transparent 30%),
+        linear-gradient(135deg, #8b5cf6 0%, #7c3aed 48%, #6d28d9 100%);
+}
+
+.premium-kpi-green {
+    background:
+        radial-gradient(circle at 95% 10%, rgba(110,231,183,.28), transparent 30%),
+        linear-gradient(135deg, #34d399 0%, #10b981 48%, #059669 100%);
+}
+
+.premium-kpi-top {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.premium-kpi-icon {
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,.42);
+    border-radius: 15px;
+    color: #ffffff;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.30), rgba(255,255,255,.13));
+    box-shadow:
+        0 9px 18px rgba(0,0,0,.10),
+        inset 0 1px 0 rgba(255,255,255,.28);
+    backdrop-filter: blur(8px);
+}
+
+.premium-kpi-icon svg {
+    width: 25px;
+    height: 25px;
+}
+
+.premium-kpi-trend {
+    min-height: 28px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(255,255,255,.20);
+    border-radius: 999px;
+    color: #ffffff;
+    background: rgba(255,255,255,.12);
+    font-size: 11px;
+    font-weight: 850;
+}
+
+.premium-kpi .pipeline-kpi-number {
+    position: relative;
+    z-index: 3;
+    margin-top: 15px;
+    color: #ffffff !important;
+    font-size: 33px;
+    font-weight: 950;
+    letter-spacing: -1px;
+    line-height: 1;
+}
+
+.premium-kpi .pipeline-kpi-label {
+    position: relative;
+    z-index: 3;
+    margin-top: 6px;
+    color: rgba(255,255,255,.94) !important;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.premium-kpi-line {
+    position: absolute;
+    z-index: 2;
+    right: 18px;
+    bottom: 18px;
+    width: 94px;
+    height: 36px;
+}
+
+.premium-kpi-line::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 20px;
+    height: 2px;
+    opacity: .92;
+    background: rgba(255,255,255,.82);
+    transform: skewY(-12deg);
+    border-radius: 999px;
+}
+
+.premium-kpi-line span {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border: 2px solid rgba(255,255,255,.95);
+    border-radius: 999px;
+    background: transparent;
+}
+
+.premium-kpi-line span:nth-child(1) { left: 5px; bottom: 8px; }
+.premium-kpi-line span:nth-child(2) { left: 31px; bottom: 17px; }
+.premium-kpi-line span:nth-child(3) { left: 57px; bottom: 10px; }
+.premium-kpi-line span:nth-child(4) { right: 2px; bottom: 25px; }
+
+/* --------------------------------------------------------------------------
+   TOOLBAR
+   -------------------------------------------------------------------------- */
+
+.pipeline-toolbar {
+    padding: 14px;
+    border-color: #e6ebe8;
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(15,23,42,.045);
+}
+
+.pipeline-search,
+.pipeline-select,
+.pipeline-reset {
+    height: 46px;
+    border-color: #dfe6e2;
+    border-radius: 12px;
+    color: #33413a;
+    background: #fbfcfb;
+    font-size: 13px !important;
+}
+
+.pipeline-search:focus,
+.pipeline-select:focus {
+    border-color: #a9c7ff;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(37,99,235,.06);
+}
+
+/* --------------------------------------------------------------------------
+   KANBAN
+   -------------------------------------------------------------------------- */
+
+.pipeline-board {
+    gap: 12px;
+}
+
+.pipeline-column {
+    overflow: hidden;
+    border: 1px solid #e2e8e4 !important;
+    border-radius: 18px;
+    background: #f8faf9 !important;
+    box-shadow: 0 10px 28px rgba(15,23,42,.045);
+}
+
+.pipeline-column-head {
+    min-height: 62px;
+    padding: 0 16px;
+    border-bottom: 1px solid rgba(255,255,255,.12) !important;
+    box-shadow: inset 0 -1px 0 rgba(255,255,255,.07);
+}
+
+.pipeline-column:nth-child(1) .pipeline-column-head {
+    background: linear-gradient(135deg, #475569, #334155) !important;
+}
+
+.pipeline-column:nth-child(2) .pipeline-column-head {
+    background: linear-gradient(135deg, #f59e0b, #f97316) !important;
+}
+
+.pipeline-column:nth-child(3) .pipeline-column-head {
+    background: linear-gradient(135deg, #4f46e5, #4338ca) !important;
+}
+
+.pipeline-column:nth-child(4) .pipeline-column-head {
+    background: linear-gradient(135deg, #8b5cf6, #6d28d9) !important;
+}
+
+.pipeline-column:nth-child(5) .pipeline-column-head {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+}
+
+.pipeline-column:nth-child(6) .pipeline-column-head {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+}
+
+.pipeline-column-title {
+    color: #ffffff !important;
+    font-size: 14px !important;
+    font-weight: 900;
+    letter-spacing: -.1px;
+}
+
+.pipeline-column-count {
+    min-width: 31px;
+    height: 31px;
+    color: #ffffff !important;
+    background: rgba(255,255,255,.18) !important;
+    border: 1px solid rgba(255,255,255,.14);
+    font-size: 11px !important;
+    font-weight: 900;
+}
+
+.pipeline-cards {
+    background: #f8faf9;
+}
+
+/* --------------------------------------------------------------------------
+   CUSTOMER CARDS
+   -------------------------------------------------------------------------- */
+
+.lead-card {
+    padding: 15px;
+    border: 1px solid #e1e8e3 !important;
+    border-radius: 14px;
+    background: #ffffff !important;
+    box-shadow:
+        0 7px 19px rgba(15,23,42,.035),
+        0 1px 2px rgba(15,23,42,.025);
+}
+
+.lead-card:hover {
+    border-color: #d5dfd9 !important;
+    box-shadow: 0 12px 26px rgba(15,23,42,.07);
+}
+
+.lead-avatar {
+    border-color: #d7e7dd;
+    color: #087a42;
+    background: linear-gradient(145deg, #f0fcf5, #e8f7ef);
+}
+
+.lead-name {
+    color: #17211b;
+    font-size: 13px !important;
+    font-weight: 900;
+}
+
+.lead-phone {
+    color: #7d8982;
+    font-size: 11px !important;
+}
+
+.lead-pill {
+    font-size: 11px !important;
+}
+
+.lead-score-label,
+.lead-score-number,
+.lead-owner {
+    font-size: 11px !important;
+}
+
+.lead-actions button {
+    min-height: 36px;
+    font-size: 11px !important;
+}
+
+.lead-actions button.primary {
+    border-color: #c8eed7;
+    color: #087a42;
+    background: #effcf5;
+}
+
+/* --------------------------------------------------------------------------
+   MOBILE
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 700px) {
+    .premium-kpi {
+        min-height: 138px;
+        padding: 17px;
+    }
+
+    .premium-kpi-icon {
+        width: 44px;
+        height: 44px;
+    }
+
+    .premium-kpi .pipeline-kpi-number {
+        font-size: 28px;
+    }
+
+    .premium-kpi-line {
+        display: none;
+    }
+
+    .pipeline-column {
+        border-radius: 17px;
+    }
+}
+
+
+/* ==========================================================================
+   WAI NATIVE BACKGROUND FIX
+   Premium kartlar korunur; sayfa zemini zorla beyaz yapılmaz.
+   ========================================================================== */
+
+.wai-pipeline {
+    background: transparent !important;
+}
+
+.pipeline-board {
+    background: transparent;
+}
+
+/* Filament'in mevcut sayfa zeminini görünür bırak. */
+.fi-main,
+.fi-page,
+.fi-page-content {
+    background: inherit;
+}
+
+
+/* ==========================================================================
+   GERÇEK VERİ KPI SPARKLINE
+   ========================================================================== */
+
+.premium-kpi-sparkline {
+    position: absolute;
+    z-index: 3;
+    right: 16px;
+    bottom: 13px;
+    width: 112px;
+    height: 48px;
+    overflow: visible;
+}
+
+.premium-kpi-sparkline svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.premium-kpi-sparkline .spark-area {
+    opacity: .10;
+}
+
+.premium-kpi-sparkline .spark-line {
+    fill: none;
+    stroke: rgba(255,255,255,.96);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,.08));
+}
+
+.premium-kpi-sparkline .spark-dot {
+    fill: #ffffff;
+    stroke: rgba(255,255,255,.45);
+    stroke-width: 1;
+}
+
+.premium-kpi-trend.up::before {
+    content: "↗";
+    margin-right: 4px;
+}
+
+.premium-kpi-trend.down::before {
+    content: "↘";
+    margin-right: 4px;
+}
+
+.premium-kpi-trend.flat::before {
+    content: "→";
+    margin-right: 4px;
+}
+
+.premium-kpi-period {
+    position: absolute;
+    z-index: 3;
+    right: 18px;
+    bottom: 7px;
+    color: rgba(255,255,255,.68);
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .2px;
+}
+
+@media (max-width: 700px) {
+    .premium-kpi-sparkline {
+        width: 92px;
+        right: 11px;
+    }
+
+    .premium-kpi-period {
+        display: none;
+    }
+}
+
+
+/* ==========================================================================
+   WAI NATIVE BACKGROUND FINAL
+   ========================================================================== */
+
+.wai-pipeline {
+    background: transparent !important;
+}
+
 </style>
 
 
 <div
     class="wai-pipeline"
+
+    wire:poll.60s
 
     x-data="{
         updated: false,
@@ -743,58 +1224,184 @@
 
     {{-- KPI --}}
 
-    <section class="pipeline-kpis">
+    @php
+        $trend =
+            $this->kpiTrendData;
 
-        <div class="pipeline-kpi">
+        $kpiCards = [
+            [
+                'key' => 'open',
+                'class' => 'premium-kpi-blue',
+                'value' => $this->totalOpenLeads,
+                'label' => 'Açık Fırsat',
+                'icon' => 'briefcase',
+            ],
+            [
+                'key' => 'hot',
+                'class' => 'premium-kpi-orange',
+                'value' => $this->hotLeads,
+                'label' => 'Sıcak Lead',
+                'icon' => 'fire',
+            ],
+            [
+                'key' => 'proposal',
+                'class' => 'premium-kpi-purple',
+                'value' => $this->proposalCount,
+                'label' => 'Teklif Aşamasında',
+                'icon' => 'target',
+            ],
+            [
+                'key' => 'won',
+                'class' => 'premium-kpi-green',
+                'value' => $this->wonCount,
+                'label' => 'Kazanılan',
+                'icon' => 'trophy',
+            ],
+        ];
+    @endphp
 
-            <div class="pipeline-kpi-number">
-                {{ $this->totalOpenLeads }}
+    <section class="pipeline-kpis premium-kpis">
+
+        @foreach ($kpiCards as $card)
+
+            @php
+                $series =
+                    $trend[
+                        $card['key']
+                    ];
+
+                $values =
+                    $series['values'];
+
+                $lastPoint =
+                    collect(
+                        explode(
+                            ' ',
+                            $series['points']
+                        )
+                    )
+                        ->last();
+
+                [$lastX, $lastY] =
+                    $lastPoint
+                        ? array_pad(
+                            explode(
+                                ',',
+                                $lastPoint
+                            ),
+                            2,
+                            0
+                        )
+                        : [
+                            104,
+                            21,
+                        ];
+            @endphp
+
+            <div
+                class="
+                    pipeline-kpi
+                    premium-kpi
+                    {{ $card['class'] }}
+                "
+                title="Son 7 gün: {{ implode(' · ', array_map(
+                    fn ($label, $value) => $label . ': ' . $value,
+                    $series['labels'],
+                    $series['values']
+                )) }}"
+            >
+
+                <div class="premium-kpi-top">
+
+                    <div class="premium-kpi-icon">
+
+                        @if ($card['icon'] === 'briefcase')
+
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+                                <path d="M4 7h16v11H4z"/>
+                                <path d="M8 7V5.8C8 4.8 8.8 4 9.8 4h4.4C15.2 4 16 4.8 16 5.8V7"/>
+                                <path d="M9 12h6"/>
+                            </svg>
+
+                        @elseif ($card['icon'] === 'fire')
+
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+                                <path d="M12 3c2.5 3 4.8 5.4 4.8 9A4.8 4.8 0 0 1 12 16.8 4.8 4.8 0 0 1 7.2 12c0-1.8.7-3.6 2-5.3.1 2.1 1 3.3 2.2 3.9-.2-2.9.7-5.4.6-7.6Z"/>
+                                <path d="M9.4 16.4c.3 2 1.2 3.6 2.6 4.6 1.4-1 2.3-2.6 2.6-4.6"/>
+                            </svg>
+
+                        @elseif ($card['icon'] === 'target')
+
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+                                <circle cx="12" cy="12" r="7"/>
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="m15 9 4-4"/>
+                                <path d="M17 5h2v2"/>
+                            </svg>
+
+                        @else
+
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+                                <path d="M8 4h8v3a4 4 0 0 1-8 0V4Z"/>
+                                <path d="M8 6H5v1a4 4 0 0 0 4 4"/>
+                                <path d="M16 6h3v1a4 4 0 0 1-4 4"/>
+                                <path d="M12 11v5"/>
+                                <path d="M9 20h6"/>
+                                <path d="M10 16h4v4h-4z"/>
+                            </svg>
+
+                        @endif
+
+                    </div>
+
+                    <div
+                        class="
+                            premium-kpi-trend
+                            {{ $series['trend_direction'] }}
+                        "
+                    >
+                        {{ $series['trend_label'] }}
+                    </div>
+
+                </div>
+
+                <div class="pipeline-kpi-number">
+                    {{ $card['value'] }}
+                </div>
+
+                <div class="pipeline-kpi-label">
+                    {{ $card['label'] }}
+                </div>
+
+                <div class="premium-kpi-sparkline">
+
+                    <svg
+                        viewBox="0 0 108 42"
+                        role="img"
+                        aria-label="{{ $card['label'] }} son 7 günlük grafik"
+                    >
+                        <polyline
+                            class="spark-line"
+                            points="{{ $series['points'] }}"
+                        />
+
+                        <circle
+                            class="spark-dot"
+                            cx="{{ $lastX }}"
+                            cy="{{ $lastY }}"
+                            r="2.7"
+                        />
+                    </svg>
+
+                </div>
+
+                <div class="premium-kpi-period">
+                    SON 7 GÜN
+                </div>
+
             </div>
 
-            <div class="pipeline-kpi-label">
-                Açık Fırsat
-            </div>
-
-        </div>
-
-
-        <div class="pipeline-kpi">
-
-            <div class="pipeline-kpi-number">
-                {{ $this->hotLeads }}
-            </div>
-
-            <div class="pipeline-kpi-label">
-                Sıcak Lead
-            </div>
-
-        </div>
-
-
-        <div class="pipeline-kpi">
-
-            <div class="pipeline-kpi-number">
-                {{ $this->proposalCount }}
-            </div>
-
-            <div class="pipeline-kpi-label">
-                Teklif Aşamasında
-            </div>
-
-        </div>
-
-
-        <div class="pipeline-kpi">
-
-            <div class="pipeline-kpi-number">
-                {{ $this->wonCount }}
-            </div>
-
-            <div class="pipeline-kpi-label">
-                Kazanılan
-            </div>
-
-        </div>
+        @endforeach
 
     </section>
 
