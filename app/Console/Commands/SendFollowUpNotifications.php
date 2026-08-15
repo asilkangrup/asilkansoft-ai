@@ -10,15 +10,243 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 #[Signature('wai:send-follow-up-notifications')]
-#[Description('Takip zamanı gelen müşteriler için WAI panel bildirimi gönderir.')]
+#[Description('Takip zamanı gelen ve öncelikli müşteriler için WAI panel bildirimi gönderir.')]
 class SendFollowUpNotifications extends Command
 {
-    /**
-     * Execute the console command.
-     */
+    private const PRIORITY_SCORE = 85;
+
     public function handle(): int
+    {
+        $prioritySentCount =
+            $this->sendPriorityLeadNotifications();
+
+        $followUpSentCount =
+            $this->sendFollowUpNotifications();
+
+        $this->info(
+            $prioritySentCount
+            .' öncelikli lead bildirimi, '
+            .$followUpSentCount
+            .' takip bildirimi gönderildi.'
+        );
+
+        return self::SUCCESS;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ÖNCELİKLİ LEAD BİLDİRİMLERİ
+    |--------------------------------------------------------------------------
+    |
+    | 85+ puanlı açık fırsatlar satış ekibine ayrı bir bildirim olarak gider.
+    | Bu bildirim normal takip bildiriminden bağımsızdır.
+    |
+    */
+
+    private function sendPriorityLeadNotifications(): int
+    {
+        $customers = ConversationControl::query()
+            ->with([
+                'user',
+                'assignedUser',
+                'aiBot',
+            ])
+            ->where(
+                'lead_score',
+                '>=',
+                self::PRIORITY_SCORE
+            )
+            ->whereNotIn(
+                'lead_status',
+                [
+                    'won',
+                    'lost',
+                ]
+            )
+            ->orderByDesc(
+                'lead_score'
+            )
+            ->limit(500)
+            ->get();
+
+        if ($customers->isEmpty()) {
+            return 0;
+        }
+
+        $sentCount = 0;
+
+        foreach ($customers as $customer) {
+            $recipient =
+                $customer->assignedUser
+                ?: $customer->user;
+
+            if (! $recipient) {
+                Log::warning(
+                    'WAI PRIORITY LEAD RECIPIENT NOT FOUND',
+                    [
+                        'conversation_control_id' =>
+                            $customer->id,
+
+                        'user_id' =>
+                            $customer->user_id,
+
+                        'assigned_user_id' =>
+                            $customer->assigned_user_id,
+                    ]
+                );
+
+                continue;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | AYNI ÖNCELİKLİ LEAD İÇİN SÜREKLİ BİLDİRİM GÖNDERME
+            |--------------------------------------------------------------------------
+            |
+            | Aynı müşteri için 7 gün içinde tekrar öncelikli lead bildirimi
+            | göndermiyoruz.
+            |
+            | Takip bildirimi ayrı cache anahtarı kullandığı için yine çalışır.
+            |
+            */
+
+            $cacheKey =
+                'wai:priority-lead-notification:'
+                .$customer->id
+                .':'
+                .$recipient->id;
+
+            if (Cache::has($cacheKey)) {
+                continue;
+            }
+
+            $customerName =
+                $this->customerName(
+                    $customer
+                );
+
+            $customerUrl =
+                $this->customerUrl(
+                    $customer
+                );
+
+            $score =
+                max(
+                    0,
+                    min(
+                        100,
+                        (int) $customer->lead_score
+                    )
+                );
+
+            $companyName =
+                trim(
+                    (string) (
+                        $customer->company_name
+                        ?: $customer->aiBot?->company_name
+                    )
+                );
+
+            $body =
+                $customerName
+                .' şu anda '
+                .$score
+                .'/100 lead puanına sahip. '
+                .'Satın alma niyeti çok yüksek görünüyor. '
+                .'Hızlı şekilde ilgilenmeniz önerilir.';
+
+            if ($companyName !== '') {
+                $body .=
+                    ' Firma: '
+                    .$companyName
+                    .'.';
+            }
+
+            try {
+                Notification::make()
+                    ->title(
+                        '🔥 Öncelikli Lead: '
+                        .$customerName
+                    )
+                    ->body(
+                        $body
+                    )
+                    ->danger()
+                    ->actions([
+                        Action::make(
+                            'customer'
+                        )
+                            ->label(
+                                'Hemen Müşteriyi Aç'
+                            )
+                            ->url(
+                                $customerUrl
+                            ),
+                    ])
+                    ->sendToDatabase(
+                        $recipient
+                    );
+
+                Cache::put(
+                    $cacheKey,
+                    true,
+                    now()->addDays(7)
+                );
+
+                $sentCount++;
+
+                Log::info(
+                    'WAI PRIORITY LEAD NOTIFICATION SENT',
+                    [
+                        'conversation_control_id' =>
+                            $customer->id,
+
+                        'recipient_user_id' =>
+                            $recipient->id,
+
+                        'customer_name' =>
+                            $customerName,
+
+                        'lead_score' =>
+                            $score,
+
+                        'lead_status' =>
+                            $customer->lead_status,
+
+                        'lead_temperature' =>
+                            $customer->lead_temperature,
+                    ]
+                );
+            } catch (Throwable $exception) {
+                Log::error(
+                    'WAI PRIORITY LEAD NOTIFICATION FAILED',
+                    [
+                        'conversation_control_id' =>
+                            $customer->id,
+
+                        'recipient_user_id' =>
+                            $recipient->id,
+
+                        'message' =>
+                            $exception->getMessage(),
+                    ]
+                );
+            }
+        }
+
+        return $sentCount;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | NORMAL TAKİP BİLDİRİMLERİ
+    |--------------------------------------------------------------------------
+    */
+
+    private function sendFollowUpNotifications(): int
     {
         $customers = ConversationControl::query()
             ->with([
@@ -47,33 +275,13 @@ class SendFollowUpNotifications extends Command
             ->limit(500)
             ->get();
 
-        /*
-        |--------------------------------------------------------------------------
-        | TAKİP YOK
-        |--------------------------------------------------------------------------
-        */
-
         if ($customers->isEmpty()) {
-            $this->info(
-                'Takip zamanı gelen müşteri bulunamadı.'
-            );
-
-            return self::SUCCESS;
+            return 0;
         }
 
         $sentCount = 0;
 
         foreach ($customers as $customer) {
-            /*
-            |--------------------------------------------------------------------------
-            | BİLDİRİM ALICISI
-            |--------------------------------------------------------------------------
-            |
-            | Müşteriye personel atanmışsa bildirim ona gider.
-            | Personel atanmamışsa hesabın ana kullanıcısına gider.
-            |
-            */
-
             $recipient =
                 $customer->assignedUser
                 ?: $customer->user;
@@ -96,18 +304,6 @@ class SendFollowUpNotifications extends Command
                 continue;
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | AYNI TAKİP İÇİN TEKRAR BİLDİRİM GÖNDERME
-            |--------------------------------------------------------------------------
-            |
-            | Cache anahtarına takip tarihini de ekliyoruz.
-            |
-            | Örneğin müşteri yarına ertelenirse next_follow_up_at değişeceği için
-            | yeni takip zamanı geldiğinde yeniden bildirim gönderilebilir.
-            |
-            */
-
             $followUpTimestamp =
                 $customer->next_follow_up_at
                     ? $customer->next_follow_up_at->timestamp
@@ -121,36 +317,14 @@ class SendFollowUpNotifications extends Command
                 .':'
                 .$recipient->id;
 
-            if (
-                Cache::has(
-                    $cacheKey
-                )
-            ) {
+            if (Cache::has($cacheKey)) {
                 continue;
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | MÜŞTERİ ADI
-            |--------------------------------------------------------------------------
-            */
-
             $customerName =
-                trim(
-                    (string) $customer->customer_name
+                $this->customerName(
+                    $customer
                 );
-
-            if ($customerName === '') {
-                $customerName =
-                    $customer->whatsapp_number
-                    ?: 'Müşteri';
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | LEAD SICAKLIĞI
-            |--------------------------------------------------------------------------
-            */
 
             $leadTemperature =
                 match (
@@ -166,12 +340,6 @@ class SendFollowUpNotifications extends Command
                         'Soğuk Lead',
                 };
 
-            /*
-            |--------------------------------------------------------------------------
-            | TAKİP TARİHİ
-            |--------------------------------------------------------------------------
-            */
-
             $followUpTime =
                 $customer->next_follow_up_at
                     ? $customer
@@ -179,62 +347,62 @@ class SendFollowUpNotifications extends Command
                         ->format('d.m.Y H:i')
                     : '-';
 
-            /*
-            |--------------------------------------------------------------------------
-            | MÜŞTERİ URL
-            |--------------------------------------------------------------------------
-            */
-
             $customerUrl =
-                url(
-                    '/admin/musteriler'
-                    .'?customer='
-                    .$customer->id
+                $this->customerUrl(
+                    $customer
                 );
 
-            /*
-            |--------------------------------------------------------------------------
-            | FİLAMENT DATABASE NOTIFICATION
-            |--------------------------------------------------------------------------
-            */
+            $score =
+                max(
+                    0,
+                    min(
+                        100,
+                        (int) $customer->lead_score
+                    )
+                );
 
             try {
-                Notification::make()
-                    ->title(
-                        'Müşteri takip zamanı geldi'
-                    )
-                    ->body(
-                        $customerName
-                        .' için planlanan takip zamanı '
-                        .$followUpTime
-                        .'. '
-                        .$leadTemperature
-                        .'.'
-                    )
-                    ->warning()
-                    ->actions([
-                        Action::make(
-                            'customer'
+                $notification =
+                    Notification::make()
+                        ->title(
+                            $score >= self::PRIORITY_SCORE
+                                ? '🔥 Öncelikli müşteri takip zamanı'
+                                : 'Müşteri takip zamanı geldi'
                         )
-                            ->label(
-                                'Müşteriyi Aç'
+                        ->body(
+                            $customerName
+                            .' için planlanan takip zamanı '
+                            .$followUpTime
+                            .'. '
+                            .$leadTemperature
+                            .' — '
+                            .$score
+                            .'/100.'
+                        )
+                        ->actions([
+                            Action::make(
+                                'customer'
                             )
-                            ->url(
-                                $customerUrl
-                            ),
-                    ])
+                                ->label(
+                                    $score >= self::PRIORITY_SCORE
+                                        ? 'Hemen Müşteriyi Aç'
+                                        : 'Müşteriyi Aç'
+                                )
+                                ->url(
+                                    $customerUrl
+                                ),
+                        ]);
+
+                if ($score >= self::PRIORITY_SCORE) {
+                    $notification->danger();
+                } else {
+                    $notification->warning();
+                }
+
+                $notification
                     ->sendToDatabase(
                         $recipient
                     );
-
-                /*
-                |--------------------------------------------------------------------------
-                | CACHE
-                |--------------------------------------------------------------------------
-                |
-                | Aynı takip tarihi için 7 gün boyunca ikinci bildirim gönderilmez.
-                |
-                */
 
                 Cache::put(
                     $cacheKey,
@@ -256,6 +424,9 @@ class SendFollowUpNotifications extends Command
                         'customer_name' =>
                             $customerName,
 
+                        'lead_score' =>
+                            $score,
+
                         'lead_temperature' =>
                             $customer->lead_temperature,
 
@@ -265,13 +436,7 @@ class SendFollowUpNotifications extends Command
                                 ?->toDateTimeString(),
                     ]
                 );
-            } catch (\Throwable $exception) {
-                /*
-                |--------------------------------------------------------------------------
-                | TEK BİR BİLDİRİM TÜM COMMAND'İ DURDURMASIN
-                |--------------------------------------------------------------------------
-                */
-
+            } catch (Throwable $exception) {
                 Log::error(
                     'WAI FOLLOW-UP NOTIFICATION FAILED',
                     [
@@ -288,11 +453,45 @@ class SendFollowUpNotifications extends Command
             }
         }
 
-        $this->info(
-            $sentCount
-            .' takip bildirimi gönderildi.'
-        );
+        return $sentCount;
+    }
 
-        return self::SUCCESS;
+    /*
+    |--------------------------------------------------------------------------
+    | MÜŞTERİ ADI
+    |--------------------------------------------------------------------------
+    */
+
+    private function customerName(
+        ConversationControl $customer
+    ): string {
+        $customerName =
+            trim(
+                (string) $customer->customer_name
+            );
+
+        if ($customerName !== '') {
+            return $customerName;
+        }
+
+        return
+            $customer->whatsapp_number
+            ?: 'Müşteri';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MÜŞTERİ URL
+    |--------------------------------------------------------------------------
+    */
+
+    private function customerUrl(
+        ConversationControl $customer
+    ): string {
+        return url(
+            '/admin/musteriler'
+            .'?customer='
+            .$customer->id
+        );
     }
 }

@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Jobs\UpdateCrmConversationSummary;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -118,6 +120,50 @@ class LeadScoringService
         'iptal etmek istiyorum',
     ];
 
+    /*
+    |--------------------------------------------------------------------------
+    | SATIŞTAN UZAKLAŞMA / KARARSIZLIK SİNYALLERİ
+    |--------------------------------------------------------------------------
+    |
+    | Bunlar kesin kayıp değildir.
+    | Lead'i lost yapmayız; kontrollü puan düşürür ve takip oluştururuz.
+    |
+    */
+
+    private const RISK_INTENT = [
+        'dusuneyim',
+        'dusunecegim',
+        'bir dusuneyim',
+        'sonra donerim',
+        'sonra yazacagim',
+        'sonra yazayim',
+        'daha sonra',
+        'simdilik bekleyelim',
+        'karar verince yazarim',
+        'karar verecegim',
+        'esime sorayim',
+        'esimle konusayim',
+        'ortagimla konusayim',
+        'patronuma sorayim',
+        'biraz arastirayim',
+        'baska yerlere de bakacagim',
+        'baska yere de bakayim',
+        'karsilastirma yapacagim',
+        'acelem yok',
+    ];
+
+    private const PRICE_HESITATION_INTENT = [
+        'biraz pahali',
+        'fiyat yuksek geldi',
+        'fiyati yuksek geldi',
+        'butceme gore pahali',
+        'daha uygun var mi',
+        'daha uygun bir sey',
+        'indirim olur mu',
+        'son fiyat nedir',
+        'fiyatta yardimci olur musunuz',
+    ];
+
     private const PROFILE_LABELS = [
         'general' => 'Genel Satış',
         'ecommerce' => 'E-Ticaret / Ürün Satışı',
@@ -227,6 +273,30 @@ class LeadScoringService
             ...$signals,
             ...$sectorSignals,
         ]));
+
+        /*
+        |--------------------------------------------------------------------------
+        | KARARSIZ / RİSKLİ LEAD
+        |--------------------------------------------------------------------------
+        */
+
+        if ($this->containsAny($normalized, self::RISK_INTENT)) {
+            $scoreChange -= 8;
+            $signals[] = 'lead_risk';
+            $signals[] = 'hesitation';
+        }
+
+        if ($this->containsAny($normalized, self::PRICE_HESITATION_INTENT)) {
+            $scoreChange -= 10;
+            $signals[] = 'lead_risk';
+            $signals[] = 'price_objection';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | KESİN OLUMSUZ NİYET
+        |--------------------------------------------------------------------------
+        */
 
         if ($this->containsAny($normalized, self::NEGATIVE_INTENT)) {
             $scoreChange -= 35;
@@ -716,6 +786,75 @@ class LeadScoringService
 
         $conversation->update($data);
 
+        /*
+        |--------------------------------------------------------------------------
+        | SICAK LEAD -> OTOMATİK TAKİP
+        |--------------------------------------------------------------------------
+        |
+        | Lead ilk kez sıcak olduğunda ve daha önce planlanmış bir takip yoksa
+        | WAI otomatik olarak anlık takip görevi oluşturur.
+        |
+        | Mevcut wai:send-follow-up-notifications command'i bu kaydı görür ve
+        | atanmış personele, personel yoksa bot sahibine panel bildirimi gönderir.
+        |
+        | Mevcut takip tarihi varsa kesinlikle ezilmez.
+        | Kazanılmış / kaybedilmiş lead için yeni takip oluşturulmaz.
+        |
+        */
+
+        $automaticFollowUpOld = null;
+        $automaticFollowUpNew = null;
+
+        if (
+            $temperature === 'hot'
+            && $oldTemperature !== 'hot'
+            && ! in_array($newStatus, ['won', 'lost'], true)
+            && ! $conversation->next_follow_up_at
+        ) {
+            $automaticFollowUpNew = now();
+
+            $conversation->update([
+                'next_follow_up_at' =>
+                    $automaticFollowUpNew,
+            ]);
+
+            $signals[] =
+                'hot_lead_follow_up_created';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | RİSKLİ LEAD -> OTOMATİK TAKİP
+        |--------------------------------------------------------------------------
+        |
+        | Müşteri kararsızlık veya fiyat itirazı gösterdiyse ve mevcut bir takip
+        | planı yoksa lead'i kaybetmeden satış ekibine takip görevi oluştururuz.
+        |
+        | Öncelikli lead daha hızlı, diğer lead'ler ertesi gün takip edilir.
+        |
+        */
+
+        $riskFollowUpNew = null;
+
+        if (
+            in_array('lead_risk', $signals, true)
+            && ! in_array($newStatus, ['won', 'lost'], true)
+            && ! $conversation->next_follow_up_at
+        ) {
+            $riskFollowUpNew =
+                $newScore >= 85
+                    ? now()->addHours(3)
+                    : now()->addDay();
+
+            $conversation->update([
+                'next_follow_up_at' =>
+                    $riskFollowUpNew,
+            ]);
+
+            $signals[] =
+                'risk_follow_up_created';
+        }
+
         $this->syncAutomaticTags(
             conversation: $conversation,
             score: $newScore,
@@ -747,6 +886,136 @@ class LeadScoringService
             newStatus: $conversation->lead_status ?: 'new',
             performedBy: null,
         );
+
+        if ($automaticFollowUpNew !== null) {
+            $activityService->followUpChanged(
+                conversation: $conversation,
+                oldDate: $automaticFollowUpOld,
+                newDate: $automaticFollowUpNew,
+                performedBy: null,
+            );
+
+            $activityService->log(
+                conversation: $conversation,
+                type: 'ai_action',
+                title: 'Sıcak lead için otomatik takip oluşturuldu',
+                description: 'WAI, lead sıcak duruma geçtiği için satış ekibine anlık takip görevi oluşturdu.',
+                oldValue: null,
+                newValue: $automaticFollowUpNew,
+                performedBy: null,
+                meta: [
+                    'source' => 'lead_scoring',
+                    'profile' => $profile,
+                    'score' => $newScore,
+                    'automatic' => true,
+                ],
+            );
+        }
+
+        if ($riskFollowUpNew !== null) {
+            $activityService->followUpChanged(
+                conversation: $conversation,
+                oldDate: null,
+                newDate: $riskFollowUpNew,
+                performedBy: null,
+            );
+
+            $activityService->log(
+                conversation: $conversation,
+                type: 'ai_action',
+                title: 'Riskli lead için otomatik takip oluşturuldu',
+                description: in_array('price_objection', $signals, true)
+                    ? 'WAI, müşteride fiyat itirazı algıladı. Lead kaybedilmedi; satış ekibine yeniden iletişim için takip görevi oluşturuldu.'
+                    : 'WAI, müşteride kararsızlık veya satıştan uzaklaşma sinyali algıladı. Lead kaybedilmedi; satış ekibine yeniden iletişim için takip görevi oluşturuldu.',
+                oldValue: null,
+                newValue: $riskFollowUpNew,
+                performedBy: null,
+                meta: [
+                    'source' => 'lead_scoring',
+                    'profile' => $profile,
+                    'score' => $newScore,
+                    'risk' => true,
+                    'price_objection' => in_array('price_objection', $signals, true),
+                    'automatic' => true,
+                ],
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 85+ PUAN -> ÖNCELİKLİ LEAD
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $oldScore < 85
+            && $newScore >= 85
+            && ! in_array($newStatus, ['won', 'lost'], true)
+        ) {
+            $activityService->log(
+                conversation: $conversation,
+                type: 'ai_action',
+                title: 'Lead öncelikli seviyeye ulaştı',
+                description: 'WAI, müşterinin satın alma niyetini çok yüksek olarak değerlendirdi. Satış ekibinin hızlı şekilde ilgilenmesi önerilir.',
+                oldValue: $oldScore,
+                newValue: $newScore,
+                performedBy: null,
+                meta: [
+                    'source' => 'lead_scoring',
+                    'profile' => $profile,
+                    'score' => $newScore,
+                    'priority' => true,
+                    'automatic' => true,
+                ],
+            );
+
+            $signals[] = 'priority_lead';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | CRM AI ÖZET JOB'U
+        |--------------------------------------------------------------------------
+        |
+        | WhatsApp ana cevap akışını bekletmemek için özet ayrı queue job'unda
+        | hazırlanır. Aynı konuşma için kısa sürede çok sayıda job oluşmasını
+        | engellemek amacıyla 30 saniyelik dispatch kilidi kullanılır.
+        |
+        */
+
+        try {
+            $summaryDispatchKey =
+                'wai:crm-summary-dispatch:'
+                .$conversation->id;
+
+            if (
+                Cache::add(
+                    $summaryDispatchKey,
+                    true,
+                    now()->addSeconds(30)
+                )
+            ) {
+                UpdateCrmConversationSummary::dispatch(
+                    (int) $conversation->id
+                )->delay(
+                    now()->addSeconds(15)
+                );
+
+                $signals[] =
+                    'crm_summary_queued';
+            }
+        } catch (\Throwable $exception) {
+            Log::warning(
+                'WAI CRM SUMMARY DISPATCH FAILED',
+                [
+                    'conversation_id' =>
+                        $conversation->id,
+
+                    'message' =>
+                        $exception->getMessage(),
+                ]
+            );
+        }
 
         Log::info(
             'WAI LEAD SCORE UPDATED',
@@ -786,6 +1055,12 @@ class LeadScoringService
             in_array('ready_to_convert', $signals, true)
             || in_array('very_high_purchase_intent', $signals, true)
         ) {
+            if ($this->statusRank($current) < $this->statusRank('proposal')) {
+                return 'proposal';
+            }
+        }
+
+        if ($score >= 85) {
             if ($this->statusRank($current) < $this->statusRank('proposal')) {
                 return 'proposal';
             }
@@ -839,6 +1114,8 @@ class LeadScoringService
                 'SÄ±cak Lead',
                 'IlÄ±k Lead',
                 'SoÄŸuk Lead',
+                'Öncelikli Lead',
+                'Oncelikli Lead',
             ] as $tag
         ) {
             if ($conversation->etiketiVarMi($tag)) {
@@ -846,12 +1123,56 @@ class LeadScoringService
             }
         }
 
-        if ($score >= 70) {
+        if ($score >= 85) {
+            $conversation->etiketEkle('Sıcak Lead');
+            $conversation->etiketEkle('Öncelikli Lead');
+        } elseif ($score >= 70) {
             $conversation->etiketEkle('Sıcak Lead');
         } elseif ($score >= 40) {
             $conversation->etiketEkle('Ilık Lead');
         } else {
             $conversation->etiketEkle('Soğuk Lead');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | RİSK ETİKETLERİ
+        |--------------------------------------------------------------------------
+        */
+
+        if (in_array('lead_risk', $signals, true)) {
+            $conversation->etiketEkle('Riskli Lead');
+
+            if (in_array('hesitation', $signals, true)) {
+                $conversation->etiketEkle('Kararsız');
+            }
+
+            if (in_array('price_objection', $signals, true)) {
+                $conversation->etiketEkle('Fiyat İtirazı');
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | GÜÇLÜ POZİTİF NİYET GELİRSE ESKİ RİSK ETİKETLERİNİ TEMİZLE
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            in_array('ready_to_convert', $signals, true)
+            || in_array('very_high_purchase_intent', $signals, true)
+        ) {
+            foreach (
+                [
+                    'Riskli Lead',
+                    'Kararsız',
+                    'Fiyat İtirazı',
+                ] as $riskTag
+            ) {
+                if ($conversation->etiketiVarMi($riskTag)) {
+                    $conversation->etiketSil($riskTag);
+                }
+            }
         }
 
         if (

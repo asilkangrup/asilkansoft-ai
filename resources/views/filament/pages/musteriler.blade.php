@@ -127,7 +127,7 @@
 .crm-kpis {
     margin-bottom: 18px;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0,1fr));
+    grid-template-columns: repeat(7, minmax(0,1fr));
     gap: 12px;
 }
 
@@ -178,6 +178,248 @@
 }
 
 /* ==========================================================================
+   REVENUE SUMMARY
+   ========================================================================== */
+
+.crm-revenue {
+    margin-bottom: 18px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 10px;
+}
+
+.crm-revenue-card {
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 17px;
+    background: #fff;
+    box-shadow: 0 8px 25px rgba(10,30,17,.03);
+}
+
+.crm-revenue-value {
+    color: var(--ink);
+    font-size: 23px;
+    font-weight: 900;
+    letter-spacing: -.6px;
+}
+
+.crm-revenue-label {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.crm-revenue-diff.positive {
+    color: #087a42;
+}
+
+.crm-revenue-diff.negative {
+    color: #a14646;
+}
+
+@media (max-width: 1250px) {
+    .crm-revenue {
+        grid-template-columns: repeat(2,1fr);
+    }
+}
+
+@media (max-width: 800px) {
+    .crm-revenue {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ==========================================================================
+   SALES FORECAST
+   ========================================================================== */
+
+.crm-forecast {
+    margin-bottom: 18px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 10px;
+}
+
+.crm-forecast-card {
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 17px;
+    background:
+        radial-gradient(circle at 95% 10%, rgba(36,225,127,.08), transparent 34%),
+        #fff;
+    box-shadow: 0 8px 25px rgba(10,30,17,.03);
+}
+
+.crm-forecast-value {
+    color: var(--ink);
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: -.7px;
+}
+
+.crm-forecast-label {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.crm-probability {
+    margin-top: 10px;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e9efeb;
+}
+
+.crm-probability span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #6defaa, #21d878);
+}
+
+@media (max-width: 800px) {
+    .crm-forecast {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ==========================================================================
+   DAILY SALES CENTER
+   ========================================================================== */
+
+.crm-daily-center {
+    margin-bottom: 18px;
+}
+
+.crm-daily-head {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.crm-daily-title {
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 900;
+}
+
+.crm-daily-subtitle {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.crm-daily-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 10px;
+}
+
+.crm-daily-card {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(10,30,17,.025);
+}
+
+.crm-daily-card-head {
+    min-height: 52px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid #edf1ee;
+}
+
+.crm-daily-card-title {
+    color: #263229;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.crm-daily-count {
+    min-width: 26px;
+    height: 26px;
+    padding: 0 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: #087a42;
+    background: #effcf5;
+    font-size: 9px;
+    font-weight: 900;
+}
+
+.crm-daily-list {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.crm-daily-item {
+    padding: 11px 13px;
+    border-bottom: 1px solid #f0f3f1;
+    cursor: pointer;
+    transition: background .16s ease;
+}
+
+.crm-daily-item:last-child {
+    border-bottom: 0;
+}
+
+.crm-daily-item:hover {
+    background: #fafcfb;
+}
+
+.crm-daily-item-name {
+    overflow: hidden;
+    color: #263229;
+    font-size: 10px;
+    font-weight: 850;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.crm-daily-item-meta {
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: #8a958e;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.crm-daily-empty {
+    padding: 18px 12px;
+    color: #8b958f;
+    text-align: center;
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+@media (max-width: 1250px) {
+    .crm-daily-grid {
+        grid-template-columns: repeat(2,1fr);
+    }
+}
+
+@media (max-width: 800px) {
+    .crm-daily-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ==========================================================================
    FILTER BAR
    ========================================================================== */
 
@@ -186,10 +428,11 @@
     padding: 13px;
     display: grid;
     grid-template-columns:
-        minmax(260px,1fr)
-        170px
+        minmax(250px,1fr)
         160px
         150px
+        140px
+        170px
         auto;
     gap: 9px;
     border: 1px solid var(--line);
@@ -563,6 +806,47 @@
 }
 
 /* ==========================================================================
+   CRM TAGS
+   ========================================================================== */
+
+.crm-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.crm-tag {
+    min-height: 27px;
+    padding: 0 9px;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #dde7e1;
+    border-radius: 999px;
+    color: #657168;
+    background: #f8faf9;
+    font-size: 9px;
+    font-weight: 850;
+}
+
+.crm-tag.priority {
+    border-color: #ffdca6;
+    color: #9a5e00;
+    background: #fff7e8;
+}
+
+.crm-tag.risk {
+    border-color: #f0c8c8;
+    color: #a14646;
+    background: #fff3f3;
+}
+
+.crm-tag.intent {
+    border-color: #c8e9d5;
+    color: #087a42;
+    background: #effcf5;
+}
+
+/* ==========================================================================
    DETAIL SECTIONS
    ========================================================================== */
 
@@ -639,6 +923,84 @@
 .crm-field textarea:focus {
     border-color: #91dfb1;
     box-shadow: 0 0 0 4px rgba(36,225,127,.055);
+}
+
+/* ==========================================================================
+   WAI AI INSIGHT
+   ========================================================================== */
+
+.crm-ai-card {
+    padding: 18px;
+    border: 1px solid #cfeedd;
+    border-radius: 16px;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(36,225,127,.09), transparent 36%),
+        linear-gradient(145deg, #fbfffd, #f3fcf7);
+}
+
+.crm-ai-card + .crm-ai-card {
+    margin-top: 10px;
+}
+
+.crm-ai-card.action {
+    border-color: #dce5ff;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(91,126,220,.08), transparent 36%),
+        linear-gradient(145deg, #fcfdff, #f6f8ff);
+}
+
+.crm-ai-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.crm-ai-card-title {
+    color: #1e4932;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.crm-ai-card.action .crm-ai-card-title {
+    color: #38538c;
+}
+
+.crm-ai-card-body {
+    margin-top: 9px;
+    color: #536159;
+    font-size: 11px;
+    line-height: 1.65;
+    white-space: pre-line;
+}
+
+.crm-ai-empty {
+    color: #89958d;
+    font-style: italic;
+}
+
+.crm-ai-meta {
+    margin-top: 9px;
+    color: #8b978f;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.crm-ai-refresh {
+    min-height: 31px;
+    padding: 0 10px;
+    border: 1px solid #ccefd9;
+    border-radius: 9px;
+    color: #087a42;
+    background: #fff;
+    font-size: 9px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.crm-ai-refresh:disabled {
+    opacity: .6;
+    cursor: wait;
 }
 
 /* ==========================================================================
@@ -1152,7 +1514,9 @@
     class="wai-crm"
 
     x-data="{
-        saved: false
+        saved: false,
+        summaryRefreshed: false,
+        summaryFailed: false
     }"
 
     x-on:crm-customer-saved.window="
@@ -1160,6 +1524,20 @@
         setTimeout(
             () => saved = false,
             2200
+        );
+    "
+    x-on:crm-ai-summary-refreshed.window="
+        summaryRefreshed = true;
+        setTimeout(
+            () => summaryRefreshed = false,
+            2200
+        );
+    "
+    x-on:crm-ai-summary-failed.window="
+        summaryFailed = true;
+        setTimeout(
+            () => summaryFailed = false,
+            3000
         );
     "
 >
@@ -1276,6 +1654,48 @@
             <div class="crm-kpi-top">
 
                 <div class="crm-kpi-icon">
+                    🔥
+                </div>
+
+            </div>
+
+            <div class="crm-kpi-number">
+                {{ $this->priorityCustomers }}
+            </div>
+
+            <div class="crm-kpi-label">
+                Öncelikli Lead
+            </div>
+
+        </div>
+
+
+        <div class="crm-kpi">
+
+            <div class="crm-kpi-top">
+
+                <div class="crm-kpi-icon">
+                    ⚠️
+                </div>
+
+            </div>
+
+            <div class="crm-kpi-number">
+                {{ $this->riskCustomers }}
+            </div>
+
+            <div class="crm-kpi-label">
+                Riskli Lead
+            </div>
+
+        </div>
+
+
+        <div class="crm-kpi">
+
+            <div class="crm-kpi-top">
+
+                <div class="crm-kpi-icon">
 
                     <svg
                         viewBox="0 0 24 24"
@@ -1367,6 +1787,333 @@
 
 
     {{-- =========================================================
+         GERÇEK CİRO
+    ========================================================== --}}
+
+    @php
+        $comparison =
+            $this->forecastComparison;
+
+        $difference =
+            (float) ($comparison['difference'] ?? 0);
+
+        $accuracy =
+            $comparison['accuracy'] ?? null;
+    @endphp
+
+    <section class="crm-revenue">
+
+        <div class="crm-revenue-card">
+
+            <div class="crm-revenue-value">
+                {{ number_format($this->totalWonRevenue, 2, ',', '.') }} ₺
+            </div>
+
+            <div class="crm-revenue-label">
+                Gerçekleşen Toplam Ciro
+            </div>
+
+        </div>
+
+
+        <div class="crm-revenue-card">
+
+            <div class="crm-revenue-value">
+                {{ number_format($this->averageWonValue, 2, ',', '.') }} ₺
+            </div>
+
+            <div class="crm-revenue-label">
+                Ortalama Kazanılan Satış
+            </div>
+
+        </div>
+
+
+        <div class="crm-revenue-card">
+
+            <div
+                class="
+                    crm-revenue-value
+                    crm-revenue-diff
+                    {{ $difference >= 0 ? 'positive' : 'negative' }}
+                "
+            >
+                {{ $difference >= 0 ? '+' : '' }}
+                {{ number_format($difference, 2, ',', '.') }} ₺
+            </div>
+
+            <div class="crm-revenue-label">
+                Tahmin / Gerçekleşen Farkı
+            </div>
+
+        </div>
+
+
+        <div class="crm-revenue-card">
+
+            <div class="crm-revenue-value">
+                {{ $accuracy !== null ? '%' . $accuracy : '-' }}
+            </div>
+
+            <div class="crm-revenue-label">
+                Tahmin Doğruluğu
+            </div>
+
+        </div>
+
+    </section>
+
+
+    {{-- =========================================================
+         SATIŞ TAHMİNİ
+    ========================================================== --}}
+
+    <section class="crm-forecast">
+
+        <div class="crm-forecast-card">
+
+            <div class="crm-forecast-value">
+                {{ number_format($this->totalPipelineValue, 2, ',', '.') }} ₺
+            </div>
+
+            <div class="crm-forecast-label">
+                Toplam Açık Pipeline Değeri
+            </div>
+
+        </div>
+
+
+        <div class="crm-forecast-card">
+
+            <div class="crm-forecast-value">
+                {{ number_format($this->weightedPipelineValue, 2, ',', '.') }} ₺
+            </div>
+
+            <div class="crm-forecast-label">
+                Olasılık Ağırlıklı Pipeline
+            </div>
+
+        </div>
+
+
+        <div class="crm-forecast-card">
+
+            <div class="crm-forecast-value">
+                {{ $this->valuedOpportunitiesCount }}
+            </div>
+
+            <div class="crm-forecast-label">
+                Tutar Girilmiş Açık Fırsat
+            </div>
+
+        </div>
+
+    </section>
+
+
+    {{-- =========================================================
+         GÜNLÜK SATIŞ MERKEZİ
+    ========================================================== --}}
+
+    <section class="crm-daily-center">
+
+        <div class="crm-daily-head">
+
+            <div>
+                <div class="crm-daily-title">
+                    Günlük Satış Merkezi
+                </div>
+
+                <div class="crm-daily-subtitle">
+                    Bugün öncelik vermeniz gereken müşteriler.
+                </div>
+            </div>
+
+        </div>
+
+        <div class="crm-daily-grid">
+
+            <div class="crm-daily-card">
+
+                <div class="crm-daily-card-head">
+                    <div class="crm-daily-card-title">
+                        📞 Bugün Aranacaklar
+                    </div>
+
+                    <div class="crm-daily-count">
+                        {{ $this->todayFollowUps->count() }}
+                    </div>
+                </div>
+
+                <div class="crm-daily-list">
+                    @forelse ($this->todayFollowUps as $customer)
+
+                        <div
+                            class="crm-daily-item"
+                            wire:click="selectCustomer({{ $customer->id }})"
+                        >
+                            <div class="crm-daily-item-name">
+                                {{ $customer->customer_name ?: $customer->whatsapp_number }}
+                            </div>
+
+                            <div class="crm-daily-item-meta">
+                                <span>
+                                    {{ $customer->lead_score }}/100
+                                </span>
+
+                                <span>
+                                    {{ $customer->next_follow_up_at?->format('H:i') }}
+                                </span>
+                            </div>
+                        </div>
+
+                    @empty
+                        <div class="crm-daily-empty">
+                            Bugün için planlanmış takip yok.
+                        </div>
+                    @endforelse
+                </div>
+
+            </div>
+
+
+            <div class="crm-daily-card">
+
+                <div class="crm-daily-card-head">
+                    <div class="crm-daily-card-title">
+                        ⏳ 24 Saattir İlgilenilmeyenler
+                    </div>
+
+                    <div class="crm-daily-count">
+                        {{ $this->unattended24h->count() }}
+                    </div>
+                </div>
+
+                <div class="crm-daily-list">
+                    @forelse ($this->unattended24h as $customer)
+
+                        <div
+                            class="crm-daily-item"
+                            wire:click="selectCustomer({{ $customer->id }})"
+                        >
+                            <div class="crm-daily-item-name">
+                                {{ $customer->customer_name ?: $customer->whatsapp_number }}
+                            </div>
+
+                            <div class="crm-daily-item-meta">
+                                <span>
+                                    {{ $customer->lead_score }}/100
+                                </span>
+
+                                <span>
+                                    {{ $customer->last_contact_at?->diffForHumans() }}
+                                </span>
+                            </div>
+                        </div>
+
+                    @empty
+                        <div class="crm-daily-empty">
+                            24 saattir ilgilenilmeyen müşteri yok.
+                        </div>
+                    @endforelse
+                </div>
+
+            </div>
+
+
+            <div class="crm-daily-card">
+
+                <div class="crm-daily-card-head">
+                    <div class="crm-daily-card-title">
+                        💤 7 Gündür Sessiz
+                    </div>
+
+                    <div class="crm-daily-count">
+                        {{ $this->silent7d->count() }}
+                    </div>
+                </div>
+
+                <div class="crm-daily-list">
+                    @forelse ($this->silent7d as $customer)
+
+                        <div
+                            class="crm-daily-item"
+                            wire:click="selectCustomer({{ $customer->id }})"
+                        >
+                            <div class="crm-daily-item-name">
+                                {{ $customer->customer_name ?: $customer->whatsapp_number }}
+                            </div>
+
+                            <div class="crm-daily-item-meta">
+                                <span>
+                                    {{ $customer->lead_score }}/100
+                                </span>
+
+                                <span>
+                                    {{ $customer->last_contact_at?->diffForHumans() }}
+                                </span>
+                            </div>
+                        </div>
+
+                    @empty
+                        <div class="crm-daily-empty">
+                            7 gündür sessiz kalan açık lead yok.
+                        </div>
+                    @endforelse
+                </div>
+
+            </div>
+
+
+            <div class="crm-daily-card">
+
+                <div class="crm-daily-card-head">
+                    <div class="crm-daily-card-title">
+                        🔥 Satışa En Yakın 10
+                    </div>
+
+                    <div class="crm-daily-count">
+                        {{ $this->closestToSale->count() }}
+                    </div>
+                </div>
+
+                <div class="crm-daily-list">
+                    @forelse ($this->closestToSale as $customer)
+
+                        <div
+                            class="crm-daily-item"
+                            wire:click="selectCustomer({{ $customer->id }})"
+                        >
+                            <div class="crm-daily-item-name">
+                                {{ $customer->customer_name ?: $customer->whatsapp_number }}
+                            </div>
+
+                            <div class="crm-daily-item-meta">
+                                <span>
+                                    {{ $this->statusLabel($customer->lead_status) }}
+                                </span>
+
+                                <span>
+                                    {{ $customer->lead_score }}/100
+                                </span>
+                            </div>
+                        </div>
+
+                    @empty
+                        <div class="crm-daily-empty">
+                            Henüz satış fırsatı oluşmadı.
+                        </div>
+                    @endforelse
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    {{-- =========================================================
          FILTERS
     ========================================================== --}}
 
@@ -1427,6 +2174,18 @@
             <option value="instagram">Instagram</option>
             <option value="facebook">Facebook</option>
             <option value="web">Web</option>
+        </select>
+
+
+        <select
+            class="crm-select"
+            wire:model.live="opportunityFilter"
+        >
+            <option value="all">Tüm Fırsatlar</option>
+            <option value="priority">🔥 Öncelikli Lead</option>
+            <option value="risk">⚠️ Riskli Lead</option>
+            <option value="price_objection">💬 Fiyat İtirazı</option>
+            <option value="follow_up">🕒 Takip Planlanan</option>
         </select>
 
 
@@ -1696,6 +2455,69 @@
                 </div>
 
 
+                @php
+                    $selectedTags =
+                        is_array($selected->tags)
+                            ? $selected->tags
+                            : [];
+                @endphp
+
+                @if (count($selectedTags) > 0)
+
+                    <div class="crm-form-section">
+
+                        <div class="crm-form-title">
+                            WAI Etiketleri
+                        </div>
+
+                        <div class="crm-tags">
+
+                            @foreach ($selectedTags as $tag)
+
+                                @php
+                                    $tagClass =
+                                        $tag === 'Öncelikli Lead'
+                                            ? 'priority'
+                                            : (
+                                                in_array(
+                                                    $tag,
+                                                    [
+                                                        'Riskli Lead',
+                                                        'Kararsız',
+                                                        'Fiyat İtirazı',
+                                                    ],
+                                                    true
+                                                )
+                                                    ? 'risk'
+                                                    : (
+                                                        in_array(
+                                                            $tag,
+                                                            [
+                                                                'Satın Alma Niyeti',
+                                                                'Acil',
+                                                                'Geri Arama',
+                                                            ],
+                                                            true
+                                                        )
+                                                            ? 'intent'
+                                                            : ''
+                                                    )
+                                            );
+                                @endphp
+
+                                <span class="crm-tag {{ $tagClass }}">
+                                    {{ $tag }}
+                                </span>
+
+                            @endforeach
+
+                        </div>
+
+                    </div>
+
+                @endif
+
+
                 <div class="crm-form-section crm-section-standard">
 
                     <div class="crm-form-title">
@@ -1792,6 +2614,163 @@
                             wire:model="customerEmail"
                             placeholder="ornek@firma.com"
                         >
+
+                    </div>
+
+                </div>
+
+
+                <div class="crm-form-section">
+
+                    <div class="crm-form-title">
+                        WAI Satış Asistanı
+                    </div>
+
+                    <div class="crm-ai-card">
+
+                        <div class="crm-ai-card-head">
+
+                            <div class="crm-ai-card-title">
+                                🤖 WAI Müşteri Özeti
+                            </div>
+
+                            <button
+                                type="button"
+                                class="crm-ai-refresh"
+                                wire:click="refreshAiSummary"
+                                wire:loading.attr="disabled"
+                                wire:target="refreshAiSummary"
+                            >
+                                <span
+                                    wire:loading.remove
+                                    wire:target="refreshAiSummary"
+                                >
+                                    Özeti Yenile
+                                </span>
+
+                                <span
+                                    wire:loading
+                                    wire:target="refreshAiSummary"
+                                >
+                                    Analiz ediliyor...
+                                </span>
+                            </button>
+
+                        </div>
+
+                        <div class="crm-ai-card-body">
+                            @if (trim((string) $selected->ai_summary) !== '')
+                                {{ $selected->ai_summary }}
+                            @else
+                                <span class="crm-ai-empty">
+                                    Yeterli konuşma oluştuğunda WAI müşteri özetini otomatik hazırlayacak.
+                                </span>
+                            @endif
+                        </div>
+
+                        @if ($selected->ai_summary_updated_at)
+                            <div class="crm-ai-meta">
+                                Son güncelleme:
+                                {{ $selected->ai_summary_updated_at->format('d.m.Y H:i') }}
+                            </div>
+                        @endif
+
+                    </div>
+
+                    <div class="crm-ai-card action">
+
+                        <div class="crm-ai-card-title">
+                            🎯 Önerilen Sonraki Aksiyon
+                        </div>
+
+                        <div class="crm-ai-card-body">
+                            @if (trim((string) $selected->next_best_action) !== '')
+                                {{ $selected->next_best_action }}
+                            @else
+                                <span class="crm-ai-empty">
+                                    WAI konuşmayı analiz ettikten sonra satış ekibi için en değerli sonraki adımı burada gösterecek.
+                                </span>
+                            @endif
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="crm-form-section">
+
+                    <div class="crm-form-title">
+                        Satış Tahmini
+                    </div>
+
+                    <div class="crm-field">
+
+                        <label>
+                            Tahmini Satış Tutarı (₺)
+                        </label>
+
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            wire:model="estimatedValue"
+                            placeholder="Örn: 25000"
+                        >
+
+                    </div>
+
+                    @if ($leadStatus === 'won')
+
+                        <div class="crm-field">
+
+                            <label>
+                                Gerçekleşen Satış Tutarı (₺)
+                            </label>
+
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                wire:model="actualValue"
+                                placeholder="Örn: 24500"
+                            >
+
+                        </div>
+
+                    @endif
+
+
+                    <div class="crm-forecast-card">
+
+                        <div class="crm-forecast-value">
+                            %{{ $this->selectedProbability }}
+                        </div>
+
+                        <div class="crm-forecast-label">
+                            Tahmini Satış Olasılığı
+                        </div>
+
+                        <div class="crm-probability">
+                            <span
+                                style="width: {{ $this->selectedProbability }}%"
+                            ></span>
+                        </div>
+
+                    </div>
+
+                    <div
+                        class="crm-forecast-card"
+                        style="margin-top:10px;"
+                    >
+
+                        <div class="crm-forecast-value">
+                            {{ number_format($this->selectedWeightedValue, 2, ',', '.') }} ₺
+                        </div>
+
+                        <div class="crm-forecast-label">
+                            Olasılık Ağırlıklı Fırsat Değeri
+                        </div>
 
                     </div>
 
@@ -2171,6 +3150,24 @@
 
         Müşteri bilgileri kaydedildi.
 
+    </div>
+
+    <div
+        class="crm-toast"
+        x-show="summaryRefreshed"
+        x-transition
+        x-cloak
+    >
+        WAI müşteri özeti güncellendi.
+    </div>
+
+    <div
+        class="crm-toast"
+        x-show="summaryFailed"
+        x-transition
+        x-cloak
+    >
+        Müşteri özeti güncellenemedi.
     </div>
 
 </div>

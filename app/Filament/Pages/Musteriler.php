@@ -5,6 +5,10 @@ namespace App\Filament\Pages;
 use App\Models\ConversationControl;
 use App\Models\User;
 use App\Services\CrmActivityService;
+use App\Services\CrmConversationSummaryService;
+use App\Services\CrmDailySalesService;
+use App\Services\CrmForecastService;
+use App\Services\CrmRevenueService;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -37,6 +41,66 @@ class Musteriler extends Page
         );
     }
 
+    protected function dailySalesService(): CrmDailySalesService
+    {
+        return app(
+            CrmDailySalesService::class
+        );
+    }
+
+    protected function forecastService(): CrmForecastService
+    {
+        return app(
+            CrmForecastService::class
+        );
+    }
+
+    protected function revenueService(): CrmRevenueService
+    {
+        return app(
+            CrmRevenueService::class
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | WAI CRM ÖZETİNİ MANUEL YENİLE
+    |--------------------------------------------------------------------------
+    */
+
+    public function refreshAiSummary(): void
+    {
+        $customer =
+            $this->selectedCustomer;
+
+        if (! $customer) {
+            return;
+        }
+
+        try {
+            app(
+                CrmConversationSummaryService::class
+            )->updateIfNeeded(
+                conversation: $customer,
+                force: true
+            );
+
+            $this->selectCustomer(
+                $customer->id
+            );
+
+            $this->dispatch(
+                'crm-ai-summary-refreshed'
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $this->dispatch(
+                'crm-ai-summary-failed'
+            );
+        }
+    }
+
     /*
     |--------------------------------------------------------------------------
     | FİLTRELER
@@ -50,6 +114,8 @@ class Musteriler extends Page
     public string $temperatureFilter = 'all';
 
     public string $channelFilter = 'all';
+
+    public string $opportunityFilter = 'all';
 
     /*
     |--------------------------------------------------------------------------
@@ -90,6 +156,10 @@ class Musteriler extends Page
     public string $nextFollowUpAt = '';
 
     public string $lostReason = '';
+
+    public string $estimatedValue = '';
+
+    public string $actualValue = '';
 
     /*
     |--------------------------------------------------------------------------
@@ -216,6 +286,71 @@ class Musteriler extends Page
                         'channel',
                         $this->channelFilter
                     )
+            )
+            ->when(
+                $this->opportunityFilter !== 'all',
+                function (Builder $query): void {
+                    match ($this->opportunityFilter) {
+                        'priority' =>
+                            $query
+                                ->where(
+                                    'lead_score',
+                                    '>=',
+                                    85
+                                )
+                                ->whereNotIn(
+                                    'lead_status',
+                                    [
+                                        'won',
+                                        'lost',
+                                    ]
+                                ),
+
+                        'risk' =>
+                            $query
+                                ->whereJsonContains(
+                                    'tags',
+                                    'Riskli Lead'
+                                )
+                                ->whereNotIn(
+                                    'lead_status',
+                                    [
+                                        'won',
+                                        'lost',
+                                    ]
+                                ),
+
+                        'price_objection' =>
+                            $query
+                                ->whereJsonContains(
+                                    'tags',
+                                    'Fiyat İtirazı'
+                                )
+                                ->whereNotIn(
+                                    'lead_status',
+                                    [
+                                        'won',
+                                        'lost',
+                                    ]
+                                ),
+
+                        'follow_up' =>
+                            $query
+                                ->whereNotNull(
+                                    'next_follow_up_at'
+                                )
+                                ->whereNotIn(
+                                    'lead_status',
+                                    [
+                                        'won',
+                                        'lost',
+                                    ]
+                                ),
+
+                        default =>
+                            null,
+                    };
+                }
             )
             ->orderByRaw(
                 "
@@ -426,6 +561,26 @@ class Musteriler extends Page
 
         $this->lostReason =
             (string) $customer->lost_reason;
+
+        $this->estimatedValue =
+            $customer->estimated_value !== null
+                ? number_format(
+                    (float) $customer->estimated_value,
+                    2,
+                    '.',
+                    ''
+                )
+                : '';
+
+        $this->actualValue =
+            $customer->actual_value !== null
+                ? number_format(
+                    (float) $customer->actual_value,
+                    2,
+                    '.',
+                    ''
+                )
+                : '';
     }
 
     /*
@@ -590,6 +745,50 @@ class Musteriler extends Page
         $customer->update(
             $data
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | TAHMİNİ SATIŞ DEĞERİ
+        |--------------------------------------------------------------------------
+        |
+        | ConversationControl model fillable listesine bağımlı kalmadan
+        | güvenli biçimde kaydedilir.
+        |
+        */
+
+        $estimatedValue =
+            $this->estimatedValue !== ''
+                ? max(
+                    0,
+                    (float) str_replace(
+                        ',',
+                        '.',
+                        $this->estimatedValue
+                    )
+                )
+                : null;
+
+        $actualValue =
+            $this->actualValue !== ''
+                ? max(
+                    0,
+                    (float) str_replace(
+                        ',',
+                        '.',
+                        $this->actualValue
+                    )
+                )
+                : null;
+
+        $customer->forceFill([
+            'estimated_value' =>
+                $estimatedValue,
+
+            'actual_value' =>
+                $customer->lead_status === 'won'
+                    ? $actualValue
+                    : null,
+        ])->save();
 
         $customer->refresh();
 
@@ -786,6 +985,8 @@ class Musteriler extends Page
         $this->temperatureFilter = 'all';
 
         $this->channelFilter = 'all';
+
+        $this->opportunityFilter = 'all';
     }
 
     /*
@@ -804,6 +1005,146 @@ class Musteriler extends Page
                 'id',
                 'name',
             ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | GÜNLÜK SATIŞ MERKEZİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function getTodayFollowUpsProperty(): Collection
+    {
+        return $this->dailySalesService()
+            ->todayFollowUps(
+                auth()->id(),
+                10
+            );
+    }
+
+    public function getUnattended24hProperty(): Collection
+    {
+        return $this->dailySalesService()
+            ->unattendedFor24Hours(
+                auth()->id(),
+                10
+            );
+    }
+
+    public function getSilent7dProperty(): Collection
+    {
+        return $this->dailySalesService()
+            ->silentFor7Days(
+                auth()->id(),
+                10
+            );
+    }
+
+    public function getClosestToSaleProperty(): Collection
+    {
+        return $this->dailySalesService()
+            ->closestToSale(
+                auth()->id(),
+                10
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SATIŞ TAHMİNİ / PIPELINE
+    |--------------------------------------------------------------------------
+    */
+
+    public function getSelectedProbabilityProperty(): int
+    {
+        $customer =
+            $this->selectedCustomer;
+
+        if (! $customer) {
+            return 0;
+        }
+
+        return $this->forecastService()
+            ->probability(
+                $customer
+            );
+    }
+
+    public function getSelectedWeightedValueProperty(): float
+    {
+        $customer =
+            $this->selectedCustomer;
+
+        if (! $customer) {
+            return 0;
+        }
+
+        return $this->forecastService()
+            ->weightedValue(
+                $customer
+            );
+    }
+
+    public function getTotalPipelineValueProperty(): float
+    {
+        return $this->forecastService()
+            ->totalPipelineValue(
+                auth()->id()
+            );
+    }
+
+    public function getWeightedPipelineValueProperty(): float
+    {
+        return $this->forecastService()
+            ->weightedPipelineValue(
+                auth()->id()
+            );
+    }
+
+    public function getValuedOpportunitiesCountProperty(): int
+    {
+        return $this->forecastService()
+            ->valuedOpportunitiesCount(
+                auth()->id()
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | GERÇEK CİRO
+    |--------------------------------------------------------------------------
+    */
+
+    public function getTotalWonRevenueProperty(): float
+    {
+        return $this->revenueService()
+            ->totalWonRevenue(
+                auth()->id()
+            );
+    }
+
+    public function getAverageWonValueProperty(): float
+    {
+        return $this->revenueService()
+            ->averageWonValue(
+                auth()->id()
+            );
+    }
+
+    public function getValuedWonSalesCountProperty(): int
+    {
+        return $this->revenueService()
+            ->valuedWonSalesCount(
+                auth()->id()
+            );
+    }
+
+    public function getForecastComparisonProperty(): array
+    {
+        return $this->revenueService()
+            ->forecastComparison(
+                auth()->id()
+            );
     }
 
     /*
@@ -858,6 +1199,41 @@ class Musteriler extends Page
                 'next_follow_up_at',
                 '<=',
                 now()->addDay()
+            )
+            ->count();
+    }
+
+    public function getPriorityCustomersProperty(): int
+    {
+        return $this->customerQuery()
+            ->where(
+                'lead_score',
+                '>=',
+                85
+            )
+            ->whereNotIn(
+                'lead_status',
+                [
+                    'won',
+                    'lost',
+                ]
+            )
+            ->count();
+    }
+
+    public function getRiskCustomersProperty(): int
+    {
+        return $this->customerQuery()
+            ->whereJsonContains(
+                'tags',
+                'Riskli Lead'
+            )
+            ->whereNotIn(
+                'lead_status',
+                [
+                    'won',
+                    'lost',
+                ]
             )
             ->count();
     }
