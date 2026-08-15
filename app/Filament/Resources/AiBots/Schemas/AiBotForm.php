@@ -273,6 +273,16 @@ class AiBotForm
                             ])
                             ->required(),
 
+                        Select::make('lead_scoring_profile')
+                            ->label('Sektör / Satış Modeli')
+                            ->options(AiBot::leadScoringProfiles())
+                            ->default('general')
+                            ->required()
+                            ->native(false)
+                            ->helperText(
+                                'WAI, lead sıcaklığını ve satış aşamasını bu profile göre otomatik değerlendirir.'
+                            ),
+
                         Hidden::make('openai_model')
                             ->default('gpt-5-mini'),
                     ])

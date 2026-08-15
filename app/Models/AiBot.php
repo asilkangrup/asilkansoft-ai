@@ -17,6 +17,7 @@ class AiBot extends Model
         'whatsapp_number',
         'logo_path',
         'role',
+        'lead_scoring_profile',
         'openai_model',
         'system_prompt',
         'status',
@@ -98,42 +99,14 @@ class AiBot extends Model
     ];
 
     protected $casts = [
-        /*
-        |--------------------------------------------------------------------------
-        | YAPAY ZEKÂ DURUMU
-        |--------------------------------------------------------------------------
-        */
-
         'ai_enabled' => 'boolean',
-
-        /*
-        |--------------------------------------------------------------------------
-        | WHATSAPP GRUP YÖNLENDİRME
-        |--------------------------------------------------------------------------
-        */
-
         'group_routing_enabled' => 'boolean',
-
-        /*
-        |--------------------------------------------------------------------------
-        | OTOMATİK TAKİP
-        |--------------------------------------------------------------------------
-        */
-
         'follow_up_enabled' => 'boolean',
         'second_follow_up_enabled' => 'boolean',
         'first_follow_up_minutes' => 'integer',
         'second_follow_up_minutes' => 'integer',
-
-        /*
-        |--------------------------------------------------------------------------
-        | ÜCRETSİZ DENEME
-        |--------------------------------------------------------------------------
-        */
-
         'trial_message_limit' => 'integer',
         'trial_messages_used' => 'integer',
-
         'trial_completed_at' => 'datetime',
         'subscription_started_at' => 'datetime',
         'subscription_ends_at' => 'datetime',
@@ -141,31 +114,40 @@ class AiBot extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | KULLANICI
+    | LEAD SCORING PROFİLLERİ
     |--------------------------------------------------------------------------
     */
+
+    public static function leadScoringProfiles(): array
+    {
+        return [
+            'general' => 'Genel Satış',
+            'ecommerce' => 'E-Ticaret / Ürün Satışı',
+            'finance' => 'Finans / Kredi',
+            'appointment' => 'Randevu / Klinik / Güzellik',
+            'service' => 'Ajans / Profesyonel Hizmet',
+            'real_estate' => 'Emlak',
+            'automotive' => 'Otomotiv',
+            'emergency' => 'Acil Hizmet / Çekici / Usta',
+        ];
+    }
+
+    public function leadScoringProfileLabel(): string
+    {
+        return self::leadScoringProfiles()[
+            $this->lead_scoring_profile ?: 'general'
+        ] ?? 'Genel Satış';
+    }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | ÜRÜNLER
-    |--------------------------------------------------------------------------
-    */
-
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | OTOMATİK TAKİPLER
-    |--------------------------------------------------------------------------
-    */
 
     public function followUps(): HasMany
     {
@@ -173,12 +155,6 @@ class AiBot extends Model
             ConversationFollowUp::class
         );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | ÜCRETSİZ DENEME KALAN MESAJ
-    |--------------------------------------------------------------------------
-    */
 
     public function kalanDenemeMesaji(): int
     {
@@ -190,12 +166,6 @@ class AiBot extends Model
             $limit - $used
         );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | DENEME BİTTİ Mİ?
-    |--------------------------------------------------------------------------
-    */
 
     public function denemeBittiMi(): bool
     {
@@ -211,29 +181,11 @@ class AiBot extends Model
             $this->trial_message_limit;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | YAPAY ZEKÂ WHATSAPP'TA CEVAP VEREBİLİR Mİ?
-    |--------------------------------------------------------------------------
-    */
-
     public function whatsappAiKullanilabilirMi(): bool
     {
-        /*
-        |--------------------------------------------------------------------------
-        | MANUEL AI AÇ / KAPAT
-        |--------------------------------------------------------------------------
-        */
-
         if (! $this->ai_enabled) {
             return false;
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | AKTİF PAKET
-        |--------------------------------------------------------------------------
-        */
 
         if (
             $this->subscription_status === 'active'
@@ -246,12 +198,6 @@ class AiBot extends Model
                 $this->subscription_ends_at
                 ->isFuture();
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | ÜCRETSİZ DENEME
-        |--------------------------------------------------------------------------
-        */
 
         if (
             $this->subscription_status === 'trial'

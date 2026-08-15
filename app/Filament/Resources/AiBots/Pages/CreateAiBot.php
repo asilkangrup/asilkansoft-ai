@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\AiBots\Pages;
 
 use App\Filament\Resources\AiBots\AiBotResource;
+use App\Models\AiBot;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -85,6 +86,17 @@ class CreateAiBot extends CreateRecord
                         ])
                         ->default('sales')
                         ->required(),
+
+
+                    Select::make('lead_scoring_profile')
+                        ->label('Sektör / Satış Modeli')
+                        ->options(AiBot::leadScoringProfiles())
+                        ->default('general')
+                        ->required()
+                        ->native(false)
+                        ->helperText(
+                            'WAI, lead sıcaklığını ve satış aşamasını seçtiğiniz satış modeline göre otomatik değerlendirir.'
+                        ),
                 ])
                 ->columns(2),
 
@@ -302,6 +314,7 @@ class CreateAiBot extends CreateRecord
 
         // Teknik OpenAI model seçimini müşteriye göstermiyoruz.
         $data['openai_model'] = 'gpt-5-mini';
+        $data['lead_scoring_profile'] = $data['lead_scoring_profile'] ?? 'general';
 
         return $data;
     }
