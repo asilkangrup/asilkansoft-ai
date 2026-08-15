@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\ConversationControl;
+use App\Models\CrmAlarm;
 use App\Services\CrmAnalyticsService;
 use App\Services\CrmForecastService;
 use App\Services\CrmManagerSummaryService;
@@ -656,6 +657,91 @@ class Raporlar extends Page
             ->unique('id')
             ->sortBy('name')
             ->values();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | WAI ALARM MERKEZİ ÖZETİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function getActiveAlarmCountProperty(): int
+    {
+        return CrmAlarm::query()
+            ->where(
+                'user_id',
+                auth()->id()
+            )
+            ->where(
+                'is_resolved',
+                false
+            )
+            ->count();
+    }
+
+    public function getCriticalAlarmCountProperty(): int
+    {
+        return CrmAlarm::query()
+            ->where(
+                'user_id',
+                auth()->id()
+            )
+            ->where(
+                'is_resolved',
+                false
+            )
+            ->where(
+                'severity',
+                'critical'
+            )
+            ->count();
+    }
+
+    public function getResolvedAlarmTodayCountProperty(): int
+    {
+        return CrmAlarm::query()
+            ->where(
+                'user_id',
+                auth()->id()
+            )
+            ->where(
+                'is_resolved',
+                true
+            )
+            ->whereDate(
+                'resolved_at',
+                today()
+            )
+            ->count();
+    }
+
+    public function getRecentCriticalAlarmsProperty(): Collection
+    {
+        return CrmAlarm::query()
+            ->with([
+                'conversation.aiBot',
+                'conversation.assignedUser',
+            ])
+            ->where(
+                'user_id',
+                auth()->id()
+            )
+            ->where(
+                'is_resolved',
+                false
+            )
+            ->orderByRaw(
+                "
+                CASE severity
+                    WHEN 'critical' THEN 1
+                    WHEN 'warning' THEN 2
+                    ELSE 3
+                END
+                "
+            )
+            ->latest('id')
+            ->limit(5)
+            ->get();
     }
 
     /*

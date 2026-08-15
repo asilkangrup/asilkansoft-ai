@@ -26,6 +26,12 @@ class AlarmMerkezi extends Page
     protected static ?int $navigationSort =
         33;
 
+    /*
+    |--------------------------------------------------------------------------
+    | FİLTRELER
+    |--------------------------------------------------------------------------
+    */
+
     public string $statusFilter =
         'active';
 
@@ -34,6 +40,81 @@ class AlarmMerkezi extends Page
 
     public string $typeFilter =
         'all';
+
+    /*
+    |--------------------------------------------------------------------------
+    | NAVIGATION BADGE
+    |--------------------------------------------------------------------------
+    |
+    | Sol menüde aktif alarm sayısını gösterir.
+    |
+    */
+
+    public static function getNavigationBadge(): ?string
+    {
+        if (! auth()->check()) {
+            return null;
+        }
+
+        $count =
+            CrmAlarm::query()
+                ->where(
+                    'user_id',
+                    auth()->id()
+                )
+                ->where(
+                    'is_resolved',
+                    false
+                )
+                ->count();
+
+        return $count > 0
+            ? (string) $count
+            : null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | NAVIGATION BADGE RENGİ
+    |--------------------------------------------------------------------------
+    |
+    | En az bir kritik alarm varsa kırmızı.
+    | Yalnızca warning varsa sarı.
+    |
+    */
+
+    public static function getNavigationBadgeColor(): string|array|null
+    {
+        if (! auth()->check()) {
+            return null;
+        }
+
+        $criticalCount =
+            CrmAlarm::query()
+                ->where(
+                    'user_id',
+                    auth()->id()
+                )
+                ->where(
+                    'is_resolved',
+                    false
+                )
+                ->where(
+                    'severity',
+                    'critical'
+                )
+                ->count();
+
+        return $criticalCount > 0
+            ? 'danger'
+            : 'warning';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ANA ALARM SORGUSU
+    |--------------------------------------------------------------------------
+    */
 
     protected function baseQuery(): Builder
     {
@@ -80,6 +161,12 @@ class AlarmMerkezi extends Page
             );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ALARMLAR
+    |--------------------------------------------------------------------------
+    */
+
     public function getAlarmsProperty(): Collection
     {
         return $this->baseQuery()
@@ -92,10 +179,20 @@ class AlarmMerkezi extends Page
                 END
                 "
             )
-            ->latest('id')
-            ->limit(200)
+            ->latest(
+                'id'
+            )
+            ->limit(
+                200
+            )
             ->get();
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AKTİF ALARM SAYISI
+    |--------------------------------------------------------------------------
+    */
 
     public function getActiveCountProperty(): int
     {
@@ -110,6 +207,12 @@ class AlarmMerkezi extends Page
             )
             ->count();
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KRİTİK ALARM SAYISI
+    |--------------------------------------------------------------------------
+    */
 
     public function getCriticalCountProperty(): int
     {
@@ -129,6 +232,12 @@ class AlarmMerkezi extends Page
             ->count();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | BUGÜN ÇÖZÜLEN ALARM SAYISI
+    |--------------------------------------------------------------------------
+    */
+
     public function getResolvedTodayCountProperty(): int
     {
         return CrmAlarm::query()
@@ -146,6 +255,12 @@ class AlarmMerkezi extends Page
             )
             ->count();
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ALARMI ÇÖZ
+    |--------------------------------------------------------------------------
+    */
 
     public function resolveAlarm(
         int $alarmId
@@ -167,6 +282,12 @@ class AlarmMerkezi extends Page
         $alarm->resolve();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ALARMI YENİDEN AÇ
+    |--------------------------------------------------------------------------
+    */
+
     public function reopenAlarm(
         int $alarmId
     ): void {
@@ -187,6 +308,12 @@ class AlarmMerkezi extends Page
         $alarm->reopen();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | FİLTRELERİ TEMİZLE
+    |--------------------------------------------------------------------------
+    */
+
     public function resetFilters(): void
     {
         $this->statusFilter =
@@ -198,6 +325,12 @@ class AlarmMerkezi extends Page
         $this->typeFilter =
             'all';
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILAMENT BAŞLIK
+    |--------------------------------------------------------------------------
+    */
 
     public function getHeading(): string
     {

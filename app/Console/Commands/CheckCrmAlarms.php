@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 #[Signature('wai:check-crm-alarms')]
-#[Description('WAI CRM kritik satış alarmlarını kontrol eder, kaydeder ve yöneticilere panel bildirimi gönderir.')]
+#[Description('WAI CRM kritik satış alarmlarını kontrol eder, kaydeder, çözer ve yöneticilere panel bildirimi gönderir.')]
 class CheckCrmAlarms extends Command
 {
     private const CRITICAL_SCORE = 95;
@@ -28,35 +28,115 @@ class CheckCrmAlarms extends Command
     public function handle(
         CrmAlarmService $alarmService
     ): int {
-        $sent = 0;
+        /*
+        |--------------------------------------------------------------------------
+        | ÖNCE ESKİ ALARMLARI GERÇEK DURUMLA SENKRONLA
+        |--------------------------------------------------------------------------
+        */
 
-        $sent += $this->criticalLeadAlarms(
-            $alarmService
-        );
+        $resolved =
+            $this->reconcileActiveAlarms(
+                $alarmService
+            );
 
-        $sent += $this->overdueHotLeadAlarms(
-            $alarmService
-        );
+        /*
+        |--------------------------------------------------------------------------
+        | SONRA YENİ ALARMLARI TARA
+        |--------------------------------------------------------------------------
+        */
 
-        $sent += $this->riskLeadAlarms(
-            $alarmService
-        );
+        $sent =
+            0;
 
-        $sent += $this->silentProposalAlarms(
-            $alarmService
-        );
+        $sent +=
+            $this->criticalLeadAlarms(
+                $alarmService
+            );
 
-        $this->resolveClosedAlarms(
-            $alarmService
-        );
+        $sent +=
+            $this->overdueHotLeadAlarms(
+                $alarmService
+            );
+
+        $sent +=
+            $this->riskLeadAlarms(
+                $alarmService
+            );
+
+        $sent +=
+            $this->silentProposalAlarms(
+                $alarmService
+            );
 
         $this->info(
             $sent
             .' WAI CRM alarmı gönderildi.'
         );
 
+        $this->info(
+            $resolved
+            .' CRM alarmı otomatik çözüldü.'
+        );
+
         return self::SUCCESS;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AKTİF ALARMLARI SENKRONLA
+    |--------------------------------------------------------------------------
+    */
+
+    private function reconcileActiveAlarms(
+        CrmAlarmService $alarmService
+    ): int {
+        $conversationIds =
+            CrmAlarm::query()
+                ->where(
+                    'is_resolved',
+                    false
+                )
+                ->distinct()
+                ->pluck(
+                    'conversation_control_id'
+                );
+
+        if ($conversationIds->isEmpty()) {
+            return 0;
+        }
+
+        $resolved =
+            0;
+
+        ConversationControl::query()
+            ->whereIn(
+                'id',
+                $conversationIds
+            )
+            ->get()
+            ->each(
+                function (
+                    ConversationControl $conversation
+                ) use (
+                    $alarmService,
+                    &$resolved
+                ): void {
+                    $resolved +=
+                        $alarmService
+                            ->reconcileConversation(
+                                $conversation
+                            );
+                }
+            );
+
+        return $resolved;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 95+ KRİTİK LEAD
+    |--------------------------------------------------------------------------
+    */
 
     private function criticalLeadAlarms(
         CrmAlarmService $alarmService
@@ -71,19 +151,28 @@ class CheckCrmAlarms extends Command
                 )
                 ->whereNotIn(
                     'lead_status',
-                    ['won', 'lost']
+                    [
+                        'won',
+                        'lost',
+                    ]
                 )
-                ->orderByDesc('lead_score')
+                ->orderByDesc(
+                    'lead_score'
+                )
                 ->limit(500)
                 ->get();
 
-        $sent = 0;
+        $sent =
+            0;
 
         foreach ($customers as $customer) {
-            $title = 'Kritik satış fırsatı';
+            $title =
+                'Kritik satış fırsatı';
 
             $message =
-                $this->customerName($customer)
+                $this->customerName(
+                    $customer
+                )
                 .' '
                 .(int) $customer->lead_score
                 .'/100 puana ulaştı. Satış ekibinin hızlı aksiyon alması önerilir.';
@@ -94,19 +183,39 @@ class CheckCrmAlarms extends Command
                 .':'
                 .(int) $customer->lead_score;
 
-            $sent += $this->persistAndNotify(
-                alarmService: $alarmService,
-                customer: $customer,
-                type: 'critical_lead',
-                severity: 'critical',
-                title: $title,
-                message: $message,
-                fingerprint: $fingerprint,
-            );
+            $sent +=
+                $this->persistAndNotify(
+                    alarmService:
+                        $alarmService,
+
+                    customer:
+                        $customer,
+
+                    type:
+                        'critical_lead',
+
+                    severity:
+                        'critical',
+
+                    title:
+                        $title,
+
+                    message:
+                        $message,
+
+                    fingerprint:
+                        $fingerprint,
+                );
         }
 
         return $sent;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 3+ SAAT GECİKMİŞ SICAK LEAD
+    |--------------------------------------------------------------------------
+    */
 
     private function overdueHotLeadAlarms(
         CrmAlarmService $alarmService
@@ -125,7 +234,10 @@ class CheckCrmAlarms extends Command
                 )
                 ->whereNotIn(
                     'lead_status',
-                    ['won', 'lost']
+                    [
+                        'won',
+                        'lost',
+                    ]
                 )
                 ->whereNotNull(
                     'next_follow_up_at'
@@ -141,14 +253,17 @@ class CheckCrmAlarms extends Command
                 ->limit(500)
                 ->get();
 
-        $sent = 0;
+        $sent =
+            0;
 
         foreach ($customers as $customer) {
             $title =
                 'Sıcak lead takibi gecikti';
 
             $message =
-                $this->customerName($customer)
+                $this->customerName(
+                    $customer
+                )
                 .' sıcak lead durumunda ve takip zamanı '
                 .self::HOT_FOLLOW_UP_DELAY_HOURS
                 .'+ saat gecikti.';
@@ -163,19 +278,39 @@ class CheckCrmAlarms extends Command
                     ?? 0
                 );
 
-            $sent += $this->persistAndNotify(
-                alarmService: $alarmService,
-                customer: $customer,
-                type: 'hot_follow_up_overdue',
-                severity: 'critical',
-                title: $title,
-                message: $message,
-                fingerprint: $fingerprint,
-            );
+            $sent +=
+                $this->persistAndNotify(
+                    alarmService:
+                        $alarmService,
+
+                    customer:
+                        $customer,
+
+                    type:
+                        'hot_follow_up_overdue',
+
+                    severity:
+                        'critical',
+
+                    title:
+                        $title,
+
+                    message:
+                        $message,
+
+                    fingerprint:
+                        $fingerprint,
+                );
         }
 
         return $sent;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RİSKLİ LEAD
+    |--------------------------------------------------------------------------
+    */
 
     private function riskLeadAlarms(
         CrmAlarmService $alarmService
@@ -194,7 +329,10 @@ class CheckCrmAlarms extends Command
                 )
                 ->whereNotIn(
                     'lead_status',
-                    ['won', 'lost']
+                    [
+                        'won',
+                        'lost',
+                    ]
                 )
                 ->orderByDesc(
                     'lead_score'
@@ -202,14 +340,17 @@ class CheckCrmAlarms extends Command
                 ->limit(500)
                 ->get();
 
-        $sent = 0;
+        $sent =
+            0;
 
         foreach ($customers as $customer) {
             $title =
                 'Değerli lead kayıp riski taşıyor';
 
             $message =
-                $this->customerName($customer)
+                $this->customerName(
+                    $customer
+                )
                 .' Riskli Lead olarak işaretlendi ve puanı '
                 .(int) $customer->lead_score
                 .'/100. Müşterinin yeniden ele alınması önerilir.';
@@ -220,19 +361,39 @@ class CheckCrmAlarms extends Command
                 .':'
                 .(int) $customer->lead_score;
 
-            $sent += $this->persistAndNotify(
-                alarmService: $alarmService,
-                customer: $customer,
-                type: 'risk_lead',
-                severity: 'warning',
-                title: $title,
-                message: $message,
-                fingerprint: $fingerprint,
-            );
+            $sent +=
+                $this->persistAndNotify(
+                    alarmService:
+                        $alarmService,
+
+                    customer:
+                        $customer,
+
+                    type:
+                        'risk_lead',
+
+                    severity:
+                        'warning',
+
+                    title:
+                        $title,
+
+                    message:
+                        $message,
+
+                    fingerprint:
+                        $fingerprint,
+                );
         }
 
         return $sent;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TEKLİF AŞAMASINDA 24+ SAAT SESSİZ
+    |--------------------------------------------------------------------------
+    */
 
     private function silentProposalAlarms(
         CrmAlarmService $alarmService
@@ -263,14 +424,17 @@ class CheckCrmAlarms extends Command
                 ->limit(500)
                 ->get();
 
-        $sent = 0;
+        $sent =
+            0;
 
         foreach ($customers as $customer) {
             $title =
                 'Teklif sonrası müşteri sessiz';
 
             $message =
-                $this->customerName($customer)
+                $this->customerName(
+                    $customer
+                )
                 .' teklif aşamasında ve '
                 .self::PROPOSAL_SILENCE_HOURS
                 .'+ saattir yeni temas yok.';
@@ -285,19 +449,39 @@ class CheckCrmAlarms extends Command
                     ?? 0
                 );
 
-            $sent += $this->persistAndNotify(
-                alarmService: $alarmService,
-                customer: $customer,
-                type: 'proposal_silent',
-                severity: 'warning',
-                title: $title,
-                message: $message,
-                fingerprint: $fingerprint,
-            );
+            $sent +=
+                $this->persistAndNotify(
+                    alarmService:
+                        $alarmService,
+
+                    customer:
+                        $customer,
+
+                    type:
+                        'proposal_silent',
+
+                    severity:
+                        'warning',
+
+                    title:
+                        $title,
+
+                    message:
+                        $message,
+
+                    fingerprint:
+                        $fingerprint,
+                );
         }
 
         return $sent;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | KAYDET + PANEL BİLDİRİMİ
+    |--------------------------------------------------------------------------
+    */
 
     private function persistAndNotify(
         CrmAlarmService $alarmService,
@@ -317,18 +501,30 @@ class CheckCrmAlarms extends Command
 
         try {
             $alarm =
-                $alarmService->createOrGet(
-                    conversation: $customer,
-                    type: $type,
-                    severity: $severity,
-                    title: $title,
-                    message: $message,
-                    fingerprint: $fingerprint,
-                );
+                $alarmService
+                    ->createOrGet(
+                        conversation:
+                            $customer,
+
+                        type:
+                            $type,
+
+                        severity:
+                            $severity,
+
+                        title:
+                            $title,
+
+                        message:
+                            $message,
+
+                        fingerprint:
+                            $fingerprint,
+                    );
 
             /*
             |--------------------------------------------------------------------------
-            | DAHA ÖNCE BİLDİRİLDİYSE TEKRAR GÖNDERME
+            | DAHA ÖNCE BİLDİRİLDİ
             |--------------------------------------------------------------------------
             */
 
@@ -370,10 +566,15 @@ class CheckCrmAlarms extends Command
                             ),
                     ]);
 
-            if ($severity === 'critical') {
-                $notification->danger();
+            if (
+                $severity
+                === 'critical'
+            ) {
+                $notification
+                    ->danger();
             } else {
-                $notification->warning();
+                $notification
+                    ->warning();
             }
 
             $notification
@@ -424,44 +625,11 @@ class CheckCrmAlarms extends Command
         }
     }
 
-    private function resolveClosedAlarms(
-        CrmAlarmService $alarmService
-    ): void {
-        $conversationIds =
-            CrmAlarm::query()
-                ->where(
-                    'is_resolved',
-                    false
-                )
-                ->distinct()
-                ->pluck(
-                    'conversation_control_id'
-                );
-
-        if ($conversationIds->isEmpty()) {
-            return;
-        }
-
-        ConversationControl::query()
-            ->whereIn(
-                'id',
-                $conversationIds
-            )
-            ->whereIn(
-                'lead_status',
-                ['won', 'lost']
-            )
-            ->get()
-            ->each(
-                fn (
-                    ConversationControl $conversation
-                ) =>
-                    $alarmService
-                        ->resolveClosedConversationAlarms(
-                            $conversation
-                        )
-            );
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | MÜŞTERİ ADI
+    |--------------------------------------------------------------------------
+    */
 
     private function customerName(
         ConversationControl $customer
@@ -471,13 +639,20 @@ class CheckCrmAlarms extends Command
                 (string) $customer->customer_name
             );
 
-        return $name !== ''
-            ? $name
-            : (
-                $customer->whatsapp_number
-                ?: 'Müşteri'
-            );
+        return
+            $name !== ''
+                ? $name
+                : (
+                    $customer->whatsapp_number
+                    ?: 'Müşteri'
+                );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CRM URL
+    |--------------------------------------------------------------------------
+    */
 
     private function customerUrl(
         ConversationControl $customer

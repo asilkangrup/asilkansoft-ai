@@ -135,6 +135,169 @@
     font-weight: 700;
 }
 
+.report-alarm-panel {
+    margin-bottom: 18px;
+    padding: 20px;
+    border: 1px solid #f0d7d7;
+    border-radius: 20px;
+    background:
+        radial-gradient(circle at 96% 8%, rgba(235,87,87,.09), transparent 34%),
+        linear-gradient(145deg, #fff, #fffafa);
+    box-shadow: 0 12px 34px rgba(45,20,20,.035);
+}
+
+.report-alarm-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.report-alarm-title {
+    color: #5f2e2e;
+    font-size: 14px;
+    font-weight: 900;
+}
+
+.report-alarm-sub {
+    margin-top: 4px;
+    color: #8d7777;
+    font-size: 9px;
+    font-weight: 750;
+}
+
+.report-alarm-link {
+    min-height: 36px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #efcccc;
+    border-radius: 10px;
+    color: #8e3636;
+    background: #fff;
+    font-size: 9px;
+    font-weight: 900;
+    text-decoration: none;
+}
+
+.report-alarm-kpis {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 8px;
+}
+
+.report-alarm-kpi {
+    padding: 11px;
+    border: 1px solid #f0e2e2;
+    border-radius: 12px;
+    background: rgba(255,255,255,.82);
+}
+
+.report-alarm-kpi strong {
+    display: block;
+    color: #382323;
+    font-size: 18px;
+    font-weight: 900;
+}
+
+.report-alarm-kpi span {
+    display: block;
+    margin-top: 3px;
+    color: #8b7979;
+    font-size: 8px;
+    font-weight: 800;
+}
+
+.report-alarm-list {
+    margin-top: 12px;
+    display: grid;
+    gap: 7px;
+}
+
+.report-alarm-row {
+    padding: 10px 11px;
+    display: grid;
+    grid-template-columns: auto minmax(0,1fr) auto;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid #eee5e5;
+    border-radius: 11px;
+    background: #fff;
+}
+
+.report-alarm-badge {
+    min-height: 23px;
+    padding: 0 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 8px;
+    font-weight: 900;
+}
+
+.report-alarm-badge.critical {
+    color: #9a3030;
+    background: #ffe8e8;
+}
+
+.report-alarm-badge.warning {
+    color: #88610d;
+    background: #fff3d3;
+}
+
+.report-alarm-customer {
+    overflow: hidden;
+    color: #3e3434;
+    font-size: 9px;
+    font-weight: 850;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.report-alarm-open {
+    color: #7e4646;
+    font-size: 8px;
+    font-weight: 900;
+    text-decoration: none;
+}
+
+.report-alarm-empty {
+    margin-top: 12px;
+    padding: 16px;
+    text-align: center;
+    border: 1px dashed #e2d9d9;
+    border-radius: 11px;
+    color: #8e8585;
+    background: rgba(255,255,255,.65);
+    font-size: 9px;
+}
+
+@media (max-width: 700px) {
+    .report-alarm-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .report-alarm-link {
+        width: 100%;
+    }
+
+    .report-alarm-kpis {
+        grid-template-columns: 1fr;
+    }
+
+    .report-alarm-row {
+        grid-template-columns: auto minmax(0,1fr);
+    }
+
+    .report-alarm-open {
+        grid-column: 1 / -1;
+    }
+}
+
 .manager-summary-card {
     margin-bottom: 18px;
     padding: 22px;
@@ -2024,6 +2187,116 @@
             </div>
 
         </div>
+
+    </section>
+
+
+    <section class="report-alarm-panel">
+
+        <div class="report-alarm-head">
+
+            <div>
+                <div class="report-alarm-title">
+                    🚨 WAI Alarm Özeti
+                </div>
+
+                <div class="report-alarm-sub">
+                    Satış ekibinin müdahale etmesi gereken aktif CRM sinyalleri.
+                </div>
+            </div>
+
+            <a
+                class="report-alarm-link"
+                href="{{ url('/admin/alarm-merkezi') }}"
+            >
+                Alarm Merkezi'ne Git
+            </a>
+
+        </div>
+
+
+        <div class="report-alarm-kpis">
+
+            <div class="report-alarm-kpi">
+                <strong>{{ $this->activeAlarmCount }}</strong>
+                <span>Aktif Alarm</span>
+            </div>
+
+            <div class="report-alarm-kpi">
+                <strong>{{ $this->criticalAlarmCount }}</strong>
+                <span>Kritik Alarm</span>
+            </div>
+
+            <div class="report-alarm-kpi">
+                <strong>{{ $this->resolvedAlarmTodayCount }}</strong>
+                <span>Bugün Çözülen</span>
+            </div>
+
+        </div>
+
+
+        @if ($this->recentCriticalAlarms->isNotEmpty())
+
+            <div class="report-alarm-list">
+
+                @foreach ($this->recentCriticalAlarms as $alarm)
+
+                    @php
+                        $alarmConversation =
+                            $alarm->conversation;
+
+                        $alarmCustomerName =
+                            $alarmConversation?->customer_name
+                            ?: $alarmConversation?->whatsapp_number
+                            ?: 'Müşteri';
+                    @endphp
+
+                    <div class="report-alarm-row">
+
+                        <span
+                            class="
+                                report-alarm-badge
+                                {{ $alarm->severity }}
+                            "
+                        >
+                            {{ $alarm->severityLabel() }}
+                        </span>
+
+                        <div class="report-alarm-customer">
+                            {{ $alarmCustomerName }}
+                            ·
+                            {{ $alarm->typeLabel() }}
+                        </div>
+
+                        @if ($alarmConversation)
+
+                            <a
+                                class="report-alarm-open"
+                                href="{{
+                                    url(
+                                        '/admin/musteriler?customer='
+                                        .$alarmConversation->id
+                                    )
+                                }}"
+                            >
+                                Müşteriyi Aç
+                            </a>
+
+                        @endif
+
+                    </div>
+
+                @endforeach
+
+            </div>
+
+        @else
+
+            <div class="report-alarm-empty">
+                Şu anda aktif CRM alarmı bulunmuyor.
+            </div>
+
+        @endif
 
     </section>
 
