@@ -676,6 +676,21 @@ class Raporlar extends Page
                 'is_resolved',
                 false
             )
+            ->where(
+                function (
+                    Builder $query
+                ): void {
+                    $query
+                        ->whereNull(
+                            'snoozed_until'
+                        )
+                        ->orWhere(
+                            'snoozed_until',
+                            '<=',
+                            now()
+                        );
+                }
+            )
             ->count();
     }
 
@@ -693,6 +708,43 @@ class Raporlar extends Page
             ->where(
                 'severity',
                 'critical'
+            )
+            ->where(
+                function (
+                    Builder $query
+                ): void {
+                    $query
+                        ->whereNull(
+                            'snoozed_until'
+                        )
+                        ->orWhere(
+                            'snoozed_until',
+                            '<=',
+                            now()
+                        );
+                }
+            )
+            ->count();
+    }
+
+    public function getSnoozedAlarmCountProperty(): int
+    {
+        return CrmAlarm::query()
+            ->where(
+                'user_id',
+                auth()->id()
+            )
+            ->where(
+                'is_resolved',
+                false
+            )
+            ->whereNotNull(
+                'snoozed_until'
+            )
+            ->where(
+                'snoozed_until',
+                '>',
+                now()
             )
             ->count();
     }
@@ -729,6 +781,24 @@ class Raporlar extends Page
             ->where(
                 'is_resolved',
                 false
+            )
+            ->where(
+                function (
+                    Builder $query
+                ): void {
+                    $query
+                        ->whereNull(
+                            'snoozed_until'
+                        )
+                        ->orWhere(
+                            'snoozed_until',
+                            '<=',
+                            now()
+                        );
+                }
+            )
+            ->orderByDesc(
+                'priority_score'
             )
             ->orderByRaw(
                 "

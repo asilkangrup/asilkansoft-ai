@@ -36,7 +36,7 @@
 .alarm-kpis {
     margin-bottom:14px;
     display:grid;
-    grid-template-columns:repeat(3,minmax(0,1fr));
+    grid-template-columns:repeat(4,minmax(0,1fr));
     gap:10px;
 }
 
@@ -66,7 +66,7 @@
     margin-bottom:14px;
     padding:11px;
     display:grid;
-    grid-template-columns:180px 180px minmax(220px,1fr) auto;
+    grid-template-columns:160px 160px 190px minmax(220px,1fr) auto;
     gap:8px;
     border:1px solid var(--line);
     border-radius:16px;
@@ -87,6 +87,188 @@
 .alarm-reset {
     background:#fff;
     cursor:pointer;
+}
+
+.risk-customers-card {
+    margin-bottom: 14px;
+    padding: 18px;
+    border: 1px solid #eddada;
+    border-radius: 17px;
+    background:
+        radial-gradient(circle at 96% 8%, rgba(225,80,80,.07), transparent 35%),
+        #fff;
+}
+
+.risk-customers-head {
+    margin-bottom: 13px;
+}
+
+.risk-customers-title {
+    color: #512f2f;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.risk-customers-sub {
+    margin-top: 3px;
+    color: #8c7777;
+    font-size: 9px;
+}
+
+.risk-customer-list {
+    display: grid;
+    gap: 8px;
+}
+
+.risk-customer-row {
+    padding: 11px;
+    display: grid;
+    grid-template-columns: 54px minmax(0,1fr) auto;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid #eee3e3;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.risk-score-box {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    color: #8f2c2c;
+    background: #ffe9e9;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.risk-customer-name {
+    color: #302626;
+    font-size: 10px;
+    font-weight: 900;
+}
+
+.risk-customer-meta {
+    margin-top: 4px;
+    color: #8a7e7e;
+    font-size: 8px;
+    line-height: 1.45;
+}
+
+.risk-customer-action {
+    margin-top: 5px;
+    color: #5a4b4b;
+    font-size: 9px;
+    line-height: 1.45;
+}
+
+.risk-customer-open {
+    min-height: 34px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #efcccc;
+    border-radius: 9px;
+    color: #8a3333;
+    background: #fff;
+    font-size: 8px;
+    font-weight: 900;
+    text-decoration: none;
+}
+
+@media(max-width:800px) {
+    .risk-customer-row {
+        grid-template-columns: 50px minmax(0,1fr);
+    }
+
+    .risk-customer-open {
+        grid-column: 1 / -1;
+    }
+}
+
+.alarm-staff-card {
+    margin-bottom: 14px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 17px;
+    background: #fff;
+}
+
+.alarm-staff-head {
+    margin-bottom: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.alarm-staff-title {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.alarm-staff-sub {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 9px;
+}
+
+.alarm-staff-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.alarm-staff-table th {
+    padding: 9px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+    color: #7d8981;
+    font-size: 8px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.alarm-staff-table td {
+    padding: 10px;
+    border-bottom: 1px solid #edf1ee;
+    color: #465248;
+    font-size: 9px;
+}
+
+.alarm-staff-name {
+    color: #26332a;
+    font-weight: 900;
+}
+
+.alarm-staff-danger {
+    color: #9b3030;
+    font-weight: 900;
+}
+
+.alarm-staff-good {
+    color: #087a42;
+    font-weight: 900;
+}
+
+.alarm-staff-empty {
+    padding: 22px;
+    text-align: center;
+    color: #8b968f;
+    font-size: 10px;
+}
+
+@media(max-width:800px) {
+    .alarm-staff-scroll {
+        overflow-x: auto;
+    }
+
+    .alarm-staff-table {
+        min-width: 700px;
+    }
 }
 
 .alarm-list {
@@ -147,6 +329,56 @@
     font-weight:850;
 }
 
+.alarm-priority {
+    min-height: 25px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    color: #334238;
+    background: #eef3f0;
+    font-size: 8px;
+    font-weight: 900;
+}
+
+.alarm-priority.urgent {
+    color: #8f2525;
+    background: #ffdede;
+}
+
+.alarm-priority.very-high {
+    color: #9a4f12;
+    background: #ffe9d2;
+}
+
+.alarm-priority.high {
+    color: #7d6710;
+    background: #fff4c8;
+}
+
+.alarm-action-box {
+    margin-top: 11px;
+    padding: 11px 12px;
+    border: 1px solid #dce9e1;
+    border-radius: 11px;
+    background: #f8fcfa;
+}
+
+.alarm-action-title {
+    color: #41604d;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+}
+
+.alarm-action-text {
+    margin-top: 5px;
+    color: #506158;
+    font-size: 10px;
+    line-height: 1.55;
+}
+
 .alarm-title {
     margin-top:10px;
     color:var(--ink);
@@ -169,6 +401,200 @@
     color:#8b968f;
     font-size:9px;
     font-weight:750;
+}
+
+.alarm-snooze-box {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #e2e8e4;
+    border-radius: 11px;
+    background: #fafcfb;
+}
+
+.alarm-snooze-title {
+    margin-bottom: 7px;
+    color: #68756d;
+    font-size: 8px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.alarm-snooze-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 5px;
+}
+
+.alarm-snooze-button {
+    min-height: 30px;
+    padding: 0 6px;
+    border: 1px solid #dce4df;
+    border-radius: 8px;
+    color: #526057;
+    background: #fff;
+    font-size: 8px;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.alarm-custom-snooze {
+    margin-top: 6px;
+    display: grid;
+    grid-template-columns: minmax(0,1fr) auto;
+    gap: 5px;
+}
+
+.alarm-custom-input {
+    min-width: 0;
+    height: 32px;
+    padding: 0 7px;
+    border: 1px solid #dce4df;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 9px;
+}
+
+.alarm-snoozed-info {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    color: #765c13;
+    background: #fff6d9;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.alarm-sla {
+    min-height: 25px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    color: #496056;
+    background: #edf3ef;
+    font-size: 8px;
+    font-weight: 900;
+}
+
+.alarm-sla.breached {
+    color: #991f1f;
+    background: #ffdede;
+    animation: waiAlarmPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes waiAlarmPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: .68;
+    }
+}
+
+.alarm-sla-summary {
+    margin-bottom: 14px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 10px;
+}
+
+.alarm-sla-card {
+    padding: 14px;
+    border: 1px solid #e2e8e4;
+    border-radius: 14px;
+    background: #fff;
+}
+
+.alarm-sla-card strong {
+    display: block;
+    color: #26352c;
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.alarm-sla-card span {
+    display: block;
+    margin-top: 4px;
+    color: #7a877f;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.alarm-sla-card.danger {
+    border-color: #f1cccc;
+    background: #fffafa;
+}
+
+.alarm-sla-card.danger strong {
+    color: #9a3030;
+}
+
+@media(max-width:800px) {
+    .alarm-sla-summary {
+        grid-template-columns: 1fr;
+    }
+}
+
+.alarm-history-toggle {
+    margin-top: 9px;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid #e0e7e2;
+    border-radius: 9px;
+    color: #526159;
+    background: #fff;
+    font-size: 8px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.alarm-history {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #e6ebe8;
+    border-radius: 11px;
+    background: #fbfcfb;
+}
+
+.alarm-history-item {
+    position: relative;
+    padding: 9px 9px 9px 17px;
+    border-left: 2px solid #dce5df;
+}
+
+.alarm-history-item:last-child {
+    padding-bottom: 2px;
+}
+
+.alarm-history-item::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 13px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #7b8b81;
+}
+
+.alarm-history-title {
+    color: #39473e;
+    font-size: 9px;
+    font-weight: 900;
+}
+
+.alarm-history-meta {
+    margin-top: 3px;
+    color: #8a958e;
+    font-size: 8px;
+}
+
+.alarm-history-description {
+    margin-top: 4px;
+    color: #68756d;
+    font-size: 9px;
+    line-height: 1.45;
 }
 
 .alarm-actions {
@@ -264,6 +690,48 @@
             <span>Bugün Çözülen</span>
         </div>
 
+        <div class="alarm-kpi">
+            <strong>{{ $this->snoozedCount }}</strong>
+            <span>Ertelenen Alarm</span>
+        </div>
+
+    </section>
+
+
+    @php
+        $oldestActiveAlarm =
+            $this->oldestActiveAlarm;
+    @endphp
+
+    <section class="alarm-sla-summary">
+
+        <div class="alarm-sla-card danger">
+            <strong>
+                {{ $this->slaBreachedCount }}
+            </strong>
+            <span>SLA Aşımı</span>
+        </div>
+
+        <div class="alarm-sla-card">
+            <strong>
+                {{ $this->averageResolutionLabel }}
+            </strong>
+            <span>Son 30 Gün Ortalama Çözüm</span>
+        </div>
+
+        <div class="alarm-sla-card">
+            <strong>
+                {{
+                    $oldestActiveAlarm
+                        ? $this->alarmAgeLabel(
+                            $oldestActiveAlarm
+                        )
+                        : '-'
+                }}
+            </strong>
+            <span>En Eski Aktif Alarm</span>
+        </div>
+
     </section>
 
 
@@ -275,6 +743,7 @@
         >
             <option value="active">Aktif Alarmlar</option>
             <option value="resolved">Çözülenler</option>
+            <option value="snoozed">Ertelenenler</option>
             <option value="all">Tümü</option>
         </select>
 
@@ -298,6 +767,14 @@
             <option value="proposal_silent">Sessiz Teklif</option>
         </select>
 
+        <input
+            type="search"
+            class="alarm-select"
+            wire:model.live.debounce.400ms="search"
+            placeholder="Müşteri veya alarm ara..."
+        >
+
+
         <button
             type="button"
             class="alarm-reset"
@@ -305,6 +782,194 @@
         >
             Temizle
         </button>
+
+    </section>
+
+
+    <section class="risk-customers-card">
+
+        <div class="risk-customers-head">
+
+            <div class="risk-customers-title">
+                Günün En Riskli 5 Müşterisi
+            </div>
+
+            <div class="risk-customers-sub">
+                Alarm önceliği, lead skoru, fırsat değeri ve gecikme sinyalleri birlikte değerlendirilir.
+            </div>
+
+        </div>
+
+        <div class="risk-customer-list">
+
+            @forelse ($this->topRiskCustomers as $riskCustomer)
+
+                <div class="risk-customer-row">
+
+                    <div class="risk-score-box">
+                        {{ $riskCustomer['risk_score'] }}
+                    </div>
+
+                    <div>
+
+                        <div class="risk-customer-name">
+                            {{ $riskCustomer['customer_name'] }}
+                        </div>
+
+                        <div class="risk-customer-meta">
+                            Lead:
+                            {{ $riskCustomer['lead_score'] }}/100
+
+                            · Alarm:
+                            {{ $riskCustomer['alarm_priority'] }}/100
+
+                            · {{ $riskCustomer['alarm_type'] }}
+
+                            @if ($riskCustomer['estimated_value'] > 0)
+                                · Fırsat:
+                                {{ number_format((float) $riskCustomer['estimated_value'], 2, ',', '.') }} ₺
+                            @endif
+
+                            @if ($riskCustomer['alarm_count'] > 1)
+                                · {{ $riskCustomer['alarm_count'] }} aktif alarm
+                            @endif
+
+                            @if ($riskCustomer['assigned_user'])
+                                · Sorumlu:
+                                {{ $riskCustomer['assigned_user'] }}
+                            @endif
+                        </div>
+
+                        @if ($riskCustomer['recommended_action'])
+                            <div class="risk-customer-action">
+                                {{ $riskCustomer['recommended_action'] }}
+                            </div>
+                        @endif
+
+                    </div>
+
+                    @if ($riskCustomer['conversation_id'] > 0)
+                        <a
+                            class="risk-customer-open"
+                            href="{{
+                                url(
+                                    '/admin/musteriler?customer='
+                                    .$riskCustomer['conversation_id']
+                                )
+                            }}"
+                        >
+                            Müşteriyi Aç
+                        </a>
+                    @endif
+
+                </div>
+
+            @empty
+
+                <div class="alarm-staff-empty">
+                    Şu anda risk sıralamasına girecek aktif alarm bulunmuyor.
+                </div>
+
+            @endforelse
+
+        </div>
+
+    </section>
+
+
+    <section class="alarm-staff-card">
+
+        <div class="alarm-staff-head">
+
+            <div>
+                <div class="alarm-staff-title">
+                    Personel Alarm Performansı
+                </div>
+
+                <div class="alarm-staff-sub">
+                    Aktif alarm, kritik alarm, SLA ihlali ve son 30 günlük çözüm performansı.
+                </div>
+            </div>
+
+        </div>
+
+        <div class="alarm-staff-scroll">
+
+            <table class="alarm-staff-table">
+
+                <thead>
+                    <tr>
+                        <th>Personel</th>
+                        <th>Aktif Alarm</th>
+                        <th>Kritik</th>
+                        <th>SLA Aşımı</th>
+                        <th>30 Günde Çözülen</th>
+                        <th>Ort. Çözüm</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    @forelse ($this->staffAlarmPerformance as $staff)
+
+                        <tr>
+
+                            <td class="alarm-staff-name">
+                                {{ $staff['name'] }}
+                            </td>
+
+                            <td>
+                                {{ $staff['active'] }}
+                            </td>
+
+                            <td
+                                class="{{
+                                    $staff['critical'] > 0
+                                        ? 'alarm-staff-danger'
+                                        : ''
+                                }}"
+                            >
+                                {{ $staff['critical'] }}
+                            </td>
+
+                            <td
+                                class="{{
+                                    $staff['sla_breached'] > 0
+                                        ? 'alarm-staff-danger'
+                                        : 'alarm-staff-good'
+                                }}"
+                            >
+                                {{ $staff['sla_breached'] }}
+                            </td>
+
+                            <td>
+                                {{ $staff['resolved_30_days'] }}
+                            </td>
+
+                            <td>
+                                {{ $staff['average_resolution_label'] }}
+                            </td>
+
+                        </tr>
+
+                    @empty
+
+                        <tr>
+                            <td
+                                colspan="6"
+                                class="alarm-staff-empty"
+                            >
+                                Henüz sorumlu personel atanmış alarm verisi bulunmuyor.
+                            </td>
+                        </tr>
+
+                    @endforelse
+
+                </tbody>
+
+            </table>
+
+        </div>
 
     </section>
 
@@ -338,6 +1003,59 @@
                             {{ $alarm->severityLabel() }}
                         </span>
 
+                        @php
+                            $priorityClass =
+                                match (true) {
+                                    $alarm->priority_score >= 95 =>
+                                        'urgent',
+
+                                    $alarm->priority_score >= 85 =>
+                                        'very-high',
+
+                                    $alarm->priority_score >= 70 =>
+                                        'high',
+
+                                    default =>
+                                        '',
+                                };
+                        @endphp
+
+                        <span
+                            class="
+                                alarm-priority
+                                {{ $priorityClass }}
+                            "
+                        >
+                            Öncelik:
+                            {{ $alarm->priority_score }}/100
+                            ·
+                            {{ $alarm->priorityLabel() }}
+                        </span>
+
+                        <span
+                            class="
+                                alarm-sla
+                                {{
+                                    $this->alarmSlaBreached(
+                                        $alarm
+                                    )
+                                        ? 'breached'
+                                        : ''
+                                }}
+                            "
+                        >
+                            @if (
+                                $this->alarmSlaBreached(
+                                    $alarm
+                                )
+                            )
+                                SLA Aşıldı
+                            @else
+                                Açık:
+                                {{ $this->alarmAgeLabel($alarm) }}
+                            @endif
+                        </span>
+
                         <span class="alarm-type">
                             {{ $alarm->typeLabel() }}
                         </span>
@@ -351,6 +1069,22 @@
                     <div class="alarm-message">
                         {{ $alarm->message }}
                     </div>
+
+                    @if ($alarm->recommended_action)
+
+                        <div class="alarm-action-box">
+
+                            <div class="alarm-action-title">
+                                Önerilen Aksiyon
+                            </div>
+
+                            <div class="alarm-action-text">
+                                {{ $alarm->recommended_action }}
+                            </div>
+
+                        </div>
+
+                    @endif
 
                     <div class="alarm-meta">
 
@@ -393,6 +1127,145 @@
                 </div>
 
 
+                <div>
+
+                    @if ($alarm->isSnoozed())
+
+                        <div class="alarm-snoozed-info">
+                            Ertelendi:
+                            {{ $alarm->snoozed_until->format('d.m.Y H:i') }}
+                        </div>
+
+                    @elseif (! $alarm->is_resolved)
+
+                        <div class="alarm-snooze-box">
+
+                            <div class="alarm-snooze-title">
+                                Alarmı Ertele
+                            </div>
+
+                            <div class="alarm-snooze-buttons">
+
+                                <button
+                                    type="button"
+                                    class="alarm-snooze-button"
+                                    wire:click="snoozeAlarm({{ $alarm->id }}, '1h')"
+                                >
+                                    1 Saat
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="alarm-snooze-button"
+                                    wire:click="snoozeAlarm({{ $alarm->id }}, '3h')"
+                                >
+                                    3 Saat
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="alarm-snooze-button"
+                                    wire:click="snoozeAlarm({{ $alarm->id }}, 'tomorrow')"
+                                >
+                                    Yarın
+                                </button>
+
+                            </div>
+
+                            <div class="alarm-custom-snooze">
+
+                                <input
+                                    type="datetime-local"
+                                    class="alarm-custom-input"
+                                    wire:model="customSnoozeUntil.{{ $alarm->id }}"
+                                >
+
+                                <button
+                                    type="button"
+                                    class="alarm-snooze-button"
+                                    wire:click="snoozeAlarmCustom({{ $alarm->id }})"
+                                >
+                                    Uygula
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    @endif
+
+                </div>
+
+
+                <div>
+
+                    <button
+                        type="button"
+                        class="alarm-history-toggle"
+                        wire:click="toggleAlarmHistory({{ $alarm->id }})"
+                    >
+                        {{
+                            in_array(
+                                $alarm->id,
+                                $expandedHistories,
+                                true
+                            )
+                                ? 'Geçmişi Gizle'
+                                : 'Alarm Geçmişi'
+                        }}
+                    </button>
+
+                    @if (
+                        in_array(
+                            $alarm->id,
+                            $expandedHistories,
+                            true
+                        )
+                    )
+
+                        <div class="alarm-history">
+
+                            @forelse ($alarm->events as $event)
+
+                                <div class="alarm-history-item">
+
+                                    <div class="alarm-history-title">
+                                        {{ $event->eventLabel() }}
+                                    </div>
+
+                                    <div class="alarm-history-meta">
+                                        {{ $event->created_at->format('d.m.Y H:i') }}
+
+                                        @if ($event->user)
+                                            · {{ $event->user->name }}
+                                        @else
+                                            · Sistem
+                                        @endif
+                                    </div>
+
+                                    @if ($event->description)
+                                        <div class="alarm-history-description">
+                                            {{ $event->description }}
+                                        </div>
+                                    @endif
+
+                                </div>
+
+                            @empty
+
+                                <div class="alarm-history-description">
+                                    Bu alarm için henüz geçmiş kaydı bulunmuyor.
+                                </div>
+
+                            @endforelse
+
+                        </div>
+
+                    @endif
+
+                </div>
+
+
                 <div class="alarm-actions">
 
                     @if ($conversation)
@@ -412,6 +1285,16 @@
                     @endif
 
                     @if (! $alarm->is_resolved)
+
+                        @if ($alarm->isSnoozed())
+                            <button
+                                type="button"
+                                class="alarm-button"
+                                wire:click="clearAlarmSnooze({{ $alarm->id }})"
+                            >
+                                Ertelemeyi Kaldır
+                            </button>
+                        @endif
 
                         <button
                             type="button"

@@ -106,6 +106,35 @@ class SatisPipeline extends Page
             );
     }
 
+    public function getPipelineCustomersProperty(): Collection
+    {
+        return $this->baseQuery()
+            ->orderByDesc(
+                'lead_score'
+            )
+            ->orderByDesc(
+                'last_contact_at'
+            )
+            ->orderByDesc(
+                'updated_at'
+            )
+            ->limit(600)
+            ->get();
+    }
+
+    protected function getStageCustomers(
+        string $status
+    ): Collection {
+        return $this
+            ->pipelineCustomers
+            ->where(
+                'lead_status',
+                $status
+            )
+            ->take(100)
+            ->values();
+    }
+
     /*
     |--------------------------------------------------------------------------
     | KOLONLAR
@@ -152,21 +181,6 @@ class SatisPipeline extends Page
         return $this->getStageCustomers(
             'lost'
         );
-    }
-
-    protected function getStageCustomers(
-        string $status
-    ): Collection {
-        return $this->baseQuery()
-            ->where(
-                'lead_status',
-                $status
-            )
-            ->orderByDesc('lead_score')
-            ->orderByDesc('last_contact_at')
-            ->orderByDesc('updated_at')
-            ->limit(100)
-            ->get();
     }
 
     /*

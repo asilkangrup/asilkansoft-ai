@@ -63,6 +63,13 @@ class Gorevler extends Page
             ->whereNotNull(
                 'next_follow_up_at'
             )
+            ->whereNotIn(
+                'lead_status',
+                [
+                    'won',
+                    'lost',
+                ]
+            )
             ->when(
                 trim($this->search) !== '',
                 function (Builder $query): void {

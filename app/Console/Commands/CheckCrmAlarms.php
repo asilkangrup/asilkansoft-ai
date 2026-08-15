@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 #[Signature('wai:check-crm-alarms')]
-#[Description('WAI CRM kritik satış alarmlarını kontrol eder, kaydeder, çözer ve yöneticilere panel bildirimi gönderir.')]
+#[Description('WAI CRM kritik satış alarmlarını kontrol eder, önceliklendirir, kaydeder ve yöneticilere bildirir.')]
 class CheckCrmAlarms extends Command
 {
     private const CRITICAL_SCORE = 95;
@@ -28,22 +28,10 @@ class CheckCrmAlarms extends Command
     public function handle(
         CrmAlarmService $alarmService
     ): int {
-        /*
-        |--------------------------------------------------------------------------
-        | ÖNCE ESKİ ALARMLARI GERÇEK DURUMLA SENKRONLA
-        |--------------------------------------------------------------------------
-        */
-
         $resolved =
             $this->reconcileActiveAlarms(
                 $alarmService
             );
-
-        /*
-        |--------------------------------------------------------------------------
-        | SONRA YENİ ALARMLARI TARA
-        |--------------------------------------------------------------------------
-        */
 
         $sent =
             0;
@@ -134,7 +122,7 @@ class CheckCrmAlarms extends Command
 
     /*
     |--------------------------------------------------------------------------
-    | 95+ KRİTİK LEAD
+    | KRİTİK LEAD
     |--------------------------------------------------------------------------
     */
 
@@ -166,6 +154,21 @@ class CheckCrmAlarms extends Command
             0;
 
         foreach ($customers as $customer) {
+            $leadScore =
+                max(
+                    0,
+                    min(
+                        100,
+                        (int) $customer->lead_score
+                    )
+                );
+
+            $priorityScore =
+                max(
+                    95,
+                    $leadScore
+                );
+
             $title =
                 'Kritik satış fırsatı';
 
@@ -174,14 +177,18 @@ class CheckCrmAlarms extends Command
                     $customer
                 )
                 .' '
-                .(int) $customer->lead_score
+                .$leadScore
                 .'/100 puana ulaştı. Satış ekibinin hızlı aksiyon alması önerilir.';
+
+            $recommendedAction =
+                'Müşteriye mümkün olan en kısa sürede dönüş yapın. '
+                .'Satın alma niyetini, fiyat/ödeme itirazlarını ve kapanış için eksik kalan bilgiyi netleştirin.';
 
             $fingerprint =
                 'critical_lead:'
                 .$customer->id
                 .':'
-                .(int) $customer->lead_score;
+                .$leadScore;
 
             $sent +=
                 $this->persistAndNotify(
@@ -197,11 +204,17 @@ class CheckCrmAlarms extends Command
                     severity:
                         'critical',
 
+                    priorityScore:
+                        $priorityScore,
+
                     title:
                         $title,
 
                     message:
                         $message,
+
+                    recommendedAction:
+                        $recommendedAction,
 
                     fingerprint:
                         $fingerprint,
@@ -213,7 +226,7 @@ class CheckCrmAlarms extends Command
 
     /*
     |--------------------------------------------------------------------------
-    | 3+ SAAT GECİKMİŞ SICAK LEAD
+    | GECİKMİŞ SICAK LEAD
     |--------------------------------------------------------------------------
     */
 
@@ -257,6 +270,29 @@ class CheckCrmAlarms extends Command
             0;
 
         foreach ($customers as $customer) {
+            $hoursOverdue =
+                max(
+                    3,
+                    (int) floor(
+                        $customer
+                            ->next_follow_up_at
+                            ->diffInMinutes(
+                                now()
+                            )
+                        / 60
+                    )
+                );
+
+            $priorityScore =
+                min(
+                    100,
+                    85
+                    + min(
+                        15,
+                        $hoursOverdue
+                    )
+                );
+
             $title =
                 'Sıcak lead takibi gecikti';
 
@@ -264,9 +300,13 @@ class CheckCrmAlarms extends Command
                 $this->customerName(
                     $customer
                 )
-                .' sıcak lead durumunda ve takip zamanı '
-                .self::HOT_FOLLOW_UP_DELAY_HOURS
-                .'+ saat gecikti.';
+                .' sıcak lead durumunda ve takip zamanı yaklaşık '
+                .$hoursOverdue
+                .' saat gecikti.';
+
+            $recommendedAction =
+                'Bu müşteriyi öncelikli takip listesine alın ve bugün yeniden temas kurun. '
+                .'Önceki konuşmadaki satın alma sinyaline göre tek ve net bir sonraki adım önerin.';
 
             $fingerprint =
                 'hot_follow_up_overdue:'
@@ -292,11 +332,17 @@ class CheckCrmAlarms extends Command
                     severity:
                         'critical',
 
+                    priorityScore:
+                        $priorityScore,
+
                     title:
                         $title,
 
                     message:
                         $message,
+
+                    recommendedAction:
+                        $recommendedAction,
 
                     fingerprint:
                         $fingerprint,
@@ -344,6 +390,24 @@ class CheckCrmAlarms extends Command
             0;
 
         foreach ($customers as $customer) {
+            $leadScore =
+                max(
+                    0,
+                    min(
+                        100,
+                        (int) $customer->lead_score
+                    )
+                );
+
+            $priorityScore =
+                min(
+                    95,
+                    max(
+                        75,
+                        $leadScore + 8
+                    )
+                );
+
             $title =
                 'Değerli lead kayıp riski taşıyor';
 
@@ -352,14 +416,18 @@ class CheckCrmAlarms extends Command
                     $customer
                 )
                 .' Riskli Lead olarak işaretlendi ve puanı '
-                .(int) $customer->lead_score
-                .'/100. Müşterinin yeniden ele alınması önerilir.';
+                .$leadScore
+                .'/100.';
+
+            $recommendedAction =
+                'Müşterinin neden ilerlemediğini belirleyin. '
+                .'Fiyat, güven, teslimat, ödeme veya karar erteleme itirazlarından hangisinin geçerli olduğunu netleştirip buna göre takip yapın.';
 
             $fingerprint =
                 'risk_lead:'
                 .$customer->id
                 .':'
-                .(int) $customer->lead_score;
+                .$leadScore;
 
             $sent +=
                 $this->persistAndNotify(
@@ -375,11 +443,17 @@ class CheckCrmAlarms extends Command
                     severity:
                         'warning',
 
+                    priorityScore:
+                        $priorityScore,
+
                     title:
                         $title,
 
                     message:
                         $message,
+
+                    recommendedAction:
+                        $recommendedAction,
 
                     fingerprint:
                         $fingerprint,
@@ -391,7 +465,7 @@ class CheckCrmAlarms extends Command
 
     /*
     |--------------------------------------------------------------------------
-    | TEKLİF AŞAMASINDA 24+ SAAT SESSİZ
+    | SESSİZ TEKLİF
     |--------------------------------------------------------------------------
     */
 
@@ -428,6 +502,35 @@ class CheckCrmAlarms extends Command
             0;
 
         foreach ($customers as $customer) {
+            $silentHours =
+                max(
+                    24,
+                    (int) floor(
+                        $customer
+                            ->last_contact_at
+                            ->diffInMinutes(
+                                now()
+                            )
+                        / 60
+                    )
+                );
+
+            $priorityScore =
+                min(
+                    94,
+                    78
+                    + min(
+                        16,
+                        (int) floor(
+                            (
+                                $silentHours
+                                - 24
+                            )
+                            / 6
+                        )
+                    )
+                );
+
             $title =
                 'Teklif sonrası müşteri sessiz';
 
@@ -435,9 +538,13 @@ class CheckCrmAlarms extends Command
                 $this->customerName(
                     $customer
                 )
-                .' teklif aşamasında ve '
-                .self::PROPOSAL_SILENCE_HOURS
-                .'+ saattir yeni temas yok.';
+                .' teklif aşamasında ve yaklaşık '
+                .$silentHours
+                .' saattir yeni temas yok.';
+
+            $recommendedAction =
+                'Teklifin ulaşıp ulaşmadığını kısa bir mesajla doğrulayın. '
+                .'Müşteriye tek bir karar sorusu sorun ve gerekiyorsa teklifin önündeki itirazı netleştirin.';
 
             $fingerprint =
                 'proposal_silent:'
@@ -463,11 +570,17 @@ class CheckCrmAlarms extends Command
                     severity:
                         'warning',
 
+                    priorityScore:
+                        $priorityScore,
+
                     title:
                         $title,
 
                     message:
                         $message,
+
+                    recommendedAction:
+                        $recommendedAction,
 
                     fingerprint:
                         $fingerprint,
@@ -479,7 +592,7 @@ class CheckCrmAlarms extends Command
 
     /*
     |--------------------------------------------------------------------------
-    | KAYDET + PANEL BİLDİRİMİ
+    | KAYDET + BİLDİR
     |--------------------------------------------------------------------------
     */
 
@@ -488,8 +601,10 @@ class CheckCrmAlarms extends Command
         ConversationControl $customer,
         string $type,
         string $severity,
+        int $priorityScore,
         string $title,
         string $message,
+        ?string $recommendedAction,
         string $fingerprint
     ): int {
         $recipient =
@@ -512,21 +627,28 @@ class CheckCrmAlarms extends Command
                         severity:
                             $severity,
 
+                        priorityScore:
+                            $priorityScore,
+
                         title:
                             $title,
 
                         message:
                             $message,
 
+                        recommendedAction:
+                            $recommendedAction,
+
                         fingerprint:
                             $fingerprint,
                     );
 
-            /*
-            |--------------------------------------------------------------------------
-            | DAHA ÖNCE BİLDİRİLDİ
-            |--------------------------------------------------------------------------
-            */
+            if (
+                $alarm->snoozed_until
+                && $alarm->snoozed_until->isFuture()
+            ) {
+                return 0;
+            }
 
             if ($alarm->notified_at) {
                 return 0;
@@ -538,7 +660,10 @@ class CheckCrmAlarms extends Command
                         $title
                     )
                     ->body(
-                        $message
+                        'Öncelik '
+                        .$priorityScore
+                        .'/100 · '
+                        .$message
                     )
                     ->actions([
                         Action::make(
@@ -596,6 +721,9 @@ class CheckCrmAlarms extends Command
                     'type' =>
                         $type,
 
+                    'priority_score' =>
+                        $priorityScore,
+
                     'conversation_control_id' =>
                         $customer->id,
 
@@ -625,12 +753,6 @@ class CheckCrmAlarms extends Command
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | MÜŞTERİ ADI
-    |--------------------------------------------------------------------------
-    */
-
     private function customerName(
         ConversationControl $customer
     ): string {
@@ -647,12 +769,6 @@ class CheckCrmAlarms extends Command
                     ?: 'Müşteri'
                 );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CRM URL
-    |--------------------------------------------------------------------------
-    */
 
     private function customerUrl(
         ConversationControl $customer

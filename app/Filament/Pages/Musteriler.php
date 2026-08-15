@@ -662,6 +662,20 @@ class Musteriler extends Page
         |--------------------------------------------------------------------------
         */
 
+        $allowedAssignedUserId =
+            $this->assignedUserId;
+
+        if ($allowedAssignedUserId !== null) {
+            $allowedAssignedUserId =
+                $this->teamMembers
+                    ->contains(
+                        'id',
+                        (int) $allowedAssignedUserId
+                    )
+                        ? (int) $allowedAssignedUserId
+                        : null;
+        }
+
         $data = [
             'customer_name' =>
                 trim($this->customerName)
@@ -685,7 +699,7 @@ class Musteriler extends Page
                 $temperature,
 
             'assigned_user_id' =>
-                $this->assignedUserId,
+                $allowedAssignedUserId,
 
             'notes' =>
                 trim($this->notes)
@@ -997,7 +1011,31 @@ class Musteriler extends Page
 
     public function getTeamMembersProperty(): Collection
     {
+        $assignedUserIds =
+            ConversationControl::query()
+                ->where(
+                    'user_id',
+                    auth()->id()
+                )
+                ->whereNotNull(
+                    'assigned_user_id'
+                )
+                ->distinct()
+                ->pluck(
+                    'assigned_user_id'
+                )
+                ->push(
+                    auth()->id()
+                )
+                ->filter()
+                ->unique()
+                ->values();
+
         return User::query()
+            ->whereIn(
+                'id',
+                $assignedUserIds
+            )
             ->orderBy(
                 'name'
             )
