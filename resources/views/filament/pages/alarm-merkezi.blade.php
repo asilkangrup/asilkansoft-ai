@@ -659,6 +659,80 @@
         font-size:16px;
     }
 }
+
+/* ==========================================================================
+   WAI READABILITY STANDARD
+   Ana metin >= 12px, yardımcı metin >= 11px.
+   ========================================================================== */
+
+.wai-alarm-center {
+    font-size: 13px;
+}
+
+.wai-alarm-center .alarm-kpi span,
+.wai-alarm-center .alarm-sla-card span,
+.wai-alarm-center .alarm-staff-sub,
+.wai-alarm-center .risk-customers-sub,
+.wai-alarm-center .alarm-action-title,
+.wai-alarm-center .alarm-history-meta,
+.wai-alarm-center .alarm-snooze-title {
+    font-size: 11px !important;
+    line-height: 1.45;
+}
+
+.wai-alarm-center .alarm-badge,
+.wai-alarm-center .alarm-priority,
+.wai-alarm-center .alarm-sla,
+.wai-alarm-center .alarm-type,
+.wai-alarm-center .alarm-button,
+.wai-alarm-center .alarm-snooze-button,
+.wai-alarm-center .alarm-history-toggle,
+.wai-alarm-center .risk-customer-open {
+    font-size: 11px !important;
+    line-height: 1.3;
+}
+
+.wai-alarm-center .alarm-message,
+.wai-alarm-center .alarm-action-text,
+.wai-alarm-center .alarm-history-description,
+.wai-alarm-center .risk-customer-meta,
+.wai-alarm-center .risk-customer-action,
+.wai-alarm-center .alarm-meta {
+    font-size: 12px !important;
+    line-height: 1.6;
+}
+
+.wai-alarm-center .alarm-title,
+.wai-alarm-center .risk-customer-name,
+.wai-alarm-center .alarm-staff-title {
+    font-size: 14px !important;
+    line-height: 1.4;
+}
+
+.wai-alarm-center .alarm-staff-table th {
+    font-size: 11px !important;
+}
+
+.wai-alarm-center .alarm-staff-table td {
+    font-size: 12px !important;
+}
+
+.wai-alarm-center .alarm-select,
+.wai-alarm-center input,
+.wai-alarm-center select,
+.wai-alarm-center button {
+    font-size: 12px;
+}
+
+@media (max-width: 800px) {
+    .wai-alarm-center .alarm-message,
+    .wai-alarm-center .alarm-action-text,
+    .wai-alarm-center .risk-customer-meta,
+    .wai-alarm-center .risk-customer-action {
+        font-size: 12px !important;
+    }
+}
+
 </style>
 
 <div class="wai-alarm-center">

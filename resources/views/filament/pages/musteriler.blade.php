@@ -1507,6 +1507,87 @@
     }
 }
 
+
+/* ==========================================================================
+   WAI READABILITY STANDARD
+   Ana metin >= 12px, yardımcı metin >= 11px.
+   ========================================================================== */
+
+.wai-crm {
+    font-size: 13px;
+}
+
+.wai-crm .crm-kpi-label,
+.wai-crm .crm-revenue-label,
+.wai-crm .crm-forecast-label,
+.wai-crm .crm-daily-subtitle,
+.wai-crm .crm-daily-count,
+.wai-crm .crm-result-count,
+.wai-crm .crm-date,
+.wai-crm .crm-ai-meta,
+.wai-crm .crm-timeline-meta,
+.wai-crm .crm-tag {
+    font-size: 11px !important;
+    line-height: 1.45;
+}
+
+.wai-crm .crm-daily-card-title,
+.wai-crm .crm-daily-item-name,
+.wai-crm .crm-daily-item-meta,
+.wai-crm .crm-pill,
+.wai-crm .score-number,
+.wai-crm .crm-field label,
+.wai-crm .crm-ai-card-title,
+.wai-crm .crm-secondary-actions button,
+.wai-crm .crm-secondary-actions a,
+.wai-crm .crm-timeline-filter {
+    font-size: 12px !important;
+    line-height: 1.4;
+}
+
+.wai-crm .customer-phone,
+.wai-crm .crm-detail-phone,
+.wai-crm .crm-ai-card-body,
+.wai-crm .crm-timeline-description,
+.wai-crm .crm-timeline-title {
+    font-size: 12px !important;
+    line-height: 1.55;
+}
+
+.wai-crm .customer-name {
+    font-size: 14px !important;
+}
+
+.wai-crm .crm-daily-title,
+.wai-crm .crm-table-title {
+    font-size: 17px !important;
+}
+
+.wai-crm .crm-search,
+.wai-crm .crm-select,
+.wai-crm .crm-reset,
+.wai-crm .crm-field input,
+.wai-crm .crm-field select,
+.wai-crm .crm-field textarea {
+    font-size: 13px;
+}
+
+@media (max-width: 800px) {
+    .wai-crm .crm-daily-item-name,
+    .wai-crm .crm-daily-item-meta,
+    .wai-crm .customer-phone,
+    .wai-crm .crm-ai-card-body,
+    .wai-crm .crm-timeline-description {
+        font-size: 12px !important;
+    }
+
+    .wai-crm .crm-field input,
+    .wai-crm .crm-field select,
+    .wai-crm .crm-field textarea {
+        font-size: 16px;
+    }
+}
+
 </style>
 
 

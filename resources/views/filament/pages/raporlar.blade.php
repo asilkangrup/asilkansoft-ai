@@ -2005,6 +2005,73 @@
         overflow-x: auto;
     }
 }
+
+/* ==========================================================================
+   WAI READABILITY STANDARD
+   Ana metin >= 12px, yardımcı metin >= 11px.
+   ========================================================================== */
+
+.wai-reports {
+    font-size: 13px;
+}
+
+.wai-reports p,
+.wai-reports td,
+.wai-reports li {
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.wai-reports th,
+.wai-reports label,
+.wai-reports small,
+.wai-reports .report-subtitle,
+.wai-reports .report-manager-meta,
+.wai-reports .report-alarm-sub,
+.wai-reports .report-goal-label,
+.wai-reports .report-kpi-label,
+.wai-reports .report-alarm-kpi span {
+    font-size: 11px !important;
+    line-height: 1.45;
+}
+
+.wai-reports button,
+.wai-reports a,
+.wai-reports input,
+.wai-reports select {
+    font-size: 12px !important;
+}
+
+.wai-reports .report-alarm-list,
+.wai-reports .report-alarm-item,
+.wai-reports .report-manager-summary,
+.wai-reports .report-manager-text,
+.wai-reports .report-insight-text {
+    font-size: 12px !important;
+    line-height: 1.6;
+}
+
+.wai-reports .report-section-title,
+.wai-reports .report-manager-title,
+.wai-reports .report-alarm-title {
+    font-size: 16px !important;
+    line-height: 1.35;
+}
+
+.wai-reports .report-kpi-number,
+.wai-reports .report-alarm-kpi strong {
+    line-height: 1.1;
+}
+
+@media (max-width: 800px) {
+    .wai-reports p,
+    .wai-reports td,
+    .wai-reports .report-manager-text,
+    .wai-reports .report-insight-text {
+        font-size: 12px !important;
+    }
+}
+
 </style>
 
 <div
