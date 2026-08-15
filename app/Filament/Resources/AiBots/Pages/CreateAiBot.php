@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\AiBots\Pages;
 
 use App\Filament\Resources\AiBots\AiBotResource;
-use App\Models\AiBot;
+use App\Services\BusinessSectorService;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -18,39 +18,15 @@ class CreateAiBot extends CreateRecord
 
     protected static string $resource = AiBotResource::class;
 
-    /*
-    |--------------------------------------------------------------------------
-    | "OLUŞTUR & YENİ OLUŞTUR" BUTONUNU KALDIR
-    |--------------------------------------------------------------------------
-    |
-    | Müşteri onboarding sırasında tek bot oluştursun.
-    | Gereksiz ikinci buton kafa karıştırmasın.
-    |
-    */
-
     protected static bool $canCreateAnother = false;
-
-    /*
-    |--------------------------------------------------------------------------
-    | WIZARD ADIMLARI
-    |--------------------------------------------------------------------------
-    */
 
     protected function getSteps(): array
     {
         return [
-
-            /*
-            |--------------------------------------------------------------------------
-            | ADIM 1 - %20
-            |--------------------------------------------------------------------------
-            */
-
             Step::make('1. Temel Bilgiler')
                 ->description('Kurulum %20')
                 ->icon('heroicon-o-building-office')
                 ->schema([
-
                     TextInput::make('name')
                         ->label('Yapay Zekâ Adı')
                         ->placeholder('Örn: Satış Asistanım')
@@ -63,6 +39,19 @@ class CreateAiBot extends CreateRecord
                         ->placeholder('Örn: ABC Klima')
                         ->required()
                         ->maxLength(255),
+
+                    Select::make('business_sector')
+                        ->label('Sektörünüz Nedir?')
+                        ->placeholder('Sektörünüzü yazın veya listeden seçin')
+                        ->helperText(
+                            'Yazmaya başladığınızda uygun sektörler listelenir. WAI, lead puanlama sistemini seçiminize göre otomatik ayarlar.'
+                        )
+                        ->options(
+                            BusinessSectorService::options()
+                        )
+                        ->searchable()
+                        ->native(false)
+                        ->required(),
 
                     TextInput::make('whatsapp_number')
                         ->label('WhatsApp Numarası')
@@ -86,31 +75,13 @@ class CreateAiBot extends CreateRecord
                         ])
                         ->default('sales')
                         ->required(),
-
-
-                    Select::make('lead_scoring_profile')
-                        ->label('Sektör / Satış Modeli')
-                        ->options(AiBot::leadScoringProfiles())
-                        ->default('general')
-                        ->required()
-                        ->native(false)
-                        ->helperText(
-                            'WAI, lead sıcaklığını ve satış aşamasını seçtiğiniz satış modeline göre otomatik değerlendirir.'
-                        ),
                 ])
                 ->columns(2),
-
-            /*
-            |--------------------------------------------------------------------------
-            | ADIM 2 - %40
-            |--------------------------------------------------------------------------
-            */
 
             Step::make('2. Firma Bilgileri')
                 ->description('Kurulum %40')
                 ->icon('heroicon-o-information-circle')
                 ->schema([
-
                     Textarea::make('company_description')
                         ->label('Firma Hakkında')
                         ->placeholder(
@@ -132,17 +103,10 @@ class CreateAiBot extends CreateRecord
                         ->columnSpanFull(),
                 ]),
 
-            /*
-            |--------------------------------------------------------------------------
-            | ADIM 3 - %60
-            |--------------------------------------------------------------------------
-            */
-
             Step::make('3. Satış ve Hizmet')
                 ->description('Kurulum %60')
                 ->icon('heroicon-o-shopping-cart')
                 ->schema([
-
                     Textarea::make('cargo_information')
                         ->label('Kargo ve Teslimat Bilgileri')
                         ->placeholder(
@@ -170,17 +134,10 @@ class CreateAiBot extends CreateRecord
                 ])
                 ->columns(2),
 
-            /*
-            |--------------------------------------------------------------------------
-            | ADIM 4 - %80
-            |--------------------------------------------------------------------------
-            */
-
             Step::make('4. Yapay Zekâ Eğitimi')
                 ->description('Kurulum %80')
                 ->icon('heroicon-o-academic-cap')
                 ->schema([
-
                     Textarea::make('company_rules')
                         ->label('Özel Firma Kuralları')
                         ->placeholder(
@@ -204,17 +161,10 @@ class CreateAiBot extends CreateRecord
                         ->columnSpanFull(),
                 ]),
 
-            /*
-            |--------------------------------------------------------------------------
-            | ADIM 5 - %100
-            |--------------------------------------------------------------------------
-            */
-
             Step::make('5. Otomatik Takip')
                 ->description('Kurulum %100')
                 ->icon('heroicon-o-check-circle')
                 ->schema([
-
                     Toggle::make('follow_up_enabled')
                         ->label('Cevap Vermeyen Müşterileri Otomatik Takip Et')
                         ->helperText(
@@ -302,43 +252,25 @@ class CreateAiBot extends CreateRecord
         ];
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | KAYIT ÖNCESİ OTOMATİK AYARLAR
-    |--------------------------------------------------------------------------
-    */
-
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['user_id'] = auth()->id();
 
-        // Teknik OpenAI model seçimini müşteriye göstermiyoruz.
         $data['openai_model'] = 'gpt-5-mini';
-        $data['lead_scoring_profile'] = $data['lead_scoring_profile'] ?? 'general';
+
+        $data['lead_scoring_profile'] =
+            BusinessSectorService::profileForSector(
+                $data['business_sector']
+                ?? null
+            );
 
         return $data;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | ADIM ATLAMAYI KAPAT
-    |--------------------------------------------------------------------------
-    */
 
     public function hasSkippableSteps(): bool
     {
         return false;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | KAYIT SONRASI
-    |--------------------------------------------------------------------------
-    |
-    | Bot oluşturulduğunda müşteriyi direkt düzenleme ekranına değil,
-    | Kurulum Merkezi'ne geri gönderiyoruz.
-    |
-    */
 
     protected function getRedirectUrl(): string
     {

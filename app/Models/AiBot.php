@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\BusinessSectorService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -17,10 +18,18 @@ class AiBot extends Model
         'whatsapp_number',
         'logo_path',
         'role',
-        'lead_scoring_profile',
         'openai_model',
         'system_prompt',
         'status',
+
+        /*
+        |--------------------------------------------------------------------------
+        | SEKTÖR / LEAD SCORING
+        |--------------------------------------------------------------------------
+        */
+
+        'business_sector',
+        'lead_scoring_profile',
 
         /*
         |--------------------------------------------------------------------------
@@ -100,13 +109,17 @@ class AiBot extends Model
 
     protected $casts = [
         'ai_enabled' => 'boolean',
+
         'group_routing_enabled' => 'boolean',
+
         'follow_up_enabled' => 'boolean',
         'second_follow_up_enabled' => 'boolean',
         'first_follow_up_minutes' => 'integer',
         'second_follow_up_minutes' => 'integer',
+
         'trial_message_limit' => 'integer',
         'trial_messages_used' => 'integer',
+
         'trial_completed_at' => 'datetime',
         'subscription_started_at' => 'datetime',
         'subscription_ends_at' => 'datetime',
@@ -114,40 +127,54 @@ class AiBot extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | LEAD SCORING PROFİLLERİ
+    | SEKTÖR DEĞİŞİNCE LEAD PROFİLİNİ OTOMATİK AYARLA
     |--------------------------------------------------------------------------
     */
 
-    public static function leadScoringProfiles(): array
+    protected static function booted(): void
     {
-        return [
-            'general' => 'Genel Satış',
-            'ecommerce' => 'E-Ticaret / Ürün Satışı',
-            'finance' => 'Finans / Kredi',
-            'appointment' => 'Randevu / Klinik / Güzellik',
-            'service' => 'Ajans / Profesyonel Hizmet',
-            'real_estate' => 'Emlak',
-            'automotive' => 'Otomotiv',
-            'emergency' => 'Acil Hizmet / Çekici / Usta',
-        ];
+        static::saving(
+            function (AiBot $aiBot): void {
+                if (
+                    $aiBot->isDirty('business_sector')
+                    || trim((string) $aiBot->lead_scoring_profile) === ''
+                ) {
+                    $aiBot->lead_scoring_profile =
+                        BusinessSectorService::profileForSector(
+                            $aiBot->business_sector
+                        );
+                }
+            }
+        );
     }
 
-    public function leadScoringProfileLabel(): string
-    {
-        return self::leadScoringProfiles()[
-            $this->lead_scoring_profile ?: 'general'
-        ] ?? 'Genel Satış';
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | KULLANICI
+    |--------------------------------------------------------------------------
+    */
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ÜRÜNLER
+    |--------------------------------------------------------------------------
+    */
+
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | OTOMATİK TAKİPLER
+    |--------------------------------------------------------------------------
+    */
 
     public function followUps(): HasMany
     {
@@ -155,6 +182,25 @@ class AiBot extends Model
             ConversationFollowUp::class
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SEKTÖR ETİKETİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function businessSectorLabel(): string
+    {
+        return BusinessSectorService::label(
+            $this->business_sector
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ÜCRETSİZ DENEME KALAN MESAJ
+    |--------------------------------------------------------------------------
+    */
 
     public function kalanDenemeMesaji(): int
     {
@@ -166,6 +212,12 @@ class AiBot extends Model
             $limit - $used
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DENEME BİTTİ Mİ?
+    |--------------------------------------------------------------------------
+    */
 
     public function denemeBittiMi(): bool
     {
@@ -180,6 +232,12 @@ class AiBot extends Model
             >=
             $this->trial_message_limit;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | YAPAY ZEKÂ WHATSAPP'TA CEVAP VEREBİLİR Mİ?
+    |--------------------------------------------------------------------------
+    */
 
     public function whatsappAiKullanilabilirMi(): bool
     {
