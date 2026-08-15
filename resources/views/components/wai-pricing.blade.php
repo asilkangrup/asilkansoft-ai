@@ -498,4 +498,18 @@
         font-size:9px;
     }
 }
+
+/* WAI PRICING LIGHT PREMIUM FINAL */
+.wai-pricing-section{padding:100px 0!important;background:radial-gradient(circle at 50% 0%,rgba(16,185,129,.075),transparent 30%),linear-gradient(180deg,#f8fbf9,#f2f6f3)!important}
+.wai-pricing-intro{margin-bottom:44px!important}.wai-pricing-intro .section-title{color:#0c140f!important}.wai-pricing-intro .section-copy{color:#66736b!important;font-size:16px!important}
+.wai-pricing-grid{gap:18px!important}.wai-price-card{min-height:620px!important;border:1px solid rgba(15,23,42,.085)!important;background:radial-gradient(circle at 100% 0%,rgba(16,185,129,.055),transparent 32%),#fff!important;box-shadow:0 24px 65px rgba(15,23,42,.07)!important}
+.wai-price-card.featured{border-color:#aee4c6!important;background:radial-gradient(circle at 90% 0%,rgba(16,185,129,.11),transparent 35%),#fff!important;box-shadow:0 30px 75px rgba(16,185,129,.10)!important}
+.wai-price-plan{color:#087a42!important;font-size:14px!important}.wai-price-audience{color:#66736b!important;font-size:14px!important}.wai-price>span{color:#647168!important}.wai-price strong{color:#101813!important}.wai-price small{color:#748078!important}
+.wai-price-limit{color:#657169!important;font-size:13px!important}.wai-price-limit b{color:#087a42!important}.wai-price-divider{background:#e4eae6!important}
+.wai-price-features li{color:#46534b!important;font-size:13px!important}.wai-price-features i{border-color:#ccefdc!important;color:#087a42!important;background:#edfbf3!important}
+.wai-price-button.secondary{border-color:#dce5df!important;color:#263129!important;background:#f7faf8!important}.wai-price-button.primary{color:#fff!important;background:linear-gradient(135deg,#1fd47b,#0fb966)!important}.wai-price-button{font-size:13px!important}
+.wai-pricing-trial{border-color:#ccefdc!important;background:#effaf4!important}.wai-trial-icon{color:#087a42!important;background:#dcf6e8!important}.wai-pricing-trial strong{color:#17211b!important;font-size:15px!important}.wai-pricing-trial p{color:#68756d!important;font-size:12px!important}.wai-pricing-trial a{color:#fff!important;background:#12c56d!important;font-size:12px!important}
+.wai-pricing-note{color:#748078!important;font-size:11px!important}
+@media(max-width:700px){.wai-pricing-section{padding:76px 0!important}.wai-price-audience,.wai-price-features li{font-size:13px!important}}
+
 </style>

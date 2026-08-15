@@ -1,3 +1,6 @@
+REMIUM.blade.php
+
+
 {{-- 
 |--------------------------------------------------------------------------
 | WAI PUBLIC LIVE DEMO
@@ -2710,6 +2713,51 @@
             padding: 0 11px;
         }
     }
+
+/* WAI DEMO LIGHT PREMIUM FINAL */
+.wd-section{padding:100px 0!important;background:radial-gradient(circle at 50% 0%,rgba(16,185,129,.08),transparent 32%),linear-gradient(180deg,#f8fbf9,#f2f6f3)!important}
+.wd-intro{max-width:980px!important;margin-bottom:44px!important}
+.wd-intro .section-title{color:#0c140f!important}
+.wd-intro .section-copy{max-width:720px!important;color:#66736b!important;font-size:16px!important}
+.wd-app{width:min(1180px,100%)!important;min-height:750px!important;border:1px solid rgba(15,23,42,.09)!important;background:radial-gradient(circle at 92% 0%,rgba(16,185,129,.07),transparent 30%),#fff!important;box-shadow:0 38px 90px rgba(15,23,42,.10)!important}
+.wd-app::before{background-image:linear-gradient(rgba(15,23,42,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(15,23,42,.022) 1px,transparent 1px)!important}
+.wd-app-header{height:84px!important;padding:0 30px!important;border-color:#e1e8e3!important;background:#f8faf9!important}
+.wd-brand-logo{width:48px!important;height:48px!important;color:#087a42!important;border-color:#ccefdc!important;background:#edfbf3!important;font-size:15px!important}
+.wd-brand-copy strong{color:#17211b!important;font-size:15px!important}
+.wd-brand-copy span{color:#748078!important;font-size:10px!important}
+.wd-live{min-height:38px!important;color:#087a42!important;border-color:#ccefdc!important;background:#edfbf3!important;font-size:11px!important}
+.wd-progress{padding:18px 30px 17px!important;border-color:#e1e8e3!important}
+.wd-progress-meta{color:#657169!important;font-size:12px!important}.wd-progress-meta strong{color:#087a42!important}
+.wd-progress-track{height:6px!important;background:#e8efea!important}
+.wd-stage,.wd-step,.wd-chat-step,.wd-chat{min-height:625px!important}
+.wd-step-content{width:min(800px,calc(100% - 64px))!important;padding:55px 0 38px!important}
+.wd-step-number{width:46px!important;height:46px!important;color:#087a42!important;border-color:#ccefdc!important;background:#edfbf3!important;font-size:13px!important}
+.wd-step-kicker{color:#56645b!important;font-size:13px!important}
+.wd-step h3{max-width:760px!important;color:#0c140f!important;font-size:45px!important;letter-spacing:-2.4px!important}
+.wd-description{max-width:700px!important;color:#68756d!important;font-size:16px!important}
+.wd-back,.wd-field label{color:#56645b!important;font-size:12px!important}
+.wd-input-wrap input,.wd-textarea-wrap textarea{color:#17211b!important;border-color:#dce5df!important;background:#f8faf9!important}
+.wd-input-wrap input{height:70px!important;font-size:17px!important}.wd-textarea-wrap textarea{min-height:175px!important;font-size:16px!important}
+.wd-input-wrap input::placeholder,.wd-textarea-wrap textarea::placeholder,.wd-composer input::placeholder{color:#9aa49e!important}
+.wd-character-count,.wd-example,.wd-fast-label{color:#7b8780!important;font-size:11px!important}
+.wd-examples button{min-height:44px!important;color:#56645b!important;border-color:#dfe7e2!important;background:#f7faf8!important;font-size:11px!important}
+.wd-role{min-height:118px!important;border-color:#dfe7e2!important;background:#f8faf9!important}.wd-role:hover,.wd-role.active{border-color:#aee4c6!important;background:#effaf4!important}
+.wd-role-copy strong{color:#18221c!important;font-size:13px!important}.wd-role-copy small{color:#748078!important;font-size:11px!important}
+.wd-step-footer{min-height:96px!important;padding:17px 30px!important;border-color:#e1e8e3!important;background:#f8faf9!important}
+.wd-safe{color:#748078!important;font-size:11px!important}.wd-primary{min-width:190px!important;min-height:56px!important;color:#fff!important;background:linear-gradient(135deg,#1fd47b,#0fb966)!important;font-size:13px!important}
+.wd-chat-header{min-height:76px!important;padding:0 24px!important;border-color:#e1e8e3!important;background:#f8faf9!important}
+.wd-chat-back{color:#56645b!important;background:#edf2ef!important}.wd-avatar{width:46px!important;height:46px!important;color:#087a42!important;border-color:#ccefdc!important;background:#edfbf3!important}
+.wd-avatar i{border-color:#fff!important}.wd-chat-profile strong{color:#17211b!important;font-size:13px!important}.wd-chat-profile span{font-size:10px!important}.wd-demo-badge{color:#087a42!important;background:#eaf9f1!important;font-size:9px!important}
+.wd-messages{min-height:355px!important;max-height:425px!important;padding:27px 28px 18px!important;background:radial-gradient(circle at 50% 100%,rgba(16,185,129,.04),transparent 35%),#fff!important}
+.wd-system-message{color:#748078!important;background:#f0f4f1!important;font-size:9px!important}.wd-bubble{max-width:70%!important}.wd-bubble>div{padding:13px 14px!important;font-size:13px!important}
+.wd-bubble.user>div{color:#08673a!important;border-color:#cdebd9!important;background:#eaf9f1!important}.wd-bubble.wai>div{color:#46534b!important;border-color:#e0e7e2!important;background:#f2f5f3!important}.wd-bubble time{color:#8c9690!important;font-size:8px!important}
+.wd-demo-status{padding:10px 24px!important;color:#68756d!important;border-color:#e3e9e5!important;background:#fbfcfb!important;font-size:10px!important}
+.wd-quick-messages{padding:12px 18px 0!important;background:#fff!important}.wd-quick-messages button{min-height:38px!important;color:#59665e!important;border-color:#dfe7e2!important;background:#f8faf9!important;font-size:10px!important}
+.wd-composer{min-height:78px!important;padding:11px 18px 14px!important;background:#fff!important}.wd-composer input{height:53px!important;color:#17211b!important;border-color:#dce5df!important;background:#f7faf8!important;font-size:14px!important}.wd-composer button{width:53px!important;height:53px!important;color:#fff!important;background:#12c56d!important}
+.wd-conversion{border-color:#ccefdc!important;background:#effaf4!important}.wd-conversion-copy strong{color:#17211b!important;font-size:12px!important}.wd-conversion-copy span{color:#68756d!important;font-size:10px!important}.wd-connect{color:#fff!important;background:#12c56d!important;font-size:11px!important}
+.wd-under{width:min(850px,100%)!important}.wd-under strong,.wd-under span{font-size:11px!important}.wd-under span{color:#657169!important}
+@media(max-width:720px){.wd-section{padding:76px 0 82px!important}.wd-step h3{font-size:32px!important}.wd-description{font-size:14px!important}.wd-bubble>div{font-size:12px!important}}
+
 </style>
 
 <script>
