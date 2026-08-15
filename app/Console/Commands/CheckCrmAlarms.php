@@ -3,17 +3,18 @@
 namespace App\Console\Commands;
 
 use App\Models\ConversationControl;
+use App\Models\CrmAlarm;
+use App\Services\CrmAlarmService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 #[Signature('wai:check-crm-alarms')]
-#[Description('WAI CRM kritik satış alarmlarını kontrol eder ve yöneticilere panel bildirimi gönderir.')]
+#[Description('WAI CRM kritik satış alarmlarını kontrol eder, kaydeder ve yöneticilere panel bildirimi gönderir.')]
 class CheckCrmAlarms extends Command
 {
     private const CRITICAL_SCORE = 95;
@@ -24,22 +25,30 @@ class CheckCrmAlarms extends Command
 
     private const PROPOSAL_SILENCE_HOURS = 24;
 
-    public function handle(): int
-    {
-        $sent =
-            0;
+    public function handle(
+        CrmAlarmService $alarmService
+    ): int {
+        $sent = 0;
 
-        $sent +=
-            $this->sendCriticalLeadAlarms();
+        $sent += $this->criticalLeadAlarms(
+            $alarmService
+        );
 
-        $sent +=
-            $this->sendOverdueHotLeadAlarms();
+        $sent += $this->overdueHotLeadAlarms(
+            $alarmService
+        );
 
-        $sent +=
-            $this->sendRiskLeadAlarms();
+        $sent += $this->riskLeadAlarms(
+            $alarmService
+        );
 
-        $sent +=
-            $this->sendSilentProposalAlarms();
+        $sent += $this->silentProposalAlarms(
+            $alarmService
+        );
+
+        $this->resolveClosedAlarms(
+            $alarmService
+        );
 
         $this->info(
             $sent
@@ -49,21 +58,12 @@ class CheckCrmAlarms extends Command
         return self::SUCCESS;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | 95+ KRİTİK LEAD
-    |--------------------------------------------------------------------------
-    */
-
-    private function sendCriticalLeadAlarms(): int
-    {
+    private function criticalLeadAlarms(
+        CrmAlarmService $alarmService
+    ): int {
         $customers =
             ConversationControl::query()
-                ->with([
-                    'user',
-                    'assignedUser',
-                    'aiBot',
-                ])
+                ->with('user')
                 ->where(
                     'lead_score',
                     '>=',
@@ -71,108 +71,46 @@ class CheckCrmAlarms extends Command
                 )
                 ->whereNotIn(
                     'lead_status',
-                    [
-                        'won',
-                        'lost',
-                    ]
+                    ['won', 'lost']
                 )
-                ->orderByDesc(
-                    'lead_score'
-                )
+                ->orderByDesc('lead_score')
                 ->limit(500)
                 ->get();
 
-        $sent =
-            0;
+        $sent = 0;
 
         foreach ($customers as $customer) {
-            $recipient =
-                $customer->user;
+            $title = 'Kritik satış fırsatı';
 
-            if (! $recipient) {
-                continue;
-            }
+            $message =
+                $this->customerName($customer)
+                .' '
+                .(int) $customer->lead_score
+                .'/100 puana ulaştı. Satış ekibinin hızlı aksiyon alması önerilir.';
 
-            $cacheKey =
-                'wai:crm-alarm:critical:'
+            $fingerprint =
+                'critical_lead:'
                 .$customer->id
                 .':'
-                .$recipient->id;
+                .(int) $customer->lead_score;
 
-            if (
-                Cache::has(
-                    $cacheKey
-                )
-            ) {
-                continue;
-            }
-
-            try {
-                Notification::make()
-                    ->title(
-                        'Kritik satış fırsatı'
-                    )
-                    ->body(
-                        $this->customerName(
-                            $customer
-                        )
-                        .' '
-                        .(int) $customer->lead_score
-                        .'/100 puana ulaştı. '
-                        .'Satış ekibinin hızlı aksiyon alması önerilir.'
-                    )
-                    ->danger()
-                    ->actions([
-                        Action::make(
-                            'customer'
-                        )
-                            ->label(
-                                'Müşteriyi Aç'
-                            )
-                            ->url(
-                                $this->customerUrl(
-                                    $customer
-                                )
-                            ),
-                    ])
-                    ->sendToDatabase(
-                        $recipient
-                    );
-
-                Cache::put(
-                    $cacheKey,
-                    true,
-                    now()->addDays(7)
-                );
-
-                $sent++;
-
-                $this->logSent(
-                    type: 'critical_lead',
-                    customer: $customer,
-                    recipientId: $recipient->id,
-                );
-            } catch (Throwable $exception) {
-                $this->logFailed(
-                    type: 'critical_lead',
-                    customer: $customer,
-                    recipientId: $recipient->id,
-                    exception: $exception,
-                );
-            }
+            $sent += $this->persistAndNotify(
+                alarmService: $alarmService,
+                customer: $customer,
+                type: 'critical_lead',
+                severity: 'critical',
+                title: $title,
+                message: $message,
+                fingerprint: $fingerprint,
+            );
         }
 
         return $sent;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | 3+ SAAT GECİKMİŞ SICAK LEAD
-    |--------------------------------------------------------------------------
-    */
-
-    private function sendOverdueHotLeadAlarms(): int
-    {
+    private function overdueHotLeadAlarms(
+        CrmAlarmService $alarmService
+    ): int {
         $deadline =
             now()->subHours(
                 self::HOT_FOLLOW_UP_DELAY_HOURS
@@ -180,21 +118,14 @@ class CheckCrmAlarms extends Command
 
         $customers =
             ConversationControl::query()
-                ->with([
-                    'user',
-                    'assignedUser',
-                    'aiBot',
-                ])
+                ->with('user')
                 ->where(
                     'lead_temperature',
                     'hot'
                 )
                 ->whereNotIn(
                     'lead_status',
-                    [
-                        'won',
-                        'lost',
-                    ]
+                    ['won', 'lost']
                 )
                 ->whereNotNull(
                     'next_follow_up_at'
@@ -210,114 +141,48 @@ class CheckCrmAlarms extends Command
                 ->limit(500)
                 ->get();
 
-        $sent =
-            0;
+        $sent = 0;
 
         foreach ($customers as $customer) {
-            $recipient =
-                $customer->user;
+            $title =
+                'Sıcak lead takibi gecikti';
 
-            if (! $recipient) {
-                continue;
-            }
+            $message =
+                $this->customerName($customer)
+                .' sıcak lead durumunda ve takip zamanı '
+                .self::HOT_FOLLOW_UP_DELAY_HOURS
+                .'+ saat gecikti.';
 
-            $followUpTimestamp =
-                $customer->next_follow_up_at
-                    ?->timestamp
-                ?? 0;
-
-            $cacheKey =
-                'wai:crm-alarm:hot-overdue:'
+            $fingerprint =
+                'hot_follow_up_overdue:'
                 .$customer->id
                 .':'
-                .$followUpTimestamp
-                .':'
-                .$recipient->id;
-
-            if (
-                Cache::has(
-                    $cacheKey
-                )
-            ) {
-                continue;
-            }
-
-            try {
-                Notification::make()
-                    ->title(
-                        'Sıcak lead takibi gecikti'
-                    )
-                    ->body(
-                        $this->customerName(
-                            $customer
-                        )
-                        .' sıcak lead durumunda ve takip zamanı '
-                        .self::HOT_FOLLOW_UP_DELAY_HOURS
-                        .'+ saat gecikti.'
-                    )
-                    ->warning()
-                    ->actions([
-                        Action::make(
-                            'customer'
-                        )
-                            ->label(
-                                'Hemen Aç'
-                            )
-                            ->url(
-                                $this->customerUrl(
-                                    $customer
-                                )
-                            ),
-                    ])
-                    ->sendToDatabase(
-                        $recipient
-                    );
-
-                Cache::put(
-                    $cacheKey,
-                    true,
-                    now()->addDay()
+                .(
+                    $customer->next_follow_up_at
+                        ?->timestamp
+                    ?? 0
                 );
 
-                $sent++;
-
-                $this->logSent(
-                    type: 'hot_follow_up_overdue',
-                    customer: $customer,
-                    recipientId: $recipient->id,
-                );
-            } catch (Throwable $exception) {
-                $this->logFailed(
-                    type: 'hot_follow_up_overdue',
-                    customer: $customer,
-                    recipientId: $recipient->id,
-                    exception: $exception,
-                );
-            }
+            $sent += $this->persistAndNotify(
+                alarmService: $alarmService,
+                customer: $customer,
+                type: 'hot_follow_up_overdue',
+                severity: 'critical',
+                title: $title,
+                message: $message,
+                fingerprint: $fingerprint,
+            );
         }
 
         return $sent;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | RİSKLİ LEAD
-    |--------------------------------------------------------------------------
-    |
-    | Riskli Lead etiketi tek başına alarm üretmez.
-    | Lead puanı da en az 70 olmalıdır.
-    |
-    */
-
-    private function sendRiskLeadAlarms(): int
-    {
+    private function riskLeadAlarms(
+        CrmAlarmService $alarmService
+    ): int {
         $customers =
             ConversationControl::query()
-                ->with([
-                    'user',
-                    'assignedUser',
-                    'aiBot',
-                ])
+                ->with('user')
                 ->whereJsonContains(
                     'tags',
                     'Riskli Lead'
@@ -329,10 +194,7 @@ class CheckCrmAlarms extends Command
                 )
                 ->whereNotIn(
                     'lead_status',
-                    [
-                        'won',
-                        'lost',
-                    ]
+                    ['won', 'lost']
                 )
                 ->orderByDesc(
                     'lead_score'
@@ -340,96 +202,41 @@ class CheckCrmAlarms extends Command
                 ->limit(500)
                 ->get();
 
-        $sent =
-            0;
+        $sent = 0;
 
         foreach ($customers as $customer) {
-            $recipient =
-                $customer->user;
+            $title =
+                'Değerli lead kayıp riski taşıyor';
 
-            if (! $recipient) {
-                continue;
-            }
+            $message =
+                $this->customerName($customer)
+                .' Riskli Lead olarak işaretlendi ve puanı '
+                .(int) $customer->lead_score
+                .'/100. Müşterinin yeniden ele alınması önerilir.';
 
-            $cacheKey =
-                'wai:crm-alarm:risk:'
+            $fingerprint =
+                'risk_lead:'
                 .$customer->id
                 .':'
-                .$recipient->id;
+                .(int) $customer->lead_score;
 
-            if (
-                Cache::has(
-                    $cacheKey
-                )
-            ) {
-                continue;
-            }
-
-            try {
-                Notification::make()
-                    ->title(
-                        'Değerli lead kayıp riski taşıyor'
-                    )
-                    ->body(
-                        $this->customerName(
-                            $customer
-                        )
-                        .' Riskli Lead olarak işaretlendi ve puanı '
-                        .(int) $customer->lead_score
-                        .'/100. Müşterinin yeniden ele alınması önerilir.'
-                    )
-                    ->warning()
-                    ->actions([
-                        Action::make(
-                            'customer'
-                        )
-                            ->label(
-                                'Müşteriyi Aç'
-                            )
-                            ->url(
-                                $this->customerUrl(
-                                    $customer
-                                )
-                            ),
-                    ])
-                    ->sendToDatabase(
-                        $recipient
-                    );
-
-                Cache::put(
-                    $cacheKey,
-                    true,
-                    now()->addDays(3)
-                );
-
-                $sent++;
-
-                $this->logSent(
-                    type: 'risk_lead',
-                    customer: $customer,
-                    recipientId: $recipient->id,
-                );
-            } catch (Throwable $exception) {
-                $this->logFailed(
-                    type: 'risk_lead',
-                    customer: $customer,
-                    recipientId: $recipient->id,
-                    exception: $exception,
-                );
-            }
+            $sent += $this->persistAndNotify(
+                alarmService: $alarmService,
+                customer: $customer,
+                type: 'risk_lead',
+                severity: 'warning',
+                title: $title,
+                message: $message,
+                fingerprint: $fingerprint,
+            );
         }
 
         return $sent;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | TEKLİF AŞAMASINDA 24+ SAAT SESSİZ
-    |--------------------------------------------------------------------------
-    */
-
-    private function sendSilentProposalAlarms(): int
-    {
+    private function silentProposalAlarms(
+        CrmAlarmService $alarmService
+    ): int {
         $deadline =
             now()->subHours(
                 self::PROPOSAL_SILENCE_HOURS
@@ -437,11 +244,7 @@ class CheckCrmAlarms extends Command
 
         $customers =
             ConversationControl::query()
-                ->with([
-                    'user',
-                    'assignedUser',
-                    'aiBot',
-                ])
+                ->with('user')
                 ->where(
                     'lead_status',
                     'proposal'
@@ -460,100 +263,205 @@ class CheckCrmAlarms extends Command
                 ->limit(500)
                 ->get();
 
-        $sent =
-            0;
+        $sent = 0;
 
         foreach ($customers as $customer) {
-            $recipient =
-                $customer->user;
+            $title =
+                'Teklif sonrası müşteri sessiz';
 
-            if (! $recipient) {
-                continue;
-            }
+            $message =
+                $this->customerName($customer)
+                .' teklif aşamasında ve '
+                .self::PROPOSAL_SILENCE_HOURS
+                .'+ saattir yeni temas yok.';
 
-            $lastContactTimestamp =
-                $customer->last_contact_at
-                    ?->timestamp
-                ?? 0;
-
-            $cacheKey =
-                'wai:crm-alarm:proposal-silent:'
+            $fingerprint =
+                'proposal_silent:'
                 .$customer->id
                 .':'
-                .$lastContactTimestamp
-                .':'
-                .$recipient->id;
+                .(
+                    $customer->last_contact_at
+                        ?->timestamp
+                    ?? 0
+                );
 
-            if (
-                Cache::has(
-                    $cacheKey
-                )
-            ) {
-                continue;
+            $sent += $this->persistAndNotify(
+                alarmService: $alarmService,
+                customer: $customer,
+                type: 'proposal_silent',
+                severity: 'warning',
+                title: $title,
+                message: $message,
+                fingerprint: $fingerprint,
+            );
+        }
+
+        return $sent;
+    }
+
+    private function persistAndNotify(
+        CrmAlarmService $alarmService,
+        ConversationControl $customer,
+        string $type,
+        string $severity,
+        string $title,
+        string $message,
+        string $fingerprint
+    ): int {
+        $recipient =
+            $customer->user;
+
+        if (! $recipient) {
+            return 0;
+        }
+
+        try {
+            $alarm =
+                $alarmService->createOrGet(
+                    conversation: $customer,
+                    type: $type,
+                    severity: $severity,
+                    title: $title,
+                    message: $message,
+                    fingerprint: $fingerprint,
+                );
+
+            /*
+            |--------------------------------------------------------------------------
+            | DAHA ÖNCE BİLDİRİLDİYSE TEKRAR GÖNDERME
+            |--------------------------------------------------------------------------
+            */
+
+            if ($alarm->notified_at) {
+                return 0;
             }
 
-            try {
+            $notification =
                 Notification::make()
                     ->title(
-                        'Teklif sonrası müşteri sessiz'
+                        $title
                     )
                     ->body(
-                        $this->customerName(
-                            $customer
-                        )
-                        .' teklif aşamasında ve '
-                        .self::PROPOSAL_SILENCE_HOURS
-                        .'+ saattir yeni temas yok.'
+                        $message
                     )
-                    ->warning()
                     ->actions([
                         Action::make(
                             'customer'
                         )
                             ->label(
-                                'Takip Et'
+                                'Müşteriyi Aç'
                             )
                             ->url(
                                 $this->customerUrl(
                                     $customer
                                 )
                             ),
-                    ])
-                    ->sendToDatabase(
-                        $recipient
-                    );
 
-                Cache::put(
-                    $cacheKey,
-                    true,
-                    now()->addDay()
-                );
+                        Action::make(
+                            'alarms'
+                        )
+                            ->label(
+                                'Alarm Merkezi'
+                            )
+                            ->url(
+                                url(
+                                    '/admin/alarm-merkezi'
+                                )
+                            ),
+                    ]);
 
-                $sent++;
-
-                $this->logSent(
-                    type: 'proposal_silent',
-                    customer: $customer,
-                    recipientId: $recipient->id,
-                );
-            } catch (Throwable $exception) {
-                $this->logFailed(
-                    type: 'proposal_silent',
-                    customer: $customer,
-                    recipientId: $recipient->id,
-                    exception: $exception,
-                );
+            if ($severity === 'critical') {
+                $notification->danger();
+            } else {
+                $notification->warning();
             }
-        }
 
-        return $sent;
+            $notification
+                ->sendToDatabase(
+                    $recipient
+                );
+
+            $alarmService
+                ->markNotified(
+                    $alarm
+                );
+
+            Log::info(
+                'WAI CRM ALARM SENT',
+                [
+                    'crm_alarm_id' =>
+                        $alarm->id,
+
+                    'type' =>
+                        $type,
+
+                    'conversation_control_id' =>
+                        $customer->id,
+
+                    'recipient_user_id' =>
+                        $recipient->id,
+                ]
+            );
+
+            return 1;
+
+        } catch (Throwable $exception) {
+            Log::error(
+                'WAI CRM ALARM FAILED',
+                [
+                    'type' =>
+                        $type,
+
+                    'conversation_control_id' =>
+                        $customer->id,
+
+                    'message' =>
+                        $exception->getMessage(),
+                ]
+            );
+
+            return 0;
+        }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | MÜŞTERİ ADI
-    |--------------------------------------------------------------------------
-    */
+    private function resolveClosedAlarms(
+        CrmAlarmService $alarmService
+    ): void {
+        $conversationIds =
+            CrmAlarm::query()
+                ->where(
+                    'is_resolved',
+                    false
+                )
+                ->distinct()
+                ->pluck(
+                    'conversation_control_id'
+                );
+
+        if ($conversationIds->isEmpty()) {
+            return;
+        }
+
+        ConversationControl::query()
+            ->whereIn(
+                'id',
+                $conversationIds
+            )
+            ->whereIn(
+                'lead_status',
+                ['won', 'lost']
+            )
+            ->get()
+            ->each(
+                fn (
+                    ConversationControl $conversation
+                ) =>
+                    $alarmService
+                        ->resolveClosedConversationAlarms(
+                            $conversation
+                        )
+            );
+    }
 
     private function customerName(
         ConversationControl $customer
@@ -563,19 +471,13 @@ class CheckCrmAlarms extends Command
                 (string) $customer->customer_name
             );
 
-        if ($name !== '') {
-            return $name;
-        }
-
-        return $customer->whatsapp_number
-            ?: 'Müşteri';
+        return $name !== ''
+            ? $name
+            : (
+                $customer->whatsapp_number
+                ?: 'Müşteri'
+            );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CRM URL
-    |--------------------------------------------------------------------------
-    */
 
     private function customerUrl(
         ConversationControl $customer
@@ -584,68 +486,6 @@ class CheckCrmAlarms extends Command
             '/admin/musteriler'
             .'?customer='
             .$customer->id
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | LOG
-    |--------------------------------------------------------------------------
-    */
-
-    private function logSent(
-        string $type,
-        ConversationControl $customer,
-        int $recipientId
-    ): void {
-        Log::info(
-            'WAI CRM ALARM SENT',
-            [
-                'type' =>
-                    $type,
-
-                'conversation_control_id' =>
-                    $customer->id,
-
-                'user_id' =>
-                    $customer->user_id,
-
-                'recipient_user_id' =>
-                    $recipientId,
-
-                'lead_score' =>
-                    $customer->lead_score,
-
-                'lead_status' =>
-                    $customer->lead_status,
-
-                'lead_temperature' =>
-                    $customer->lead_temperature,
-            ]
-        );
-    }
-
-    private function logFailed(
-        string $type,
-        ConversationControl $customer,
-        int $recipientId,
-        Throwable $exception
-    ): void {
-        Log::error(
-            'WAI CRM ALARM FAILED',
-            [
-                'type' =>
-                    $type,
-
-                'conversation_control_id' =>
-                    $customer->id,
-
-                'recipient_user_id' =>
-                    $recipientId,
-
-                'message' =>
-                    $exception->getMessage(),
-            ]
         );
     }
 }
