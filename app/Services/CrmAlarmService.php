@@ -72,7 +72,7 @@ class CrmAlarmService
 
             /*
             |--------------------------------------------------------------------------
-            | AYNI KOŞUL TEKRAR OLUŞTUYSA ALARMI YENİDEN AÇ
+            | AYNI KOŞUL TEKRAR OLUŞTUYSA YENİDEN AÇ
             |--------------------------------------------------------------------------
             */
 
@@ -95,7 +95,7 @@ class CrmAlarmService
 
             if ($wasResolved) {
                 app(
-                    \App\Services\CrmAlarmAuditService::class
+                    CrmAlarmAuditService::class
                 )->record(
                     alarm: $alarm,
                     eventType: 'reopened',
@@ -106,6 +106,142 @@ class CrmAlarmService
             return $alarm;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | YENİ ALARM
+        |--------------------------------------------------------------------------
+        */
+
+        $alarm =
+            CrmAlarm::query()
+                ->create([
+                    'user_id' =>
+                        $conversation->user_id,
+
+                    'conversation_control_id' =>
+                        $conversation->id,
+
+                    'type' =>
+                        $type,
+
+                    'severity' =>
+                        $severity,
+
+                    'priority_score' =>
+                        $priorityScore,
+
+                    'title' =>
+                        $title,
+
+                    'message' =>
+                        $message,
+
+                    'recommended_action' =>
+                        $recommendedAction,
+
+                    'fingerprint' =>
+                        $fingerprint,
+
+                    'is_resolved' =>
+                        false,
+
+                    'resolved_at' =>
+                        null,
+
+                    'notified_at' =>
+                        null,
+
+                    'snoozed_until' =>
+                        null,
+                ]);
+
+        app(
+            CrmAlarmAuditService::class
+        )->record(
+            alarm: $alarm,
+            eventType: 'created',
+            description: 'Alarm otomatik olarak oluşturuldu.',
+            meta: [
+                'priority_score' =>
+                    $priorityScore,
+
+                'type' =>
+                    $type,
+
+                'severity' =>
+                    $severity,
+            ],
+        );
+
+        return $alarm;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | BİLDİRİLDİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function markNotified(
+        CrmAlarm $alarm
+    ): void {
+        if ($alarm->notified_at) {
+            return;
+        }
+
+        $alarm->update([
+            'notified_at' =>
+                now(),
+        ]);
+
+        app(
+            CrmAlarmAuditService::class
+        )->record(
+            alarm: $alarm,
+            eventType: 'notified',
+            description: 'Panel bildirimi gönderildi.',
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ALARM ÇÖZ
+    |--------------------------------------------------------------------------
+    */
+
+    public function resolve(
+        CrmAlarm $alarm
+    ): void {
+        if ($alarm->is_resolved) {
+            return;
+        }
+
+        $alarm->update([
+            'is_resolved' =>
+                true,
+
+            'resolved_at' =>
+                now(),
+        ]);
+
+        app(
+            CrmAlarmAuditService::class
+        )->record(
+            alarm: $alarm,
+            eventType: 'resolved',
+            description: 'Alarm CRM koşulu ortadan kalktığı için otomatik çözüldü.',
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MÜŞTERİNİN AKTİF ALARMLARI
+    |--------------------------------------------------------------------------
+    */
+
+    public function activeAlarmsForConversation(
+        ConversationControl $conversation
+    ): Collection {
         return CrmAlarm::query()
             ->where(
                 'conversation_control_id',
@@ -140,22 +276,16 @@ class CrmAlarmService
             return;
         }
 
-        CrmAlarm::query()
-            ->where(
-                'conversation_control_id',
-                $conversation->id
-            )
-            ->where(
-                'is_resolved',
-                false
-            )
-            ->update([
-                'is_resolved' =>
-                    true,
+        $alarms =
+            $this->activeAlarmsForConversation(
+                $conversation
+            );
 
-                'resolved_at' =>
-                    now(),
-            ]);
+        foreach ($alarms as $alarm) {
+            $this->resolve(
+                $alarm
+            );
+        }
     }
 
     /*
@@ -244,6 +374,12 @@ class CrmAlarmService
         return $resolvedCount;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | KRİTİK LEAD ÇÖZÜLDÜ MÜ?
+    |--------------------------------------------------------------------------
+    */
+
     private function criticalLeadResolved(
         ConversationControl $conversation
     ): bool {
@@ -251,6 +387,12 @@ class CrmAlarmService
             (int) $conversation->lead_score
             < 95;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SICAK LEAD TAKİBİ ÇÖZÜLDÜ MÜ?
+    |--------------------------------------------------------------------------
+    */
 
     private function hotFollowUpResolved(
         ConversationControl $conversation
@@ -273,6 +415,12 @@ class CrmAlarmService
             >
             now()->subHours(3);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RİSKLİ LEAD ÇÖZÜLDÜ MÜ?
+    |--------------------------------------------------------------------------
+    */
 
     private function riskLeadResolved(
         ConversationControl $conversation
@@ -299,6 +447,12 @@ class CrmAlarmService
             (int) $conversation->lead_score
             < 70;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SESSİZ TEKLİF ÇÖZÜLDÜ MÜ?
+    |--------------------------------------------------------------------------
+    */
 
     private function silentProposalResolved(
         ConversationControl $conversation
