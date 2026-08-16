@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\AiBot;
 use App\Models\AiUsageRecord;
 use App\Models\ChatMessage;
 use App\Models\User;
@@ -164,10 +165,24 @@ class AiKullanimMaliyet extends Page
 
     public function getCustomerRowsProperty(): Collection
     {
+        /*
+        |--------------------------------------------------------------------------
+        | POSTGRESQL UYUMLU MALİYET SORGUSU
+        |--------------------------------------------------------------------------
+        |
+        | PostgreSQL'de:
+        |
+        | "chat_reply" = kolon adı
+        | 'chat_reply' = string değer
+        |
+        | Bu nedenle CASE ifadelerinde tek tırnak kullanıyoruz.
+        |
+        */
+
         $usageRows =
             AiUsageRecord::query()
                 ->selectRaw(
-                    '
+                    "
                     user_id,
                     ai_bot_id,
 
@@ -180,7 +195,7 @@ class AiKullanimMaliyet extends Page
 
                     SUM(
                         CASE
-                            WHEN operation = "chat_reply"
+                            WHEN operation = 'chat_reply'
                             THEN estimated_cost_usd
                             ELSE 0
                         END
@@ -188,7 +203,7 @@ class AiKullanimMaliyet extends Page
 
                     SUM(
                         CASE
-                            WHEN operation = "finance_extractor"
+                            WHEN operation = 'finance_extractor'
                             THEN estimated_cost_usd
                             ELSE 0
                         END
@@ -196,14 +211,14 @@ class AiKullanimMaliyet extends Page
 
                     SUM(
                         CASE
-                            WHEN operation = "crm_summary"
+                            WHEN operation = 'crm_summary'
                             THEN estimated_cost_usd
                             ELSE 0
                         END
                     ) as crm_cost,
 
                     SUM(estimated_cost_usd) as total_cost
-                    '
+                    "
                 )
                 ->where(
                     'created_at',
@@ -228,7 +243,7 @@ class AiKullanimMaliyet extends Page
                         );
 
                     $bot =
-                        \App\Models\AiBot::find(
+                        AiBot::find(
                             $row->ai_bot_id
                         );
 
@@ -236,9 +251,6 @@ class AiKullanimMaliyet extends Page
                     |--------------------------------------------------------------------------
                     | MÜŞTERİ MESAJ SAYISI
                     |--------------------------------------------------------------------------
-                    |
-                    | Bu ay kullanıcının gerçek WhatsApp müşteri mesajlarını sayıyoruz.
-                    |
                     */
 
                     $customerMessages =
@@ -311,7 +323,7 @@ class AiKullanimMaliyet extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | FORMAT
+    | SAYI FORMATLAMA
     |--------------------------------------------------------------------------
     */
 
@@ -345,6 +357,12 @@ class AiKullanimMaliyet extends Page
             '.'
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | USD FORMATLAMA
+    |--------------------------------------------------------------------------
+    */
 
     public function formatUsd(
         float $value
