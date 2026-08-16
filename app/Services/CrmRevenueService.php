@@ -3,22 +3,25 @@
 namespace App\Services;
 
 use App\Models\ConversationControl;
+use Illuminate\Database\Eloquent\Builder;
 
 class CrmRevenueService
 {
     /*
     |--------------------------------------------------------------------------
-    | GERÇEKLEŞEN CİRO
+    | GERÃ‡EKLEÅEN CÄ°RO
     |--------------------------------------------------------------------------
     */
 
     public function totalWonRevenue(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): float {
-        return (float) ConversationControl::query()
-            ->where(
-                'user_id',
-                $userId
+        return (float) $this->baseQuery(
+                $userId,
+                $organizationId,
+                $role
             )
             ->where(
                 'lead_status',
@@ -34,17 +37,19 @@ class CrmRevenueService
 
     /*
     |--------------------------------------------------------------------------
-    | KAZANILAN SATIŞ SAYISI
+    | KAZANILAN SATIÅ SAYISI
     |--------------------------------------------------------------------------
     */
 
     public function wonSalesCount(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): int {
-        return ConversationControl::query()
-            ->where(
-                'user_id',
-                $userId
+        return $this->baseQuery(
+                $userId,
+                $organizationId,
+                $role
             )
             ->where(
                 'lead_status',
@@ -55,17 +60,19 @@ class CrmRevenueService
 
     /*
     |--------------------------------------------------------------------------
-    | GERÇEK TUTARI GİRİLMİŞ SATIŞ SAYISI
+    | GERÃ‡EK TUTARI GÄ°RÄ°LMÄ°Å SATIÅ SAYISI
     |--------------------------------------------------------------------------
     */
 
     public function valuedWonSalesCount(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): int {
-        return ConversationControl::query()
-            ->where(
-                'user_id',
-                $userId
+        return $this->baseQuery(
+                $userId,
+                $organizationId,
+                $role
             )
             ->where(
                 'lead_status',
@@ -84,18 +91,20 @@ class CrmRevenueService
 
     /*
     |--------------------------------------------------------------------------
-    | ORTALAMA SATIŞ TUTARI
+    | ORTALAMA SATIÅ TUTARI
     |--------------------------------------------------------------------------
     */
 
     public function averageWonValue(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): float {
         return round(
-            (float) ConversationControl::query()
-                ->where(
-                    'user_id',
-                    $userId
+            (float) $this->baseQuery(
+                    $userId,
+                    $organizationId,
+                    $role
                 )
                 ->where(
                     'lead_status',
@@ -118,22 +127,24 @@ class CrmRevenueService
 
     /*
     |--------------------------------------------------------------------------
-    | TAHMİN / GERÇEKLEŞEN FARKI
+    | TAHMÄ°N / GERÃ‡EKLEÅEN FARKI
     |--------------------------------------------------------------------------
     |
-    | Sadece hem estimated_value hem actual_value bulunan kazanılmış satışları
-    | dikkate alır.
+    | Sadece hem estimated_value hem actual_value bulunan kazanÄ±lmÄ±ÅŸ satÄ±ÅŸlarÄ±
+    | dikkate alÄ±r.
     |
     */
 
     public function forecastComparison(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): array {
         $sales =
-            ConversationControl::query()
-                ->where(
-                    'user_id',
-                    $userId
+            $this->baseQuery(
+                    $userId,
+                    $organizationId,
+                    $role
                 )
                 ->where(
                     'lead_status',
@@ -214,5 +225,40 @@ class CrmRevenueService
             'accuracy' => $accuracy,
             'count' => $sales->count(),
         ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORTAK ORGANİZASYON QUERY
+    |--------------------------------------------------------------------------
+    */
+
+    private function baseQuery(
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
+    ): Builder {
+        $query = ConversationControl::query();
+
+        if ($organizationId !== null) {
+            $query->where(
+                'organization_id',
+                $organizationId
+            );
+
+            if ($role === 'sales') {
+                $query->where(
+                    'assigned_user_id',
+                    $userId
+                );
+            }
+        } else {
+            $query->where(
+                'user_id',
+                $userId
+            );
+        }
+
+        return $query;
     }
 }

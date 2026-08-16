@@ -9,11 +9,11 @@ class CrmForecastService
 {
     /*
     |--------------------------------------------------------------------------
-    | SATIŞ OLASILIĞI
+    | SATIÅ OLASILIÄI
     |--------------------------------------------------------------------------
     |
-    | Olasılık yalnızca lead_score değildir.
-    | Pipeline aşaması ile lead puanı birlikte değerlendirilir.
+    | OlasÄ±lÄ±k yalnÄ±zca lead_score deÄŸildir.
+    | Pipeline aÅŸamasÄ± ile lead puanÄ± birlikte deÄŸerlendirilir.
     |
     */
 
@@ -47,11 +47,11 @@ class CrmForecastService
 
         /*
         |--------------------------------------------------------------------------
-        | PUANIN ETKİSİ
+        | PUANIN ETKÄ°SÄ°
         |--------------------------------------------------------------------------
         |
-        | Lead score toplam olasılığın %60'ını etkiler.
-        | Pipeline aşaması kalan davranış tabanını oluşturur.
+        | Lead score toplam olasÄ±lÄ±ÄŸÄ±n %60'Ä±nÄ± etkiler.
+        | Pipeline aÅŸamasÄ± kalan davranÄ±ÅŸ tabanÄ±nÄ± oluÅŸturur.
         |
         */
 
@@ -63,7 +63,7 @@ class CrmForecastService
 
         /*
         |--------------------------------------------------------------------------
-        | SICAK / ÖNCELİKLİ LEAD ALT SINIRLARI
+        | SICAK / Ã–NCELÄ°KLÄ° LEAD ALT SINIRLARI
         |--------------------------------------------------------------------------
         */
 
@@ -102,7 +102,7 @@ class CrmForecastService
 
     /*
     |--------------------------------------------------------------------------
-    | AĞIRLIKLI SATIŞ DEĞERİ
+    | AÄIRLIKLI SATIÅ DEÄERÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -136,30 +136,38 @@ class CrmForecastService
 
     /*
     |--------------------------------------------------------------------------
-    | TOPLAM AÇIK PIPELINE DEĞERİ
+    | TOPLAM AÃ‡IK PIPELINE DEÄERÄ°
     |--------------------------------------------------------------------------
     */
 
     public function totalPipelineValue(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): float {
         return (float) $this->openQuery(
-            $userId
+            $userId,
+            $organizationId,
+            $role
         )->sum('estimated_value');
     }
 
     /*
     |--------------------------------------------------------------------------
-    | AĞIRLIKLI PIPELINE
+    | AÄIRLIKLI PIPELINE
     |--------------------------------------------------------------------------
     */
 
     public function weightedPipelineValue(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): float {
         return round(
             $this->openQuery(
-                $userId
+                $userId,
+                $organizationId,
+                $role
             )
                 ->get()
                 ->sum(
@@ -176,15 +184,19 @@ class CrmForecastService
 
     /*
     |--------------------------------------------------------------------------
-    | DEĞERİ OLAN AÇIK FIRSATLAR
+    | DEÄERÄ° OLAN AÃ‡IK FIRSATLAR
     |--------------------------------------------------------------------------
     */
 
     public function valuedOpportunitiesCount(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): int {
         return $this->openQuery(
-            $userId
+            $userId,
+            $organizationId,
+            $role
         )
             ->whereNotNull(
                 'estimated_value'
@@ -199,16 +211,20 @@ class CrmForecastService
 
     /*
     |--------------------------------------------------------------------------
-    | EN DEĞERLİ FIRSATLAR
+    | EN DEÄERLÄ° FIRSATLAR
     |--------------------------------------------------------------------------
     */
 
     public function topOpportunities(
         int $userId,
-        int $limit = 10
+        int $limit = 10,
+        ?int $organizationId = null,
+        ?string $role = null
     ) {
         return $this->openQuery(
-            $userId
+            $userId,
+            $organizationId,
+            $role
         )
             ->whereNotNull(
                 'estimated_value'
@@ -231,13 +247,23 @@ class CrmForecastService
     }
 
     private function openQuery(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): Builder {
-        return ConversationControl::query()
-            ->where(
-                'user_id',
-                $userId
-            )
+        $query = ConversationControl::query();
+
+        if ($organizationId !== null) {
+            $query->where('organization_id', $organizationId);
+
+            if ($role === 'sales') {
+                $query->where('assigned_user_id', $userId);
+            }
+        } else {
+            $query->where('user_id', $userId);
+        }
+
+        return $query
             ->whereNotIn(
                 'lead_status',
                 [

@@ -10,20 +10,22 @@ class CrmDailySalesService
 {
     /*
     |--------------------------------------------------------------------------
-    | GÜNLÜK SATIŞ MERKEZİ
+    | GÃœNLÃœK SATIÅ MERKEZÄ°
     |--------------------------------------------------------------------------
     |
-    | Bu servis günlük operasyon listelerini tek yerde toplar.
-    | Böylece aynı mantık ileride Dashboard / Görevler / Mobil panelde
-    | tekrar kullanılabilir.
+    | Bu servis gÃ¼nlÃ¼k operasyon listelerini tek yerde toplar.
+    | BÃ¶ylece aynÄ± mantÄ±k ileride Dashboard / GÃ¶revler / Mobil panelde
+    | tekrar kullanÄ±labilir.
     |
     */
 
     public function todayFollowUps(
         int $userId,
-        int $limit = 10
+        int $limit = 10,
+        ?int $organizationId = null,
+        ?string $role = null
     ): Collection {
-        return $this->baseQuery($userId)
+        return $this->baseQuery($userId, $organizationId, $role)
             ->whereNotNull('next_follow_up_at')
             ->whereBetween(
                 'next_follow_up_at',
@@ -39,9 +41,11 @@ class CrmDailySalesService
 
     public function unattendedFor24Hours(
         int $userId,
-        int $limit = 10
+        int $limit = 10,
+        ?int $organizationId = null,
+        ?string $role = null
     ): Collection {
-        return $this->baseQuery($userId)
+        return $this->baseQuery($userId, $organizationId, $role)
             ->whereNotNull('last_contact_at')
             ->where(
                 'last_contact_at',
@@ -55,9 +59,11 @@ class CrmDailySalesService
 
     public function silentFor7Days(
         int $userId,
-        int $limit = 10
+        int $limit = 10,
+        ?int $organizationId = null,
+        ?string $role = null
     ): Collection {
-        return $this->baseQuery($userId)
+        return $this->baseQuery($userId, $organizationId, $role)
             ->whereNotNull('last_contact_at')
             ->where(
                 'last_contact_at',
@@ -71,9 +77,11 @@ class CrmDailySalesService
 
     public function closestToSale(
         int $userId,
-        int $limit = 10
+        int $limit = 10,
+        ?int $organizationId = null,
+        ?string $role = null
     ): Collection {
-        return $this->baseQuery($userId)
+        return $this->baseQuery($userId, $organizationId, $role)
             ->orderByDesc('lead_score')
             ->orderByRaw(
                 "
@@ -91,31 +99,47 @@ class CrmDailySalesService
     }
 
     public function counts(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): array {
         return [
             'today_follow_ups' =>
                 $this->todayFollowUps(
                     $userId,
-                    1000
+                    10,
+                    $organizationId,
+                    $role00,
+                    $organizationId,
+                    $role
                 )->count(),
 
             'unattended_24h' =>
                 $this->unattendedFor24Hours(
                     $userId,
-                    1000
+                    10,
+                    $organizationId,
+                    $role00,
+                    $organizationId,
+                    $role
                 )->count(),
 
             'silent_7d' =>
                 $this->silentFor7Days(
                     $userId,
-                    1000
+                    10,
+                    $organizationId,
+                    $role00,
+                    $organizationId,
+                    $role
                 )->count(),
 
             'closest_to_sale' =>
                 $this->closestToSale(
                     $userId,
-                    10
+                    10,
+                    $organizationId,
+                    $role
                 )->count(),
         ];
     }
@@ -127,17 +151,27 @@ class CrmDailySalesService
     */
 
     private function baseQuery(
-        int $userId
+        int $userId,
+        ?int $organizationId = null,
+        ?string $role = null
     ): Builder {
-        return ConversationControl::query()
+        $query = ConversationControl::query()
             ->with([
                 'aiBot',
                 'assignedUser',
-            ])
-            ->where(
-                'user_id',
-                $userId
-            )
+            ]);
+
+        if ($organizationId !== null) {
+            $query->where('organization_id', $organizationId);
+
+            if ($role === 'sales') {
+                $query->where('assigned_user_id', $userId);
+            }
+        } else {
+            $query->where('user_id', $userId);
+        }
+
+        return $query
             ->whereNotIn(
                 'lead_status',
                 [
