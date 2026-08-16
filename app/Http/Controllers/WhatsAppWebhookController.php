@@ -1676,26 +1676,14 @@ class WhatsAppWebhookController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | CEVABI HAFIZAYA KAYDET
+        | AI CEVABI TEK KAYIT
         |--------------------------------------------------------------------------
+        |
+        | Yukarıdaki ChatMessage kaydı hem Gelen Kutusu hem de konuşma hafızası
+        | tarafından kullanılır. Burada MemoryService ile ikinci kez kayıt
+        | oluşturulmaz.
+        |
         */
-
-        $memoryService->mesajKaydet(
-            userId:
-                $aiBot->user_id,
-
-            aiBotId:
-                $aiBot->id,
-
-            sessionId:
-                $sessionId,
-
-            role:
-                'assistant',
-
-            message:
-                $answer,
-        );
 
         /*
         |--------------------------------------------------------------------------
