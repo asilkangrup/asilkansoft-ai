@@ -2972,6 +2972,32 @@
     }
 }
 
+
+/* ==========================================================================
+   WAI PREMIUM V3.4 — AI SUMMARY FIRST
+   ========================================================================== */
+
+.wai-ai-summary-priority {
+    border-color: rgba(31,211,113,.16);
+    background:
+        linear-gradient(145deg,#f9fffb,#ffffff);
+}
+
+.wai-ai-summary-priority .wai-title {
+    color: #078449;
+}
+
+.wai-ai-summary-priority .wai-ai-summary-box {
+    max-height: 230px;
+    overflow-y: auto;
+}
+
+@media (min-width: 1181px) {
+    .wai-crm-tab-panel[x-show] {
+        padding-bottom: 10px;
+    }
+}
+
 </style>
 
 
@@ -4486,6 +4512,24 @@
                         x-cloak
                     >
 
+                        <div class="wai-section wai-ai-summary-priority">
+                            <div class="wai-title">WAI Konuşma Özeti</div>
+                            <div class="wai-ai-summary-box">
+                                @if (filled($this->selectedConversation->ai_summary))
+                                    <strong>🤖 Yapay Zekâ Özeti</strong>
+                                    {{ $this->selectedConversation->ai_summary }}
+                                    @if (filled($this->selectedConversation->next_best_action))
+                                        <div class="wai-next-action">
+                                            <b>Önerilen sonraki adım:</b><br>
+                                            {{ $this->selectedConversation->next_best_action }}
+                                        </div>
+                                    @endif
+                                @else
+                                    Bu konuşma için henüz AI özeti oluşturulmadı.
+                                @endif
+                            </div>
+                        </div>
+
                         <div class="wai-section">
 
                             <div class="wai-title">
@@ -4564,24 +4608,6 @@
                             <strong>{{ $this->selectedConversation->estimated_value !== null ? '₺'.number_format((float) $this->selectedConversation->estimated_value, 2, ',', '.') : '-' }}</strong>
                         </div>
                         <div class="wai-sales-card"><span>Sonraki Takip</span><strong>{{ $this->selectedConversation->next_follow_up_at?->format('d.m.Y H:i') ?? '-' }}</strong></div>
-                    </div>
-                </div>
-
-                <div class="wai-section">
-                    <div class="wai-title">WAI Konuşma Özeti</div>
-                    <div class="wai-ai-summary-box">
-                        @if (filled($this->selectedConversation->ai_summary))
-                            <strong>🤖 Yapay Zekâ Özeti</strong>
-                            {{ $this->selectedConversation->ai_summary }}
-                            @if (filled($this->selectedConversation->next_best_action))
-                                <div class="wai-next-action">
-                                    <b>Önerilen sonraki adım:</b><br>
-                                    {{ $this->selectedConversation->next_best_action }}
-                                </div>
-                            @endif
-                        @else
-                            Bu konuşma için henüz AI özeti oluşturulmadı.
-                        @endif
                     </div>
                 </div>
 
