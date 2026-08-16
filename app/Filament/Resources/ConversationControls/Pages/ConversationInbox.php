@@ -6,6 +6,7 @@ use App\Filament\Resources\ConversationControls\ConversationControlResource;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Services\WhatsAppService;
+use App\Services\OrganizationAccessService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
@@ -74,6 +75,41 @@ class ConversationInbox extends Page
         return 'Gelen Kutusu';
     }
 
+    protected function accessService(): OrganizationAccessService
+    {
+        return app(
+            OrganizationAccessService::class
+        );
+    }
+
+    protected function currentOrganization()
+    {
+        return $this
+            ->accessService()
+            ->currentOrganization();
+    }
+
+    protected function currentRole(): ?string
+    {
+        return $this
+            ->accessService()
+            ->currentRole();
+    }
+
+    protected function canWriteInbox(): bool
+    {
+        return $this
+            ->accessService()
+            ->canWriteCrm();
+    }
+
+    protected function canManageAssignments(): bool
+    {
+        return $this
+            ->accessService()
+            ->canAssignCustomers();
+    }
+
     /*
     |--------------------------------------------------------------------------
     | SAYFA AÇILIŞI
@@ -128,28 +164,46 @@ class ConversationInbox extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | ANA YÖNETİCİ
+        | SİSTEM ADMIN
         |--------------------------------------------------------------------------
         */
 
-        if (
-            (int) $user->id === 1
-            || (string) $user->email === 'asilkangrup@gmail.com'
-            || (bool) ($user->is_admin ?? false)
-        ) {
+        if ((bool) ($user->is_admin ?? false)) {
             return $query;
         }
 
+        $organization =
+            $this->currentOrganization();
+
+        if (! $organization) {
+            return $query->where(
+                'user_id',
+                $user->id
+            );
+        }
+
+        $role =
+            $this->currentRole();
+
+        $query->where(
+            'organization_id',
+            $organization->id
+        );
+
         /*
         |--------------------------------------------------------------------------
-        | NORMAL KULLANICI
+        | SALES YALNIZCA KENDİ MÜŞTERİLERİNİ GÖRÜR
         |--------------------------------------------------------------------------
         */
 
-        return $query->where(
-            'user_id',
-            $user->id
-        );
+        if ($role === 'sales') {
+            $query->where(
+                'assigned_user_id',
+                $user->id
+            );
+        }
+
+        return $query;
     }
 
     /*
@@ -196,6 +250,14 @@ class ConversationInbox extends Page
 
         foreach ($conversations as $conversation) {
             $lastMessage = ChatMessage::query()
+                ->when(
+                    $conversation->organization_id !== null,
+                    fn (Builder $query) =>
+                        $query->where(
+                            'organization_id',
+                            $conversation->organization_id
+                        )
+                )
                 ->where('ai_bot_id', $conversation->ai_bot_id)
                 ->where('session_id', $conversation->session_id)
                 ->latest('id')
@@ -268,6 +330,14 @@ class ConversationInbox extends Page
             ->with([
                 'sentByUser',
             ])
+            ->when(
+                $conversation->organization_id !== null,
+                fn (Builder $query) =>
+                    $query->where(
+                        'organization_id',
+                        $conversation->organization_id
+                    )
+            )
             ->where(
                 'ai_bot_id',
                 $conversation->ai_bot_id
@@ -357,6 +427,10 @@ class ConversationInbox extends Page
 
     public function addTag(): void
     {
+        if (! $this->canWriteInbox()) {
+            abort(403);
+        }
+
         $conversation = $this->selectedConversation;
 
         if (! $conversation) {
@@ -398,6 +472,10 @@ class ConversationInbox extends Page
 
     public function removeTag(string $tag): void
     {
+        if (! $this->canWriteInbox()) {
+            abort(403);
+        }
+
         $conversation = $this->selectedConversation;
 
         if (! $conversation) {
@@ -421,6 +499,10 @@ class ConversationInbox extends Page
 
     public function addTagFromPreset(string $tag): void
     {
+        if (! $this->canWriteInbox()) {
+            abort(403);
+        }
+
         $tag = trim($tag);
 
         if ($tag === '') {
@@ -444,6 +526,10 @@ class ConversationInbox extends Page
 
     public function takeOver(): void
     {
+        if (! $this->canWriteInbox()) {
+            abort(403);
+        }
+
         $conversation =
             $this->selectedConversation;
 
@@ -472,6 +558,10 @@ class ConversationInbox extends Page
 
     public function releaseToAi(): void
     {
+        if (! $this->canWriteInbox()) {
+            abort(403);
+        }
+
         $conversation =
             $this->selectedConversation;
 
@@ -502,6 +592,10 @@ class ConversationInbox extends Page
     public function sendMessage(
         WhatsAppService $whatsAppService
     ): void {
+        if (! $this->canWriteInbox()) {
+            abort(403);
+        }
+
         $conversation = $this->selectedConversation;
 
         if (! $conversation) {
@@ -538,7 +632,6 @@ class ConversationInbox extends Page
 
             ChatMessage::create([
                 'user_id' => $conversation->user_id,
-                'organization_id' => $conversation->organization_id,
                 'ai_bot_id' => $conversation->ai_bot_id,
                 'session_id' => $conversation->session_id,
                 'role' => 'assistant',
@@ -575,6 +668,10 @@ class ConversationInbox extends Page
     public function sendMediaMessage(
         WhatsAppService $whatsAppService
     ): void {
+        if (! $this->canWriteInbox()) {
+            abort(403);
+        }
+
         $conversation = $this->selectedConversation;
 
         if (! $conversation || ! $this->mediaUpload instanceof TemporaryUploadedFile) {
@@ -647,7 +744,6 @@ class ConversationInbox extends Page
 
             ChatMessage::create([
                 'user_id' => $conversation->user_id,
-                'organization_id' => $conversation->organization_id,
                 'ai_bot_id' => $conversation->ai_bot_id,
                 'session_id' => $conversation->session_id,
                 'role' => 'assistant',
@@ -683,6 +779,10 @@ class ConversationInbox extends Page
         string $base64Audio,
         WhatsAppService $whatsAppService
     ): void {
+        if (! $this->canWriteInbox()) {
+            abort(403);
+        }
+
         $conversation = $this->selectedConversation;
 
         if (! $conversation || trim($base64Audio) === '') {
@@ -708,7 +808,6 @@ class ConversationInbox extends Page
 
             ChatMessage::create([
                 'user_id' => $conversation->user_id,
-                'organization_id' => $conversation->organization_id,
                 'ai_bot_id' => $conversation->ai_bot_id,
                 'session_id' => $conversation->session_id,
                 'role' => 'assistant',
