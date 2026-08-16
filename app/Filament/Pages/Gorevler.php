@@ -16,9 +16,9 @@ class Gorevler extends Page
 {
     protected string $view = 'filament.pages.gorevler';
 
-    protected static ?string $title = 'GÃ¶revler';
+    protected static ?string $title = 'Görevler';
 
-    protected static ?string $navigationLabel = 'GÃ¶revler';
+    protected static ?string $navigationLabel = 'Görevler';
 
     protected static string | BackedEnum | null $navigationIcon =
         Heroicon::OutlinedClipboardDocumentCheck;
@@ -114,7 +114,7 @@ class Gorevler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | CRM AKTÄ°VÄ°TE SERVÄ°SÄ°
+    | CRM AKTİVİTE SERVİSİ
     |--------------------------------------------------------------------------
     */
 
@@ -197,7 +197,7 @@ class Gorevler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | GECÄ°KENLER
+    | GECİKENLER
     |--------------------------------------------------------------------------
     */
 
@@ -217,7 +217,7 @@ class Gorevler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | BUGÃœN
+    | BUGÜN
     |--------------------------------------------------------------------------
     */
 
@@ -311,7 +311,7 @@ class Gorevler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | TAKÄ°BÄ° TAMAMLA
+    | TAKİBİ TAMAMLA
     |--------------------------------------------------------------------------
     */
 
@@ -475,7 +475,7 @@ class Gorevler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | FÄ°LTRELER
+    | FİLTRELER
     |--------------------------------------------------------------------------
     */
 
@@ -501,13 +501,13 @@ class Gorevler extends Page
     ): string {
         return match ($temperature) {
             'hot' =>
-                'SÄ±cak',
+                'Sıcak',
 
             'warm' =>
-                'IlÄ±k',
+                'Ilık',
 
             default =>
-                'SoÄŸuk',
+                'Soğuk',
         };
     }
 

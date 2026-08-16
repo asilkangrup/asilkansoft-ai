@@ -16,9 +16,9 @@ class SatisPipeline extends Page
 {
     protected string $view = 'filament.pages.satis-pipeline';
 
-    protected static ?string $title = 'SatÄ±ÅŸ Pipeline';
+    protected static ?string $title = 'Satış Pipeline';
 
-    protected static ?string $navigationLabel = 'SatÄ±ÅŸ Pipeline';
+    protected static ?string $navigationLabel = 'Satış Pipeline';
 
     protected static string | BackedEnum | null $navigationIcon =
         Heroicon::OutlinedRectangleStack;
@@ -114,7 +114,7 @@ class SatisPipeline extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | CRM AKTÄ°VÄ°TE SERVÄ°SÄ°
+    | CRM AKTİVİTE SERVİSİ
     |--------------------------------------------------------------------------
     */
 
@@ -362,11 +362,11 @@ class SatisPipeline extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | CRM AKTÄ°VÄ°TE KAYDI
+        | CRM AKTİVİTE KAYDI
         |--------------------------------------------------------------------------
         |
-        | Kart sÃ¼rÃ¼kle-bÄ±rak veya hÄ±zlÄ± aksiyon ile baÅŸka kolona taÅŸÄ±ndÄ±ÄŸÄ±nda
-        | mÃ¼ÅŸteri geÃ§miÅŸine satÄ±ÅŸ aÅŸamasÄ± deÄŸiÅŸikliÄŸi yazÄ±lÄ±r.
+        | Kart sürükle-bırak veya hızlı aksiyon ile başka kolona taşındığında
+        | müşteri geçmişine satış aşaması değişikliği yazılır.
         |
         */
 
@@ -527,25 +527,25 @@ class SatisPipeline extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | GERÃ‡EK ZAMANLI KPI MÄ°NÄ° GRAFÄ°KLERÄ°
+    | GERÇEK ZAMANLI KPI MİNİ GRAFİKLERİ
     |--------------------------------------------------------------------------
     |
-    | Grafikler dekoratif deÄŸildir.
+    | Grafikler dekoratif değildir.
     |
-    | AÃ§Ä±k FÄ±rsat:
-    |   Son 7 gÃ¼nde oluÅŸturulmuÅŸ ve ÅŸu anda aÃ§Ä±k olan fÄ±rsatlar.
+    | Açık Fırsat:
+    |   Son 7 günde oluşturulmuş ve şu anda açık olan fırsatlar.
     |
-    | SÄ±cak Lead:
-    |   Son 7 gÃ¼nde oluÅŸturulmuÅŸ ve ÅŸu anda sÄ±cak olan aÃ§Ä±k lead'ler.
+    | Sıcak Lead:
+    |   Son 7 günde oluşturulmuş ve şu anda sıcak olan açık lead'ler.
     |
     | Teklif:
-    |   Son 7 gÃ¼nde oluÅŸturulmuÅŸ ve ÅŸu anda teklif aÅŸamasÄ±nda olan lead'ler.
+    |   Son 7 günde oluşturulmuş ve şu anda teklif aşamasında olan lead'ler.
     |
-    | KazanÄ±lan:
-    |   Son 7 gÃ¼nde gerÃ§ekten kazanÄ±lmÄ±ÅŸ satÄ±ÅŸlar (won_at).
+    | Kazanılan:
+    |   Son 7 günde gerçekten kazanılmış satışlar (won_at).
     |
-    | Sayfa wire:poll ile 60 saniyede bir tekrar render edildiÄŸi iÃ§in grafik
-    | verileri de veritabanÄ±ndan yeniden okunur.
+    | Sayfa wire:poll ile 60 saniyede bir tekrar render edildiği için grafik
+    | verileri de veritabanından yeniden okunur.
     |
     */
 
@@ -594,7 +594,7 @@ class SatisPipeline extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | SON 7 GÃœNDE KAZANILANLAR
+        | SON 7 GÜNDE KAZANILANLAR
         |--------------------------------------------------------------------------
         */
 
@@ -1016,7 +1016,7 @@ class SatisPipeline extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | FÄ°LTRELER
+    | FİLTRELER
     |--------------------------------------------------------------------------
     */
 
@@ -1042,13 +1042,13 @@ class SatisPipeline extends Page
     ): string {
         return match ($temperature) {
             'hot' =>
-                'SÄ±cak',
+                'Sıcak',
 
             'warm' =>
-                'IlÄ±k',
+                'Ilık',
 
             default =>
-                'SoÄŸuk',
+                'Soğuk',
         };
     }
 

@@ -51,6 +51,7 @@ class ConversationInbox extends Page
 
     public string $filter = 'all';
     public string $filterTag = '';
+    public string $salesFilter = 'all';
 
     public $mediaUpload = null;
     public string $mediaCaption = '';
@@ -154,6 +155,7 @@ class ConversationInbox extends Page
             ConversationControl::query()
                 ->with([
                     'aiBot',
+                    'assignedUser',
                 ]);
 
         if (! $user) {
@@ -243,6 +245,18 @@ class ConversationInbox extends Page
             $query->whereJsonContains('tags', $this->filterTag);
         }
 
+        match ($this->salesFilter) {
+            'hot' => $query->where('lead_temperature', 'hot'),
+            'warm' => $query->where('lead_temperature', 'warm'),
+            'cold' => $query->where('lead_temperature', 'cold'),
+            'new' => $query->where('lead_status', 'new'),
+            'contacted' => $query->where('lead_status', 'contacted'),
+            'qualified' => $query->where('lead_status', 'qualified'),
+            'proposal' => $query->where('lead_status', 'proposal'),
+            'won' => $query->where('lead_status', 'won'),
+            default => null,
+        };
+
         $conversations = $query
             ->latest('updated_at')
             ->limit(100)
@@ -284,8 +298,30 @@ class ConversationInbox extends Page
 
         return $conversations
             ->sortByDesc(
-                fn (ConversationControl $conversation) =>
-                    $conversation->last_message_at ?? $conversation->updated_at
+                function (ConversationControl $conversation): int {
+                    $temperature = match ($conversation->lead_temperature) {
+                        'hot' => 300,
+                        'warm' => 200,
+                        default => 100,
+                    };
+
+                    $stage = match ($conversation->lead_status) {
+                        'proposal' => 60,
+                        'qualified' => 50,
+                        'contacted' => 40,
+                        'new' => 30,
+                        'won' => 10,
+                        'lost' => 0,
+                        default => 20,
+                    };
+
+                    $score = min(100, max(0, (int) $conversation->lead_score));
+                    $lastAt = $conversation->last_message_at ?? $conversation->updated_at;
+
+                    return
+                        (($temperature + $stage + $score) * 10000000000)
+                        + (int) ($lastAt?->timestamp ?? 0);
+                }
             )
             ->values();
     }
@@ -417,12 +453,30 @@ class ConversationInbox extends Page
             : 'all';
 
         $this->filterTag = '';
+        $this->salesFilter = 'all';
     }
 
     public function setTagFilter(string $tag): void
     {
         $this->filterTag = trim($tag);
         $this->filter = 'all';
+        $this->salesFilter = 'all';
+    }
+
+    public function setSalesFilter(string $filter): void
+    {
+        $allowed = [
+            'all', 'hot', 'warm', 'cold',
+            'new', 'contacted', 'qualified', 'proposal', 'won',
+        ];
+
+        $this->salesFilter =
+            in_array($filter, $allowed, true)
+                ? $filter
+                : 'all';
+
+        $this->filter = 'all';
+        $this->filterTag = '';
     }
 
     public function addTag(): void

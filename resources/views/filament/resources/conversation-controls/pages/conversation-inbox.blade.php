@@ -607,6 +607,19 @@
     height: 12px;
 }
 
+
+.wai-sales-row{margin-top:7px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.wai-sales-pill{min-height:23px;padding:0 7px;display:inline-flex;align-items:center;border-radius:999px;font-size:9px;font-weight:900;white-space:nowrap}
+.wai-sales-pill.hot{color:#a72d22;background:#fff0ed}.wai-sales-pill.warm{color:#946000;background:#fff7dc}.wai-sales-pill.cold{color:#4d6d86;background:#edf6fc}
+.wai-sales-pill.stage{color:#3d4a42;background:#f0f4f1}.wai-sales-pill.score{color:var(--green-deep);background:var(--green-soft)}
+.wai-ai-mini-summary{margin-top:6px;display:-webkit-box;overflow:hidden;color:#66736b;font-size:10px;line-height:1.35;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.wai-ai-mini-summary strong{color:var(--green-deep);font-weight:900}
+.wai-sales-dashboard{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.wai-sales-card{padding:10px;border:1px solid var(--line);border-radius:11px;background:#fafcfb}
+.wai-sales-card span{display:block;color:#89948d;font-size:9px;font-weight:800}.wai-sales-card strong{display:block;margin-top:4px;color:#2d3931;font-size:11px;font-weight:900;word-break:break-word}
+.wai-ai-summary-box{padding:12px;border:1px solid #cfe9d9;border-radius:12px;color:#3d4a42;background:linear-gradient(145deg,#f5fdf8,#fbfefc);font-size:11px;line-height:1.6}
+.wai-ai-summary-box strong{display:block;margin-bottom:6px;color:var(--green-deep);font-size:10px;font-weight:900}.wai-next-action{margin-top:8px;padding-top:8px;border-top:1px solid #dceee3;color:#536158}.wai-next-action b{color:#2f3b33}
+
 .wai-unread {
     min-width: 21px;
     height: 21px;
@@ -2493,6 +2506,25 @@
                     </button>
 
 
+                    @foreach ([
+                        'hot' => '🔥 Sıcak',
+                        'warm' => '🌤️ Ilık',
+                        'cold' => '❄️ Soğuk',
+                        'new' => 'Yeni Lead',
+                        'contacted' => 'Görüşülüyor',
+                        'qualified' => 'Nitelikli',
+                        'proposal' => 'Teklif',
+                    ] as $salesKey => $salesLabel)
+                        <button
+                            type="button"
+                            class="wai-filter {{ $salesFilter === $salesKey ? 'active' : '' }}"
+                            wire:click="setSalesFilter('{{ $salesKey }}')"
+                        >
+                            {{ $salesLabel }}
+                        </button>
+                    @endforeach
+
+
                     @foreach (
                         [
                             'Yeni Müşteri',
@@ -2544,6 +2576,21 @@
 
                         $lastAt =
                             $conversation->last_message_at;
+
+                        $temperature = $conversation->lead_temperature ?: 'cold';
+                        $temperatureLabel = match ($temperature) {
+                            'hot' => '🔥 Sıcak',
+                            'warm' => '🌤️ Ilık',
+                            default => '❄️ Soğuk',
+                        };
+                        $stageLabel = match ($conversation->lead_status) {
+                            'contacted' => 'Görüşülüyor',
+                            'qualified' => 'Nitelikli',
+                            'proposal' => 'Teklif',
+                            'won' => 'Kazanıldı',
+                            'lost' => 'Kaybedildi',
+                            default => 'Yeni Lead',
+                        };
                     @endphp
 
 
@@ -2589,6 +2636,18 @@
                                 <div class="wai-preview">
                                     {{ $conversation->last_message_preview }}
                                 </div>
+
+                                <div class="wai-sales-row">
+                                    <span class="wai-sales-pill {{ $temperature }}">{{ $temperatureLabel }}</span>
+                                    <span class="wai-sales-pill stage">{{ $stageLabel }}</span>
+                                    <span class="wai-sales-pill score">{{ (int) $conversation->lead_score }}/100</span>
+                                </div>
+
+                                @if (filled($conversation->ai_summary))
+                                    <div class="wai-ai-mini-summary">
+                                        <strong>WAI:</strong> {{ $conversation->ai_summary }}
+                                    </div>
+                                @endif
 
 
                                 <div class="wai-chat-meta">
@@ -3586,6 +3645,21 @@
                             1
                         )
                     );
+
+                $crmTemperature = $this->selectedConversation->lead_temperature ?: 'cold';
+                $crmTemperatureLabel = match ($crmTemperature) {
+                    'hot' => '🔥 Sıcak',
+                    'warm' => '🌤️ Ilık',
+                    default => '❄️ Soğuk',
+                };
+                $crmStageLabel = match ($this->selectedConversation->lead_status) {
+                    'contacted' => 'Görüşülüyor',
+                    'qualified' => 'Nitelikli',
+                    'proposal' => 'Teklif',
+                    'won' => 'Kazanıldı',
+                    'lost' => 'Kaybedildi',
+                    default => 'Yeni Lead',
+                };
             @endphp
 
 
@@ -3694,6 +3768,40 @@
 
                 </div>
 
+
+
+                <div class="wai-section">
+                    <div class="wai-title">Satış Durumu</div>
+                    <div class="wai-sales-dashboard">
+                        <div class="wai-sales-card"><span>Sıcaklık</span><strong>{{ $crmTemperatureLabel }}</strong></div>
+                        <div class="wai-sales-card"><span>Aşama</span><strong>{{ $crmStageLabel }}</strong></div>
+                        <div class="wai-sales-card"><span>Lead Puanı</span><strong>{{ (int) $this->selectedConversation->lead_score }}/100</strong></div>
+                        <div class="wai-sales-card"><span>Sorumlu</span><strong>{{ $this->selectedConversation->assignedUser?->name ?? 'Atanmadı' }}</strong></div>
+                        <div class="wai-sales-card">
+                            <span>Tahmini Değer</span>
+                            <strong>{{ $this->selectedConversation->estimated_value !== null ? '₺'.number_format((float) $this->selectedConversation->estimated_value, 2, ',', '.') : '-' }}</strong>
+                        </div>
+                        <div class="wai-sales-card"><span>Sonraki Takip</span><strong>{{ $this->selectedConversation->next_follow_up_at?->format('d.m.Y H:i') ?? '-' }}</strong></div>
+                    </div>
+                </div>
+
+                <div class="wai-section">
+                    <div class="wai-title">WAI Konuşma Özeti</div>
+                    <div class="wai-ai-summary-box">
+                        @if (filled($this->selectedConversation->ai_summary))
+                            <strong>🤖 Yapay Zekâ Özeti</strong>
+                            {{ $this->selectedConversation->ai_summary }}
+                            @if (filled($this->selectedConversation->next_best_action))
+                                <div class="wai-next-action">
+                                    <b>Önerilen sonraki adım:</b><br>
+                                    {{ $this->selectedConversation->next_best_action }}
+                                </div>
+                            @endif
+                        @else
+                            Bu konuşma için henüz AI özeti oluşturulmadı.
+                        @endif
+                    </div>
+                </div>
 
                 {{-- TAGS --}}
 
@@ -3942,6 +4050,40 @@
 
                     </div>
 
+
+
+                    <div class="wai-section">
+                        <div class="wai-title">Satış Durumu</div>
+                        <div class="wai-sales-dashboard">
+                            <div class="wai-sales-card"><span>Sıcaklık</span><strong>{{ $crmTemperatureLabel }}</strong></div>
+                            <div class="wai-sales-card"><span>Aşama</span><strong>{{ $crmStageLabel }}</strong></div>
+                            <div class="wai-sales-card"><span>Lead Puanı</span><strong>{{ (int) $this->selectedConversation->lead_score }}/100</strong></div>
+                            <div class="wai-sales-card"><span>Sorumlu</span><strong>{{ $this->selectedConversation->assignedUser?->name ?? 'Atanmadı' }}</strong></div>
+                            <div class="wai-sales-card">
+                                <span>Tahmini Değer</span>
+                                <strong>{{ $this->selectedConversation->estimated_value !== null ? '₺'.number_format((float) $this->selectedConversation->estimated_value, 2, ',', '.') : '-' }}</strong>
+                            </div>
+                            <div class="wai-sales-card"><span>Sonraki Takip</span><strong>{{ $this->selectedConversation->next_follow_up_at?->format('d.m.Y H:i') ?? '-' }}</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="wai-section">
+                        <div class="wai-title">WAI Konuşma Özeti</div>
+                        <div class="wai-ai-summary-box">
+                            @if (filled($this->selectedConversation->ai_summary))
+                                <strong>🤖 Yapay Zekâ Özeti</strong>
+                                {{ $this->selectedConversation->ai_summary }}
+                                @if (filled($this->selectedConversation->next_best_action))
+                                    <div class="wai-next-action">
+                                        <b>Önerilen sonraki adım:</b><br>
+                                        {{ $this->selectedConversation->next_best_action }}
+                                    </div>
+                                @endif
+                            @else
+                                Bu konuşma için henüz AI özeti oluşturulmadı.
+                            @endif
+                        </div>
+                    </div>
 
                     <div class="wai-section">
 

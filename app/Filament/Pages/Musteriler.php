@@ -20,9 +20,9 @@ class Musteriler extends Page
 {
     protected string $view = 'filament.pages.musteriler';
 
-    protected static ?string $title = 'MÃ¼ÅŸteriler';
+    protected static ?string $title = 'Müşteriler';
 
-    protected static ?string $navigationLabel = 'MÃ¼ÅŸteriler';
+    protected static ?string $navigationLabel = 'Müşteriler';
 
     protected static string | BackedEnum | null $navigationIcon =
         Heroicon::OutlinedUsers;
@@ -31,7 +31,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | CRM AKTÄ°VÄ°TE SERVÄ°SÄ°
+    | CRM AKTİVİTE SERVİSİ
     |--------------------------------------------------------------------------
     */
 
@@ -65,7 +65,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | WAI CRM Ã–ZETÄ°NÄ° MANUEL YENÄ°LE
+    | WAI CRM ÖZETİNİ MANUEL YENİLE
     |--------------------------------------------------------------------------
     */
 
@@ -104,7 +104,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | FÄ°LTRELER
+    | FİLTRELER
     |--------------------------------------------------------------------------
     */
 
@@ -128,7 +128,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | AKTÄ°VÄ°TE FÄ°LTRESÄ°
+    | AKTİVİTE FİLTRESİ
     |--------------------------------------------------------------------------
     */
 
@@ -411,7 +411,7 @@ class Musteriler extends Page
                             $query
                                 ->whereJsonContains(
                                     'tags',
-                                    'Fiyat Ä°tirazÄ±'
+                                    'Fiyat İtirazı'
                                 )
                                 ->whereNotIn(
                                     'lead_status',
@@ -498,7 +498,7 @@ class Musteriler extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | TIMELINE FÄ°LTRELERÄ°
+        | TIMELINE FİLTRELERİ
         |--------------------------------------------------------------------------
         */
 
@@ -563,7 +563,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | AKTÄ°VÄ°TE FÄ°LTRESÄ° AYARLA
+    | AKTİVİTE FİLTRESİ AYARLA
     |--------------------------------------------------------------------------
     */
 
@@ -727,7 +727,7 @@ class Musteriler extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | YENÄ° PUAN / SICAKLIK
+        | YENİ PUAN / SICAKLIK
         |--------------------------------------------------------------------------
         */
 
@@ -752,7 +752,7 @@ class Musteriler extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | KAYIT VERÄ°SÄ°
+        | KAYIT VERİSİ
         |--------------------------------------------------------------------------
         */
 
@@ -867,8 +867,8 @@ class Musteriler extends Page
         | TAHMÄ°NÄ° SATIÅ DEÄERÄ°
         |--------------------------------------------------------------------------
         |
-        | ConversationControl model fillable listesine baÄŸÄ±mlÄ± kalmadan
-        | gÃ¼venli biÃ§imde kaydedilir.
+        | ConversationControl model fillable listesine bağımlı kalmadan
+        | güvenli biçimde kaydedilir.
         |
         */
 
@@ -913,7 +913,7 @@ class Musteriler extends Page
         | CRM AKTÄ°VÄ°TE GEÃ‡MÄ°ÅÄ°
         |--------------------------------------------------------------------------
         |
-        | Sadece gerÃ§ekten deÄŸiÅŸen deÄŸerler activity tablosuna yazÄ±lÄ±r.
+        | Sadece gerçekten değişen değerler activity tablosuna yazılır.
         |
         */
 
@@ -987,7 +987,7 @@ class Musteriler extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | FORMU YENÄ°LE
+        | FORMU YENİLE
         |--------------------------------------------------------------------------
         */
 
@@ -1057,7 +1057,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | KENDÄ°ME ATA
+    | KENDİME ATA
     |--------------------------------------------------------------------------
     */
 
@@ -1101,7 +1101,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | FÄ°LTRELERÄ° TEMÄ°ZLE
+    | FİLTRELERİ TEMİZLE
     |--------------------------------------------------------------------------
     */
 
@@ -1299,7 +1299,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | GERÃ‡EK CÄ°RO
+    | GERÇEK CİRO
     |--------------------------------------------------------------------------
     */
 
@@ -1445,7 +1445,7 @@ class Musteriler extends Page
     ): string {
         return match ($status) {
             'contacted' =>
-                'GÃ¶rÃ¼ÅŸÃ¼lÃ¼yor',
+                'Görüşülüyor',
 
             'qualified' =>
                 'Nitelikli',
@@ -1454,7 +1454,7 @@ class Musteriler extends Page
                 'Teklif',
 
             'won' =>
-                'KazanÄ±ldÄ±',
+                'Kazanıldı',
 
             'lost' =>
                 'Kaybedildi',
@@ -1469,13 +1469,13 @@ class Musteriler extends Page
     ): string {
         return match ($temperature) {
             'hot' =>
-                'SÄ±cak',
+                'Sıcak',
 
             'warm' =>
-                'IlÄ±k',
+                'Ilık',
 
             default =>
-                'SoÄŸuk',
+                'Soğuk',
         };
     }
 
