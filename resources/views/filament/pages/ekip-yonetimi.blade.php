@@ -108,7 +108,7 @@
         .team-form-grid {
             display: grid;
             grid-template-columns:
-                repeat(3, minmax(0, 1fr));
+                repeat(2, minmax(0, 1fr));
             gap: 14px;
         }
 
@@ -471,6 +471,48 @@
                                     {{ $message }}
                                 </div>
                             @enderror
+
+                        </div>
+
+                        <div class="team-field">
+
+                            <label>
+                                Şifre
+                            </label>
+
+                            <input
+                                type="password"
+                                wire:model="password"
+                                autocomplete="new-password"
+                                placeholder="En az 8 karakter"
+                            >
+
+                            @error('password')
+                                <div
+                                    style="
+                                        color:#dc2626;
+                                        font-size:12px;
+                                        margin-top:5px;
+                                    "
+                                >
+                                    {{ $message }}
+                                </div>
+                            @enderror
+
+                        </div>
+
+                        <div class="team-field">
+
+                            <label>
+                                Şifre Tekrar
+                            </label>
+
+                            <input
+                                type="password"
+                                wire:model="passwordConfirmation"
+                                autocomplete="new-password"
+                                placeholder="Şifreyi tekrar girin"
+                            >
 
                         </div>
 

@@ -38,6 +38,10 @@ class EkipYonetimi extends Page
 
     public string $email = '';
 
+    public string $password = '';
+
+    public string $passwordConfirmation = '';
+
     public string $role = 'sales';
 
     public bool $showCreateForm = false;
@@ -170,6 +174,8 @@ class EkipYonetimi extends Page
         $this->reset([
             'name',
             'email',
+            'password',
+            'passwordConfirmation',
         ]);
 
         $this->role =
@@ -355,6 +361,12 @@ class EkipYonetimi extends Page
                     'email' =>
                         $this->email,
 
+                    'password' =>
+                        $this->password,
+
+                    'password_confirmation' =>
+                        $this->passwordConfirmation,
+
                     'role' =>
                         $this->role,
                 ],
@@ -371,6 +383,14 @@ class EkipYonetimi extends Page
                             'required',
                             'email',
                             'max:190',
+                        ],
+
+                    'password' =>
+                        [
+                            'required',
+                            'string',
+                            'min:8',
+                            'confirmed',
                         ],
 
                     'role' =>
@@ -446,11 +466,6 @@ class EkipYonetimi extends Page
         */
 
         if (! $user) {
-            $temporaryPassword =
-                Str::password(
-                    length: 12
-                );
-
             $user =
                 User::create([
                     'name' =>
@@ -463,22 +478,12 @@ class EkipYonetimi extends Page
 
                     'password' =>
                         Hash::make(
-                            $temporaryPassword
+                            $data['password']
                         ),
 
                     'is_admin' =>
                         false,
                 ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | GEÇİCİ ŞİFRE
-            |--------------------------------------------------------------------------
-            |
-            | Şimdilik mail davet sistemi kurmadığımız için geçici şifreyi
-            | notification içinde gösteriyoruz.
-            |
-            */
 
             Notification::make()
                 ->success()
@@ -486,10 +491,8 @@ class EkipYonetimi extends Page
                     'Çalışan hesabı oluşturuldu'
                 )
                 ->body(
-                    'Geçici şifre: '
-                    .$temporaryPassword
+                    'Çalışanın giriş şifresi başarıyla oluşturuldu.'
                 )
-                ->persistent()
                 ->send();
         }
 
@@ -512,6 +515,8 @@ class EkipYonetimi extends Page
         $this->reset([
             'name',
             'email',
+            'password',
+            'passwordConfirmation',
         ]);
 
         $this->role =

@@ -306,13 +306,13 @@ class ConversationInbox extends Page
                     };
 
                     $stage = match ($conversation->lead_status) {
-                        'proposal' => 60,
-                        'qualified' => 50,
-                        'contacted' => 40,
-                        'new' => 30,
-                        'won' => 10,
-                        'lost' => 0,
-                        default => 20,
+                        'proposal' => 80,
+                        'qualified' => 70,
+                        'contacted' => 60,
+                        'new' => 50,
+                        'won' => -150,
+                        'lost' => -200,
+                        default => 40,
                     };
 
                     $score = min(100, max(0, (int) $conversation->lead_score));

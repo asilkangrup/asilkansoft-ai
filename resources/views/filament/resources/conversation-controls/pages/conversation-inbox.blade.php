@@ -2236,6 +2236,600 @@
             repeat(5,1fr);
     }
 }
+
+/* ==========================================================================
+   WAI PREMIUM V2 — SALES COMMAND CENTER
+   Görsel katman. Mevcut Livewire / CRM / WhatsApp mantığına dokunmaz.
+   ========================================================================== */
+
+.wai-inbox {
+    --premium-ink: #07130d;
+    --premium-green: #19d978;
+    --premium-green-2: #65f1a9;
+    --premium-deep: #063b23;
+    --premium-line: rgba(15, 59, 35, .10);
+    --premium-shadow: 0 24px 80px rgba(6, 33, 19, .10);
+}
+
+.wai-inbox-hero {
+    min-height: 132px;
+    padding: 27px 30px;
+    border: 1px solid rgba(49, 220, 126, .18);
+    background:
+        radial-gradient(circle at 82% 28%, rgba(91, 241, 163, .18), transparent 24%),
+        radial-gradient(circle at 96% 95%, rgba(29, 217, 120, .14), transparent 30%),
+        linear-gradient(135deg, #07130d 0%, #0b2116 58%, #0d2d1c 100%);
+    box-shadow:
+        0 26px 70px rgba(4, 27, 15, .18),
+        inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+.wai-inbox-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: .26;
+    background-image:
+        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: linear-gradient(90deg, transparent, #000 45%, #000);
+}
+
+.wai-inbox-hero::after {
+    border-color: rgba(101,241,169,.17);
+    box-shadow:
+        0 0 0 42px rgba(101,241,169,.035),
+        0 0 0 84px rgba(101,241,169,.018);
+}
+
+.wai-inbox-eyebrow {
+    color: #8af4b9;
+}
+
+.wai-inbox-eyebrow i {
+    background: #59ee9d;
+    box-shadow:
+        0 0 0 4px rgba(89,238,157,.12),
+        0 0 20px rgba(89,238,157,.38);
+}
+
+.wai-inbox-hero h1 {
+    color: #ffffff;
+    font-size: 31px;
+    letter-spacing: -1.2px;
+}
+
+.wai-inbox-hero p {
+    max-width: 650px;
+    color: rgba(235, 250, 241, .68);
+}
+
+.wai-inbox-status {
+    min-height: 46px;
+    padding: 0 16px;
+    border: 1px solid rgba(101,241,169,.20);
+    color: #b6f8d1;
+    background: rgba(255,255,255,.055);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.06),
+        0 12px 35px rgba(0,0,0,.10);
+    backdrop-filter: blur(16px);
+}
+
+.wai-inbox-status i {
+    background: #60f1a3;
+    box-shadow: 0 0 14px rgba(96,241,163,.55);
+}
+
+.wai-shell {
+    grid-template-columns: 365px minmax(0,1fr) 330px;
+    height: calc(100vh - 255px);
+    min-height: 710px;
+    max-height: 940px;
+    border: 1px solid rgba(14, 47, 29, .10);
+    border-radius: 28px;
+    background: #fff;
+    box-shadow:
+        0 30px 90px rgba(7, 31, 19, .09),
+        0 3px 12px rgba(7, 31, 19, .04);
+}
+
+.wai-side {
+    padding: 10px;
+    border-right: 1px solid rgba(17, 59, 36, .08);
+    background:
+        linear-gradient(180deg, #f8fbf9 0%, #f5f9f6 100%);
+}
+
+.wai-side-head {
+    padding: 12px 10px 15px;
+    border-bottom: 0;
+}
+
+.wai-side-title {
+    font-size: 19px;
+    letter-spacing: -.65px;
+}
+
+.wai-side-count {
+    border: 1px solid rgba(31, 211, 113, .14);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+.wai-search input {
+    height: 49px;
+    border: 1px solid rgba(16, 64, 38, .11);
+    border-radius: 15px;
+    background: #fff;
+    box-shadow: 0 7px 22px rgba(10, 46, 28, .035);
+}
+
+.wai-search input:focus {
+    border-color: rgba(31, 211, 113, .45);
+    box-shadow:
+        0 0 0 4px rgba(31,211,113,.08),
+        0 10px 26px rgba(10,46,28,.05);
+}
+
+.wai-filters-wrap {
+    padding: 4px 3px 10px;
+    border-bottom: 0;
+    background: transparent;
+}
+
+.wai-filters {
+    gap: 6px;
+    padding-bottom: 2px;
+}
+
+.wai-filter {
+    min-height: 33px;
+    border: 1px solid rgba(17, 61, 37, .09);
+    color: #66736b;
+    background: rgba(255,255,255,.88);
+    box-shadow: 0 4px 14px rgba(9, 43, 26, .025);
+}
+
+.wai-filter:hover {
+    transform: translateY(-1px);
+    border-color: rgba(31,211,113,.25);
+    color: #0a7643;
+}
+
+.wai-filter.active {
+    border-color: rgba(31,211,113,.25);
+    color: #075f37;
+    background:
+        linear-gradient(135deg, #eafbf1, #f5fff9);
+    box-shadow:
+        0 7px 18px rgba(31,211,113,.08),
+        inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+.wai-list {
+    padding: 0 2px 8px;
+}
+
+.wai-chat {
+    margin: 0 0 7px;
+    padding: 13px;
+    border: 1px solid rgba(15, 56, 34, .07);
+    border-radius: 17px;
+    background: rgba(255,255,255,.92);
+    box-shadow:
+        0 6px 20px rgba(8, 39, 23, .025);
+}
+
+.wai-chat:hover {
+    border-color: rgba(31,211,113,.16);
+    background: #ffffff;
+    transform: translateY(-1px);
+    box-shadow:
+        0 10px 28px rgba(8,39,23,.05);
+}
+
+.wai-chat.active {
+    border-color: rgba(31,211,113,.26);
+    background:
+        radial-gradient(circle at 100% 0%, rgba(55,228,135,.10), transparent 35%),
+        linear-gradient(135deg, #effcf5, #ffffff 72%);
+    box-shadow:
+        0 13px 34px rgba(17, 177, 88, .09),
+        inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+.wai-chat.active::before {
+    left: -1px;
+    top: 18px;
+    bottom: 18px;
+    width: 4px;
+    border-radius: 0 6px 6px 0;
+    background:
+        linear-gradient(180deg, #67f0aa, #18cf73);
+    box-shadow: 0 0 15px rgba(31,211,113,.25);
+}
+
+.wai-avatar {
+    width: 49px;
+    height: 49px;
+    flex: 0 0 49px;
+    border: 1px solid rgba(30, 207, 108, .18);
+    border-radius: 16px;
+    background:
+        linear-gradient(145deg, #ecfbf2, #dff7e9);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.8),
+        0 6px 18px rgba(31,211,113,.06);
+}
+
+.wai-name {
+    font-size: 13.5px;
+    letter-spacing: -.15px;
+}
+
+.wai-preview {
+    margin-top: 4px;
+    color: #7b8780;
+}
+
+.wai-sales-row {
+    gap: 5px;
+}
+
+.wai-sales-pill {
+    min-height: 24px;
+    border: 1px solid transparent;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.65);
+}
+
+.wai-sales-pill.hot {
+    border-color: rgba(221,78,63,.10);
+    background: linear-gradient(135deg,#fff0ed,#fff8f5);
+}
+
+.wai-sales-pill.warm {
+    border-color: rgba(214,154,28,.12);
+    background: linear-gradient(135deg,#fff7dc,#fffbea);
+}
+
+.wai-sales-pill.cold {
+    border-color: rgba(72,126,166,.10);
+    background: linear-gradient(135deg,#edf6fc,#f6fbfe);
+}
+
+.wai-ai-mini-summary {
+    margin-top: 8px;
+    padding: 7px 9px;
+    border-left: 2px solid rgba(31,211,113,.25);
+    border-radius: 0 9px 9px 0;
+    color: #637068;
+    background: rgba(241,248,244,.72);
+}
+
+.wai-main {
+    background:
+        radial-gradient(circle at 15% 0%, rgba(31,211,113,.055), transparent 27%),
+        radial-gradient(circle at 88% 88%, rgba(31,211,113,.035), transparent 25%),
+        #f4f7f5;
+}
+
+.wai-main::before {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+}
+
+.wai-header {
+    min-height: 82px;
+    padding: 13px 18px;
+    border-bottom: 1px solid rgba(17, 59, 36, .08);
+    background: rgba(255,255,255,.92);
+    box-shadow: 0 7px 24px rgba(8, 39, 23, .025);
+}
+
+.wai-header-avatar {
+    border: 1px solid rgba(31,211,113,.14);
+    background: linear-gradient(145deg,#eefcf4,#e1f8ea);
+}
+
+.wai-header-name {
+    font-size: 14.5px;
+}
+
+.wai-control-badge {
+    border: 1px solid rgba(17,59,36,.06);
+}
+
+.wai-btn {
+    min-height: 40px;
+    border: 1px solid rgba(0,0,0,.035);
+    box-shadow: 0 7px 18px rgba(0,0,0,.05);
+}
+
+.wai-deal-strip {
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    overflow-x: auto;
+    border-bottom: 1px solid rgba(17,59,36,.07);
+    background: rgba(255,255,255,.76);
+    backdrop-filter: blur(12px);
+    scrollbar-width: none;
+}
+
+.wai-deal-strip::-webkit-scrollbar {
+    display: none;
+}
+
+.wai-deal-chip {
+    min-height: 28px;
+    padding: 0 9px;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 5px;
+    border: 1px solid rgba(17,59,36,.08);
+    border-radius: 999px;
+    color: #526158;
+    background: #fff;
+    font-size: 9.5px;
+    font-weight: 850;
+}
+
+.wai-deal-chip.hot {
+    color: #a33126;
+    border-color: rgba(211,76,61,.12);
+    background: #fff3ef;
+}
+
+.wai-deal-chip.warm {
+    color: #936000;
+    border-color: rgba(201,146,25,.14);
+    background: #fff8e3;
+}
+
+.wai-deal-chip.cold {
+    color: #4f7088;
+    border-color: rgba(70,122,162,.13);
+    background: #eff7fc;
+}
+
+.wai-deal-chip.score {
+    color: #087343;
+    border-color: rgba(31,211,113,.15);
+    background: #eefbf4;
+}
+
+.wai-deal-chip.value {
+    color: #3e475f;
+    background: #f5f6fa;
+}
+
+.wai-messages {
+    padding: 22px 28px;
+    background-image:
+        radial-gradient(circle at 1px 1px, rgba(25,80,49,.045) 1px, transparent 0);
+    background-size: 22px 22px;
+}
+
+.wai-date span {
+    border-color: rgba(17,59,36,.08);
+    color: #7b877f;
+    background: rgba(255,255,255,.92);
+    box-shadow: 0 6px 18px rgba(9,42,25,.035);
+}
+
+.wai-bubble {
+    padding: 11px 13px;
+    border-radius: 17px;
+    box-shadow:
+        0 8px 22px rgba(8, 39, 23, .045),
+        inset 0 1px 0 rgba(255,255,255,.5);
+}
+
+.wai-bubble.customer {
+    border-color: rgba(17,59,36,.08);
+    background: rgba(255,255,255,.97);
+}
+
+.wai-bubble.ai {
+    border-color: rgba(31,211,113,.18);
+    background:
+        linear-gradient(145deg,#eafbf1,#f2fff7);
+}
+
+.wai-bubble.human {
+    border-color: rgba(79,137,180,.12);
+    background:
+        linear-gradient(145deg,#edf5fb,#f5faff);
+}
+
+.wai-sender {
+    letter-spacing: .1px;
+}
+
+.wai-composer {
+    padding: 12px 16px 15px;
+    border-top: 1px solid rgba(17,59,36,.08);
+    background: rgba(255,255,255,.94);
+    box-shadow: 0 -10px 30px rgba(8,39,23,.025);
+}
+
+.wai-textarea {
+    min-height: 52px;
+    border: 1px solid rgba(17,59,36,.11);
+    border-radius: 16px;
+    box-shadow:
+        inset 0 1px 2px rgba(8,39,23,.02),
+        0 6px 18px rgba(8,39,23,.025);
+}
+
+.wai-send {
+    border-radius: 16px;
+    background: linear-gradient(135deg,#71f3ab,#21d97a);
+    box-shadow:
+        0 12px 28px rgba(31,211,113,.22),
+        inset 0 1px 0 rgba(255,255,255,.45);
+}
+
+.wai-crm {
+    padding: 10px;
+    border-left: 1px solid rgba(17,59,36,.08);
+    background:
+        linear-gradient(180deg,#fbfdfc,#f7faf8);
+}
+
+.wai-crm-profile {
+    padding: 24px 14px 18px;
+    border: 1px solid rgba(17,59,36,.07);
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 50% 0%, rgba(31,211,113,.10), transparent 48%),
+        #fff;
+    box-shadow: 0 8px 24px rgba(8,39,23,.035);
+}
+
+.wai-crm-avatar {
+    border-radius: 23px;
+    box-shadow:
+        0 12px 28px rgba(31,211,113,.10),
+        inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+.wai-section {
+    margin-top: 9px;
+    padding: 15px;
+    border: 1px solid rgba(17,59,36,.07);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 7px 22px rgba(8,39,23,.025);
+}
+
+.wai-title {
+    margin-bottom: 12px;
+    color: #69766e;
+    letter-spacing: .8px;
+}
+
+.wai-sales-dashboard {
+    gap: 8px;
+}
+
+.wai-sales-card {
+    padding: 11px;
+    border-color: rgba(17,59,36,.07);
+    border-radius: 13px;
+    background:
+        linear-gradient(145deg,#fafcfb,#f6faf7);
+}
+
+.wai-sales-card strong {
+    font-size: 11.5px;
+}
+
+.wai-ai-summary-box {
+    position: relative;
+    overflow: hidden;
+    padding: 13px;
+    border-color: rgba(31,211,113,.16);
+    border-radius: 14px;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(31,211,113,.10), transparent 30%),
+        linear-gradient(145deg,#f1fcf5,#fbfefc);
+}
+
+.wai-ai-summary-box::after {
+    content: "✦";
+    position: absolute;
+    right: 10px;
+    top: 6px;
+    color: rgba(18,171,86,.18);
+    font-size: 34px;
+    pointer-events: none;
+}
+
+.wai-tag {
+    border-color: rgba(17,59,36,.08);
+    background: #f7faf8;
+}
+
+.wai-preset {
+    border-color: rgba(17,59,36,.08);
+    background: #fff;
+}
+
+@media (max-width: 1180px) {
+    .wai-shell {
+        grid-template-columns: 320px minmax(0,1fr);
+    }
+}
+
+@media (max-width: 780px) {
+    .wai-inbox-hero {
+        min-height: 0;
+        padding: 20px;
+    }
+
+    .wai-inbox-hero h1 {
+        font-size: 24px;
+    }
+
+    .wai-shell {
+        height: calc(100vh - 210px);
+        border-radius: 22px;
+    }
+
+    .wai-side {
+        padding: 8px;
+    }
+
+    .wai-chat {
+        margin-bottom: 6px;
+        border-radius: 15px;
+    }
+
+    .wai-deal-strip {
+        padding: 7px 10px;
+    }
+
+    .wai-messages {
+        padding: 15px 12px;
+        background-size: 20px 20px;
+    }
+}
+
+
+/* ==========================================================================
+   WAI PREMIUM V3 — FINAL INBOX
+   ========================================================================== */
+
+.wai-inbox-hero{min-height:108px;padding:22px 28px}
+.wai-inbox-hero h1{font-size:28px}
+.wai-shell{grid-template-columns:390px minmax(0,1fr) 335px;height:calc(100vh - 225px);min-height:690px}
+.wai-side{min-width:0}
+.wai-side-head{padding-bottom:11px}
+.wai-filters-wrap{display:flex;flex-direction:column;gap:7px;overflow:visible}
+.wai-filter-group{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:0 1px 2px;scrollbar-width:none}
+.wai-filter-group::-webkit-scrollbar{display:none}
+.wai-filter-group.sales{padding-top:7px;border-top:1px solid rgba(17,59,36,.06)}
+.wai-filter-group-label{flex:0 0 auto;margin-right:2px;color:#93a097;font-size:9px;font-weight:900;letter-spacing:.6px;text-transform:uppercase}
+.wai-empty-stage{height:100%;min-height:420px;display:flex;align-items:center;justify-content:center;padding:28px}
+.wai-empty-card{width:min(460px,90%);padding:30px;border:1px solid rgba(17,59,36,.08);border-radius:24px;text-align:center;background:radial-gradient(circle at 50% 0%,rgba(31,211,113,.12),transparent 36%),linear-gradient(145deg,#fff,#f7fbf8);box-shadow:0 18px 50px rgba(8,39,23,.06),inset 0 1px 0 rgba(255,255,255,.8)}
+.wai-empty-icon{width:74px;height:74px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(31,211,113,.16);border-radius:24px;color:#0e8c52;background:linear-gradient(145deg,#eafbf1,#f7fff9);box-shadow:0 14px 30px rgba(31,211,113,.12),inset 0 1px 0 rgba(255,255,255,.9);font-size:30px}
+.wai-empty-card h3{margin:0;color:#0c1c13;font-size:20px;font-weight:900;letter-spacing:-.5px}
+.wai-empty-card p{margin:9px auto 0;max-width:360px;color:#7b8780;font-size:12px;line-height:1.65}
+.wai-empty-tips{margin-top:18px;display:flex;flex-wrap:wrap;justify-content:center;gap:7px}
+.wai-empty-tip{min-height:29px;padding:0 10px;display:inline-flex;align-items:center;border:1px solid rgba(17,59,36,.07);border-radius:999px;color:#657169;background:#fff;font-size:9.5px;font-weight:850}
+.wai-ai-mini-summary{-webkit-line-clamp:2;max-height:3em}
+.wai-chat{padding:12px 13px}
+.wai-preview{-webkit-line-clamp:1}
+@media(max-width:1350px){.wai-shell{grid-template-columns:355px minmax(0,1fr) 310px}}
+@media(max-width:1180px){.wai-shell{grid-template-columns:335px minmax(0,1fr)}}
+@media(max-width:780px){.wai-inbox-hero{padding:18px}.wai-inbox-hero h1{font-size:23px}.wai-shell{height:calc(100vh - 195px)}.wai-filter-group-label{display:none}}
+
 </style>
 
 
@@ -2429,131 +3023,64 @@
 
             <div class="wai-filters-wrap">
 
-                <div class="wai-filters">
+                    <div class="wai-filter-group">
 
-                    <button
-                        type="button"
-                        class="wai-filter {{ $filter === 'all' && $filterTag === '' ? 'active' : '' }}"
-                        wire:click="setFilter('all')"
-                    >
-                        Tümü
-                    </button>
+                        <span class="wai-filter-group-label">Görüşme</span>
 
-
-                    <button
-                        type="button"
-                        class="wai-filter {{ $filter === 'unread' ? 'active' : '' }}"
-                        wire:click="setFilter('unread')"
-                    >
-
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.8"
-                        >
-                            <path d="M5 5h14v12H8l-3 2V5Z"/>
-                            <circle cx="18" cy="5" r="2.5" fill="currentColor" stroke="none"/>
-                        </svg>
-
-                        Okunmamış
-
-                    </button>
-
-
-                    <button
-                        type="button"
-                        class="wai-filter {{ $filter === 'human' ? 'active' : '' }}"
-                        wire:click="setFilter('human')"
-                    >
-
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.8"
-                        >
-                            <circle cx="12" cy="8" r="3"/>
-                            <path d="M5 20c.7-4 3-6 7-6s6.3 2 7 6"/>
-                        </svg>
-
-                        İnsan
-
-                    </button>
-
-
-                    <button
-                        type="button"
-                        class="wai-filter {{ $filter === 'ai' ? 'active' : '' }}"
-                        wire:click="setFilter('ai')"
-                    >
-
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.8"
-                        >
-                            <rect x="5" y="6" width="14" height="13" rx="3"/>
-                            <circle cx="9" cy="12" r="1"/>
-                            <circle cx="15" cy="12" r="1"/>
-                            <path d="M9 16h6"/>
-                            <path d="M12 3v3"/>
-                        </svg>
-
-                        AI
-
-                    </button>
-
-
-                    @foreach ([
-                        'hot' => '🔥 Sıcak',
-                        'warm' => '🌤️ Ilık',
-                        'cold' => '❄️ Soğuk',
-                        'new' => 'Yeni Lead',
-                        'contacted' => 'Görüşülüyor',
-                        'qualified' => 'Nitelikli',
-                        'proposal' => 'Teklif',
-                    ] as $salesKey => $salesLabel)
-                        <button
-                            type="button"
-                            class="wai-filter {{ $salesFilter === $salesKey ? 'active' : '' }}"
-                            wire:click="setSalesFilter('{{ $salesKey }}')"
-                        >
-                            {{ $salesLabel }}
-                        </button>
-                    @endforeach
-
-
-                    @foreach (
-                        [
-                            'Yeni Müşteri',
-                            'Sıcak Müşteri',
-                            'Teklif Bekliyor',
-                            'Sipariş',
-                            'VIP',
-                            'Acil'
-                        ] as $tag
-                    )
-
-                        <button
-                            type="button"
-                            class="wai-filter {{ $filterTag === $tag ? 'active' : '' }}"
-                            wire:click="setTagFilter(@js($tag))"
-                        >
-                            {{ $tag }}
+                        <button type="button"
+                            class="wai-filter {{ $filter === 'all' && $filterTag === '' && $salesFilter === 'all' ? 'active' : '' }}"
+                            wire:click="setFilter('all')">
+                            Tümü
                         </button>
 
-                    @endforeach
+                        <button type="button"
+                            class="wai-filter {{ $filter === 'unread' ? 'active' : '' }}"
+                            wire:click="setFilter('unread')">
+                            ▱ Okunmamış
+                        </button>
+
+                        <button type="button"
+                            class="wai-filter {{ $filter === 'human' ? 'active' : '' }}"
+                            wire:click="setFilter('human')">
+                            ♙ İnsan
+                        </button>
+
+                        <button type="button"
+                            class="wai-filter {{ $filter === 'ai' ? 'active' : '' }}"
+                            wire:click="setFilter('ai')">
+                            ▣ AI
+                        </button>
+
+                    </div>
+
+                    <div class="wai-filter-group sales">
+
+                        <span class="wai-filter-group-label">Satış</span>
+
+                        @foreach ([
+                            'hot' => '🔥 Sıcak',
+                            'warm' => '🌤️ Ilık',
+                            'cold' => '❄️ Soğuk',
+                            'new' => 'Yeni Lead',
+                            'contacted' => 'Görüşülüyor',
+                            'qualified' => 'Nitelikli',
+                            'proposal' => 'Teklif',
+                            'won' => 'Kazanıldı',
+                        ] as $salesKey => $salesLabel)
+                            <button
+                                type="button"
+                                class="wai-filter {{ $salesFilter === $salesKey ? 'active' : '' }}"
+                                wire:click="setSalesFilter('{{ $salesKey }}')"
+                            >
+                                {{ $salesLabel }}
+                            </button>
+                        @endforeach
+
+                    </div>
 
                 </div>
 
-            </div>
-
-
-            {{-- CHAT LIST --}}
-
-            <div class="wai-list">
+                <div class="wai-list">
 
                 @forelse (
                     $this->conversations
@@ -2749,6 +3276,27 @@
                                 1
                             )
                         );
+
+                    $selectedTemperature =
+                        $this->selectedConversation->lead_temperature
+                        ?: 'cold';
+
+                    $selectedTemperatureLabel =
+                        match ($selectedTemperature) {
+                            'hot' => '🔥 Sıcak',
+                            'warm' => '🌤️ Ilık',
+                            default => '❄️ Soğuk',
+                        };
+
+                    $selectedStageLabel =
+                        match ($this->selectedConversation->lead_status) {
+                            'contacted' => 'Görüşülüyor',
+                            'qualified' => 'Nitelikli',
+                            'proposal' => 'Teklif',
+                            'won' => 'Kazanıldı',
+                            'lost' => 'Kaybedildi',
+                            default => 'Yeni Lead',
+                        };
                 @endphp
 
 
@@ -2913,6 +3461,40 @@
                     </div>
 
                 </header>
+
+                <div class="wai-deal-strip">
+
+                    <span class="wai-deal-chip {{ $selectedTemperature }}">
+                        {{ $selectedTemperatureLabel }}
+                    </span>
+
+                    <span class="wai-deal-chip">
+                        {{ $selectedStageLabel }}
+                    </span>
+
+                    <span class="wai-deal-chip score">
+                        Lead {{ (int) $this->selectedConversation->lead_score }}/100
+                    </span>
+
+                    @if ($this->selectedConversation->estimated_value !== null)
+                        <span class="wai-deal-chip value">
+                            ₺{{ number_format((float) $this->selectedConversation->estimated_value, 0, ',', '.') }}
+                        </span>
+                    @endif
+
+                    @if ($this->selectedConversation->assignedUser?->name)
+                        <span class="wai-deal-chip">
+                            👤 {{ $this->selectedConversation->assignedUser->name }}
+                        </span>
+                    @endif
+
+                    @if ($this->selectedConversation->next_follow_up_at)
+                        <span class="wai-deal-chip">
+                            ⏰ {{ $this->selectedConversation->next_follow_up_at->format('d.m H:i') }}
+                        </span>
+                    @endif
+
+                </div>
 
 
                 {{-- MESSAGES --}}
@@ -3606,7 +4188,21 @@
             @else
 
                 <div class="wai-no-message">
-                    Bir konuşma seçin.
+                    <div class="wai-empty-stage">
+                            <div class="wai-empty-card">
+                                <div class="wai-empty-icon">✦</div>
+                                <h3>Bir müşteri görüşmesi seçin</h3>
+                                <p>
+                                    Sıcak lead’leri önceliklendirin, teklif aşamasındaki müşterileri takip edin
+                                    ve WAI özetleriyle konuşmaya kaldığınız yerden devam edin.
+                                </p>
+                                <div class="wai-empty-tips">
+                                    <span class="wai-empty-tip">🔥 Sıcak lead</span>
+                                    <span class="wai-empty-tip">📄 Teklif</span>
+                                    <span class="wai-empty-tip">🤖 WAI özeti</span>
+                                </div>
+                            </div>
+                        </div>
                 </div>
 
             @endif
