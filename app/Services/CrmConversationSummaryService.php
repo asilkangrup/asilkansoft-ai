@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
+use App\Services\AiUsageService;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Laravel\Facades\OpenAI;
 use Throwable;
@@ -28,9 +29,11 @@ class CrmConversationSummaryService
 
     private const MIN_MESSAGES_FOR_FIRST_SUMMARY = 4;
 
-    private const MIN_NEW_MESSAGES_FOR_REFRESH = 6;
+    private const MIN_NEW_MESSAGES_FOR_REFRESH = 8;
 
-    private const MAX_MESSAGES_TO_ANALYZE = 30;
+    private const MIN_NEW_MESSAGES_FOR_PRIORITY_REFRESH = 4;
+
+    private const MAX_MESSAGES_TO_ANALYZE = 12;
 
     /*
     |--------------------------------------------------------------------------
@@ -310,7 +313,10 @@ class CrmConversationSummaryService
         if (
             (int) $conversation->lead_score >= 70
             &&
-            $messageCount > $previousCount
+            $messageCount
+            >=
+            $previousCount
+            + self::MIN_NEW_MESSAGES_FOR_PRIORITY_REFRESH
         ) {
             return true;
         }
@@ -324,7 +330,10 @@ class CrmConversationSummaryService
         if (
             $conversation->lead_status === 'proposal'
             &&
-            $messageCount > $previousCount
+            $messageCount
+            >=
+            $previousCount
+            + self::MIN_NEW_MESSAGES_FOR_PRIORITY_REFRESH
         ) {
             return true;
         }
@@ -518,6 +527,9 @@ PROMPT;
 
             'input' =>
                 $messages,
+
+            'max_output_tokens' =>
+                500,
         ];
 
         if (
@@ -542,6 +554,18 @@ PROMPT;
                 ->create(
                     $request
                 );
+
+        app(AiUsageService::class)->record(
+            response: $response,
+            operation: 'crm_summary',
+            aiBot: $aiBot,
+            conversation: $conversation,
+            meta: [
+                'message_count' => count($messages),
+                'lead_score' => (int) $conversation->lead_score,
+                'lead_status' => $conversation->lead_status,
+            ],
+        );
 
         $text =
             trim(

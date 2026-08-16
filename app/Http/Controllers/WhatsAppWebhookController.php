@@ -665,7 +665,7 @@ class WhatsAppWebhookController extends Controller
                                 $sessionId,
 
                             limit:
-                                30,
+                                10,
                         );
 
                 $extractedFinanceData =

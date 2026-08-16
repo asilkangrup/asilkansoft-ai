@@ -3,11 +3,23 @@
 namespace App\Services;
 
 use App\Models\AiBot;
+use App\Services\AiUsageService;
+use Illuminate\Support\Str;
 use OpenAI\Laravel\Facades\OpenAI;
 use Throwable;
 
 class FinanceLeadExtractorService
 {
+    /*
+    |--------------------------------------------------------------------------
+    | MALİYET / PERFORMANS AYARLARI
+    |--------------------------------------------------------------------------
+    */
+
+    private const MAX_HISTORY_MESSAGES = 10;
+
+    private const MAX_OUTPUT_TOKENS = 350;
+
     /**
      * Konuşma geçmişinden finans başvuru verilerini yapılandırılmış olarak çıkarır.
      *
@@ -25,17 +37,103 @@ class FinanceLeadExtractorService
             return $this->emptyResult();
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | GEREKSİZ OPENAI ÇAĞRISINI ENGELLE
+        |--------------------------------------------------------------------------
+        |
+        | Yalnızca selamlama / teşekkür / vedalaşma gibi başvuru verisi taşımayan
+        | müşteri mesajlarında ikinci bir OpenAI çağrısı yapmayız.
+        |
+        | "evet", "hayır", "tamam" gibi kısa cevaplar özellikle atlanmaz.
+        | Bunlar hat sahipliği veya başvuru akışı için gerçek veri olabilir.
+        |
+        */
+
+        if ($this->yalnizcaSosyalMesajMi($messages)) {
+            return $this->emptyResult();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | GEÇMİŞİ SINIRLA
+        |--------------------------------------------------------------------------
+        |
+        | Controller tarafında da geçmiş sınırlandırılıyor. Burada ikinci bir
+        | güvenlik katmanı olarak en fazla son 10 mesajı OpenAI'ye gönderiyoruz.
+        |
+        */
+
+        $messages = array_slice(
+            array_values($messages),
+            -self::MAX_HISTORY_MESSAGES
+        );
+
         try {
-            $response = OpenAI::responses()->create([
-                'model' => $aiBot->openai_model ?: 'gpt-5-mini',
+            $model =
+                $aiBot->openai_model
+                ?: 'gpt-5-mini';
 
-                'instructions' => $this->instructions(),
+            $request = [
+                'model' =>
+                    $model,
 
-                'input' => $messages,
-            ]);
+                'instructions' =>
+                    $this->instructions(),
+
+                'input' =>
+                    $messages,
+
+                'max_output_tokens' =>
+                    self::MAX_OUTPUT_TOKENS,
+            ];
+
+            /*
+            |--------------------------------------------------------------------------
+            | REASONING MALİYETİNİ DÜŞÜR
+            |--------------------------------------------------------------------------
+            |
+            | Bu servis yalnızca mevcut metinden alan çıkarıyor.
+            | Derin reasoning gerektirmediği için GPT-5 / o-serisinde low yeterlidir.
+            |
+            */
+
+            if (
+                str_starts_with(
+                    $model,
+                    'gpt-5'
+                )
+                || preg_match(
+                    '/^o\d/i',
+                    $model
+                )
+            ) {
+                $request['reasoning'] = [
+                    'effort' =>
+                        'low',
+                ];
+            }
+
+            $response =
+                OpenAI::responses()
+                    ->create(
+                        $request
+                    );
+
+            app(AiUsageService::class)->record(
+                response: $response,
+                operation: 'finance_extractor',
+                aiBot: $aiBot,
+                meta: [
+                    'input_messages' => count($messages),
+                ],
+            );
 
             $text = trim(
-                (string) ($response->outputText ?? '')
+                (string) (
+                    $response->outputText
+                    ?? ''
+                )
             );
 
             if ($text === '') {
@@ -61,19 +159,95 @@ class FinanceLeadExtractorService
     }
 
     /**
+     * Son müşteri mesajı yalnızca sosyal / nezaket mesajı mı?
+     */
+    private function yalnizcaSosyalMesajMi(
+        array $messages
+    ): bool {
+        $lastUserMessage = collect($messages)
+            ->reverse()
+            ->first(
+                fn (array $message): bool =>
+                    ($message['role'] ?? null)
+                    === 'user'
+            );
+
+        if (! is_array($lastUserMessage)) {
+            return false;
+        }
+
+        $text = trim(
+            (string) (
+                $lastUserMessage['content']
+                ?? ''
+            )
+        );
+
+        if ($text === '') {
+            return true;
+        }
+
+        $normalized = Str::lower(
+            $this->turkceNormalize(
+                $text
+            )
+        );
+
+        $normalized = preg_replace(
+            '/[^\pL\pN\s]+/u',
+            ' ',
+            $normalized
+        ) ?? '';
+
+        $normalized = trim(
+            preg_replace(
+                '/\s+/u',
+                ' ',
+                $normalized
+            ) ?? ''
+        );
+
+        $socialMessages = [
+            'merhaba',
+            'selam',
+            'selamlar',
+            'gunaydin',
+            'iyi gunler',
+            'iyi aksamlar',
+            'iyi geceler',
+            'tesekkurler',
+            'tesekkur ederim',
+            'tesekkur ederiz',
+            'sagol',
+            'sag ol',
+            'cok sagol',
+            'cok sag ol',
+            'gorusuruz',
+            'iyi calismalar',
+            'kolay gelsin',
+        ];
+
+        return in_array(
+            $normalized,
+            $socialMessages,
+            true
+        );
+    }
+
+    /**
      * Extractor'a verilen kesin kurallar.
      */
     private function instructions(): string
     {
         return <<<'PROMPT'
-Sen yalnızca finans başvuru verisi çıkaran bir sistemsin.
+Yalnızca verilen konuşmadan finans başvuru verisi çıkar.
 
-Müşteriyle konuşma yapma.
-Cevap üretme.
-Tavsiye verme.
-Sadece verilen konuşma geçmişindeki bilgileri analiz et.
+Müşteriyle konuşma, tavsiye verme, açıklama yazma.
+Konuşmada açıkça bulunmayan hiçbir bilgiyi üretme.
+Emin olmadığın alanı null bırak.
+Assistant mesajlarını müşteri cevabı kabul etme.
 
-SADECE aşağıdaki JSON yapısını döndür:
+SADECE şu JSON yapısını döndür:
 
 {
   "type": null,
@@ -88,83 +262,37 @@ SADECE aşağıdaki JSON yapısını döndür:
   "limit": null
 }
 
-TYPE sadece şu değerlerden biri olabilir:
+type yalnızca:
+"vodafone", "turk_telekom", "turkcell", "findeks", "elden_taksit" veya null.
 
-"vodafone"
-"turk_telekom"
-"turkcell"
-"findeks"
-"elden_taksit"
-null
+ALAN KURALLARI
 
-BAŞVURU TÜRÜ KURALLARI
+vodafone:
+name, phone, city, line_owner
 
-1. Vodafone konuşmasıysa:
-type = "vodafone"
+turk_telekom:
+name, phone, city, line_owner, mother_maiden_surname
+T.C. kimlik numarası çıkarma.
 
-Gerekli alanlar:
-- name
-- phone
-- city
-- line_owner
+turkcell:
+name, phone, city, line_owner, limit_score
+limit_score = Turkcell Pasaj limit / puan bilgisi.
 
-2. Türk Telekom konuşmasıysa:
-type = "turk_telekom"
+findeks:
+name, phone, city, birth_date, tc_identity_number
 
-Gerekli alanlar:
-- name
-- phone
-- city
-- line_owner
-- mother_maiden_surname
+elden_taksit:
+name, phone, city, limit
 
-Türk Telekom için T.C. kimlik numarası çıkarma.
+EK KURALLAR
 
-3. Turkcell konuşmasıysa:
-type = "turkcell"
-
-Gerekli alanlar:
-- name
-- phone
-- city
-- line_owner
-- limit_score
-
-limit_score alanına Turkcell Pasaj limit / puan bilgisini yaz.
-
-4. Findeks / banka kredi danışmanlığı konuşmasıysa:
-type = "findeks"
-
-Gerekli alanlar:
-- name
-- phone
-- city
-- birth_date
-- tc_identity_number
-
-5. Bankasız / Kefilsiz Elden Taksit / Fair Finans konuşmasıysa:
-type = "elden_taksit"
-
-Gerekli alanlar:
-- name
-- phone
-- city
-- limit
-
-ÇOK ÖNEMLİ KURALLAR
-
-- Konuşmada açıkça bulunmayan hiçbir bilgiyi uydurma.
-- Emin olmadığın alanı null bırak.
-- Müşterinin daha önce verdiği bilgileri konuşmanın tamamından bul.
-- AI'ın sorduğu soruyu müşterinin cevabı sanma.
-- Sadece müşterinin verdiği gerçek bilgileri çıkar.
-- Telefon numarasını mümkünse sadece rakamlardan oluşan biçime getir.
-- T.C. kimlik numarasını sadece Findeks akışında çıkar.
-- Doğum tarihini mümkünse GG/AA/YYYY formatında döndür.
-- Hat sahibi cevabını mümkünse "Evet" veya "Hayır" olarak normalize et.
-- Limit veya puan değerlerini uydurma.
-- Bir konuşmada birden fazla finans seçeneği geçmiş olabilir. Müşterinin şu anda aktif olarak ilerlediği başvuru türünü seç.
-- Başvuru türünden emin değilsen type alanını null bırak.
+- Telefonu mümkünse sadece rakamlara dönüştür.
+- T.C. kimlik numarasını yalnızca findeks akışında çıkar.
+- Doğum tarihini mümkünse GG/AA/YYYY biçiminde döndür.
+- line_owner bilgisini mümkünse "Evet" veya "Hayır" olarak normalize et.
+- Limit veya puan uydurma.
+- Birden fazla finans seçeneği geçmişse müşterinin şu anda ilerlediği türü seç.
+- Türden emin değilsen type = null.
 - JSON dışında hiçbir metin yazma.
 PROMPT;
     }
@@ -172,11 +300,17 @@ PROMPT;
     /**
      * OpenAI bazen JSON'u code fence içinde döndürebilir.
      */
-    private function jsonTemizle(string $text): string
-    {
+    private function jsonTemizle(
+        string $text
+    ): string {
         $text = trim($text);
 
-        if (str_starts_with($text, '```')) {
+        if (
+            str_starts_with(
+                $text,
+                '```'
+            )
+        ) {
             $text = preg_replace(
                 '/^```(?:json)?\s*/i',
                 '',
@@ -196,8 +330,9 @@ PROMPT;
     /**
      * Gelen veriyi güvenli biçimde normalize eder.
      */
-    private function normalize(array $data): array
-    {
+    private function normalize(
+        array $data
+    ): array {
         $allowedTypes = [
             'vodafone',
             'turk_telekom',
@@ -206,9 +341,17 @@ PROMPT;
             'elden_taksit',
         ];
 
-        $type = $data['type'] ?? null;
+        $type =
+            $data['type']
+            ?? null;
 
-        if (! in_array($type, $allowedTypes, true)) {
+        if (
+            ! in_array(
+                $type,
+                $allowedTypes,
+                true
+            )
+        ) {
             $type = null;
         }
 
@@ -218,47 +361,56 @@ PROMPT;
 
             'name' =>
                 $this->nullableString(
-                    $data['name'] ?? null
+                    $data['name']
+                    ?? null
                 ),
 
             'phone' =>
                 $this->normalizePhone(
-                    $data['phone'] ?? null
+                    $data['phone']
+                    ?? null
                 ),
 
             'city' =>
                 $this->nullableString(
-                    $data['city'] ?? null
+                    $data['city']
+                    ?? null
                 ),
 
             'line_owner' =>
                 $this->normalizeLineOwner(
-                    $data['line_owner'] ?? null
+                    $data['line_owner']
+                    ?? null
                 ),
 
             'mother_maiden_surname' =>
                 $this->nullableString(
-                    $data['mother_maiden_surname'] ?? null
+                    $data['mother_maiden_surname']
+                    ?? null
                 ),
 
             'limit_score' =>
                 $this->nullableString(
-                    $data['limit_score'] ?? null
+                    $data['limit_score']
+                    ?? null
                 ),
 
             'birth_date' =>
                 $this->nullableString(
-                    $data['birth_date'] ?? null
+                    $data['birth_date']
+                    ?? null
                 ),
 
             'tc_identity_number' =>
                 $this->normalizeTc(
-                    $data['tc_identity_number'] ?? null
+                    $data['tc_identity_number']
+                    ?? null
                 ),
 
             'limit' =>
                 $this->nullableString(
-                    $data['limit'] ?? null
+                    $data['limit']
+                    ?? null
                 ),
         ];
     }
@@ -288,7 +440,10 @@ PROMPT;
     private function normalizePhone(
         mixed $value
     ): ?string {
-        $value = $this->nullableString($value);
+        $value =
+            $this->nullableString(
+                $value
+            );
 
         if ($value === null) {
             return null;
@@ -300,7 +455,10 @@ PROMPT;
             $value
         );
 
-        if (! is_string($digits) || $digits === '') {
+        if (
+            ! is_string($digits)
+            || $digits === ''
+        ) {
             return null;
         }
 
@@ -313,7 +471,10 @@ PROMPT;
     private function normalizeTc(
         mixed $value
     ): ?string {
-        $value = $this->nullableString($value);
+        $value =
+            $this->nullableString(
+                $value
+            );
 
         if ($value === null) {
             return null;
@@ -341,7 +502,10 @@ PROMPT;
     private function normalizeLineOwner(
         mixed $value
     ): ?string {
-        $value = $this->nullableString($value);
+        $value =
+            $this->nullableString(
+                $value
+            );
 
         if ($value === null) {
             return null;
@@ -362,8 +526,16 @@ PROMPT;
             'benim adima',
         ];
 
-        foreach ($yesValues as $yesValue) {
-            if (str_contains($lower, $yesValue)) {
+        foreach (
+            $yesValues
+            as $yesValue
+        ) {
+            if (
+                str_contains(
+                    $lower,
+                    $yesValue
+                )
+            ) {
                 return 'Evet';
             }
         }
@@ -377,13 +549,47 @@ PROMPT;
             'baskasinin',
         ];
 
-        foreach ($noValues as $noValue) {
-            if (str_contains($lower, $noValue)) {
+        foreach (
+            $noValues
+            as $noValue
+        ) {
+            if (
+                str_contains(
+                    $lower,
+                    $noValue
+                )
+            ) {
                 return 'Hayır';
             }
         }
 
         return $value;
+    }
+
+    /**
+     * Türkçe karakterleri arama / karşılaştırma için normalize eder.
+     */
+    private function turkceNormalize(
+        string $text
+    ): string {
+        return strtr(
+            $text,
+            [
+                'İ' => 'i',
+                'I' => 'i',
+                'ı' => 'i',
+                'Ş' => 's',
+                'ş' => 's',
+                'Ğ' => 'g',
+                'ğ' => 'g',
+                'Ü' => 'u',
+                'ü' => 'u',
+                'Ö' => 'o',
+                'ö' => 'o',
+                'Ç' => 'c',
+                'ç' => 'c',
+            ]
+        );
     }
 
     /**

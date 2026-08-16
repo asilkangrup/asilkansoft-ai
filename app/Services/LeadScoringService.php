@@ -979,7 +979,7 @@ class LeadScoringService
         |
         | WhatsApp ana cevap akışını bekletmemek için özet ayrı queue job'unda
         | hazırlanır. Aynı konuşma için kısa sürede çok sayıda job oluşmasını
-        | engellemek amacıyla 30 saniyelik dispatch kilidi kullanılır.
+        | engellemek amacıyla 3 dakikalık dispatch kilidi kullanılır.
         |
         */
 
@@ -992,13 +992,13 @@ class LeadScoringService
                 Cache::add(
                     $summaryDispatchKey,
                     true,
-                    now()->addSeconds(30)
+                    now()->addMinutes(3)
                 )
             ) {
                 UpdateCrmConversationSummary::dispatch(
                     (int) $conversation->id
                 )->delay(
-                    now()->addSeconds(15)
+                    now()->addSeconds(30)
                 );
 
                 $signals[] =

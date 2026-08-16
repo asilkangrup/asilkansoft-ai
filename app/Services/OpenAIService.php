@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AiBot;
+use App\Services\AiUsageService;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -20,7 +21,7 @@ class OpenAIService
     |--------------------------------------------------------------------------
     */
 
-    private const MAX_HISTORY_MESSAGES = 16;
+    private const MAX_HISTORY_MESSAGES = 8;
 
     private const MAX_SEARCH_WORDS = 10;
 
@@ -88,6 +89,16 @@ class OpenAIService
                 $openAiStart = microtime(true);
 
                 $response = OpenAI::responses()->create($request);
+
+                app(AiUsageService::class)->record(
+                    response: $response,
+                    operation: 'chat_reply',
+                    aiBot: $aiBot,
+                    meta: [
+                        'attempt' => $attempt,
+                        'input_messages' => count($input),
+                    ],
+                );
 
                 $openAiMs = $this->elapsedMs($openAiStart);
                 $cevap = trim($response->outputText ?? '');
