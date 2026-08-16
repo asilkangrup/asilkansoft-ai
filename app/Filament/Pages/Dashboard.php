@@ -114,15 +114,15 @@ class Dashboard extends BaseDashboard
         $user = auth()->user();
 
         if (! $user) {
-            return 'HoÅŸ geldiniz';
+            return 'HoÃ…Å¸ geldiniz';
         }
 
-        return $user->name ?: 'HoÅŸ geldiniz';
+        return $user->name ?: 'HoÃ…Å¸ geldiniz';
     }
 
     /*
     |--------------------------------------------------------------------------
-    | AKTÄ°F / SON BOT
+    | AKTÃ„Â°F / SON BOT
     |--------------------------------------------------------------------------
     */
 
@@ -143,7 +143,7 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | KULLANICIYA AÄ°T BOT ID'LERÄ°
+    | KULLANICIYA AÃ„Â°T BOT ID'LERÃ„Â°
     |--------------------------------------------------------------------------
     */
 
@@ -167,7 +167,7 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | TOPLAM MÃœÅTERÄ° / GÃ–RÃœÅME
+    | TOPLAM MÃƒÅ“Ã…TERÃ„Â° / GÃƒâ€“RÃƒÅ“Ã…ME
     |--------------------------------------------------------------------------
     */
 
@@ -181,7 +181,7 @@ class Dashboard extends BaseDashboard
 
         /*
         |--------------------------------------------------------------------------
-        | Ã–ncelik user_id
+        | Ãƒâ€“ncelik user_id
         |--------------------------------------------------------------------------
         */
 
@@ -198,7 +198,7 @@ class Dashboard extends BaseDashboard
 
         /*
         |--------------------------------------------------------------------------
-        | Eski / farklÄ± ÅŸema iÃ§in ai_bot_id desteÄŸi
+        | Eski / farklÃ„Â± Ã…Å¸ema iÃƒÂ§in ai_bot_id desteÃ„Å¸i
         |--------------------------------------------------------------------------
         */
 
@@ -224,7 +224,7 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | OKUNMAMIÅ MESAJ
+    | OKUNMAMIÃ… MESAJ
     |--------------------------------------------------------------------------
     */
 
@@ -275,11 +275,11 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | ÃœRÃœN / HÄ°ZMET SAYISI
+    | ÃƒÅ“RÃƒÅ“N / HÃ„Â°ZMET SAYISI
     |--------------------------------------------------------------------------
     |
-    | Product modelimiz user_id kullanmÄ±yor.
-    | ÃœrÃ¼nler ai_bot_id Ã¼zerinden yapay zekÃ¢ botuna baÄŸlÄ±.
+    | Product modelimiz user_id kullanmÃ„Â±yor.
+    | ÃƒÅ“rÃƒÂ¼nler ai_bot_id ÃƒÂ¼zerinden yapay zekÃƒÂ¢ botuna baÃ„Å¸lÃ„Â±.
     |
     */
 
@@ -293,7 +293,7 @@ class Dashboard extends BaseDashboard
 
         /*
         |--------------------------------------------------------------------------
-        | Mevcut doÄŸru yapÄ±: ai_bot_id
+        | Mevcut doÃ„Å¸ru yapÃ„Â±: ai_bot_id
         |--------------------------------------------------------------------------
         */
 
@@ -316,7 +316,7 @@ class Dashboard extends BaseDashboard
 
         /*
         |--------------------------------------------------------------------------
-        | Ä°leriye dÃ¶nÃ¼k user_id desteÄŸi
+        | Ã„Â°leriye dÃƒÂ¶nÃƒÂ¼k user_id desteÃ„Å¸i
         |--------------------------------------------------------------------------
         */
 
@@ -336,11 +336,11 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | SÄ°PARÄ°Å SAYISI
+    | SÃ„Â°PARÃ„Â°Ã… SAYISI
     |--------------------------------------------------------------------------
     |
-    | Production ve local ÅŸemalar arasÄ±nda fark varsa 500 vermesin.
-    | Ã–nce user_id, yoksa ai_bot_id kullanÄ±r.
+    | Production ve local Ã…Å¸emalar arasÃ„Â±nda fark varsa 500 vermesin.
+    | Ãƒâ€“nce user_id, yoksa ai_bot_id kullanÃ„Â±r.
     |
     */
 
@@ -397,7 +397,7 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | WHATSAPP BAÄLANTI DURUMU
+    | WHATSAPP BAÃ„LANTI DURUMU
     |--------------------------------------------------------------------------
     */
 
@@ -430,7 +430,7 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | AKTÄ°F KANAL SAYISI
+    | AKTÃ„Â°F KANAL SAYISI
     |--------------------------------------------------------------------------
     */
 
@@ -444,7 +444,7 @@ class Dashboard extends BaseDashboard
 
         /*
         |--------------------------------------------------------------------------
-        | Instagram / Facebook / Web baÄŸlandÄ±ÄŸÄ±nda buraya eklenecek.
+        | Instagram / Facebook / Web baÃ„Å¸landÃ„Â±Ã„Å¸Ã„Â±nda buraya eklenecek.
         |--------------------------------------------------------------------------
         */
 
@@ -482,4 +482,3 @@ class Dashboard extends BaseDashboard
         );
     }
 }
-PS C:\laragon\www\asilkansoft-ai>

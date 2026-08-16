@@ -229,6 +229,16 @@ class EkipYonetimi extends Page
             ];
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | KULLANILAN ÇALIŞAN KOLTUĞU
+        |--------------------------------------------------------------------------
+        |
+        | İşletme sahibi (owner) koltuk limitinden sayılmaz.
+        | Sadece aktif çalışanlar sayılır.
+        |
+        */
+
         $used =
             $organization
                 ->users()
@@ -236,7 +246,18 @@ class EkipYonetimi extends Page
                     'status',
                     'active'
                 )
+                ->wherePivot(
+                    'role',
+                    '!=',
+                    'owner'
+                )
                 ->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | PAKET KOLTUK LİMİTİ
+        |--------------------------------------------------------------------------
+        */
 
         $limit =
             max(
@@ -261,7 +282,10 @@ class EkipYonetimi extends Page
                 min(
                     100,
                     (int) round(
-                        ($used / $limit)
+                        (
+                            $used
+                            / $limit
+                        )
                         * 100
                     )
                 ),
