@@ -2830,6 +2830,75 @@
 @media(max-width:1180px){.wai-shell{grid-template-columns:335px minmax(0,1fr)}}
 @media(max-width:780px){.wai-inbox-hero{padding:18px}.wai-inbox-hero h1{font-size:23px}.wai-shell{height:calc(100vh - 195px)}.wai-filter-group-label{display:none}}
 
+
+/* ==========================================================================
+   WAI PREMIUM V3.1 — RIGHT PANEL TOP ALIGNMENT FINAL
+   Sağ CRM kolonu, Görüşmeler ve orta sohbet kolonu gibi üst kenara yapışır.
+   ========================================================================== */
+
+@media (min-width: 1181px) {
+
+    .wai-crm {
+        padding: 0;
+        overflow: hidden;
+
+        border-left: 1px solid rgba(17,59,36,.08);
+
+        background:
+            linear-gradient(
+                180deg,
+                #fbfdfc 0%,
+                #f7faf8 100%
+            );
+    }
+
+    .wai-crm-profile {
+        margin: 0;
+
+        padding:
+            24px
+            14px
+            20px;
+
+        border:
+            0;
+
+        border-bottom:
+            1px solid rgba(17,59,36,.08);
+
+        border-radius:
+            0;
+
+        background:
+            radial-gradient(
+                circle at 50% 0%,
+                rgba(31,211,113,.10),
+                transparent 48%
+            ),
+            #fff;
+
+        box-shadow:
+            none;
+    }
+
+    .wai-crm > .wai-section {
+        margin:
+            10px
+            10px
+            0;
+    }
+
+    .wai-crm > .wai-section:last-child {
+        margin-bottom:
+            10px;
+    }
+
+    .wai-crm-avatar {
+        margin-top:
+            0;
+    }
+}
+
 </style>
 
 
