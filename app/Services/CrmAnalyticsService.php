@@ -5,32 +5,62 @@ namespace App\Services;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class CrmAnalyticsService
 {
-    /*
-    |--------------------------------------------------------------------------
-    | AI MESAJ SAYISI
-    |--------------------------------------------------------------------------
-    */
+    protected function messageQuery(
+        int $userId,
+        ?int $organizationId = null
+    ): Builder {
+        $query = ChatMessage::query();
+
+        if ($organizationId !== null) {
+            return $query->where(
+                'organization_id',
+                $organizationId
+            );
+        }
+
+        return $query->where(
+            'user_id',
+            $userId
+        );
+    }
+
+    protected function conversationQuery(
+        int $userId,
+        ?int $organizationId = null
+    ): Builder {
+        $query = ConversationControl::query();
+
+        if ($organizationId !== null) {
+            return $query->where(
+                'organization_id',
+                $organizationId
+            );
+        }
+
+        return $query->where(
+            'user_id',
+            $userId
+        );
+    }
 
     public function aiMessageCount(
         int $userId,
-        $startDate = null
+        $startDate = null,
+        ?int $organizationId = null
     ): int {
-        return ChatMessage::query()
-            ->where(
-                'user_id',
-                $userId
-            )
-            ->where(
-                'sender_type',
-                'ai'
-            )
+        return $this->messageQuery(
+            $userId,
+            $organizationId
+        )
+            ->where('sender_type', 'ai')
             ->when(
                 $startDate,
-                fn ($query) =>
+                fn (Builder $query) =>
                     $query->where(
                         'created_at',
                         '>=',
@@ -39,29 +69,20 @@ class CrmAnalyticsService
             )
             ->count();
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | İNSAN MESAJ SAYISI
-    |--------------------------------------------------------------------------
-    */
 
     public function humanMessageCount(
         int $userId,
-        $startDate = null
+        $startDate = null,
+        ?int $organizationId = null
     ): int {
-        return ChatMessage::query()
-            ->where(
-                'user_id',
-                $userId
-            )
-            ->where(
-                'sender_type',
-                'human'
-            )
+        return $this->messageQuery(
+            $userId,
+            $organizationId
+        )
+            ->where('sender_type', 'human')
             ->when(
                 $startDate,
-                fn ($query) =>
+                fn (Builder $query) =>
                     $query->where(
                         'created_at',
                         '>=',
@@ -70,29 +91,20 @@ class CrmAnalyticsService
             )
             ->count();
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | MÜŞTERİ MESAJ SAYISI
-    |--------------------------------------------------------------------------
-    */
 
     public function customerMessageCount(
         int $userId,
-        $startDate = null
+        $startDate = null,
+        ?int $organizationId = null
     ): int {
-        return ChatMessage::query()
-            ->where(
-                'user_id',
-                $userId
-            )
-            ->where(
-                'sender_type',
-                'customer'
-            )
+        return $this->messageQuery(
+            $userId,
+            $organizationId
+        )
+            ->where('sender_type', 'customer')
             ->when(
                 $startDate,
-                fn ($query) =>
+                fn (Builder $query) =>
                     $query->where(
                         'created_at',
                         '>=',
@@ -102,100 +114,67 @@ class CrmAnalyticsService
             ->count();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | AI CEVAPLAMA ORANI
-    |--------------------------------------------------------------------------
-    */
-
     public function aiResponseRate(
         int $userId,
-        $startDate = null
+        $startDate = null,
+        ?int $organizationId = null
     ): float {
-        $ai =
-            $this->aiMessageCount(
-                $userId,
-                $startDate
-            );
-
-        $human =
-            $this->humanMessageCount(
-                $userId,
-                $startDate
-            );
-
-        $total =
-            $ai + $human;
-
-        if ($total === 0) {
-            return 0;
-        }
-
-        return round(
-            ($ai / $total) * 100,
-            1
+        $ai = $this->aiMessageCount(
+            $userId,
+            $startDate,
+            $organizationId
         );
-    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | İNSAN CEVAPLAMA ORANI
-    |--------------------------------------------------------------------------
-    */
+        $human = $this->humanMessageCount(
+            $userId,
+            $startDate,
+            $organizationId
+        );
+
+        $total = $ai + $human;
+
+        return $total > 0
+            ? round(($ai / $total) * 100, 1)
+            : 0;
+    }
 
     public function humanResponseRate(
         int $userId,
-        $startDate = null
+        $startDate = null,
+        ?int $organizationId = null
     ): float {
-        $ai =
-            $this->aiMessageCount(
-                $userId,
-                $startDate
-            );
-
-        $human =
-            $this->humanMessageCount(
-                $userId,
-                $startDate
-            );
-
-        $total =
-            $ai + $human;
-
-        if ($total === 0) {
-            return 0;
-        }
-
-        return round(
-            ($human / $total) * 100,
-            1
+        $ai = $this->aiMessageCount(
+            $userId,
+            $startDate,
+            $organizationId
         );
-    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | İNSAN DEVRALMA SAYISI
-    |--------------------------------------------------------------------------
-    |
-    | taken_over_at alanı dolmuş konuşmaları sayar.
-    |
-    */
+        $human = $this->humanMessageCount(
+            $userId,
+            $startDate,
+            $organizationId
+        );
+
+        $total = $ai + $human;
+
+        return $total > 0
+            ? round(($human / $total) * 100, 1)
+            : 0;
+    }
 
     public function takeoverCount(
         int $userId,
-        $startDate = null
+        $startDate = null,
+        ?int $organizationId = null
     ): int {
-        return ConversationControl::query()
-            ->where(
-                'user_id',
-                $userId
-            )
-            ->whereNotNull(
-                'taken_over_at'
-            )
+        return $this->conversationQuery(
+            $userId,
+            $organizationId
+        )
+            ->whereNotNull('taken_over_at')
             ->when(
                 $startDate,
-                fn ($query) =>
+                fn (Builder $query) =>
                     $query->where(
                         'taken_over_at',
                         '>=',
@@ -205,20 +184,14 @@ class CrmAnalyticsService
             ->count();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | ŞU ANDA İNSANDA OLAN KONUŞMALAR
-    |--------------------------------------------------------------------------
-    */
-
     public function activeHumanTakeovers(
-        int $userId
+        int $userId,
+        ?int $organizationId = null
     ): int {
-        return ConversationControl::query()
-            ->where(
-                'user_id',
-                $userId
-            )
+        return $this->conversationQuery(
+            $userId,
+            $organizationId
+        )
             ->where(
                 'human_takeover',
                 true
@@ -226,48 +199,78 @@ class CrmAnalyticsService
             ->count();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | ORTALAMA İLK CEVAP SÜRESİ
-    |--------------------------------------------------------------------------
-    |
-    | Her müşteri mesajından sonra gelen ilk AI veya insan cevabını bulur.
-    | Aradaki saniye farklarının ortalamasını döndürür.
-    |
-    | Limit koymamızın sebebi rapor ekranında çok büyük hesap yükü oluşturmamak.
-    |
-    */
-
     public function averageFirstResponseSeconds(
         int $userId,
         $startDate = null,
+        ?int $organizationId = null,
+        int $limit = 500
+    ): float {
+        return $this->averageResponseSeconds(
+            userId: $userId,
+            senderTypes: ['ai', 'human'],
+            startDate: $startDate,
+            organizationId: $organizationId,
+            limit: $limit,
+        );
+    }
+
+    public function averageAiResponseSeconds(
+        int $userId,
+        $startDate = null,
+        ?int $organizationId = null,
+        int $limit = 500
+    ): float {
+        return $this->averageResponseSeconds(
+            userId: $userId,
+            senderTypes: ['ai'],
+            startDate: $startDate,
+            organizationId: $organizationId,
+            limit: $limit,
+        );
+    }
+
+    public function averageHumanResponseSeconds(
+        int $userId,
+        $startDate = null,
+        ?int $organizationId = null,
+        int $limit = 500
+    ): float {
+        return $this->averageResponseSeconds(
+            userId: $userId,
+            senderTypes: ['human'],
+            startDate: $startDate,
+            organizationId: $organizationId,
+            limit: $limit,
+        );
+    }
+
+    protected function averageResponseSeconds(
+        int $userId,
+        array $senderTypes,
+        $startDate = null,
+        ?int $organizationId = null,
         int $limit = 500
     ): float {
         $customerMessages =
-            ChatMessage::query()
-                ->where(
-                    'user_id',
-                    $userId
-                )
+            $this->messageQuery(
+                $userId,
+                $organizationId
+            )
                 ->where(
                     'sender_type',
                     'customer'
                 )
                 ->when(
                     $startDate,
-                    fn ($query) =>
+                    fn (Builder $query) =>
                         $query->where(
                             'created_at',
                             '>=',
                             $startDate
                         )
                 )
-                ->orderByDesc(
-                    'created_at'
-                )
-                ->limit(
-                    $limit
-                )
+                ->orderByDesc('created_at')
+                ->limit($limit)
                 ->get([
                     'id',
                     'session_id',
@@ -279,192 +282,28 @@ class CrmAnalyticsService
         }
 
         $totalSeconds = 0;
-
         $matchedCount = 0;
 
         foreach ($customerMessages as $message) {
             $reply =
-                ChatMessage::query()
-                    ->where(
-                        'user_id',
-                        $userId
-                    )
+                $this->messageQuery(
+                    $userId,
+                    $organizationId
+                )
                     ->where(
                         'session_id',
                         $message->session_id
                     )
                     ->whereIn(
                         'sender_type',
-                        [
-                            'ai',
-                            'human',
-                        ]
+                        $senderTypes
                     )
                     ->where(
                         'created_at',
                         '>',
                         $message->created_at
                     )
-                    ->orderBy(
-                        'created_at'
-                    )
-                    ->first([
-                        'id',
-                        'created_at',
-                    ]);
-
-            if (! $reply) {
-                continue;
-            }
-
-            $seconds =
-                $message
-                    ->created_at
-                    ->diffInSeconds(
-                        $reply->created_at
-                    );
-
-            /*
-            |--------------------------------------------------------------------------
-            | ANORMAL VERİ KORUMASI
-            |--------------------------------------------------------------------------
-            |
-            | 24 saatten uzun cevap farklarını ortalamaya dahil etmiyoruz.
-            |
-            */
-
-            if ($seconds > 86400) {
-                continue;
-            }
-
-            $totalSeconds +=
-                $seconds;
-
-            $matchedCount++;
-        }
-
-        if ($matchedCount === 0) {
-            return 0;
-        }
-
-        return round(
-            $totalSeconds / $matchedCount,
-            1
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | ORTALAMA AI CEVAP SÜRESİ
-    |--------------------------------------------------------------------------
-    */
-
-    public function averageAiResponseSeconds(
-        int $userId,
-        $startDate = null,
-        int $limit = 500
-    ): float {
-        return $this->averageResponseSecondsByType(
-            userId: $userId,
-            senderType: 'ai',
-            startDate: $startDate,
-            limit: $limit,
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | ORTALAMA İNSAN CEVAP SÜRESİ
-    |--------------------------------------------------------------------------
-    */
-
-    public function averageHumanResponseSeconds(
-        int $userId,
-        $startDate = null,
-        int $limit = 500
-    ): float {
-        return $this->averageResponseSecondsByType(
-            userId: $userId,
-            senderType: 'human',
-            startDate: $startDate,
-            limit: $limit,
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CEVAP SÜRESİ - TİPE GÖRE
-    |--------------------------------------------------------------------------
-    */
-
-    protected function averageResponseSecondsByType(
-        int $userId,
-        string $senderType,
-        $startDate = null,
-        int $limit = 500
-    ): float {
-        $customerMessages =
-            ChatMessage::query()
-                ->where(
-                    'user_id',
-                    $userId
-                )
-                ->where(
-                    'sender_type',
-                    'customer'
-                )
-                ->when(
-                    $startDate,
-                    fn ($query) =>
-                        $query->where(
-                            'created_at',
-                            '>=',
-                            $startDate
-                        )
-                )
-                ->orderByDesc(
-                    'created_at'
-                )
-                ->limit(
-                    $limit
-                )
-                ->get([
-                    'id',
-                    'session_id',
-                    'created_at',
-                ]);
-
-        if ($customerMessages->isEmpty()) {
-            return 0;
-        }
-
-        $totalSeconds = 0;
-
-        $matchedCount = 0;
-
-        foreach ($customerMessages as $message) {
-            $reply =
-                ChatMessage::query()
-                    ->where(
-                        'user_id',
-                        $userId
-                    )
-                    ->where(
-                        'session_id',
-                        $message->session_id
-                    )
-                    ->where(
-                        'sender_type',
-                        $senderType
-                    )
-                    ->where(
-                        'created_at',
-                        '>',
-                        $message->created_at
-                    )
-                    ->orderBy(
-                        'created_at'
-                    )
+                    ->orderBy('created_at')
                     ->first([
                         'id',
                         'created_at',
@@ -485,42 +324,28 @@ class CrmAnalyticsService
                 continue;
             }
 
-            $totalSeconds +=
-                $seconds;
-
+            $totalSeconds += $seconds;
             $matchedCount++;
         }
 
-        if ($matchedCount === 0) {
-            return 0;
-        }
-
-        return round(
-            $totalSeconds / $matchedCount,
-            1
-        );
+        return $matchedCount > 0
+            ? round(
+                $totalSeconds / $matchedCount,
+                1
+            )
+            : 0;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | PERSONEL PERFORMANSI
-    |--------------------------------------------------------------------------
-    |
-    | sent_by_user_id üzerinden gerçek insan mesaj sayısını,
-    | assigned_user_id üzerinden CRM müşteri sonuçlarını toplar.
-    |
-    */
 
     public function staffPerformance(
         int $userId,
-        $startDate = null
+        $startDate = null,
+        ?int $organizationId = null
     ): Collection {
         $staffIds =
-            ChatMessage::query()
-                ->where(
-                    'user_id',
-                    $userId
-                )
+            $this->messageQuery(
+                $userId,
+                $organizationId
+            )
                 ->where(
                     'sender_type',
                     'human'
@@ -530,7 +355,7 @@ class CrmAnalyticsService
                 )
                 ->when(
                     $startDate,
-                    fn ($query) =>
+                    fn (Builder $query) =>
                         $query->where(
                             'created_at',
                             '>=',
@@ -543,17 +368,16 @@ class CrmAnalyticsService
                 );
 
         $assignedIds =
-            ConversationControl::query()
-                ->where(
-                    'user_id',
-                    $userId
-                )
+            $this->conversationQuery(
+                $userId,
+                $organizationId
+            )
                 ->whereNotNull(
                     'assigned_user_id'
                 )
                 ->when(
                     $startDate,
-                    fn ($query) =>
+                    fn (Builder $query) =>
                         $query->where(
                             'created_at',
                             '>=',
@@ -567,9 +391,8 @@ class CrmAnalyticsService
 
         $ids =
             $staffIds
-                ->merge(
-                    $assignedIds
-                )
+                ->merge($assignedIds)
+                ->filter()
                 ->unique()
                 ->values();
 
@@ -579,37 +402,30 @@ class CrmAnalyticsService
 
         $users =
             User::query()
-                ->whereIn(
-                    'id',
-                    $ids
-                )
+                ->whereIn('id', $ids)
                 ->get()
-                ->keyBy(
-                    'id'
-                );
+                ->keyBy('id');
 
         return $ids
             ->map(
                 function ($staffId) use (
                     $users,
                     $userId,
-                    $startDate
+                    $startDate,
+                    $organizationId
                 ) {
                     $staff =
-                        $users->get(
-                            $staffId
-                        );
+                        $users->get($staffId);
 
                     if (! $staff) {
                         return null;
                     }
 
                     $humanMessages =
-                        ChatMessage::query()
-                            ->where(
-                                'user_id',
-                                $userId
-                            )
+                        $this->messageQuery(
+                            $userId,
+                            $organizationId
+                        )
                             ->where(
                                 'sender_type',
                                 'human'
@@ -620,7 +436,7 @@ class CrmAnalyticsService
                             )
                             ->when(
                                 $startDate,
-                                fn ($query) =>
+                                fn (Builder $query) =>
                                     $query->where(
                                         'created_at',
                                         '>=',
@@ -630,18 +446,17 @@ class CrmAnalyticsService
                             ->count();
 
                     $assigned =
-                        ConversationControl::query()
-                            ->where(
-                                'user_id',
-                                $userId
-                            )
+                        $this->conversationQuery(
+                            $userId,
+                            $organizationId
+                        )
                             ->where(
                                 'assigned_user_id',
                                 $staffId
                             )
                             ->when(
                                 $startDate,
-                                fn ($query) =>
+                                fn (Builder $query) =>
                                     $query->where(
                                         'created_at',
                                         '>=',
@@ -650,8 +465,7 @@ class CrmAnalyticsService
                             );
 
                     $assignedCount =
-                        (clone $assigned)
-                            ->count();
+                        (clone $assigned)->count();
 
                     $wonCount =
                         (clone $assigned)
@@ -675,52 +489,27 @@ class CrmAnalyticsService
                     $conversionRate =
                         $assignedCount > 0
                             ? round(
-                                (
-                                    $wonCount
-                                    /
-                                    $assignedCount
-                                )
+                                ($wonCount / $assignedCount)
                                 * 100,
                                 1
                             )
                             : 0;
 
                     return [
-                        'id' =>
-                            $staff->id,
-
-                        'name' =>
-                            $staff->name,
-
-                        'human_messages' =>
-                            $humanMessages,
-
-                        'assigned_leads' =>
-                            $assignedCount,
-
-                        'open_leads' =>
-                            $openCount,
-
-                        'won_leads' =>
-                            $wonCount,
-
-                        'conversion_rate' =>
-                            $conversionRate,
+                        'id' => (int) $staff->id,
+                        'name' => $staff->name,
+                        'human_messages' => $humanMessages,
+                        'assigned_leads' => $assignedCount,
+                        'open_leads' => $openCount,
+                        'won_leads' => $wonCount,
+                        'conversion_rate' => $conversionRate,
                     ];
                 }
             )
             ->filter()
-            ->sortByDesc(
-                'won_leads'
-            )
+            ->sortByDesc('won_leads')
             ->values();
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CEVAP SÜRESİNİ OKUNABİLİR HALE GETİR
-    |--------------------------------------------------------------------------
-    */
 
     public function formatSeconds(
         float|int $seconds
@@ -728,54 +517,40 @@ class CrmAnalyticsService
         $seconds =
             max(
                 0,
-                (int) round(
-                    $seconds
-                )
+                (int) round($seconds)
             );
 
         if ($seconds < 60) {
-            return $seconds
-                .' sn';
+            return $seconds.' sn';
         }
 
         if ($seconds < 3600) {
             $minutes =
-                floor(
-                    $seconds / 60
-                );
+                floor($seconds / 60);
 
             $remainingSeconds =
                 $seconds % 60;
 
-            if ($remainingSeconds === 0) {
-                return $minutes
-                    .' dk';
-            }
-
-            return $minutes
-                .' dk '
-                .$remainingSeconds
-                .' sn';
+            return $remainingSeconds === 0
+                ? $minutes.' dk'
+                : $minutes.' dk '
+                    .$remainingSeconds
+                    .' sn';
         }
 
         $hours =
-            floor(
-                $seconds / 3600
-            );
+            floor($seconds / 3600);
 
         $minutes =
             floor(
-                ($seconds % 3600) / 60
+                ($seconds % 3600)
+                / 60
             );
 
-        if ($minutes === 0) {
-            return $hours
-                .' sa';
-        }
-
-        return $hours
-            .' sa '
-            .$minutes
-            .' dk';
+        return $minutes === 0
+            ? $hours.' sa'
+            : $hours.' sa '
+                .$minutes
+                .' dk';
     }
 }

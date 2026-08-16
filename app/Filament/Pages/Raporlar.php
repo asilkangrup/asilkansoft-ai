@@ -81,11 +81,137 @@ class Raporlar extends Page
         return app(CrmStaffSalesGoalService::class);
     }
 
+
+    protected function accessService(): OrganizationAccessService
+    {
+        return app(
+            OrganizationAccessService::class
+        );
+    }
+
+    protected function currentOrganization()
+    {
+        return $this
+            ->accessService()
+            ->currentOrganization();
+    }
+
+    protected function currentRole(): ?string
+    {
+        return $this
+            ->accessService()
+            ->currentRole();
+    }
+
+    protected function reportOwnerUser()
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return null;
+        }
+
+        if ($user->is_admin) {
+            return $user;
+        }
+
+        $organization =
+            $this->currentOrganization();
+
+        if (! $organization) {
+            return $user;
+        }
+
+        return $organization->owner
+            ?? \App\Models\User::query()
+                ->find(
+                    $organization->owner_user_id
+                )
+            ?? $user;
+    }
+
+    protected function reportOwnerUserId(): int
+    {
+        return (int) (
+            $this->reportOwnerUser()?->id
+            ?? auth()->id()
+            ?? 0
+        );
+    }
+
+    protected function reportOrganizationId(): ?int
+    {
+        if (auth()->user()?->is_admin) {
+            return null;
+        }
+
+        return $this->currentOrganization()?->id;
+    }
+
+    protected function canManageReportGoals(): bool
+    {
+        return in_array(
+            $this->currentRole(),
+            [
+                'admin',
+                'owner',
+                'manager',
+            ],
+            true
+        );
+    }
+
+    protected function conversationScopeQuery(): Builder
+    {
+        $query =
+            ConversationControl::query();
+
+        $organizationId =
+            $this->reportOrganizationId();
+
+        if ($organizationId !== null) {
+            return $query->where(
+                'organization_id',
+                $organizationId
+            );
+        }
+
+        return $query->where(
+            'user_id',
+            $this->reportOwnerUserId()
+        );
+    }
+
+    protected function alarmScopeQuery(): Builder
+    {
+        $query =
+            CrmAlarm::query();
+
+        $organizationId =
+            $this->reportOrganizationId();
+
+        if ($organizationId !== null) {
+            return $query->whereHas(
+                'conversation',
+                fn (Builder $conversationQuery) =>
+                    $conversationQuery->where(
+                        'organization_id',
+                        $organizationId
+                    )
+            );
+        }
+
+        return $query->where(
+            'user_id',
+            $this->reportOwnerUserId()
+        );
+    }
+
     public function mount(): void
     {
         $target =
             (float) (
-                auth()->user()?->monthly_sales_target
+                $this->reportOwnerUser()?->monthly_sales_target
                 ?? 0
             );
 
@@ -115,9 +241,8 @@ class Raporlar extends Page
 
     protected function baseQuery(): Builder
     {
-        return ConversationControl::query()
+        return $this->conversationScopeQuery()
             ->with(['aiBot', 'assignedUser'])
-            ->where('user_id', auth()->id())
             ->where('created_at', '>=', $this->startDate())
             ->when(
                 $this->channelFilter !== 'all',
@@ -172,8 +297,7 @@ class Raporlar extends Page
 
     public function getTodayLeadsProperty(): int
     {
-        return ConversationControl::query()
-            ->where('user_id', auth()->id())
+        return $this->conversationScopeQuery()
             ->whereBetween('created_at', [now()->startOfDay(), now()->endOfDay()])
             ->when(
                 $this->channelFilter !== 'all',
@@ -307,52 +431,52 @@ class Raporlar extends Page
 
     public function getAiMessageCountProperty(): int
     {
-        return $this->analytics()->aiMessageCount(auth()->id(), $this->startDate());
+        return $this->analytics()->aiMessageCount($this->reportOwnerUserId(), $this->startDate(), $this->reportOrganizationId());
     }
 
     public function getHumanMessageCountProperty(): int
     {
-        return $this->analytics()->humanMessageCount(auth()->id(), $this->startDate());
+        return $this->analytics()->humanMessageCount($this->reportOwnerUserId(), $this->startDate(), $this->reportOrganizationId());
     }
 
     public function getCustomerMessageCountProperty(): int
     {
-        return $this->analytics()->customerMessageCount(auth()->id(), $this->startDate());
+        return $this->analytics()->customerMessageCount($this->reportOwnerUserId(), $this->startDate(), $this->reportOrganizationId());
     }
 
     public function getAiResponseRateProperty(): float
     {
-        return $this->analytics()->aiResponseRate(auth()->id(), $this->startDate());
+        return $this->analytics()->aiResponseRate($this->reportOwnerUserId(), $this->startDate(), $this->reportOrganizationId());
     }
 
     public function getHumanResponseRateProperty(): float
     {
-        return $this->analytics()->humanResponseRate(auth()->id(), $this->startDate());
+        return $this->analytics()->humanResponseRate($this->reportOwnerUserId(), $this->startDate(), $this->reportOrganizationId());
     }
 
     public function getTakeoverCountProperty(): int
     {
-        return $this->analytics()->takeoverCount(auth()->id(), $this->startDate());
+        return $this->analytics()->takeoverCount($this->reportOwnerUserId(), $this->startDate(), $this->reportOrganizationId());
     }
 
     public function getActiveHumanTakeoversProperty(): int
     {
-        return $this->analytics()->activeHumanTakeovers(auth()->id());
+        return $this->analytics()->activeHumanTakeovers($this->reportOwnerUserId(), $this->reportOrganizationId());
     }
 
     public function getAverageResponseSecondsProperty(): float
     {
-        return $this->analytics()->averageFirstResponseSeconds(auth()->id(), $this->startDate());
+        return $this->analytics()->averageFirstResponseSeconds($this->reportOwnerUserId(), $this->startDate(), $this->reportOrganizationId());
     }
 
     public function getAverageAiResponseSecondsProperty(): float
     {
-        return $this->analytics()->averageAiResponseSeconds(auth()->id(), $this->startDate());
+        return $this->analytics()->averageAiResponseSeconds($this->reportOwnerUserId(), $this->startDate(), $this->reportOrganizationId());
     }
 
     public function getAverageHumanResponseSecondsProperty(): float
     {
-        return $this->analytics()->averageHumanResponseSeconds(auth()->id(), $this->startDate());
+        return $this->analytics()->averageHumanResponseSeconds($this->reportOwnerUserId(), $this->startDate(), $this->reportOrganizationId());
     }
 
     public function getAverageResponseLabelProperty(): string
@@ -372,7 +496,7 @@ class Raporlar extends Page
 
     public function getStaffPerformanceProperty(): Collection
     {
-        return $this->analytics()->staffPerformance(auth()->id(), $this->startDate());
+        return $this->analytics()->staffPerformance($this->reportOwnerUserId(), $this->startDate(), $this->reportOrganizationId());
     }
 
     public function getSevenDayTrendProperty(): array
@@ -382,8 +506,7 @@ class Raporlar extends Page
         for ($i = 6; $i >= 0; $i--) {
             $date = now()->subDays($i)->startOfDay();
 
-            $count = ConversationControl::query()
-                ->where('user_id', auth()->id())
+            $count = $this->conversationScopeQuery()
                 ->whereBetween('created_at', [
                     $date->copy()->startOfDay(),
                     $date->copy()->endOfDay(),
@@ -622,7 +745,7 @@ class Raporlar extends Page
 
     public function getBotStatsProperty(): Collection
     {
-        return ConversationControl::query()
+        return $this->conversationScopeQuery()
             ->selectRaw(
                 "
                 ai_bot_id,
@@ -651,7 +774,6 @@ class Raporlar extends Page
                 ) as realized_revenue
                 "
             )
-            ->where('user_id', auth()->id())
             ->where('created_at', '>=', $this->startDate())
             ->when(
                 $this->channelFilter !== 'all',
@@ -669,9 +791,8 @@ class Raporlar extends Page
 
     public function getBotsProperty(): Collection
     {
-        return ConversationControl::query()
+        return $this->conversationScopeQuery()
             ->with('aiBot')
-            ->where('user_id', auth()->id())
             ->whereNotNull('ai_bot_id')
             ->get()
             ->pluck('aiBot')
@@ -689,7 +810,7 @@ class Raporlar extends Page
 
     public function getActiveAlarmCountProperty(): int
     {
-        return CrmAlarm::query()
+        return $this->alarmScopeQuery()
             ->where(
                 'user_id',
                 auth()->id()
@@ -718,7 +839,7 @@ class Raporlar extends Page
 
     public function getCriticalAlarmCountProperty(): int
     {
-        return CrmAlarm::query()
+        return $this->alarmScopeQuery()
             ->where(
                 'user_id',
                 auth()->id()
@@ -751,7 +872,7 @@ class Raporlar extends Page
 
     public function getSnoozedAlarmCountProperty(): int
     {
-        return CrmAlarm::query()
+        return $this->alarmScopeQuery()
             ->where(
                 'user_id',
                 auth()->id()
@@ -773,7 +894,7 @@ class Raporlar extends Page
 
     public function getResolvedAlarmTodayCountProperty(): int
     {
-        return CrmAlarm::query()
+        return $this->alarmScopeQuery()
             ->where(
                 'user_id',
                 auth()->id()
@@ -791,7 +912,7 @@ class Raporlar extends Page
 
     public function getRecentCriticalAlarmsProperty(): Collection
     {
-        return CrmAlarm::query()
+        return $this->alarmScopeQuery()
             ->with([
                 'conversation.aiBot',
                 'conversation.assignedUser',
@@ -845,7 +966,7 @@ class Raporlar extends Page
     public function getMonthlyGoalProgressProperty(): array
     {
         $user =
-            auth()->user();
+            $this->reportOwnerUser();
 
         if (! $user) {
             return [
@@ -860,14 +981,19 @@ class Raporlar extends Page
 
         return $this->salesGoalService()
             ->progress(
-                $user
+                $user,
+                $this->reportOrganizationId()
             );
     }
 
     public function saveMonthlySalesTarget(): void
     {
+        if (! $this->canManageReportGoals()) {
+            abort(403);
+        }
+
         $user =
-            auth()->user();
+            $this->reportOwnerUser();
 
         if (! $user) {
             return;
@@ -923,7 +1049,8 @@ class Raporlar extends Page
     {
         return $this->staffSalesGoalService()
             ->rows(
-                auth()->id()
+                $this->reportOwnerUserId(),
+                $this->reportOrganizationId()
             );
     }
 
@@ -934,7 +1061,8 @@ class Raporlar extends Page
         foreach (
             $this->staffSalesGoalService()
                 ->rows(
-                    auth()->id()
+                    $this->reportOwnerUserId(),
+                    $this->reportOrganizationId()
                 )
             as $row
         ) {
@@ -961,6 +1089,10 @@ class Raporlar extends Page
     public function saveStaffSalesTarget(
         int $staffUserId
     ): void {
+        if (! $this->canManageReportGoals()) {
+            abort(403);
+        }
+
         $raw =
             trim(
                 (string) (
@@ -987,13 +1119,16 @@ class Raporlar extends Page
             $this->staffSalesGoalService()
                 ->saveTarget(
                     ownerUserId:
-                        auth()->id(),
+                        $this->reportOwnerUserId(),
 
                     staffUserId:
                         $staffUserId,
 
                     target:
                         $value,
+
+                    organizationId:
+                        $this->reportOrganizationId(),
                 );
 
         if (! $saved) {
@@ -1028,7 +1163,7 @@ class Raporlar extends Page
         $summary =
             $this->managerSummaryService()
                 ->latest(
-                    auth()->id()
+                    $this->reportOwnerUserId()
                 );
 
         if (
@@ -1040,7 +1175,7 @@ class Raporlar extends Page
                 $summary =
                     $this->managerSummaryService()
                         ->generate(
-                            auth()->user()
+                            $this->reportOwnerUser()
                         );
             } catch (\Throwable $exception) {
                 report(
@@ -1055,7 +1190,7 @@ class Raporlar extends Page
     public function refreshManagerSummary(): void
     {
         $user =
-            auth()->user();
+            $this->reportOwnerUser();
 
         if (! $user) {
             return;
@@ -1096,7 +1231,7 @@ class Raporlar extends Page
     public function getLiveKpiTrendsProperty(): array
     {
         $s=now()->subDays(6)->startOfDay();
-        $rows=ConversationControl::query()->where('user_id',auth()->id())->where('created_at','>=',$s)->get(['created_at','lead_status','lead_temperature']);
+        $rows=$this->conversationScopeQuery()->where('created_at','>=',$s)->get(['created_at','lead_status','lead_temperature']);
         $days=collect(range(0,6))->map(fn($i)=>$s->copy()->addDays($i));
         $daily=fn($f)=>$days->map(fn($d)=>$rows->filter(fn(ConversationControl $c)=>$c->created_at?->isSameDay($d)&&$f($c))->count())->all();
         return [

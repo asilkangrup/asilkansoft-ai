@@ -4,15 +4,10 @@ namespace App\Services;
 
 use App\Models\ConversationControl;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 class CrmSalesGoalService
 {
-    /*
-    |--------------------------------------------------------------------------
-    | AYLIK HEDEF
-    |--------------------------------------------------------------------------
-    */
-
     public function target(
         User $user
     ): float {
@@ -25,20 +20,35 @@ class CrmSalesGoalService
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | AYLIK GERÇEKLEŞEN CİRO
-    |--------------------------------------------------------------------------
-    */
+    protected function conversationQuery(
+        int $userId,
+        ?int $organizationId = null
+    ): Builder {
+        $query =
+            ConversationControl::query();
+
+        if ($organizationId !== null) {
+            return $query->where(
+                'organization_id',
+                $organizationId
+            );
+        }
+
+        return $query->where(
+            'user_id',
+            $userId
+        );
+    }
 
     public function realizedRevenue(
-        int $userId
+        int $userId,
+        ?int $organizationId = null
     ): float {
         return round(
-            (float) ConversationControl::query()
-                ->where(
-                    'user_id',
-                    $userId
+            (float) $this
+                ->conversationQuery(
+                    $userId,
+                    $organizationId
                 )
                 ->where(
                     'lead_status',
@@ -61,14 +71,9 @@ class CrmSalesGoalService
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | HEDEF İLERLEMESİ
-    |--------------------------------------------------------------------------
-    */
-
     public function progress(
-        User $user
+        User $user,
+        ?int $organizationId = null
     ): array {
         $target =
             $this->target(
@@ -77,7 +82,8 @@ class CrmSalesGoalService
 
         $realized =
             $this->realizedRevenue(
-                $user->id
+                $user->id,
+                $organizationId
             );
 
         $remaining =
@@ -101,10 +107,7 @@ class CrmSalesGoalService
         $percent =
             $target > 0
                 ? round(
-                    (
-                        $realized
-                        / $target
-                    )
+                    ($realized / $target)
                     * 100,
                     1
                 )
@@ -113,30 +116,19 @@ class CrmSalesGoalService
         return [
             'target' =>
                 $target,
-
             'realized' =>
                 $realized,
-
             'remaining' =>
                 $remaining,
-
             'exceeded' =>
                 $exceeded,
-
             'percent' =>
                 $percent,
-
             'completed' =>
                 $target > 0
                 && $realized >= $target,
         ];
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | HEDEF KAYDET
-    |--------------------------------------------------------------------------
-    */
 
     public function saveTarget(
         User $user,
