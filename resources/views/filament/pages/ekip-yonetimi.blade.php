@@ -205,12 +205,54 @@
             border-radius: 10px;
             padding: 8px 10px;
             background: #fff;
+            color: #0f172a;
         }
 
         .team-empty {
             padding: 45px 20px;
             text-align: center;
             color: #64748b;
+        }
+
+        .team-admin-selector {
+            padding: 20px;
+        }
+
+        .team-admin-selector-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .team-admin-kicker {
+            font-size: 12px;
+            font-weight: 800;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .team-admin-title {
+            font-size: 18px;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .team-admin-select-wrap {
+            min-width: 320px;
+            flex: 0 1 420px;
+        }
+
+        .team-admin-select {
+            width: 100%;
+            min-width: 320px;
+            padding: 11px 12px;
+            border: 1px solid #dbe3ef;
+            border-radius: 12px;
+            background: #fff;
+            color: #0f172a;
+            font-weight: 700;
         }
 
         @media (max-width: 900px) {
@@ -220,6 +262,15 @@
 
             .team-form-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .team-admin-select-wrap {
+                min-width: 100%;
+                width: 100%;
+            }
+
+            .team-admin-select {
+                min-width: 100%;
             }
         }
     </style>
@@ -231,6 +282,68 @@
     @endphp
 
     <div class="team-page">
+
+        @if(auth()->user()?->is_admin)
+
+            <section class="team-card team-admin-selector">
+
+                <div class="team-admin-selector-inner">
+
+                    <div>
+
+                        <div class="team-admin-kicker">
+                            Sistem Admini
+                        </div>
+
+                        <div class="team-admin-title">
+                            İşletme Seç
+                        </div>
+
+                    </div>
+
+                    <div class="team-admin-select-wrap">
+
+                        <select
+                            class="team-admin-select"
+                            wire:change="
+                                selectOrganization(
+                                    $event.target.value
+                                )
+                            "
+                        >
+
+                            @foreach(
+                                $this->adminOrganizations
+                                as $adminOrganization
+                            )
+
+                                <option
+                                    value="{{ $adminOrganization->id }}"
+                                    @selected(
+                                        $organization?->id
+                                        ===
+                                        $adminOrganization->id
+                                    )
+                                >
+                                    {{ $adminOrganization->name }}
+
+                                    @if($adminOrganization->owner)
+                                        —
+                                        {{ $adminOrganization->owner->email }}
+                                    @endif
+                                </option>
+
+                            @endforeach
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        @endif
 
         @if(!$organization)
 
@@ -272,12 +385,14 @@
                     </strong>
 
                     <div class="team-progress">
+
                         <span
                             style="
                                 width:
                                 {{ $seat['percent'] }}%;
                             "
                         ></span>
+
                     </div>
 
                     <small style="margin-top: 10px; display:block;">
@@ -308,6 +423,7 @@
                     <div class="team-form-grid">
 
                         <div class="team-field">
+
                             <label>
                                 Ad Soyad
                             </label>
@@ -319,13 +435,21 @@
                             >
 
                             @error('name')
-                                <div style="color:#dc2626;font-size:12px;margin-top:5px;">
+                                <div
+                                    style="
+                                        color:#dc2626;
+                                        font-size:12px;
+                                        margin-top:5px;
+                                    "
+                                >
                                     {{ $message }}
                                 </div>
                             @enderror
+
                         </div>
 
                         <div class="team-field">
+
                             <label>
                                 E-posta
                             </label>
@@ -337,13 +461,21 @@
                             >
 
                             @error('email')
-                                <div style="color:#dc2626;font-size:12px;margin-top:5px;">
+                                <div
+                                    style="
+                                        color:#dc2626;
+                                        font-size:12px;
+                                        margin-top:5px;
+                                    "
+                                >
                                     {{ $message }}
                                 </div>
                             @enderror
+
                         </div>
 
                         <div class="team-field">
+
                             <label>
                                 Rol
                             </label>
@@ -427,7 +559,9 @@
                                     <tr>
 
                                         <td>
+
                                             <div class="team-member">
+
                                                 <strong>
                                                     {{ $member->name }}
                                                 </strong>
@@ -435,12 +569,18 @@
                                                 <span>
                                                     {{ $member->email }}
                                                 </span>
+
                                             </div>
+
                                         </td>
 
                                         <td>
 
-                                            @if($member->pivot->role === 'owner')
+                                            @if(
+                                                $member->pivot->role
+                                                ===
+                                                'owner'
+                                            )
 
                                                 <strong>
                                                     İşletme Sahibi
@@ -469,7 +609,8 @@
                                                             value="{{ $value }}"
                                                             @selected(
                                                                 $member->pivot->role
-                                                                === $value
+                                                                ===
+                                                                $value
                                                             )
                                                         >
                                                             {{ $label }}
@@ -490,7 +631,8 @@
                                                     team-badge
                                                     {{
                                                         $member->pivot->status
-                                                        === 'active'
+                                                        ===
+                                                        'active'
                                                             ? 'team-badge-active'
                                                             : 'team-badge-inactive'
                                                     }}
@@ -498,7 +640,8 @@
                                             >
                                                 {{
                                                     $member->pivot->status
-                                                    === 'active'
+                                                    ===
+                                                    'active'
                                                         ? 'Aktif'
                                                         : 'Pasif'
                                                 }}
@@ -507,6 +650,7 @@
                                         </td>
 
                                         <td>
+
                                             {{
                                                 $member->pivot->joined_at
                                                     ? \Carbon\Carbon::parse(
@@ -514,11 +658,16 @@
                                                     )->format('d.m.Y')
                                                     : '-'
                                             }}
+
                                         </td>
 
                                         <td>
 
-                                            @if($member->pivot->role !== 'owner')
+                                            @if(
+                                                $member->pivot->role
+                                                !==
+                                                'owner'
+                                            )
 
                                                 <button
                                                     type="button"
@@ -531,7 +680,8 @@
                                                 >
                                                     {{
                                                         $member->pivot->status
-                                                        === 'active'
+                                                        ===
+                                                        'active'
                                                             ? 'Pasif Yap'
                                                             : 'Aktifleştir'
                                                     }}

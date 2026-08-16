@@ -42,6 +42,8 @@ class EkipYonetimi extends Page
 
     public bool $showCreateForm = false;
 
+    public ?int $selectedOrganizationId = null;
+
     /*
     |--------------------------------------------------------------------------
     | ERİŞİM
@@ -105,19 +107,16 @@ class EkipYonetimi extends Page
         */
 
         if ($user->is_admin) {
+            if ($this->selectedOrganizationId) {
+                return Organization::query()
+                    ->find(
+                        $this->selectedOrganizationId
+                    );
+            }
+
             return Organization::query()
-                ->where(
-                    'owner_user_id',
-                    $user->id
-                )
-                ->first()
-                ?? $user
-                    ->organizations()
-                    ->wherePivot(
-                        'status',
-                        'active'
-                    )
-                    ->first();
+                ->orderBy('name')
+                ->first();
         }
 
         return $user
@@ -127,6 +126,54 @@ class EkipYonetimi extends Page
                 'active'
             )
             ->first();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADMIN İŞLETME SEÇİCİ
+    |--------------------------------------------------------------------------
+    */
+
+    public function getAdminOrganizationsProperty(): Collection
+    {
+        if (! auth()->user()?->is_admin) {
+            return collect();
+        }
+
+        return Organization::query()
+            ->with('owner')
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function selectOrganization(
+        int $organizationId
+    ): void {
+        if (! auth()->user()?->is_admin) {
+            abort(403);
+        }
+
+        if (
+            ! Organization::query()
+                ->whereKey($organizationId)
+                ->exists()
+        ) {
+            return;
+        }
+
+        $this->selectedOrganizationId =
+            $organizationId;
+
+        $this->showCreateForm =
+            false;
+
+        $this->reset([
+            'name',
+            'email',
+        ]);
+
+        $this->role =
+            'sales';
     }
 
     /*
