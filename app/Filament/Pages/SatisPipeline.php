@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\ConversationControl;
 use App\Services\CrmActivityService;
+use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Pages\Page;
@@ -15,9 +16,9 @@ class SatisPipeline extends Page
 {
     protected string $view = 'filament.pages.satis-pipeline';
 
-    protected static ?string $title = 'Satış Pipeline';
+    protected static ?string $title = 'SatÄ±ÅŸ Pipeline';
 
-    protected static ?string $navigationLabel = 'Satış Pipeline';
+    protected static ?string $navigationLabel = 'SatÄ±ÅŸ Pipeline';
 
     protected static string | BackedEnum | null $navigationIcon =
         Heroicon::OutlinedRectangleStack;
@@ -30,9 +31,90 @@ class SatisPipeline extends Page
 
     public string $channelFilter = 'all';
 
+    public static function canAccess(): bool
+    {
+        return app(
+            OrganizationAccessService::class
+        )->can(
+            'pipeline'
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
+    protected function accessService(): OrganizationAccessService
+    {
+        return app(
+            OrganizationAccessService::class
+        );
+    }
+
+    protected function currentOrganization()
+    {
+        return $this
+            ->accessService()
+            ->currentOrganization();
+    }
+
+    protected function currentRole(): ?string
+    {
+        return $this
+            ->accessService()
+            ->currentRole();
+    }
+
+    protected function canWritePipeline(): bool
+    {
+        return $this
+            ->accessService()
+            ->canWriteCrm();
+    }
+
+    protected function scopedConversationQuery(): Builder
+    {
+        $user = auth()->user();
+
+        $query = ConversationControl::query();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        $organization =
+            $this->currentOrganization();
+
+        if (! $organization) {
+            return $query->where(
+                'user_id',
+                $user->id
+            );
+        }
+
+        $query->where(
+            'organization_id',
+            $organization->id
+        );
+
+        if ($this->currentRole() === 'sales') {
+            $query->where(
+                'assigned_user_id',
+                $user->id
+            );
+        }
+
+        return $query;
+    }
+
     /*
     |--------------------------------------------------------------------------
-    | CRM AKTİVİTE SERVİSİ
+    | CRM AKTÄ°VÄ°TE SERVÄ°SÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -51,15 +133,11 @@ class SatisPipeline extends Page
 
     protected function baseQuery(): Builder
     {
-        return ConversationControl::query()
+        return $this->scopedConversationQuery()
             ->with([
                 'aiBot',
                 'assignedUser',
             ])
-            ->where(
-                'user_id',
-                auth()->id()
-            )
             ->when(
                 trim($this->search) !== '',
                 function (Builder $query): void {
@@ -186,7 +264,7 @@ class SatisPipeline extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | AŞAMA DEĞİŞTİR
+    | AÅAMA DEÄÄ°ÅTÄ°R
     |--------------------------------------------------------------------------
     */
 
@@ -213,11 +291,11 @@ class SatisPipeline extends Page
             return;
         }
 
-        $customer = ConversationControl::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        if (! $this->canWritePipeline()) {
+            abort(403);
+        }
+
+        $customer = $this->scopedConversationQuery()
             ->whereKey(
                 $customerId
             )
@@ -284,11 +362,11 @@ class SatisPipeline extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | CRM AKTİVİTE KAYDI
+        | CRM AKTÄ°VÄ°TE KAYDI
         |--------------------------------------------------------------------------
         |
-        | Kart sürükle-bırak veya hızlı aksiyon ile başka kolona taşındığında
-        | müşteri geçmişine satış aşaması değişikliği yazılır.
+        | Kart sÃ¼rÃ¼kle-bÄ±rak veya hÄ±zlÄ± aksiyon ile baÅŸka kolona taÅŸÄ±ndÄ±ÄŸÄ±nda
+        | mÃ¼ÅŸteri geÃ§miÅŸine satÄ±ÅŸ aÅŸamasÄ± deÄŸiÅŸikliÄŸi yazÄ±lÄ±r.
         |
         */
 
@@ -340,11 +418,11 @@ class SatisPipeline extends Page
         int $customerId,
         int $score
     ): void {
-        $customer = ConversationControl::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        if (! $this->canWritePipeline()) {
+            abort(403);
+        }
+
+        $customer = $this->scopedConversationQuery()
             ->whereKey(
                 $customerId
             )
@@ -449,25 +527,25 @@ class SatisPipeline extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | GERÇEK ZAMANLI KPI MİNİ GRAFİKLERİ
+    | GERÃ‡EK ZAMANLI KPI MÄ°NÄ° GRAFÄ°KLERÄ°
     |--------------------------------------------------------------------------
     |
-    | Grafikler dekoratif değildir.
+    | Grafikler dekoratif deÄŸildir.
     |
-    | Açık Fırsat:
-    |   Son 7 günde oluşturulmuş ve şu anda açık olan fırsatlar.
+    | AÃ§Ä±k FÄ±rsat:
+    |   Son 7 gÃ¼nde oluÅŸturulmuÅŸ ve ÅŸu anda aÃ§Ä±k olan fÄ±rsatlar.
     |
-    | Sıcak Lead:
-    |   Son 7 günde oluşturulmuş ve şu anda sıcak olan açık lead'ler.
+    | SÄ±cak Lead:
+    |   Son 7 gÃ¼nde oluÅŸturulmuÅŸ ve ÅŸu anda sÄ±cak olan aÃ§Ä±k lead'ler.
     |
     | Teklif:
-    |   Son 7 günde oluşturulmuş ve şu anda teklif aşamasında olan lead'ler.
+    |   Son 7 gÃ¼nde oluÅŸturulmuÅŸ ve ÅŸu anda teklif aÅŸamasÄ±nda olan lead'ler.
     |
-    | Kazanılan:
-    |   Son 7 günde gerçekten kazanılmış satışlar (won_at).
+    | KazanÄ±lan:
+    |   Son 7 gÃ¼nde gerÃ§ekten kazanÄ±lmÄ±ÅŸ satÄ±ÅŸlar (won_at).
     |
-    | Sayfa wire:poll ile 60 saniyede bir tekrar render edildiği için grafik
-    | verileri de veritabanından yeniden okunur.
+    | Sayfa wire:poll ile 60 saniyede bir tekrar render edildiÄŸi iÃ§in grafik
+    | verileri de veritabanÄ±ndan yeniden okunur.
     |
     */
 
@@ -496,7 +574,7 @@ class SatisPipeline extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | SON 7 GÜNDE OLUŞTURULAN MEVCUT LEAD'LER
+        | SON 7 GÃœNDE OLUÅTURULAN MEVCUT LEAD'LER
         |--------------------------------------------------------------------------
         */
 
@@ -516,7 +594,7 @@ class SatisPipeline extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | SON 7 GÜNDE KAZANILANLAR
+        | SON 7 GÃœNDE KAZANILANLAR
         |--------------------------------------------------------------------------
         */
 
@@ -938,7 +1016,7 @@ class SatisPipeline extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | FİLTRELER
+    | FÄ°LTRELER
     |--------------------------------------------------------------------------
     */
 
@@ -964,13 +1042,13 @@ class SatisPipeline extends Page
     ): string {
         return match ($temperature) {
             'hot' =>
-                'Sıcak',
+                'SÄ±cak',
 
             'warm' =>
-                'Ilık',
+                'IlÄ±k',
 
             default =>
-                'Soğuk',
+                'SoÄŸuk',
         };
     }
 

@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\ConversationControl;
 use App\Services\CrmActivityService;
+use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Pages\Page;
@@ -15,9 +16,9 @@ class Gorevler extends Page
 {
     protected string $view = 'filament.pages.gorevler';
 
-    protected static ?string $title = 'Görevler';
+    protected static ?string $title = 'GÃ¶revler';
 
-    protected static ?string $navigationLabel = 'Görevler';
+    protected static ?string $navigationLabel = 'GÃ¶revler';
 
     protected static string | BackedEnum | null $navigationIcon =
         Heroicon::OutlinedClipboardDocumentCheck;
@@ -30,9 +31,90 @@ class Gorevler extends Page
 
     public string $channelFilter = 'all';
 
+    public static function canAccess(): bool
+    {
+        return app(
+            OrganizationAccessService::class
+        )->can(
+            'tasks'
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
+    protected function accessService(): OrganizationAccessService
+    {
+        return app(
+            OrganizationAccessService::class
+        );
+    }
+
+    protected function currentOrganization()
+    {
+        return $this
+            ->accessService()
+            ->currentOrganization();
+    }
+
+    protected function currentRole(): ?string
+    {
+        return $this
+            ->accessService()
+            ->currentRole();
+    }
+
+    protected function canWriteTasks(): bool
+    {
+        return $this
+            ->accessService()
+            ->canWriteCrm();
+    }
+
+    protected function scopedConversationQuery(): Builder
+    {
+        $user = auth()->user();
+
+        $query = ConversationControl::query();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        $organization =
+            $this->currentOrganization();
+
+        if (! $organization) {
+            return $query->where(
+                'user_id',
+                $user->id
+            );
+        }
+
+        $query->where(
+            'organization_id',
+            $organization->id
+        );
+
+        if ($this->currentRole() === 'sales') {
+            $query->where(
+                'assigned_user_id',
+                $user->id
+            );
+        }
+
+        return $query;
+    }
+
     /*
     |--------------------------------------------------------------------------
-    | CRM AKTİVİTE SERVİSİ
+    | CRM AKTÄ°VÄ°TE SERVÄ°SÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -51,15 +133,11 @@ class Gorevler extends Page
 
     protected function baseQuery(): Builder
     {
-        return ConversationControl::query()
+        return $this->scopedConversationQuery()
             ->with([
                 'aiBot',
                 'assignedUser',
             ])
-            ->where(
-                'user_id',
-                auth()->id()
-            )
             ->whereNotNull(
                 'next_follow_up_at'
             )
@@ -119,7 +197,7 @@ class Gorevler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | GECİKENLER
+    | GECÄ°KENLER
     |--------------------------------------------------------------------------
     */
 
@@ -139,7 +217,7 @@ class Gorevler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | BUGÜN
+    | BUGÃœN
     |--------------------------------------------------------------------------
     */
 
@@ -161,7 +239,7 @@ class Gorevler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | YAKLAŞAN
+    | YAKLAÅAN
     |--------------------------------------------------------------------------
     */
 
@@ -233,18 +311,18 @@ class Gorevler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | TAKİBİ TAMAMLA
+    | TAKÄ°BÄ° TAMAMLA
     |--------------------------------------------------------------------------
     */
 
     public function completeTask(
         int $customerId
     ): void {
-        $customer = ConversationControl::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        if (! $this->canWriteTasks()) {
+            abort(403);
+        }
+
+        $customer = $this->scopedConversationQuery()
             ->whereKey(
                 $customerId
             )
@@ -288,11 +366,11 @@ class Gorevler extends Page
     public function postponeToTomorrow(
         int $customerId
     ): void {
-        $customer = ConversationControl::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        if (! $this->canWriteTasks()) {
+            abort(403);
+        }
+
+        $customer = $this->scopedConversationQuery()
             ->whereKey(
                 $customerId
             )
@@ -346,11 +424,11 @@ class Gorevler extends Page
     public function postponeOneHour(
         int $customerId
     ): void {
-        $customer = ConversationControl::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        if (! $this->canWriteTasks()) {
+            abort(403);
+        }
+
+        $customer = $this->scopedConversationQuery()
             ->whereKey(
                 $customerId
             )
@@ -397,7 +475,7 @@ class Gorevler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | FİLTRELER
+    | FÄ°LTRELER
     |--------------------------------------------------------------------------
     */
 
@@ -423,13 +501,13 @@ class Gorevler extends Page
     ): string {
         return match ($temperature) {
             'hot' =>
-                'Sıcak',
+                'SÄ±cak',
 
             'warm' =>
-                'Ilık',
+                'IlÄ±k',
 
             default =>
-                'Soğuk',
+                'SoÄŸuk',
         };
     }
 

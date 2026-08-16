@@ -6,12 +6,92 @@ use App\Models\AiBot;
 use App\Models\ConversationControl;
 use App\Models\Order;
 use App\Models\Product;
+use App\Services\OrganizationAccessService;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Illuminate\Support\Facades\Schema;
 
 class Dashboard extends BaseDashboard
 {
     protected string $view = 'filament.pages.dashboard';
+
+    protected function accessService(): OrganizationAccessService
+    {
+        return app(
+            OrganizationAccessService::class
+        );
+    }
+
+    protected function currentOrganization()
+    {
+        return $this
+            ->accessService()
+            ->currentOrganization();
+    }
+
+    protected function currentRole(): ?string
+    {
+        return $this
+            ->accessService()
+            ->currentRole();
+    }
+
+    protected function ownerUserId(): int
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return 0;
+        }
+
+        if ($user->is_admin) {
+            return $user->id;
+        }
+
+        return (int) (
+            $this->currentOrganization()?->owner_user_id
+            ?? $user->id
+        );
+    }
+
+    protected function conversationQuery()
+    {
+        $user = auth()->user();
+
+        $query =
+            ConversationControl::query();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        $organization =
+            $this->currentOrganization();
+
+        if (! $organization) {
+            return $query->where(
+                'user_id',
+                $user->id
+            );
+        }
+
+        $query->where(
+            'organization_id',
+            $organization->id
+        );
+
+        if ($this->currentRole() === 'sales') {
+            $query->where(
+                'assigned_user_id',
+                $user->id
+            );
+        }
+
+        return $query;
+    }
 
     public function getHeading(): string
     {
@@ -34,15 +114,15 @@ class Dashboard extends BaseDashboard
         $user = auth()->user();
 
         if (! $user) {
-            return 'Hoş geldiniz';
+            return 'HoÅŸ geldiniz';
         }
 
-        return $user->name ?: 'Hoş geldiniz';
+        return $user->name ?: 'HoÅŸ geldiniz';
     }
 
     /*
     |--------------------------------------------------------------------------
-    | AKTİF / SON BOT
+    | AKTÄ°F / SON BOT
     |--------------------------------------------------------------------------
     */
 
@@ -53,14 +133,17 @@ class Dashboard extends BaseDashboard
         }
 
         return AiBot::query()
-            ->where('user_id', auth()->id())
+            ->where(
+                'user_id',
+                $this->ownerUserId()
+            )
             ->latest('id')
             ->first();
     }
 
     /*
     |--------------------------------------------------------------------------
-    | KULLANICIYA AİT BOT ID'LERİ
+    | KULLANICIYA AÄ°T BOT ID'LERÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -71,7 +154,10 @@ class Dashboard extends BaseDashboard
         }
 
         return AiBot::query()
-            ->where('user_id', auth()->id())
+            ->where(
+                'user_id',
+                $this->ownerUserId()
+            )
             ->pluck('id')
             ->map(
                 fn ($id) => (int) $id
@@ -81,7 +167,7 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | TOPLAM MÜŞTERİ / GÖRÜŞME
+    | TOPLAM MÃœÅTERÄ° / GÃ–RÃœÅME
     |--------------------------------------------------------------------------
     */
 
@@ -95,7 +181,7 @@ class Dashboard extends BaseDashboard
 
         /*
         |--------------------------------------------------------------------------
-        | Öncelik user_id
+        | Ã–ncelik user_id
         |--------------------------------------------------------------------------
         */
 
@@ -105,14 +191,14 @@ class Dashboard extends BaseDashboard
                 'user_id'
             )
         ) {
-            return $query
-                ->where('user_id', auth()->id())
+            return $this
+                ->conversationQuery()
                 ->count();
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Eski / farklı şema için ai_bot_id desteği
+        | Eski / farklÄ± ÅŸema iÃ§in ai_bot_id desteÄŸi
         |--------------------------------------------------------------------------
         */
 
@@ -138,7 +224,7 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | OKUNMAMIŞ MESAJ
+    | OKUNMAMIÅ MESAJ
     |--------------------------------------------------------------------------
     */
 
@@ -162,8 +248,8 @@ class Dashboard extends BaseDashboard
                 'user_id'
             )
         ) {
-            return (int) $query
-                ->where('user_id', auth()->id())
+            return (int) $this
+                ->conversationQuery()
                 ->sum('unread_count');
         }
 
@@ -189,11 +275,11 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | ÜRÜN / HİZMET SAYISI
+    | ÃœRÃœN / HÄ°ZMET SAYISI
     |--------------------------------------------------------------------------
     |
-    | Product modelimiz user_id kullanmıyor.
-    | Ürünler ai_bot_id üzerinden yapay zekâ botuna bağlı.
+    | Product modelimiz user_id kullanmÄ±yor.
+    | ÃœrÃ¼nler ai_bot_id Ã¼zerinden yapay zekÃ¢ botuna baÄŸlÄ±.
     |
     */
 
@@ -207,7 +293,7 @@ class Dashboard extends BaseDashboard
 
         /*
         |--------------------------------------------------------------------------
-        | Mevcut doğru yapı: ai_bot_id
+        | Mevcut doÄŸru yapÄ±: ai_bot_id
         |--------------------------------------------------------------------------
         */
 
@@ -230,7 +316,7 @@ class Dashboard extends BaseDashboard
 
         /*
         |--------------------------------------------------------------------------
-        | İleriye dönük user_id desteği
+        | Ä°leriye dÃ¶nÃ¼k user_id desteÄŸi
         |--------------------------------------------------------------------------
         */
 
@@ -241,7 +327,7 @@ class Dashboard extends BaseDashboard
             )
         ) {
             return Product::query()
-                ->where('user_id', auth()->id())
+                ->where('user_id', $this->ownerUserId())
                 ->count();
         }
 
@@ -250,11 +336,11 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | SİPARİŞ SAYISI
+    | SÄ°PARÄ°Å SAYISI
     |--------------------------------------------------------------------------
     |
-    | Production ve local şemalar arasında fark varsa 500 vermesin.
-    | Önce user_id, yoksa ai_bot_id kullanır.
+    | Production ve local ÅŸemalar arasÄ±nda fark varsa 500 vermesin.
+    | Ã–nce user_id, yoksa ai_bot_id kullanÄ±r.
     |
     */
 
@@ -279,7 +365,7 @@ class Dashboard extends BaseDashboard
             )
         ) {
             return Order::query()
-                ->where('user_id', auth()->id())
+                ->where('user_id', $this->ownerUserId())
                 ->count();
         }
 
@@ -311,7 +397,7 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | WHATSAPP BAĞLANTI DURUMU
+    | WHATSAPP BAÄLANTI DURUMU
     |--------------------------------------------------------------------------
     */
 
@@ -344,7 +430,7 @@ class Dashboard extends BaseDashboard
 
     /*
     |--------------------------------------------------------------------------
-    | AKTİF KANAL SAYISI
+    | AKTÄ°F KANAL SAYISI
     |--------------------------------------------------------------------------
     */
 
@@ -358,7 +444,7 @@ class Dashboard extends BaseDashboard
 
         /*
         |--------------------------------------------------------------------------
-        | Instagram / Facebook / Web bağlandığında buraya eklenecek.
+        | Instagram / Facebook / Web baÄŸlandÄ±ÄŸÄ±nda buraya eklenecek.
         |--------------------------------------------------------------------------
         */
 
@@ -396,3 +482,4 @@ class Dashboard extends BaseDashboard
         );
     }
 }
+PS C:\laragon\www\asilkansoft-ai>

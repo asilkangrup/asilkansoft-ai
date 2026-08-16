@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\CrmAlarm;
 use App\Services\CrmAlarmAuditService;
+use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Pages\Page;
@@ -41,18 +42,105 @@ class AlarmMerkezi extends Page
 
     public array $expandedHistories = [];
 
+    public static function canAccess(): bool
+    {
+        return app(
+            OrganizationAccessService::class
+        )->can(
+            'alarms'
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
+    protected function accessService(): OrganizationAccessService
+    {
+        return app(
+            OrganizationAccessService::class
+        );
+    }
+
+    protected function currentOrganization()
+    {
+        return $this
+            ->accessService()
+            ->currentOrganization();
+    }
+
+    protected function currentRole(): ?string
+    {
+        return $this
+            ->accessService()
+            ->currentRole();
+    }
+
+    protected function canWriteAlarms(): bool
+    {
+        return $this
+            ->accessService()
+            ->canWriteCrm();
+    }
+
+    protected function alarmScopeQuery(): Builder
+    {
+        $user = auth()->user();
+
+        $query = CrmAlarm::query();
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        $organization =
+            $this->currentOrganization();
+
+        if (! $organization) {
+            return $query->where(
+                'user_id',
+                $user->id
+            );
+        }
+
+        $role =
+            $this->currentRole();
+
+        return $query->whereHas(
+            'conversation',
+            function (Builder $conversationQuery) use (
+                $organization,
+                $role,
+                $user
+            ): void {
+                $conversationQuery->where(
+                    'organization_id',
+                    $organization->id
+                );
+
+                if ($role === 'sales') {
+                    $conversationQuery->where(
+                        'assigned_user_id',
+                        $user->id
+                    );
+                }
+            }
+        );
+    }
+
     protected function baseQuery(): Builder
     {
-        return CrmAlarm::query()
+        return $this->alarmScopeQuery()
             ->with([
                 'conversation.aiBot',
                 'conversation.assignedUser',
                 'events.user',
             ])
-            ->where(
-                'user_id',
-                auth()->id()
-            )
             ->when(
                 $this->statusFilter === 'active',
                 fn (Builder $query) =>
@@ -142,11 +230,7 @@ class AlarmMerkezi extends Page
 
     public function getActiveCountProperty(): int
     {
-        return CrmAlarm::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        return $this->alarmScopeQuery()
             ->where(
                 'is_resolved',
                 false
@@ -171,11 +255,7 @@ class AlarmMerkezi extends Page
 
     public function getCriticalCountProperty(): int
     {
-        return CrmAlarm::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        return $this->alarmScopeQuery()
             ->where(
                 'is_resolved',
                 false
@@ -204,11 +284,7 @@ class AlarmMerkezi extends Page
 
     public function getResolvedTodayCountProperty(): int
     {
-        return CrmAlarm::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        return $this->alarmScopeQuery()
             ->where(
                 'is_resolved',
                 true
@@ -226,7 +302,7 @@ class AlarmMerkezi extends Page
     |--------------------------------------------------------------------------
     |
     | Kritik: 2 saat
-    | Uyarı: 8 saat
+    | UyarÄ±: 8 saat
     | Bilgi: 24 saat
     |
     */
@@ -297,7 +373,7 @@ class AlarmMerkezi extends Page
             $hours % 24;
 
         return $days
-            .' gün '
+            .' gÃ¼n '
             .$remainingHours
             .' sa';
     }
@@ -328,11 +404,7 @@ class AlarmMerkezi extends Page
 
     public function getSlaBreachedCountProperty(): int
     {
-        return CrmAlarm::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        return $this->alarmScopeQuery()
             ->where(
                 'is_resolved',
                 false
@@ -365,11 +437,7 @@ class AlarmMerkezi extends Page
     public function getAverageResolutionMinutesProperty(): int
     {
         $alarms =
-            CrmAlarm::query()
-                ->where(
-                    'user_id',
-                    auth()->id()
-                )
+            $this->alarmScopeQuery()
                 ->where(
                     'is_resolved',
                     true
@@ -432,16 +500,12 @@ class AlarmMerkezi extends Page
             $hours / 24,
             1
         )
-            .' gün';
+            .' gÃ¼n';
     }
 
     public function getOldestActiveAlarmProperty(): ?CrmAlarm
     {
-        return CrmAlarm::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        return $this->alarmScopeQuery()
             ->where(
                 'is_resolved',
                 false
@@ -476,14 +540,10 @@ class AlarmMerkezi extends Page
     public function getStaffAlarmPerformanceProperty(): Collection
     {
         $alarms =
-            CrmAlarm::query()
+            $this->alarmScopeQuery()
                 ->with([
                     'conversation.assignedUser',
                 ])
-                ->where(
-                    'user_id',
-                    auth()->id()
-                )
                 ->whereHas(
                     'conversation',
                     fn (Builder $query) =>
@@ -653,34 +713,30 @@ class AlarmMerkezi extends Page
             $hours / 24,
             1
         )
-            .' gün';
+            .' gÃ¼n';
     }
 
     /*
     |--------------------------------------------------------------------------
-    | GÜNÜN EN RİSKLİ MÜŞTERİLERİ
+    | GÃœNÃœN EN RÄ°SKLÄ° MÃœÅTERÄ°LERÄ°
     |--------------------------------------------------------------------------
     |
-    | Risk puanı:
-    | - Alarm önceliği
+    | Risk puanÄ±:
+    | - Alarm Ã¶nceliÄŸi
     | - Lead skoru
-    | - Açık fırsatlar içindeki göreli tahmini değer
-    | - Geciken takip / sessizlik süresi
+    | - AÃ§Ä±k fÄ±rsatlar iÃ§indeki gÃ¶reli tahmini deÄŸer
+    | - Geciken takip / sessizlik sÃ¼resi
     |
     */
 
     public function getTopRiskCustomersProperty(): Collection
     {
         $alarms =
-            CrmAlarm::query()
+            $this->alarmScopeQuery()
                 ->with([
                     'conversation.aiBot',
                     'conversation.assignedUser',
                 ])
-                ->where(
-                    'user_id',
-                    auth()->id()
-                )
                 ->where(
                     'is_resolved',
                     false
@@ -840,7 +896,7 @@ class AlarmMerkezi extends Page
                         'customer_name' =>
                             $conversation?->customer_name
                             ?: $conversation?->whatsapp_number
-                            ?: 'Müşteri',
+                            ?: 'MÃ¼ÅŸteri',
 
                         'risk_score' =>
                             $riskScore,
@@ -972,11 +1028,7 @@ class AlarmMerkezi extends Page
 
     public function getSnoozedCountProperty(): int
     {
-        return CrmAlarm::query()
-            ->where(
-                'user_id',
-                auth()->id()
-            )
+        return $this->alarmScopeQuery()
             ->where(
                 'is_resolved',
                 false
@@ -996,12 +1048,12 @@ class AlarmMerkezi extends Page
         int $alarmId,
         string $duration
     ): void {
+        if (! $this->canWriteAlarms()) {
+            abort(403);
+        }
+
         $alarm =
-            CrmAlarm::query()
-                ->where(
-                    'user_id',
-                    auth()->id()
-                )
+            $this->alarmScopeQuery()
                 ->find(
                     $alarmId
                 );
@@ -1039,7 +1091,7 @@ class AlarmMerkezi extends Page
                 $until,
 
             /*
-            | Erteleme bittiğinde yeniden bir kez bildirim gönderebilsin.
+            | Erteleme bittiÄŸinde yeniden bir kez bildirim gÃ¶nderebilsin.
             */
             'notified_at' =>
                 null,
@@ -1061,12 +1113,12 @@ class AlarmMerkezi extends Page
     public function snoozeAlarmCustom(
         int $alarmId
     ): void {
+        if (! $this->canWriteAlarms()) {
+            abort(403);
+        }
+
         $alarm =
-            CrmAlarm::query()
-                ->where(
-                    'user_id',
-                    auth()->id()
-                )
+            $this->alarmScopeQuery()
                 ->find(
                     $alarmId
                 );
@@ -1115,7 +1167,7 @@ class AlarmMerkezi extends Page
                 alarm: $alarm,
                 eventType: 'snoozed',
                 user: auth()->user(),
-                description: 'Alarm özel tarihe ertelendi.',
+                description: 'Alarm Ã¶zel tarihe ertelendi.',
                 meta: [
                     'snoozed_until' =>
                         $until->toDateTimeString(),
@@ -1126,12 +1178,12 @@ class AlarmMerkezi extends Page
     public function clearAlarmSnooze(
         int $alarmId
     ): void {
+        if (! $this->canWriteAlarms()) {
+            abort(403);
+        }
+
         $alarm =
-            CrmAlarm::query()
-                ->where(
-                    'user_id',
-                    auth()->id()
-                )
+            $this->alarmScopeQuery()
                 ->find(
                     $alarmId
                 );
@@ -1147,7 +1199,7 @@ class AlarmMerkezi extends Page
                 alarm: $alarm,
                 eventType: 'snooze_cleared',
                 user: auth()->user(),
-                description: 'Alarm ertelemesi kaldırıldı.',
+                description: 'Alarm ertelemesi kaldÄ±rÄ±ldÄ±.',
             );
     }
 
@@ -1187,12 +1239,12 @@ class AlarmMerkezi extends Page
     public function resolveAlarm(
         int $alarmId
     ): void {
+        if (! $this->canWriteAlarms()) {
+            abort(403);
+        }
+
         $alarm =
-            CrmAlarm::query()
-                ->where(
-                    'user_id',
-                    auth()->id()
-                )
+            $this->alarmScopeQuery()
                 ->find(
                     $alarmId
                 );
@@ -1208,19 +1260,19 @@ class AlarmMerkezi extends Page
                 alarm: $alarm,
                 eventType: 'resolved',
                 user: auth()->user(),
-                description: 'Alarm manuel olarak çözüldü.',
+                description: 'Alarm manuel olarak Ã§Ã¶zÃ¼ldÃ¼.',
             );
     }
 
     public function reopenAlarm(
         int $alarmId
     ): void {
+        if (! $this->canWriteAlarms()) {
+            abort(403);
+        }
+
         $alarm =
-            CrmAlarm::query()
-                ->where(
-                    'user_id',
-                    auth()->id()
-                )
+            $this->alarmScopeQuery()
                 ->find(
                     $alarmId
                 );
@@ -1236,7 +1288,7 @@ class AlarmMerkezi extends Page
                 alarm: $alarm,
                 eventType: 'reopened',
                 user: auth()->user(),
-                description: 'Alarm yeniden açıldı.',
+                description: 'Alarm yeniden aÃ§Ä±ldÄ±.',
             );
     }
 
@@ -1256,7 +1308,7 @@ class AlarmMerkezi extends Page
     public function getLiveKpiTrendsProperty(): array
     {
         $s=now()->subDays(6)->startOfDay();
-        $rows=CrmAlarm::query()->where('user_id',auth()->id())->where(fn(Builder $q)=>$q->where('created_at','>=',$s)->orWhere('resolved_at','>=',$s))->get(['created_at','resolved_at','severity','snoozed_until']);
+        $rows=$this->alarmScopeQuery()->where(fn(Builder $q)=>$q->where('created_at','>=',$s)->orWhere('resolved_at','>=',$s))->get(['created_at','resolved_at','severity','snoozed_until']);
         $days=collect(range(0,6))->map(fn($i)=>$s->copy()->addDays($i));
         return [
             'active'=>$this->liveSeries($days->map(fn($d)=>$rows->filter(fn(CrmAlarm $a)=>$a->created_at?->isSameDay($d)&&!$a->resolved_at)->count())->all()),

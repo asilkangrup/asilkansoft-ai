@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\AiBots\Pages;
 
 use App\Filament\Resources\AiBots\AiBotResource;
+use App\Services\OrganizationAccessService;
 use App\Services\WhatsAppService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
@@ -14,22 +15,49 @@ class WhatsAppBagla extends Page
 {
     use InteractsWithRecord;
 
-    protected static string $resource = AiBotResource::class;
+    protected static string $resource =
+        AiBotResource::class;
 
     protected string $view =
         'filament.resources.ai-bots.pages.whatsapp-bagla';
 
     /*
     |--------------------------------------------------------------------------
+    | YETKİ
+    |--------------------------------------------------------------------------
+    */
+
+    protected function accessService(): OrganizationAccessService
+    {
+        return app(
+            OrganizationAccessService::class
+        );
+    }
+
+    protected function canManageWhatsApp(): bool
+    {
+        $role =
+            $this->accessService()
+                ->currentRole();
+
+        return in_array(
+            $role,
+            [
+                'admin',
+                'owner',
+                'manager',
+            ],
+            true
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | SAYFA AÇILIŞI
     |--------------------------------------------------------------------------
     |
-    | Kullanıcı bu sayfaya nereden gelirse gelsin:
-    |
-    | 1. Bot kaydı bulunur.
-    | 2. Evolution instance yoksa otomatik oluşturulur.
-    | 3. Webhook otomatik kurulur.
-    | 4. QR kod hazırlanır.
+    | Yetki kontrolü resolveRecord işleminden önce yapılır.
+    | Resource query ayrıca başka işletmenin bot ID'sine erişimi engeller.
     |
     */
 
@@ -37,7 +65,14 @@ class WhatsAppBagla extends Page
         int|string $record,
         WhatsAppService $whatsAppService
     ): void {
-        $this->record = $this->resolveRecord($record);
+        if (! $this->canManageWhatsApp()) {
+            abort(403);
+        }
+
+        $this->record =
+            $this->resolveRecord(
+                $record
+            );
 
         $this->whatsappHazirla(
             $whatsAppService
@@ -58,6 +93,10 @@ class WhatsAppBagla extends Page
     public function baglantiyiYenile(
         WhatsAppService $whatsAppService
     ): void {
+        if (! $this->canManageWhatsApp()) {
+            abort(403);
+        }
+
         $this->whatsappHazirla(
             $whatsAppService
         );
@@ -72,6 +111,10 @@ class WhatsAppBagla extends Page
     private function whatsappHazirla(
         WhatsAppService $whatsAppService
     ): void {
+        if (! $this->canManageWhatsApp()) {
+            abort(403);
+        }
+
         try {
 
             /*
@@ -90,20 +133,25 @@ class WhatsAppBagla extends Page
 
             if (
                 blank(
-                    $this->record->whatsapp_instance
+                    $this->record
+                        ->whatsapp_instance
                 )
             ) {
-                $firmaAdi = Str::slug(
-                    $this->record->company_name
-                    ?: $this->record->name
-                );
+                $firmaAdi =
+                    Str::slug(
+                        $this->record
+                            ->company_name
+                        ?: $this->record
+                            ->name
+                    );
 
-                $instanceName = trim(
-                    $firmaAdi
-                    .'-'
-                    .$this->record->id,
-                    '-'
-                );
+                $instanceName =
+                    trim(
+                        $firmaAdi
+                        .'-'
+                        .$this->record->id,
+                        '-'
+                    );
 
                 /*
                 |--------------------------------------------------------------------------
@@ -155,7 +203,9 @@ class WhatsAppBagla extends Page
                         'connecting',
 
                     'whatsapp_qr' =>
-                        is_string($qrCode)
+                        is_string(
+                            $qrCode
+                        )
                             ? $qrCode
                             : null,
                 ]);
@@ -175,10 +225,11 @@ class WhatsAppBagla extends Page
                     )
                     .'/api/whatsapp/webhook';
 
-                $whatsAppService->setWebhook(
-                    $instanceName,
-                    $webhookUrl
-                );
+                $whatsAppService
+                    ->setWebhook(
+                        $instanceName,
+                        $webhookUrl
+                    );
 
                 $this->record->refresh();
             }
@@ -187,9 +238,6 @@ class WhatsAppBagla extends Page
             |--------------------------------------------------------------------------
             | INSTANCE VARSA WEBHOOK'U GARANTİLE
             |--------------------------------------------------------------------------
-            |
-            | Eski botlarda webhook boş kalmış olabilir.
-            |
             */
 
             if (
@@ -207,11 +255,12 @@ class WhatsAppBagla extends Page
                     )
                     .'/api/whatsapp/webhook';
 
-                $whatsAppService->setWebhook(
-                    $this->record
-                        ->whatsapp_instance,
-                    $webhookUrl
-                );
+                $whatsAppService
+                    ->setWebhook(
+                        $this->record
+                            ->whatsapp_instance,
+                        $webhookUrl
+                    );
             }
 
             /*
