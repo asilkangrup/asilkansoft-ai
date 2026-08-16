@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\ChatMessage;
+use App\Models\ConversationControl;
+use App\Models\Organization;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -19,12 +21,12 @@ class MemoryService
     |--------------------------------------------------------------------------
     |
     | role:
-    | user      = OpenAI tarafında kullanıcı mesajı
-    | assistant = OpenAI tarafında asistan mesajı
+    | user      = OpenAI tarafÄ±nda kullanÄ±cÄ± mesajÄ±
+    | assistant = OpenAI tarafÄ±nda asistan mesajÄ±
     |
     | senderType:
-    | customer  = WhatsApp müşterisi
-    | ai        = Yapay zekâ
+    | customer  = WhatsApp mÃ¼ÅŸterisi
+    | ai        = Yapay zekÃ¢
     | human     = Paneldeki personel
     |
     */
@@ -40,15 +42,15 @@ class MemoryService
     ): ChatMessage {
         /*
         |--------------------------------------------------------------------------
-        | SENDER TYPE OTOMATİK BELİRLE
+        | SENDER TYPE OTOMATÄ°K BELÄ°RLE
         |--------------------------------------------------------------------------
         |
-        | Eski kodlardan senderType gönderilmezse:
+        | Eski kodlardan senderType gÃ¶nderilmezse:
         |
         | user      => customer
         | assistant => ai
         |
-        | Böylece mevcut sistem bozulmadan çalışmaya devam eder.
+        | BÃ¶ylece mevcut sistem bozulmadan Ã§alÄ±ÅŸmaya devam eder.
         |
         */
 
@@ -59,9 +61,38 @@ class MemoryService
                     : 'customer';
         }
 
+        $organizationId =
+            ConversationControl::query()
+                ->where(
+                    'user_id',
+                    $userId
+                )
+                ->where(
+                    'session_id',
+                    $sessionId
+                )
+                ->value(
+                    'organization_id'
+                );
+
+        if ($organizationId === null) {
+            $organizationId =
+                Organization::query()
+                    ->where(
+                        'owner_user_id',
+                        $userId
+                    )
+                    ->value(
+                        'id'
+                    );
+        }
+
         return ChatMessage::create([
             'user_id' =>
                 $userId,
+
+            'organization_id' =>
+                $organizationId,
 
             'ai_bot_id' =>
                 $aiBotId,
@@ -85,7 +116,7 @@ class MemoryService
 
     /*
     |--------------------------------------------------------------------------
-    | KONUŞMA GEÇMİŞİ
+    | KONUÅMA GEÃ‡MÄ°ÅÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -112,7 +143,7 @@ class MemoryService
 
     /*
     |--------------------------------------------------------------------------
-    | OPENAI MESAJ FORMATINA ÇEVİR
+    | OPENAI MESAJ FORMATINA Ã‡EVÄ°R
     |--------------------------------------------------------------------------
     */
 
@@ -143,7 +174,7 @@ class MemoryService
 
     /*
     |--------------------------------------------------------------------------
-    | SOHBETİ TEMİZLE
+    | SOHBETÄ° TEMÄ°ZLE
     |--------------------------------------------------------------------------
     */
 

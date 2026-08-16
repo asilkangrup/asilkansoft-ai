@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\AiBot;
+use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Pages\Page;
 use UnitEnum;
@@ -22,6 +23,27 @@ class Kanallar extends Page
     protected static string|UnitEnum|null $navigationGroup = 'WAI';
 
     protected static ?int $navigationSort = 20;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ROL BAZLI ERİŞİM
+    |--------------------------------------------------------------------------
+    */
+
+    public static function canAccess(): bool
+    {
+        return app(
+            OrganizationAccessService::class
+        )->can(
+            'channels'
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
 
     public ?AiBot $bot = null;
 

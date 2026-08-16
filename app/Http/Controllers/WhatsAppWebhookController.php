@@ -8,6 +8,7 @@ use App\Models\ChatMessage;
 use App\Models\ConversationFollowUp;
 use App\Models\ConversationControl;
 use App\Models\FinanceLead;
+use App\Models\Organization;
 use App\Services\CrmCustomerExtractorService;
 use App\Services\FinanceLeadExtractorService;
 use App\Services\FinanceLeadService;
@@ -388,6 +389,16 @@ class WhatsAppWebhookController extends Controller
             |
             */
 
+            $organizationId =
+                Organization::query()
+                    ->where(
+                        'owner_user_id',
+                        $aiBot->user_id
+                    )
+                    ->value(
+                        'id'
+                    );
+
             $conversationControl =
                 ConversationControl::firstOrCreate(
                     [
@@ -400,6 +411,9 @@ class WhatsAppWebhookController extends Controller
                     [
                         'user_id' =>
                             $aiBot->user_id,
+
+                        'organization_id' =>
+                            $organizationId,
 
                         'whatsapp_number' =>
                             $phoneNumber,
@@ -414,6 +428,16 @@ class WhatsAppWebhookController extends Controller
                             false,
                     ]
                 );
+
+            if (
+                $conversationControl->organization_id === null
+                && $organizationId !== null
+            ) {
+                $conversationControl->forceFill([
+                    'organization_id' =>
+                        $organizationId,
+                ])->save();
+            }
 
             /*
             |--------------------------------------------------------------------------
@@ -556,6 +580,7 @@ class WhatsAppWebhookController extends Controller
             if ($messageType !== 'text') {
                 ChatMessage::create([
                     'user_id' => $aiBot->user_id,
+                    'organization_id' => $conversationControl->organization_id,
                     'ai_bot_id' => $aiBot->id,
                     'session_id' => $sessionId,
                     'role' => 'user',
@@ -1611,8 +1636,31 @@ class WhatsAppWebhookController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        $organizationId =
+            ConversationControl::query()
+                ->where(
+                    'ai_bot_id',
+                    $aiBot->id
+                )
+                ->where(
+                    'session_id',
+                    $sessionId
+                )
+                ->value(
+                    'organization_id'
+                )
+            ?? Organization::query()
+                ->where(
+                    'owner_user_id',
+                    $aiBot->user_id
+                )
+                ->value(
+                    'id'
+                );
+
         ChatMessage::create([
             'user_id' => $aiBot->user_id,
+            'organization_id' => $organizationId,
             'ai_bot_id' => $aiBot->id,
             'session_id' => $sessionId,
             'role' => 'assistant',

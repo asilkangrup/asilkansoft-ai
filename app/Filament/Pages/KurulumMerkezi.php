@@ -6,6 +6,7 @@ use App\Filament\Resources\AiBots\AiBotResource;
 use App\Filament\Resources\Products\ProductResource;
 use App\Models\AiBot;
 use App\Models\Product;
+use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
@@ -23,6 +24,27 @@ class KurulumMerkezi extends Page
     protected static ?string $title = 'Kurulum Merkezi';
 
     protected static ?int $navigationSort = 1;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ROL BAZLI ERİŞİM
+    |--------------------------------------------------------------------------
+    */
+
+    public static function canAccess(): bool
+    {
+        return app(
+            OrganizationAccessService::class
+        )->can(
+            'setup'
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
 
     public function getViewData(): array
     {
@@ -67,9 +89,9 @@ class KurulumMerkezi extends Page
 
         $steps = [
             [
-                'title' => 'Yapay Zekânı Oluştur',
+                'title' => 'Yapay ZekÃ¢nÄ± OluÅŸtur',
                 'description' =>
-                    'İlk yapay zekâ botunu oluştur ve temel rolünü belirle.',
+                    'Ä°lk yapay zekÃ¢ botunu oluÅŸtur ve temel rolÃ¼nÃ¼ belirle.',
 
                 'completed' =>
                     $botCreated,
@@ -88,11 +110,11 @@ class KurulumMerkezi extends Page
 
                 'button' =>
                     $botCreated
-                        ? 'Yapay Zekâyı Düzenle'
-                        : 'Yapay Zekâ Oluştur',
+                        ? 'Yapay ZekÃ¢yÄ± DÃ¼zenle'
+                        : 'Yapay ZekÃ¢ OluÅŸtur',
 
                 'icon' =>
-                    '🤖',
+                    'ğŸ¤–',
             ],
 
             [
@@ -100,7 +122,7 @@ class KurulumMerkezi extends Page
                     'Firma Bilgilerini Tamamla',
 
                 'description' =>
-                    'Firma açıklaması, çalışma saatleri, ödeme ve özel kuralları gir.',
+                    'Firma aÃ§Ä±klamasÄ±, Ã§alÄ±ÅŸma saatleri, Ã¶deme ve Ã¶zel kurallarÄ± gir.',
 
                 'completed' =>
                     $companyCompleted,
@@ -118,18 +140,18 @@ class KurulumMerkezi extends Page
                         ),
 
                 'button' =>
-                    'Firma Bilgilerini Düzenle',
+                    'Firma Bilgilerini DÃ¼zenle',
 
                 'icon' =>
-                    '🏢',
+                    'ğŸ¢',
             ],
 
             [
                 'title' =>
-                    'WhatsApp Bağlantısını Kur',
+                    'WhatsApp BaÄŸlantÄ±sÄ±nÄ± Kur',
 
                 'description' =>
-                    'WhatsApp hesabını bağlayarak yapay zekâyı canlı kullanıma aç.',
+                    'WhatsApp hesabÄ±nÄ± baÄŸlayarak yapay zekÃ¢yÄ± canlÄ± kullanÄ±ma aÃ§.',
 
                 'completed' =>
                     $whatsappConnected,
@@ -148,19 +170,19 @@ class KurulumMerkezi extends Page
 
                 'button' =>
                     $whatsappConnected
-                        ? 'WhatsApp Durumunu Gör'
-                        : 'WhatsApp Bağla',
+                        ? 'WhatsApp Durumunu GÃ¶r'
+                        : 'WhatsApp BaÄŸla',
 
                 'icon' =>
-                    '💬',
+                    'ğŸ’¬',
             ],
 
             [
                 'title' =>
-                    'Ürünlerini Ekle',
+                    'ÃœrÃ¼nlerini Ekle',
 
                 'description' =>
-                    'Yapay zekânın müşterilere önereceği ürün ve hizmetleri ekle.',
+                    'Yapay zekÃ¢nÄ±n mÃ¼ÅŸterilere Ã¶nereceÄŸi Ã¼rÃ¼n ve hizmetleri ekle.',
 
                 'completed' =>
                     $productsAdded,
@@ -171,10 +193,10 @@ class KurulumMerkezi extends Page
                     ),
 
                 'button' =>
-                    'Ürün Ekle',
+                    'ÃœrÃ¼n Ekle',
 
                 'icon' =>
-                    '📦',
+                    'ğŸ“¦',
             ],
 
             [
@@ -182,7 +204,7 @@ class KurulumMerkezi extends Page
                     'Otomatik Takibi Ayarla',
 
                 'description' =>
-                    'Cevap vermeyen müşterilere otomatik hatırlatma mesajları gönder.',
+                    'Cevap vermeyen mÃ¼ÅŸterilere otomatik hatÄ±rlatma mesajlarÄ± gÃ¶nder.',
 
                 'completed' =>
                     $followUpConfigured,
@@ -200,16 +222,16 @@ class KurulumMerkezi extends Page
                         ),
 
                 'button' =>
-                    'Takip Ayarlarını Düzenle',
+                    'Takip AyarlarÄ±nÄ± DÃ¼zenle',
 
                 'icon' =>
-                    '⏱️',
+                    'â±ï¸',
             ],
         ];
 
         /*
         |--------------------------------------------------------------------------
-        | KURULUM YÜZDESİ
+        | KURULUM YÃœZDESÄ°
         |--------------------------------------------------------------------------
         */
 
@@ -233,7 +255,7 @@ class KurulumMerkezi extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | ÜCRETSİZ DENEME / ABONELİK
+        | ÃœCRETSÄ°Z DENEME / ABONELÄ°K
         |--------------------------------------------------------------------------
         */
 
@@ -297,7 +319,7 @@ class KurulumMerkezi extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | PAKET DURUM METİNLERİ
+        | PAKET DURUM METÄ°NLERÄ°
         |--------------------------------------------------------------------------
         */
 
@@ -306,20 +328,20 @@ class KurulumMerkezi extends Page
                 'Paketiniz Aktif';
 
             $planDescription =
-                'Yapay zekânız WhatsApp üzerinden aktif olarak cevap vermeye devam ediyor.';
+                'Yapay zekÃ¢nÄ±z WhatsApp Ã¼zerinden aktif olarak cevap vermeye devam ediyor.';
         } elseif ($trialCompleted) {
             $planTitle =
-                'Ücretsiz Denemeniz Sona Erdi';
+                'Ãœcretsiz Denemeniz Sona Erdi';
 
             $planDescription =
-                '30 ücretsiz WhatsApp yapay zekâ cevabınız tamamlandı. Devam etmek için paketinizi aktifleştirin.';
+                '30 Ã¼cretsiz WhatsApp yapay zekÃ¢ cevabÄ±nÄ±z tamamlandÄ±. Devam etmek iÃ§in paketinizi aktifleÅŸtirin.';
         } else {
             $planTitle =
-                'Ücretsiz Deneme';
+                'Ãœcretsiz Deneme';
 
             $planDescription =
                 $trialMessagesRemaining
-                .' ücretsiz WhatsApp yapay zekâ cevabınız kaldı.';
+                .' Ã¼cretsiz WhatsApp yapay zekÃ¢ cevabÄ±nÄ±z kaldÄ±.';
         }
 
         /*
@@ -349,7 +371,7 @@ class KurulumMerkezi extends Page
 
             /*
             |--------------------------------------------------------------------------
-            | DENEME / PAKET BİLGİLERİ
+            | DENEME / PAKET BÄ°LGÄ°LERÄ°
             |--------------------------------------------------------------------------
             */
 

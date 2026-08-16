@@ -538,6 +538,7 @@ class ConversationInbox extends Page
 
             ChatMessage::create([
                 'user_id' => $conversation->user_id,
+                'organization_id' => $conversation->organization_id,
                 'ai_bot_id' => $conversation->ai_bot_id,
                 'session_id' => $conversation->session_id,
                 'role' => 'assistant',
@@ -646,6 +647,7 @@ class ConversationInbox extends Page
 
             ChatMessage::create([
                 'user_id' => $conversation->user_id,
+                'organization_id' => $conversation->organization_id,
                 'ai_bot_id' => $conversation->ai_bot_id,
                 'session_id' => $conversation->session_id,
                 'role' => 'assistant',
@@ -706,6 +708,7 @@ class ConversationInbox extends Page
 
             ChatMessage::create([
                 'user_id' => $conversation->user_id,
+                'organization_id' => $conversation->organization_id,
                 'ai_bot_id' => $conversation->ai_bot_id,
                 'session_id' => $conversation->session_id,
                 'role' => 'assistant',

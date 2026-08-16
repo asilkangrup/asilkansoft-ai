@@ -9,6 +9,7 @@ use App\Services\CrmForecastService;
 use App\Services\CrmManagerSummaryService;
 use App\Services\CrmSalesGoalService;
 use App\Services\CrmStaffSalesGoalService;
+use App\Services\OrganizationAccessService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Pages\Page;
@@ -23,6 +24,27 @@ class Raporlar extends Page
     protected static ?string $navigationLabel = 'Raporlar';
     protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedChartBar;
     protected static ?int $navigationSort = 34;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ROL BAZLI ERİŞİM
+    |--------------------------------------------------------------------------
+    */
+
+    public static function canAccess(): bool
+    {
+        return app(
+            OrganizationAccessService::class
+        )->can(
+            'reports'
+        );
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
 
     public string $period = '30';
     public string $channelFilter = 'all';
@@ -166,7 +188,7 @@ class Raporlar extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | FİNANSAL PERFORMANS
+    | FÄ°NANSAL PERFORMANS
     |--------------------------------------------------------------------------
     */
 
@@ -413,7 +435,7 @@ class Raporlar extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | SATIŞ HUNİSİ
+    | SATIÅ HUNÄ°SÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -421,10 +443,10 @@ class Raporlar extends Page
     {
         $stages = [
             'new' => 'Yeni',
-            'contacted' => 'Görüşülüyor',
+            'contacted' => 'GÃ¶rÃ¼ÅŸÃ¼lÃ¼yor',
             'qualified' => 'Nitelikli',
             'proposal' => 'Teklif',
-            'won' => 'Kazanıldı',
+            'won' => 'KazanÄ±ldÄ±',
             'lost' => 'Kaybedildi',
         ];
 
@@ -472,7 +494,7 @@ class Raporlar extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | KAYIP NEDENLERİ
+    | KAYIP NEDENLERÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -485,7 +507,7 @@ class Raporlar extends Page
             )
             ->selectRaw(
                 "
-                COALESCE(NULLIF(TRIM(lost_reason), ''), 'Belirtilmemiş') as reason,
+                COALESCE(NULLIF(TRIM(lost_reason), ''), 'BelirtilmemiÅŸ') as reason,
                 COUNT(*) as total
                 "
             )
@@ -501,7 +523,7 @@ class Raporlar extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | KANAL BAZLI CİRO
+    | KANAL BAZLI CÄ°RO
     |--------------------------------------------------------------------------
     */
 
@@ -661,7 +683,7 @@ class Raporlar extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | WAI ALARM MERKEZİ ÖZETİ
+    | WAI ALARM MERKEZÄ° Ã–ZETÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -816,7 +838,7 @@ class Raporlar extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | AYLIK SATIŞ HEDEFİ
+    | AYLIK SATIÅ HEDEFÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -893,7 +915,7 @@ class Raporlar extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | PERSONEL SATIŞ HEDEFLERİ
+    | PERSONEL SATIÅ HEDEFLERÄ°
     |--------------------------------------------------------------------------
     */
 
@@ -997,7 +1019,7 @@ class Raporlar extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | WAI YÖNETİCİ ÖZETİ
+    | WAI YÃ–NETÄ°CÄ° Ã–ZETÄ°
     |--------------------------------------------------------------------------
     */
 

@@ -9,6 +9,7 @@ class ChatMessage extends Model
 {
     protected $fillable = [
         'user_id',
+        'organization_id',
         'ai_bot_id',
         'session_id',
         'role',
@@ -31,20 +32,64 @@ class ChatMessage extends Model
         'media_size' => 'integer',
     ];
 
+    /*
+    |--------------------------------------------------------------------------
+    | HESAP SAHİBİ
+    |--------------------------------------------------------------------------
+    */
+
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(
+            User::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORGANİZASYON
+    |--------------------------------------------------------------------------
+    */
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(
+            Organization::class
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AI BOT
+    |--------------------------------------------------------------------------
+    */
 
     public function aiBot(): BelongsTo
     {
-        return $this->belongsTo(AiBot::class);
+        return $this->belongsTo(
+            AiBot::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MESAJI GÖNDEREN PERSONEL
+    |--------------------------------------------------------------------------
+    */
 
     public function sentByUser(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'sent_by_user_id');
+        return $this->belongsTo(
+            User::class,
+            'sent_by_user_id'
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MESAJ KAYNAĞI
+    |--------------------------------------------------------------------------
+    */
 
     public function musteridenMi(): bool
     {
@@ -61,16 +106,31 @@ class ChatMessage extends Model
         return $this->sender_type === 'human';
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | MESAJ TİPİ
+    |--------------------------------------------------------------------------
+    */
+
     public function isText(): bool
     {
-        return ($this->message_type ?: 'text') === 'text';
+        return (
+            $this->message_type
+            ?: 'text'
+        ) === 'text';
     }
 
     public function isMedia(): bool
     {
         return in_array(
-            $this->message_type ?: 'text',
-            ['image', 'video', 'audio', 'document'],
+            $this->message_type
+            ?: 'text',
+            [
+                'image',
+                'video',
+                'audio',
+                'document',
+            ],
             true
         );
     }
