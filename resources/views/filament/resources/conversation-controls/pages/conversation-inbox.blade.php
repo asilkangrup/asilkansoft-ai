@@ -2899,6 +2899,79 @@
     }
 }
 
+
+/* ==========================================================================
+   WAI PREMIUM V3.2 — CRM TABS
+   ========================================================================== */
+
+.wai-crm-tabs-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.wai-crm-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+
+    margin: 0;
+    padding: 8px 10px 0;
+
+    border-bottom: 1px solid rgba(17,59,36,.08);
+
+    background: rgba(250,253,251,.96);
+    backdrop-filter: blur(14px);
+}
+
+.wai-crm-tab {
+    min-height: 42px;
+
+    border: 0;
+    border-bottom: 2px solid transparent;
+
+    color: #7a867e;
+    background: transparent;
+
+    font-size: 11px;
+    font-weight: 900;
+
+    cursor: pointer;
+
+    transition: .18s ease;
+}
+
+.wai-crm-tab:hover {
+    color: #0a7543;
+}
+
+.wai-crm-tab.active {
+    color: #078449;
+    border-bottom-color: #18cf73;
+}
+
+.wai-crm-tab-panel {
+    min-height: 0;
+}
+
+.wai-crm-tab-panel > .wai-section:first-child {
+    margin-top: 10px;
+}
+
+.wai-crm-tab-icon {
+    margin-right: 5px;
+    font-size: 12px;
+}
+
+@media (max-width: 1180px) {
+    .wai-crm-tabs {
+        top: 0;
+    }
+}
+
 </style>
 
 
@@ -2911,7 +2984,7 @@
         mediaRecorder: null,
         audioChunks: [],
         typing: false,
-        mobileView: {{ $selectedConversationId ? "'chat'" : "'list'" }},
+        mobileView: 'list',
         crmOpen: false,
 
         quickReplies: [
@@ -4368,12 +4441,56 @@
 
                 </div>
 
+                <div
+                    class="wai-crm-tabs-shell"
+                    x-data="{ crmTab: 'summary' }"
+                >
 
-                <div class="wai-section">
+                    <div class="wai-crm-tabs">
 
-                    <div class="wai-title">
-                        Müşteri Bilgileri
+                        <button
+                            type="button"
+                            class="wai-crm-tab"
+                            :class="{ 'active': crmTab === 'summary' }"
+                            @click="crmTab = 'summary'"
+                        >
+                            <span class="wai-crm-tab-icon">✦</span>
+                            Özet
+                        </button>
+
+                        <button
+                            type="button"
+                            class="wai-crm-tab"
+                            :class="{ 'active': crmTab === 'crm' }"
+                            @click="crmTab = 'crm'"
+                        >
+                            <span class="wai-crm-tab-icon">◉</span>
+                            CRM
+                        </button>
+
+                        <button
+                            type="button"
+                            class="wai-crm-tab"
+                            :class="{ 'active': crmTab === 'notes' }"
+                            @click="crmTab = 'notes'"
+                        >
+                            <span class="wai-crm-tab-icon">▣</span>
+                            Notlar
+                        </button>
+
                     </div>
+
+                    <div
+                        class="wai-crm-tab-panel"
+                        x-show="crmTab === 'summary'"
+                        x-cloak
+                    >
+
+                        <div class="wai-section">
+
+                            <div class="wai-title">
+                                Müşteri Bilgileri
+                            </div>
 
 
                     <div class="wai-info">
@@ -4467,6 +4584,14 @@
                         @endif
                     </div>
                 </div>
+
+                    </div>
+
+                    <div
+                        class="wai-crm-tab-panel"
+                        x-show="crmTab === 'crm'"
+                        x-cloak
+                    >
 
                 {{-- TAGS --}}
 
@@ -4590,6 +4715,14 @@
                 </div>
 
 
+                    </div>
+
+                    <div
+                        class="wai-crm-tab-panel"
+                        x-show="crmTab === 'notes'"
+                        x-cloak
+                    >
+
                 {{-- NOTES --}}
 
                 <div class="wai-section">
@@ -4600,6 +4733,10 @@
 
                     <div class="wai-note">
                         Kalıcı müşteri notları, CRM modülünde bu alana bağlanacak.
+                    </div>
+
+                </div>
+
                     </div>
 
                 </div>
