@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use OpenAI\Exceptions\RateLimitException;
 use OpenAI\Laravel\Facades\OpenAI;
 use Throwable;
 
@@ -47,20 +48,13 @@ class OpenAIService
     ): string {
         $totalStart = microtime(true);
 
-        $input = $this->inputHazirla(
-            $mesajlar
-        );
+        $input = $this->inputHazirla($mesajlar);
 
         if ($input === []) {
             return 'Lütfen bir mesaj yazın.';
         }
 
-        $model = trim(
-            (string) (
-                $aiBot?->openai_model
-                ?: 'gpt-5-mini'
-            )
-        );
+        $model = trim((string) ($aiBot?->openai_model ?: 'gpt-5-mini'));
 
         $promptStart = microtime(true);
 
@@ -69,135 +63,91 @@ class OpenAIService
             mesajlar: $input,
         );
 
-        $promptMs = $this->elapsedMs(
-            $promptStart
-        );
+        $promptMs = $this->elapsedMs($promptStart);
 
-        try {
-            $request = [
-                'model' => $model,
+        $request = [
+            'model' => $model,
+            'instructions' => $instructions,
+            'input' => $input,
+            'max_output_tokens' => 700,
+        ];
 
-                'instructions' => $instructions,
-
-                'input' => $input,
+        if (
+            str_starts_with($model, 'gpt-5')
+            || preg_match('/^o\\d/i', $model)
+        ) {
+            $request['reasoning'] = [
+                'effort' => 'low',
             ];
-
-            /*
-            |--------------------------------------------------------------------------
-            | GPT-5 / O-SERİSİ HIZ OPTİMİZASYONU
-            |--------------------------------------------------------------------------
-            |
-            | WhatsApp satış ve destek konuşmalarında çoğu mesaj için
-            | yüksek reasoning gerekli değildir.
-            |
-            | Daha düşük reasoning:
-            | - daha hızlı cevap
-            | - daha düşük reasoning maliyeti
-            | - kısa WhatsApp cevapları için daha uygun
-            |
-            */
-
-            if (
-                str_starts_with(
-                    $model,
-                    'gpt-5'
-                )
-                || preg_match(
-                    '/^o\d/i',
-                    $model
-                )
-            ) {
-                $request['reasoning'] = [
-                    'effort' => 'low',
-                ];
-            }
-
-            $openAiStart = microtime(true);
-
-            $response = OpenAI::responses()
-                ->create(
-                    $request
-                );
-
-            $openAiMs = $this->elapsedMs(
-                $openAiStart
-            );
-
-            $cevap = trim(
-                $response->outputText ?? ''
-            );
-
-            $totalMs = $this->elapsedMs(
-                $totalStart
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | PERFORMANS LOGU
-            |--------------------------------------------------------------------------
-            */
-
-            Log::info(
-                'WAI AI PERFORMANCE',
-                [
-                    'ai_bot_id' =>
-                        $aiBot?->id,
-
-                    'model' =>
-                        $model,
-
-                    'input_messages' =>
-                        count($input),
-
-                    'products_loaded' =>
-                        $this->lastProductsLoaded,
-
-                    'product_search_ms' =>
-                        $this->lastProductSearchMs,
-
-                    'prompt_ms' =>
-                        $promptMs,
-
-                    'openai_ms' =>
-                        $openAiMs,
-
-                    'total_ms' =>
-                        $totalMs,
-                ]
-            );
-
-            if ($cevap !== '') {
-                return $cevap;
-            }
-
-            return 'Şu anda uygun bir yanıt oluşturamadım. Mesajınızı biraz daha açık yazar mısınız?';
-        } catch (Throwable $exception) {
-            Log::error(
-                'WAI AI ERROR',
-                [
-                    'ai_bot_id' =>
-                        $aiBot?->id,
-
-                    'model' =>
-                        $model,
-
-                    'input_messages' =>
-                        count($input),
-
-                    'products_loaded' =>
-                        $this->lastProductsLoaded,
-
-                    'message' =>
-                        $exception->getMessage(),
-                ]
-            );
-
-            report(
-                $exception
-            );
-
-            return 'Yapay zekâ bağlantısında geçici bir sorun oluştu. Lütfen kısa bir süre sonra tekrar deneyin.';
         }
+
+        $maxAttempts = 3;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $openAiStart = microtime(true);
+
+                $response = OpenAI::responses()->create($request);
+
+                $openAiMs = $this->elapsedMs($openAiStart);
+                $cevap = trim($response->outputText ?? '');
+                $totalMs = $this->elapsedMs($totalStart);
+
+                Log::info('WAI AI PERFORMANCE', [
+                    'ai_bot_id' => $aiBot?->id,
+                    'model' => $model,
+                    'attempt' => $attempt,
+                    'input_messages' => count($input),
+                    'products_loaded' => $this->lastProductsLoaded,
+                    'product_search_ms' => $this->lastProductSearchMs,
+                    'prompt_ms' => $promptMs,
+                    'openai_ms' => $openAiMs,
+                    'total_ms' => $totalMs,
+                ]);
+
+                if ($cevap !== '') {
+                    return $cevap;
+                }
+
+                return 'Şu anda uygun bir yanıt oluşturamadım. Mesajınızı biraz daha açık yazar mısınız?';
+            } catch (RateLimitException $exception) {
+                Log::warning('WAI AI RATE LIMIT', [
+                    'ai_bot_id' => $aiBot?->id,
+                    'model' => $model,
+                    'attempt' => $attempt,
+                    'max_attempts' => $maxAttempts,
+                    'input_messages' => count($input),
+                    'products_loaded' => $this->lastProductsLoaded,
+                    'message' => $exception->getMessage(),
+                ]);
+
+                if ($attempt >= $maxAttempts) {
+                    report($exception);
+
+                    return 'Şu anda yoğunluk nedeniyle yanıtım gecikiyor. Lütfen birkaç saniye sonra tekrar deneyin.';
+                }
+
+                $baseDelayMs = $attempt === 1 ? 1000 : 2000;
+                $jitterMs = random_int(100, 400);
+
+                usleep(($baseDelayMs + $jitterMs) * 1000);
+            } catch (Throwable $exception) {
+                Log::error('WAI AI ERROR', [
+                    'ai_bot_id' => $aiBot?->id,
+                    'model' => $model,
+                    'attempt' => $attempt,
+                    'input_messages' => count($input),
+                    'products_loaded' => $this->lastProductsLoaded,
+                    'message' => $exception->getMessage(),
+                ]);
+
+                report($exception);
+
+                return 'Yapay zekâ bağlantısında geçici bir sorun oluştu. Lütfen kısa bir süre sonra tekrar deneyin.';
+            }
+        }
+
+        return 'Şu anda yoğunluk nedeniyle yanıtım gecikiyor. Lütfen birkaç saniye sonra tekrar deneyin.';
     }
 
     /*
