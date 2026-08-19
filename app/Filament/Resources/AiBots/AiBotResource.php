@@ -79,24 +79,7 @@ class AiBotResource extends Resource
 
     public static function canViewAny(): bool
     {
-        $user = Filament::auth()->user();
-
-        if (! $user) {
-            return false;
-        }
-
-        if ($user->is_admin) {
-            return true;
-        }
-
-        return in_array(
-            static::currentRole(),
-            [
-                'owner',
-                'manager',
-            ],
-            true
-        );
+        return (bool) Filament::auth()->user();
     }
 
     public static function canCreate(): bool
@@ -144,16 +127,8 @@ class AiBotResource extends Resource
             return true;
         }
 
-        $organization =
-            static::currentOrganization();
-
-        if (! $organization) {
-            return false;
-        }
-
         return (int) $record->getAttribute('user_id')
-            ===
-            (int) $organization->owner_user_id;
+            === (int) $user->id;
     }
 
     /*
@@ -169,42 +144,16 @@ class AiBotResource extends Resource
         $user = Filament::auth()->user();
 
         if (! $user) {
-            return $query->whereRaw(
-                '1 = 0'
-            );
+            return $query->whereRaw('1 = 0');
         }
 
         if ($user->is_admin) {
             return $query;
         }
 
-        if (
-            ! in_array(
-                static::currentRole(),
-                [
-                    'owner',
-                    'manager',
-                ],
-                true
-            )
-        ) {
-            return $query->whereRaw(
-                '1 = 0'
-            );
-        }
-
-        $organization =
-            static::currentOrganization();
-
-        if (! $organization) {
-            return $query->whereRaw(
-                '1 = 0'
-            );
-        }
-
         return $query->where(
             'user_id',
-            $organization->owner_user_id
+            $user->id
         );
     }
 

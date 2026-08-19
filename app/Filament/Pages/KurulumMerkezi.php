@@ -89,9 +89,9 @@ class KurulumMerkezi extends Page
 
         $steps = [
             [
-                'title' => 'Yapay ZekÃ¢nÄ± OluÅŸtur',
+                'title' => 'Yapay Zekânı Oluştur',
                 'description' =>
-                    'Ä°lk yapay zekÃ¢ botunu oluÅŸtur ve temel rolÃ¼nÃ¼ belirle.',
+                    'İlk yapay zekâ botunu oluştur ve temel rolünü belirle.',
 
                 'completed' =>
                     $botCreated,
@@ -110,11 +110,11 @@ class KurulumMerkezi extends Page
 
                 'button' =>
                     $botCreated
-                        ? 'Yapay ZekÃ¢yÄ± DÃ¼zenle'
-                        : 'Yapay ZekÃ¢ OluÅŸtur',
+                        ? 'Yapay Zekâyı Düzenle'
+                        : 'Yapay Zekâ Oluştur',
 
                 'icon' =>
-                    'ğŸ¤–',
+                    '🤖',
             ],
 
             [
@@ -122,7 +122,7 @@ class KurulumMerkezi extends Page
                     'Firma Bilgilerini Tamamla',
 
                 'description' =>
-                    'Firma aÃ§Ä±klamasÄ±, Ã§alÄ±ÅŸma saatleri, Ã¶deme ve Ã¶zel kurallarÄ± gir.',
+                    'Firma açıklaması, çalışma saatleri, ödeme ve özel kuralları gir.',
 
                 'completed' =>
                     $companyCompleted,
@@ -140,18 +140,18 @@ class KurulumMerkezi extends Page
                         ),
 
                 'button' =>
-                    'Firma Bilgilerini DÃ¼zenle',
+                    'Firma Bilgilerini Düzenle',
 
                 'icon' =>
-                    'ğŸ¢',
+                    '🏢',
             ],
 
             [
                 'title' =>
-                    'WhatsApp BaÄŸlantÄ±sÄ±nÄ± Kur',
+                    'WhatsApp Bağlantısını Kur',
 
                 'description' =>
-                    'WhatsApp hesabÄ±nÄ± baÄŸlayarak yapay zekÃ¢yÄ± canlÄ± kullanÄ±ma aÃ§.',
+                    'WhatsApp hesabını bağlayarak yapay zekâyı canlı kullanıma aç.',
 
                 'completed' =>
                     $whatsappConnected,
@@ -170,19 +170,19 @@ class KurulumMerkezi extends Page
 
                 'button' =>
                     $whatsappConnected
-                        ? 'WhatsApp Durumunu GÃ¶r'
-                        : 'WhatsApp BaÄŸla',
+                        ? 'WhatsApp Durumunu Gör'
+                        : 'WhatsApp Bağla',
 
                 'icon' =>
-                    'ğŸ’¬',
+                    '💬',
             ],
 
             [
                 'title' =>
-                    'ÃœrÃ¼nlerini Ekle',
+                    'Ürünlerini Ekle',
 
                 'description' =>
-                    'Yapay zekÃ¢nÄ±n mÃ¼ÅŸterilere Ã¶nereceÄŸi Ã¼rÃ¼n ve hizmetleri ekle.',
+                    'Yapay zekânın müşterilere önereceği ürün ve hizmetleri ekle.',
 
                 'completed' =>
                     $productsAdded,
@@ -193,10 +193,10 @@ class KurulumMerkezi extends Page
                     ),
 
                 'button' =>
-                    'ÃœrÃ¼n Ekle',
+                    'Ürün Ekle',
 
                 'icon' =>
-                    'ğŸ“¦',
+                    '📦',
             ],
 
             [
@@ -204,7 +204,7 @@ class KurulumMerkezi extends Page
                     'Otomatik Takibi Ayarla',
 
                 'description' =>
-                    'Cevap vermeyen mÃ¼ÅŸterilere otomatik hatÄ±rlatma mesajlarÄ± gÃ¶nder.',
+                    'Cevap vermeyen müşterilere otomatik hatırlatma mesajları gönder.',
 
                 'completed' =>
                     $followUpConfigured,
@@ -222,16 +222,16 @@ class KurulumMerkezi extends Page
                         ),
 
                 'button' =>
-                    'Takip AyarlarÄ±nÄ± DÃ¼zenle',
+                    'Takip Ayarlarını Düzenle',
 
                 'icon' =>
-                    'â±ï¸',
+                    '⏱️',
             ],
         ];
 
         /*
         |--------------------------------------------------------------------------
-        | KURULUM YÃœZDESÄ°
+        | KURULUM YÜZDESİ
         |--------------------------------------------------------------------------
         */
 
@@ -255,7 +255,7 @@ class KurulumMerkezi extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | ÃœCRETSÄ°Z DENEME / ABONELÄ°K
+        | ÜCRETSİZ DENEME / ABONELİK
         |--------------------------------------------------------------------------
         */
 
@@ -319,7 +319,7 @@ class KurulumMerkezi extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | PAKET DURUM METÄ°NLERÄ°
+        | PAKET DURUM METİNLERİ
         |--------------------------------------------------------------------------
         */
 
@@ -328,20 +328,20 @@ class KurulumMerkezi extends Page
                 'Paketiniz Aktif';
 
             $planDescription =
-                'Yapay zekÃ¢nÄ±z WhatsApp Ã¼zerinden aktif olarak cevap vermeye devam ediyor.';
+                'Yapay zekânız WhatsApp üzerinden aktif olarak cevap vermeye devam ediyor.';
         } elseif ($trialCompleted) {
             $planTitle =
-                'Ãœcretsiz Denemeniz Sona Erdi';
+                'Ücretsiz Denemeniz Sona Erdi';
 
             $planDescription =
-                '30 Ã¼cretsiz WhatsApp yapay zekÃ¢ cevabÄ±nÄ±z tamamlandÄ±. Devam etmek iÃ§in paketinizi aktifleÅŸtirin.';
+                '30 ücretsiz WhatsApp yapay zekâ cevabınız tamamlandı. Devam etmek için paketinizi aktifleştirin.';
         } else {
             $planTitle =
-                'Ãœcretsiz Deneme';
+                'Ücretsiz Deneme';
 
             $planDescription =
                 $trialMessagesRemaining
-                .' Ã¼cretsiz WhatsApp yapay zekÃ¢ cevabÄ±nÄ±z kaldÄ±.';
+                .' ücretsiz WhatsApp yapay zekâ cevabınız kaldı.';
         }
 
         /*
@@ -371,7 +371,7 @@ class KurulumMerkezi extends Page
 
             /*
             |--------------------------------------------------------------------------
-            | DENEME / PAKET BÄ°LGÄ°LERÄ°
+            | DENEME / PAKET BİLGİLERİ
             |--------------------------------------------------------------------------
             */
 

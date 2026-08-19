@@ -3,7 +3,6 @@
 namespace App\Filament\Pages;
 
 use App\Models\ConversationControl;
-use App\Models\Organization;
 use App\Models\User;
 use App\Services\CrmActivityService;
 use App\Services\CrmConversationSummaryService;
@@ -28,6 +27,22 @@ class Musteriler extends Page
         Heroicon::OutlinedUsers;
 
     protected static ?int $navigationSort = 31;
+
+    /*
+    |--------------------------------------------------------------------------
+    | SADECE ANA YÖNETİCİ
+    |--------------------------------------------------------------------------
+    */
+
+    public static function canAccess(): bool
+    {
+        return (bool) auth()->user()?->is_admin;
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -120,7 +135,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | SEÃ‡Ä°LÄ° MÃœÅTERÄ°
+    | SEÇİLİ MÜŞTERİ
     |--------------------------------------------------------------------------
     */
 
@@ -208,108 +223,22 @@ class Musteriler extends Page
     |--------------------------------------------------------------------------
     */
 
-    protected function currentOrganization(): ?Organization
-    {
-        $user = auth()->user();
-
-        if (! $user) {
-            return null;
-        }
-
-        return $user
-            ->organizations()
-            ->wherePivot(
-                'status',
-                'active'
-            )
-            ->first();
-    }
-
-    protected function currentOrganizationRole(): ?string
-    {
-        $organization =
-            $this->currentOrganization();
-
-        if (! $organization) {
-            return null;
-        }
-
-        return auth()
-            ->user()
-            ?->roleInOrganization(
-                $organization->id
-            );
-    }
-
     protected function customerQuery(): Builder
     {
-        $user = auth()->user();
-
-        $query = ConversationControl::query()
+        return ConversationControl::query()
             ->with([
                 'aiBot',
                 'assignedUser',
-            ]);
-
-        if (! $user) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | SİSTEM ADMIN
-        |--------------------------------------------------------------------------
-        |
-        | Admin mevcut davranışını korur. Admin CRM ekranı tüm müşterileri
-        | gösterecek ayrı organizasyon seçiciye bağlanana kadar kendi kayıtları
-        | üzerinden çalışmaya devam eder.
-        |
-        */
-
-        if ($user->is_admin) {
-            return $query->where(
+            ])
+            ->where(
                 'user_id',
-                $user->id
+                auth()->id()
             );
-        }
-
-        $organization =
-            $this->currentOrganization();
-
-        if (! $organization) {
-            return $query->where(
-                'user_id',
-                $user->id
-            );
-        }
-
-        $role =
-            $this->currentOrganizationRole();
-
-        $query->where(
-            'organization_id',
-            $organization->id
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | SALES İZOLASYONU
-        |--------------------------------------------------------------------------
-        */
-
-        if ($role === 'sales') {
-            $query->where(
-                'assigned_user_id',
-                $user->id
-            );
-        }
-
-        return $query;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | MÃœÅTERÄ°LER
+    | MÜŞTERİLER
     |--------------------------------------------------------------------------
     */
 
@@ -457,7 +386,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | SEÃ‡Ä°LÄ° MÃœÅTERÄ°
+    | SEÇİLİ MÜŞTERİ
     |--------------------------------------------------------------------------
     */
 
@@ -476,7 +405,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | SEÃ‡Ä°LÄ° MÃœÅTERÄ° AKTÄ°VÄ°TELERÄ°
+    | SEÇİLİ MÜŞTERİ AKTİVİTELERİ
     |--------------------------------------------------------------------------
     */
 
@@ -596,7 +525,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | MÃœÅTERÄ° SEÃ‡
+    | MÜŞTERİ SEÇ
     |--------------------------------------------------------------------------
     */
 
@@ -678,13 +607,6 @@ class Musteriler extends Page
 
     public function saveCustomer(): void
     {
-        $role =
-            $this->currentOrganizationRole();
-
-        if ($role === 'viewer') {
-            abort(403);
-        }
-
         $activityService =
             $this->activityService();
 
@@ -697,7 +619,7 @@ class Musteriler extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | ESKÄ° DEÄERLERÄ° AL
+        | ESKİ DEĞERLERİ AL
         |--------------------------------------------------------------------------
         */
 
@@ -756,28 +678,6 @@ class Musteriler extends Page
         |--------------------------------------------------------------------------
         */
 
-        $allowedAssignedUserId =
-            $this->assignedUserId;
-
-        if (
-            $role === 'sales'
-            && $allowedAssignedUserId !== null
-        ) {
-            $allowedAssignedUserId =
-                auth()->id();
-        }
-
-        if ($allowedAssignedUserId !== null) {
-            $allowedAssignedUserId =
-                $this->teamMembers
-                    ->contains(
-                        'id',
-                        (int) $allowedAssignedUserId
-                    )
-                        ? (int) $allowedAssignedUserId
-                        : null;
-        }
-
         $data = [
             'customer_name' =>
                 trim($this->customerName)
@@ -801,7 +701,7 @@ class Musteriler extends Page
                 $temperature,
 
             'assigned_user_id' =>
-                $allowedAssignedUserId,
+                $this->assignedUserId,
 
             'notes' =>
                 trim($this->notes)
@@ -864,7 +764,7 @@ class Musteriler extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | TAHMÄ°NÄ° SATIÅ DEÄERÄ°
+        | TAHMİNİ SATIŞ DEĞERİ
         |--------------------------------------------------------------------------
         |
         | ConversationControl model fillable listesine bağımlı kalmadan
@@ -910,7 +810,7 @@ class Musteriler extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | CRM AKTÄ°VÄ°TE GEÃ‡MÄ°ÅÄ°
+        | CRM AKTİVİTE GEÇMİŞİ
         |--------------------------------------------------------------------------
         |
         | Sadece gerçekten değişen değerler activity tablosuna yazılır.
@@ -1002,7 +902,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | HIZLI DURUM DEÄÄ°ÅTÄ°R
+    | HIZLI DURUM DEĞİŞTİR
     |--------------------------------------------------------------------------
     */
 
@@ -1036,7 +936,7 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | PUAN DEÄÄ°ÅTÄ°R
+    | PUAN DEĞİŞTİR
     |--------------------------------------------------------------------------
     */
 
@@ -1081,19 +981,6 @@ class Musteriler extends Page
 
     public function clearAssignment(): void
     {
-        if (
-            in_array(
-                $this->currentOrganizationRole(),
-                [
-                    'sales',
-                    'viewer',
-                ],
-                true
-            )
-        ) {
-            return;
-        }
-
         $this->assignedUserId = null;
 
         $this->saveCustomer();
@@ -1126,64 +1013,19 @@ class Musteriler extends Page
 
     public function getTeamMembersProperty(): Collection
     {
-        $user =
-            auth()->user();
-
-        if (! $user) {
-            return collect();
-        }
-
-        $organization =
-            $this->currentOrganization();
-
-        if (! $organization) {
-            return User::query()
-                ->whereKey(
-                    $user->id
-                )
-                ->get([
-                    'id',
-                    'name',
-                ]);
-        }
-
-        return $organization
-            ->users()
-            ->wherePivot(
-                'status',
-                'active'
-            )
-            ->wherePivotIn(
-                'role',
-                [
-                    'owner',
-                    'manager',
-                    'sales',
-                    'support',
-                ]
-            )
+        return User::query()
             ->orderBy(
-                'users.name'
+                'name'
             )
             ->get([
-                'users.id',
-                'users.name',
+                'id',
+                'name',
             ]);
-    }
-
-    protected function crmScopeOrganizationId(): ?int
-    {
-        return $this->currentOrganization()?->id;
-    }
-
-    protected function crmScopeRole(): ?string
-    {
-        return $this->currentOrganizationRole();
     }
 
     /*
     |--------------------------------------------------------------------------
-    | GÃœNLÃœK SATIÅ MERKEZÄ°
+    | GÜNLÜK SATIŞ MERKEZİ
     |--------------------------------------------------------------------------
     */
 
@@ -1192,9 +1034,7 @@ class Musteriler extends Page
         return $this->dailySalesService()
             ->todayFollowUps(
                 auth()->id(),
-                10,
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                10
             );
     }
 
@@ -1203,9 +1043,7 @@ class Musteriler extends Page
         return $this->dailySalesService()
             ->unattendedFor24Hours(
                 auth()->id(),
-                10,
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                10
             );
     }
 
@@ -1214,9 +1052,7 @@ class Musteriler extends Page
         return $this->dailySalesService()
             ->silentFor7Days(
                 auth()->id(),
-                10,
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                10
             );
     }
 
@@ -1225,15 +1061,13 @@ class Musteriler extends Page
         return $this->dailySalesService()
             ->closestToSale(
                 auth()->id(),
-                10,
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                10
             );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | SATIÅ TAHMÄ°NÄ° / PIPELINE
+    | SATIŞ TAHMİNİ / PIPELINE
     |--------------------------------------------------------------------------
     */
 
@@ -1271,9 +1105,7 @@ class Musteriler extends Page
     {
         return $this->forecastService()
             ->totalPipelineValue(
-                auth()->id(),
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                auth()->id()
             );
     }
 
@@ -1281,9 +1113,7 @@ class Musteriler extends Page
     {
         return $this->forecastService()
             ->weightedPipelineValue(
-                auth()->id(),
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                auth()->id()
             );
     }
 
@@ -1291,9 +1121,7 @@ class Musteriler extends Page
     {
         return $this->forecastService()
             ->valuedOpportunitiesCount(
-                auth()->id(),
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                auth()->id()
             );
     }
 
@@ -1307,9 +1135,7 @@ class Musteriler extends Page
     {
         return $this->revenueService()
             ->totalWonRevenue(
-                auth()->id(),
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                auth()->id()
             );
     }
 
@@ -1317,9 +1143,7 @@ class Musteriler extends Page
     {
         return $this->revenueService()
             ->averageWonValue(
-                auth()->id(),
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                auth()->id()
             );
     }
 
@@ -1327,9 +1151,7 @@ class Musteriler extends Page
     {
         return $this->revenueService()
             ->valuedWonSalesCount(
-                auth()->id(),
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                auth()->id()
             );
     }
 
@@ -1337,9 +1159,7 @@ class Musteriler extends Page
     {
         return $this->revenueService()
             ->forecastComparison(
-                auth()->id(),
-                $this->crmScopeOrganizationId(),
-                $this->crmScopeRole()
+                auth()->id()
             );
     }
 
@@ -1512,42 +1332,9 @@ class Musteriler extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | BAÅLIK
+    | BAŞLIK
     |--------------------------------------------------------------------------
     */
-
-
-    public function getLiveKpiTrendsProperty(): array
-    {
-        $s=now()->subDays(6)->startOfDay();
-        $rows=$this->customerQuery()->where('created_at','>=',$s)->get(['created_at','lead_status','lead_temperature']);
-        $won=$this->customerQuery()->whereNotNull('won_at')->where('won_at','>=',$s)->get(['won_at']);
-        $days=collect(range(0,6))->map(fn($i)=>$s->copy()->addDays($i));
-        $daily=fn($f)=>$days->map(fn($d)=>$rows->filter(fn(ConversationControl $c)=>$c->created_at?->isSameDay($d)&&$f($c))->count())->all();
-        return [
-            'new'=>$this->liveSeries($daily(fn(ConversationControl $c)=>($c->lead_status?:'new')==='new')),
-            'hot'=>$this->liveSeries($daily(fn(ConversationControl $c)=>$c->lead_temperature==='hot')),
-            'proposal'=>$this->liveSeries($daily(fn(ConversationControl $c)=>$c->lead_status==='proposal')),
-            'won'=>$this->liveSeries($days->map(fn($d)=>$won->filter(fn(ConversationControl $c)=>$c->won_at?->isSameDay($d))->count())->all()),
-        ];
-    }
-
-
-    protected function liveSeries(array $v): array
-    {
-        while (count($v)<7) array_unshift($v,0);
-        $v=array_slice(array_map('intval',$v),-7);
-        $a=$v[6]??0; $b=$v[5]??0;
-        if($a===0&&$b===0){$pct=0;$dir='flat';}
-        elseif($b===0){$pct=$a>0?100:0;$dir=$a>0?'up':'flat';}
-        else{$pct=(int)round((($a-$b)/$b)*100);$dir=$pct>0?'up':($pct<0?'down':'flat');}
-        $min=min($v);$max=max($v);$flat=$min===$max;$range=max(1,$max-$min);
-        $pts=collect($v)->map(function($n,$i)use($min,$range,$flat){
-            $x=4+$i*(100/6);$y=$flat?21:5+(1-(($n-$min)/$range))*32;
-            return round($x,1).','.round($y,1);
-        })->implode(' ');
-        return ['points'=>$pts,'trend_label'=>($pct>0?'+':'').$pct.'%','trend_direction'=>$dir];
-    }
 
     public function getHeading(): string
     {

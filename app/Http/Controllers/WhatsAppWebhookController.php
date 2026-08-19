@@ -509,10 +509,12 @@ class WhatsAppWebhookController extends Controller
             */
 
             try {
-                $leadScoringService->puanla(
-                    conversation: $conversationControl,
-                    message: $message,
-                );
+                if ((int) $aiBot->user_id === 1) {
+                    $leadScoringService->puanla(
+                        conversation: $conversationControl,
+                        message: $message,
+                    );
+                }
             } catch (Throwable $exception) {
                 Log::warning(
                     'WAI LEAD SCORING FAILED',
@@ -545,13 +547,15 @@ class WhatsAppWebhookController extends Controller
             */
 
             try {
-                $crmCustomerExtractorService->process(
-                    conversation: $conversationControl,
-                    message: $message,
-                    pushName: $customerName !== ''
-                        ? $customerName
-                        : null,
-                );
+                if ((int) $aiBot->user_id === 1) {
+                    $crmCustomerExtractorService->process(
+                        conversation: $conversationControl,
+                        message: $message,
+                        pushName: $customerName !== ''
+                            ? $customerName
+                            : null,
+                    );
+                }
             } catch (Throwable $exception) {
                 Log::warning(
                     'WAI CRM CUSTOMER EXTRACTOR FAILED',
@@ -1676,14 +1680,26 @@ class WhatsAppWebhookController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | AI CEVABI TEK KAYIT
+        | CEVABI HAFIZAYA KAYDET
         |--------------------------------------------------------------------------
-        |
-        | Yukarıdaki ChatMessage kaydı hem Gelen Kutusu hem de konuşma hafızası
-        | tarafından kullanılır. Burada MemoryService ile ikinci kez kayıt
-        | oluşturulmaz.
-        |
         */
+
+        $memoryService->mesajKaydet(
+            userId:
+                $aiBot->user_id,
+
+            aiBotId:
+                $aiBot->id,
+
+            sessionId:
+                $sessionId,
+
+            role:
+                'assistant',
+
+            message:
+                $answer,
+        );
 
         /*
         |--------------------------------------------------------------------------

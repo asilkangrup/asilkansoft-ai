@@ -20,7 +20,7 @@ class TestSohbeti extends Page
 
     protected static ?string $navigationLabel = 'Test Sohbeti';
 
-    protected static ?string $title = 'Yapay ZekÃ¢yÄ± Test Et';
+    protected static ?string $title = 'Yapay Zekâyı Test Et';
 
     protected static ?string $slug = 'test-sohbeti';
 
@@ -30,22 +30,7 @@ class TestSohbeti extends Page
 
     public static function canAccess(): bool
     {
-        $role =
-            app(
-                OrganizationAccessService::class
-            )->currentRole();
-
-        return in_array(
-            $role,
-            [
-                'admin',
-                'owner',
-                'manager',
-                'sales',
-                'support',
-            ],
-            true
-        );
+        return (bool) Filament::auth()->user();
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -78,31 +63,12 @@ class TestSohbeti extends Page
     {
         $user = Filament::auth()->user();
 
-        if (! $user) {
-            return 0;
-        }
-
-        if ($user->is_admin) {
-            return $user->id;
-        }
-
-        return (int) (
-            $this->currentOrganization()?->owner_user_id
-            ?? $user->id
-        );
+        return $user ? (int) $user->id : 0;
     }
 
     protected function canManageBotSettings(): bool
     {
-        return in_array(
-            $this->currentRole(),
-            [
-                'admin',
-                'owner',
-                'manager',
-            ],
-            true
-        );
+        return (bool) Filament::auth()->user();
     }
 
     /*
@@ -121,7 +87,7 @@ class TestSohbeti extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | CANLI DÃœZENLENEBÄ°LÄ°R BOT AYARLARI
+    | CANLI DÜZENLENEBİLİR BOT AYARLARI
     |--------------------------------------------------------------------------
     */
 
@@ -159,7 +125,7 @@ class TestSohbeti extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | SAYFA AÃ‡ILIÅI
+    | SAYFA AÇILIŞI
     |--------------------------------------------------------------------------
     */
 
@@ -182,9 +148,9 @@ class TestSohbeti extends Page
 
         if (! $aiBot) {
             Notification::make()
-                ->title('Yapay zekÃ¢ bulunamadÄ±')
+                ->title('Yapay zekâ bulunamadı')
                 ->body(
-                    'Test sohbetini kullanmadan Ã¶nce bir yapay zekÃ¢ oluÅŸturmalÄ±sÄ±nÄ±z.'
+                    'Test sohbetini kullanmadan önce bir yapay zekâ oluşturmalısınız.'
                 )
                 ->warning()
                 ->send();
@@ -204,7 +170,7 @@ class TestSohbeti extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | BOT AYARLARINI FORMA YÃœKLE
+    | BOT AYARLARINI FORMA YÜKLE
     |--------------------------------------------------------------------------
     */
 
@@ -253,7 +219,7 @@ class TestSohbeti extends Page
         $this->firstFollowUpMessage =
             (string) (
                 $aiBot->first_follow_up_message
-                ?: 'Merhaba ğŸ‘‹ Daha Ã¶nce gÃ¶rÃ¼ÅŸtÃ¼ÄŸÃ¼mÃ¼z Ã¼rÃ¼nle hÃ¢lÃ¢ ilgileniyor musunuz? Size yardÄ±mcÄ± olabilirim.'
+                ?: 'Merhaba 👋 Daha önce görüştüğümüz ürünle hâlâ ilgileniyor musunuz? Size yardımcı olabilirim.'
             );
 
         $this->secondFollowUpEnabled =
@@ -268,13 +234,13 @@ class TestSohbeti extends Page
         $this->secondFollowUpMessage =
             (string) (
                 $aiBot->second_follow_up_message
-                ?: 'Merhaba ğŸ‘‹ Daha Ã¶nce gÃ¶rÃ¼ÅŸtÃ¼ÄŸÃ¼mÃ¼z Ã¼rÃ¼nle ilgili yardÄ±mcÄ± olabileceÄŸimiz bir konu var mÄ±? Dilerseniz sipariÅŸinizi birlikte oluÅŸturabiliriz.'
+                ?: 'Merhaba 👋 Daha önce görüştüğümüz ürünle ilgili yardımcı olabileceğimiz bir konu var mı? Dilerseniz siparişinizi birlikte oluşturabiliriz.'
             );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | YENÄ° TEST OTURUMU BAÅLAT
+    | YENİ TEST OTURUMU BAŞLAT
     |--------------------------------------------------------------------------
     */
 
@@ -294,16 +260,16 @@ class TestSohbeti extends Page
             [
                 'rol' => 'assistant',
                 'metin' =>
-                    'Merhaba ğŸ‘‹ Ben '
+                    'Merhaba 👋 Ben '
                     .$aiBot->name
-                    .'. Size nasÄ±l yardÄ±mcÄ± olabilirim?',
+                    .'. Size nasıl yardımcı olabilirim?',
             ],
         ];
     }
 
     /*
     |--------------------------------------------------------------------------
-    | AKTÄ°F BOTU GÃœVENLÄ° ÅEKÄ°LDE BUL
+    | AKTİF BOTU GÜVENLİ ŞEKİLDE BUL
     |--------------------------------------------------------------------------
     */
 
@@ -329,7 +295,7 @@ class TestSohbeti extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | FORM VERÄ°LERÄ°NÄ° BOTA KAYDET
+    | FORM VERİLERİNİ BOTA KAYDET
     |--------------------------------------------------------------------------
     */
 
@@ -389,7 +355,7 @@ class TestSohbeti extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | ZORUNLU ALAN KONTROLÃœ
+    | ZORUNLU ALAN KONTROLÜ
     |--------------------------------------------------------------------------
     */
 
@@ -403,7 +369,7 @@ class TestSohbeti extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | AYARLARI KAYDET VE TESTÄ° YENÄ°LE
+    | AYARLARI KAYDET VE TESTİ YENİLE
     |--------------------------------------------------------------------------
     */
 
@@ -418,7 +384,7 @@ class TestSohbeti extends Page
 
         if (! $aiBot) {
             Notification::make()
-                ->title('Yapay zekÃ¢ bulunamadÄ±.')
+                ->title('Yapay zekâ bulunamadı.')
                 ->danger()
                 ->send();
 
@@ -429,7 +395,7 @@ class TestSohbeti extends Page
             Notification::make()
                 ->title('Eksik bilgi var')
                 ->body(
-                    'Yapay zekÃ¢ adÄ±, firma adÄ± ve firma hakkÄ±nda alanlarÄ±nÄ± doldurun.'
+                    'Yapay zekâ adı, firma adı ve firma hakkında alanlarını doldurun.'
                 )
                 ->warning()
                 ->send();
@@ -447,7 +413,7 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | ESKÄ° TEST KONUÅMASINI TEMÄ°ZLE
+        | ESKİ TEST KONUŞMASINI TEMİZLE
         |--------------------------------------------------------------------------
         */
 
@@ -460,7 +426,7 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | VERÄ°TABANINDAN GÃœNCEL BÄ°LGÄ°LERÄ° AL
+        | VERİTABANINDAN GÜNCEL BİLGİLERİ AL
         |--------------------------------------------------------------------------
         */
 
@@ -470,7 +436,7 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | YENÄ° AYARLARLA YENÄ° TEST OTURUMU
+        | YENİ AYARLARLA YENİ TEST OTURUMU
         |--------------------------------------------------------------------------
         */
 
@@ -480,9 +446,9 @@ class TestSohbeti extends Page
         );
 
         Notification::make()
-            ->title('Ayarlar gÃ¼ncellendi')
+            ->title('Ayarlar güncellendi')
             ->body(
-                'Test sohbeti yeni yapay zekÃ¢ ayarlarÄ±yla yeniden baÅŸlatÄ±ldÄ±.'
+                'Test sohbeti yeni yapay zekâ ayarlarıyla yeniden başlatıldı.'
             )
             ->success()
             ->send();
@@ -490,7 +456,7 @@ class TestSohbeti extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | MESAJ GÃ–NDER
+    | MESAJ GÖNDER
     |--------------------------------------------------------------------------
     */
 
@@ -503,7 +469,7 @@ class TestSohbeti extends Page
 
         if ($kullaniciMesaji === '') {
             Notification::make()
-                ->title('LÃ¼tfen bir mesaj yazÄ±n.')
+                ->title('Lütfen bir mesaj yazın.')
                 ->warning()
                 ->send();
 
@@ -514,7 +480,7 @@ class TestSohbeti extends Page
 
         if (! $aiBot) {
             Notification::make()
-                ->title('Yapay zekÃ¢ bulunamadÄ±.')
+                ->title('Yapay zekâ bulunamadı.')
                 ->danger()
                 ->send();
 
@@ -544,7 +510,7 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | KONUÅMA GEÃ‡MÄ°ÅÄ°NÄ° HAZIRLA
+        | KONUŞMA GEÇMİŞİNİ HAZIRLA
         |--------------------------------------------------------------------------
         */
 
@@ -557,7 +523,7 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | WHATSAPP Ä°LE AYNI YAPAY ZEKÃ‚ MOTORUNU Ã‡ALIÅTIR
+        | WHATSAPP İLE AYNI YAPAY ZEKÂ MOTORUNU ÇALIŞTIR
         |--------------------------------------------------------------------------
         */
 
@@ -569,7 +535,7 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | YAPAY ZEKÃ‚ CEVABINI HAFIZAYA KAYDET
+        | YAPAY ZEKÂ CEVABINI HAFIZAYA KAYDET
         |--------------------------------------------------------------------------
         */
 
@@ -589,7 +555,7 @@ class TestSohbeti extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | SOHBETÄ° TEMÄ°ZLE
+    | SOHBETİ TEMİZLE
     |--------------------------------------------------------------------------
     */
 
@@ -617,11 +583,11 @@ class TestSohbeti extends Page
 
     /*
     |--------------------------------------------------------------------------
-    | TESTÄ° ONAYLA VE WHATSAPP'A GEÃ‡
+    | TESTİ ONAYLA VE WHATSAPP'A GEÇ
     |--------------------------------------------------------------------------
     |
-    | KullanÄ±cÄ± saÄŸdaki ayarlarÄ± deÄŸiÅŸtirmiÅŸ fakat "AyarlarÄ± Kaydet"
-    | butonuna basmamÄ±ÅŸ olsa bile burada son bilgiler otomatik kaydedilir.
+    | Kullanıcı sağdaki ayarları değiştirmiş fakat "Ayarları Kaydet"
+    | butonuna basmamış olsa bile burada son bilgiler otomatik kaydedilir.
     |
     */
 
@@ -636,7 +602,7 @@ class TestSohbeti extends Page
 
         if (! $aiBot) {
             Notification::make()
-                ->title('Yapay zekÃ¢ bulunamadÄ±.')
+                ->title('Yapay zekâ bulunamadı.')
                 ->danger()
                 ->send();
 
@@ -653,7 +619,7 @@ class TestSohbeti extends Page
             Notification::make()
                 ->title('Eksik bilgi var')
                 ->body(
-                    'WhatsApp baÄŸlantÄ±sÄ±na geÃ§meden Ã¶nce Yapay ZekÃ¢ AdÄ±, Firma AdÄ± ve Firma HakkÄ±nda alanlarÄ±nÄ± doldurun.'
+                    'WhatsApp bağlantısına geçmeden önce Yapay Zekâ Adı, Firma Adı ve Firma Hakkında alanlarını doldurun.'
                 )
                 ->warning()
                 ->send();
@@ -663,7 +629,7 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | SON DEÄÄ°ÅÄ°KLÄ°KLERÄ° OTOMATÄ°K KAYDET
+        | SON DEĞİŞİKLİKLERİ OTOMATİK KAYDET
         |--------------------------------------------------------------------------
         */
 
@@ -673,7 +639,7 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | TEST OTURUMUNU TEMÄ°ZLE
+        | TEST OTURUMUNU TEMİZLE
         |--------------------------------------------------------------------------
         */
 
@@ -686,21 +652,21 @@ class TestSohbeti extends Page
 
         /*
         |--------------------------------------------------------------------------
-        | KULLANICIYA BÄ°LGÄ° VER
+        | KULLANICIYA BİLGİ VER
         |--------------------------------------------------------------------------
         */
 
         Notification::make()
-            ->title('Test onaylandÄ±')
+            ->title('Test onaylandı')
             ->body(
-                'Son ayarlarÄ±nÄ±z kaydedildi. Åimdi WhatsApp baÄŸlantÄ±nÄ±zÄ± tamamlayabilirsiniz.'
+                'Son ayarlarınız kaydedildi. Şimdi WhatsApp bağlantınızı tamamlayabilirsiniz.'
             )
             ->success()
             ->send();
 
         /*
         |--------------------------------------------------------------------------
-        | WHATSAPP QR EKRANINA GÄ°T
+        | WHATSAPP QR EKRANINA GİT
         |--------------------------------------------------------------------------
         */
 

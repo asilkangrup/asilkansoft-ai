@@ -7,6 +7,12 @@ use App\Models\User;
 
 class OrganizationAccessService
 {
+    /*
+    |--------------------------------------------------------------------------
+    | AKTİF ORGANİZASYON
+    |--------------------------------------------------------------------------
+    */
+
     public function currentOrganization(
         ?User $user = null
     ): ?Organization {
@@ -25,6 +31,12 @@ class OrganizationAccessService
             ->first();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | KULLANICI ROLÜ
+    |--------------------------------------------------------------------------
+    */
+
     public function currentRole(
         ?User $user = null
     ): ?string {
@@ -34,9 +46,21 @@ class OrganizationAccessService
             return null;
         }
 
-        if ($user->is_admin) {
+        /*
+        |--------------------------------------------------------------------------
+        | ANA YÖNETİCİ
+        |--------------------------------------------------------------------------
+        */
+
+        if ((bool) $user->is_admin) {
             return 'admin';
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | NORMAL KULLANICI
+        |--------------------------------------------------------------------------
+        */
 
         $organization =
             $this->currentOrganization(
@@ -53,6 +77,38 @@ class OrganizationAccessService
             );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | MODÜL YETKİLERİ
+    |--------------------------------------------------------------------------
+    |
+    | ADMIN:
+    | Her şeye erişebilir.
+    |
+    | NORMAL KULLANICI:
+    |
+    | AÇIK:
+    | - Kurulum Merkezi
+    | - Test Sohbeti
+    |
+    | Yapay Zeka Ayarları AiBotResource içerisindeki owner / manager
+    | yetkilendirmesiyle çalışmaya devam eder.
+    |
+    | Gelen Kutusu kendi resource erişimiyle çalışmaya devam eder.
+    |
+    | KAPALI:
+    | - Dashboard
+    | - Müşteriler / CRM
+    | - Pipeline
+    | - Görevler
+    | - Alarmlar
+    | - Raporlar
+    | - Ekip
+    | - Kanallar
+    | - diğer CRM modülleri
+    |
+    */
+
     public function can(
         string $permission,
         ?User $user = null
@@ -63,113 +119,71 @@ class OrganizationAccessService
             return false;
         }
 
-        if ($user->is_admin) {
+        /*
+        |--------------------------------------------------------------------------
+        | ADMIN HER ŞEYE ERİŞİR
+        |--------------------------------------------------------------------------
+        */
+
+        if ((bool) $user->is_admin) {
             return true;
         }
 
-        $role =
-            $this->currentRole(
-                $user
-            );
-
-        $permissions = [
-            'owner' => [
-                'dashboard',
-                'customers',
-                'pipeline',
-                'tasks',
-                'alarms',
-                'reports',
-                'team',
-                'channels',
-                'setup',
-                'whatsapp_connect',
-                'test_chat',
-            ],
-
-            'manager' => [
-                'dashboard',
-                'customers',
-                'pipeline',
-                'tasks',
-                'alarms',
-                'reports',
-                'team',
-                'channels',
-                'test_chat',
-            ],
-
-            'sales' => [
-                'dashboard',
-                'customers',
-                'pipeline',
-                'tasks',
-                'alarms',
-                'test_chat',
-            ],
-
-            'support' => [
-                'dashboard',
-                'customers',
-                'tasks',
-                'alarms',
-                'test_chat',
-            ],
-
-            'viewer' => [
-                'dashboard',
-                'customers',
-                'pipeline',
-                'tasks',
-                'alarms',
-                'reports',
-            ],
-        ];
+        /*
+        |--------------------------------------------------------------------------
+        | NORMAL KULLANICIYA AÇIK MODÜLLER
+        |--------------------------------------------------------------------------
+        */
 
         return in_array(
             $permission,
-            $permissions[$role] ?? [],
+            [
+                'setup',
+                'test_chat',
+            ],
             true
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CRM YAZMA YETKİSİ
+    |--------------------------------------------------------------------------
+    |
+    | CRM sadece admin hesabında kullanılabilir.
+    |
+    */
 
     public function canWriteCrm(
         ?User $user = null
     ): bool {
-        $role =
-            $this->currentRole(
-                $user
-            );
+        $user ??= auth()->user();
 
-        return in_array(
-            $role,
-            [
-                'admin',
-                'owner',
-                'manager',
-                'sales',
-                'support',
-            ],
-            true
-        );
+        if (! $user) {
+            return false;
+        }
+
+        return (bool) $user->is_admin;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CRM MÜŞTERİ ATAMA YETKİSİ
+    |--------------------------------------------------------------------------
+    |
+    | CRM müşteri/personel ataması sadece admin hesabında kullanılabilir.
+    |
+    */
 
     public function canAssignCustomers(
         ?User $user = null
     ): bool {
-        $role =
-            $this->currentRole(
-                $user
-            );
+        $user ??= auth()->user();
 
-        return in_array(
-            $role,
-            [
-                'admin',
-                'owner',
-                'manager',
-            ],
-            true
-        );
+        if (! $user) {
+            return false;
+        }
+
+        return (bool) $user->is_admin;
     }
 }

@@ -8,6 +8,7 @@ use App\Services\WhatsAppService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -15,9 +16,6 @@ use Throwable;
 #[Description('Cevap vermeyen WhatsApp müşterilerine otomatik takip mesajları gönderir.')]
 class SendConversationFollowUps extends Command
 {
-    /**
-     * Execute the console command.
-     */
     public function handle(
         WhatsAppService $whatsAppService,
         MemoryService $memoryService
@@ -26,14 +24,22 @@ class SendConversationFollowUps extends Command
 
         /*
         |--------------------------------------------------------------------------
-        | AKTİF TAKİP KAYITLARINI GETİR
+        | SADECE AKTİF VE GEÇERLİ KAYITLARI GETİR
         |--------------------------------------------------------------------------
+        |
+        | Not:
+        | Zaman filtresi bot bazında değiştiği için burada tamamen SQL'e
+        | taşımıyoruz. Ancak gereksiz ilişkileri ve bozuk kayıtları erken eliyoruz.
+        |
         */
 
         $followUps = ConversationFollowUp::query()
             ->with('aiBot')
             ->where('is_active', true)
             ->whereNotNull('last_customer_message_at')
+            ->whereNotNull('ai_bot_id')
+            ->whereNotNull('whatsapp_number')
+            ->orderBy('last_customer_message_at')
             ->get();
 
         if ($followUps->isEmpty()) {
@@ -53,8 +59,12 @@ class SendConversationFollowUps extends Command
                 */
 
                 if (! $aiBot) {
+                    $followUp->update([
+                        'is_active' => false,
+                    ]);
+
                     $this->warn(
-                        "Takip #{$followUp->id}: AiBot bulunamadı."
+                        "Takip #{$followUp->id}: AiBot bulunamadı, pasif yapıldı."
                     );
 
                     continue;
@@ -62,7 +72,7 @@ class SendConversationFollowUps extends Command
 
                 /*
                 |--------------------------------------------------------------------------
-                | TAKİP SİSTEMİ HÂLÂ AÇIK MI?
+                | TAKİP SİSTEMİ AÇIK MI?
                 |--------------------------------------------------------------------------
                 */
 
@@ -71,16 +81,12 @@ class SendConversationFollowUps extends Command
                         'is_active' => false,
                     ]);
 
-                    $this->info(
-                        "Takip #{$followUp->id}: Takip sistemi kapalı."
-                    );
-
                     continue;
                 }
 
                 /*
                 |--------------------------------------------------------------------------
-                | WHATSAPP BAĞLANTISI VAR MI?
+                | WHATSAPP INSTANCE / NUMARA VAR MI?
                 |--------------------------------------------------------------------------
                 */
 
@@ -97,9 +103,35 @@ class SendConversationFollowUps extends Command
 
                 /*
                 |--------------------------------------------------------------------------
-                | SON MÜŞTERİ MESAJI
+                | WHATSAPP GERÇEKTEN BAĞLI MI?
                 |--------------------------------------------------------------------------
+                |
+                | DB'deki status alanı connection closed olan botlara gereksiz
+                | HTTP isteği atılmasını engeller.
+                |
                 */
+
+                $whatsappStatus = strtolower(
+                    trim((string) $aiBot->whatsapp_status)
+                );
+
+                if (
+                    $whatsappStatus !== ''
+                    && ! in_array(
+                        $whatsappStatus,
+                        [
+                            'connected',
+                            'open',
+                        ],
+                        true
+                    )
+                ) {
+                    $this->warn(
+                        "Takip #{$followUp->id}: WhatsApp bağlı değil ({$whatsappStatus})."
+                    );
+
+                    continue;
+                }
 
                 $lastCustomerMessageAt =
                     $followUp->last_customer_message_at;
@@ -110,25 +142,36 @@ class SendConversationFollowUps extends Command
 
                 /*
                 |--------------------------------------------------------------------------
-                | 1. TAKİP MESAJI
+                | 1. TAKİP
                 |--------------------------------------------------------------------------
                 */
 
-                $firstFollowUpMinutes =
-                    max(
-                        1,
-                        (int) ($aiBot->first_follow_up_minutes ?: 1440)
-                    );
+                $firstFollowUpMinutes = max(
+                    1,
+                    (int) (
+                        $aiBot->first_follow_up_minutes
+                        ?: 1440
+                    )
+                );
 
                 $firstFollowUpTime =
                     $lastCustomerMessageAt
                         ->copy()
-                        ->addMinutes($firstFollowUpMinutes);
+                        ->addMinutes(
+                            $firstFollowUpMinutes
+                        );
 
-                if (
-                    ! $followUp->first_follow_up_sent_at
-                    && now()->greaterThanOrEqualTo($firstFollowUpTime)
-                ) {
+                if (! $followUp->first_follow_up_sent_at) {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | HENÜZ ZAMANI GELMEDİYSE HİÇBİR ŞEY YAPMA
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (now()->lessThan($firstFollowUpTime)) {
+                        continue;
+                    }
+
                     $firstMessage = trim(
                         (string) $aiBot->first_follow_up_message
                     );
@@ -138,18 +181,14 @@ class SendConversationFollowUps extends Command
                             'Merhaba 👋 Daha önce görüştüğümüz ürünle hâlâ ilgileniyor musunuz? Size yardımcı olabilirim.';
                     }
 
-                    /*
-                     * WhatsApp mesajını gönder.
-                     */
                     $whatsAppService->sendText(
-                        instanceName: $aiBot->whatsapp_instance,
-                        number: $followUp->whatsapp_number,
+                        instanceName: trim(
+                            (string) $aiBot->whatsapp_instance
+                        ),
+                        number: (string) $followUp->whatsapp_number,
                         text: $firstMessage,
                     );
 
-                    /*
-                     * Mesajı konuşma hafızasına da kaydet.
-                     */
                     $memoryService->mesajKaydet(
                         userId: $followUp->user_id,
                         aiBotId: $followUp->ai_bot_id,
@@ -158,131 +197,161 @@ class SendConversationFollowUps extends Command
                         message: $firstMessage,
                     );
 
-                    /*
-                     * İlk takip gönderildi olarak işaretle.
-                     */
+                    $now = now();
+
                     $followUp->update([
-                        'first_follow_up_sent_at' => now(),
-                        'follow_up_sent_at' => now(),
-                        'last_bot_message_at' => now(),
+                        'first_follow_up_sent_at' => $now,
+                        'follow_up_sent_at' => $now,
+                        'last_bot_message_at' => $now,
                     ]);
 
                     $this->info(
                         "Takip #{$followUp->id}: 1. takip mesajı gönderildi."
                     );
 
-                    /*
-                     * Aynı komut çalışmasında ikinci mesajı da
-                     * hemen göndermemek için bu kayıtta burada dur.
-                     */
                     continue;
                 }
 
                 /*
                 |--------------------------------------------------------------------------
-                | 2. VE SON TAKİP MESAJI
+                | İKİNCİ TAKİP KAPALIYSA TAMAMLA
                 |--------------------------------------------------------------------------
                 */
 
                 if (! $aiBot->second_follow_up_enabled) {
-                    /*
-                     * İlk takip gönderildiyse ve ikinci takip kapalıysa
-                     * bu konuşma için otomatik takip tamamlanmıştır.
-                     */
-                    if ($followUp->first_follow_up_sent_at) {
-                        $followUp->update([
-                            'is_active' => false,
-                        ]);
-                    }
-
-                    continue;
-                }
-
-                /*
-                 * İlk takip henüz gönderilmediyse ikinci takip gönderilmez.
-                 */
-                if (! $followUp->first_follow_up_sent_at) {
-                    continue;
-                }
-
-                $secondFollowUpMinutes =
-                    max(
-                        1,
-                        (int) ($aiBot->second_follow_up_minutes ?: 4320)
-                    );
-
-                /*
-                 * 2. süre de müşterinin SON mesajından itibaren hesaplanır.
-                 *
-                 * Örnek:
-                 * 1. mesaj = 1 saat
-                 * 2. mesaj = 1 gün
-                 *
-                 * Müşteri 10:00'da son mesajı attıysa:
-                 * 1. takip = 11:00
-                 * 2. takip = ertesi gün 10:00
-                 */
-                $secondFollowUpTime =
-                    $lastCustomerMessageAt
-                        ->copy()
-                        ->addMinutes($secondFollowUpMinutes);
-
-                if (
-                    ! $followUp->second_follow_up_sent_at
-                    && now()->greaterThanOrEqualTo($secondFollowUpTime)
-                ) {
-                    $secondMessage = trim(
-                        (string) $aiBot->second_follow_up_message
-                    );
-
-                    if ($secondMessage === '') {
-                        $secondMessage =
-                            'Merhaba 👋 Daha önce görüştüğümüz ürünle ilgili yardımcı olabileceğimiz bir konu var mı? Dilerseniz siparişinizi birlikte oluşturabiliriz.';
-                    }
-
-                    /*
-                     * WhatsApp mesajını gönder.
-                     */
-                    $whatsAppService->sendText(
-                        instanceName: $aiBot->whatsapp_instance,
-                        number: $followUp->whatsapp_number,
-                        text: $secondMessage,
-                    );
-
-                    /*
-                     * Hafızaya kaydet.
-                     */
-                    $memoryService->mesajKaydet(
-                        userId: $followUp->user_id,
-                        aiBotId: $followUp->ai_bot_id,
-                        sessionId: $followUp->session_id,
-                        role: 'assistant',
-                        message: $secondMessage,
-                    );
-
-                    /*
-                     * İkinci takip SON mesajdır.
-                     * Bundan sonra sistem bu konuşmayı takip etmez.
-                     */
                     $followUp->update([
-                        'second_follow_up_sent_at' => now(),
-                        'follow_up_sent_at' => now(),
-                        'last_bot_message_at' => now(),
                         'is_active' => false,
                     ]);
 
-                    $this->info(
-                        "Takip #{$followUp->id}: 2. ve son takip mesajı gönderildi."
-                    );
+                    continue;
                 }
 
-            } catch (Throwable $exception) {
-                Log::error('Otomatik takip mesajı gönderilemedi', [
-                    'follow_up_id' => $followUp->id,
-                    'ai_bot_id' => $followUp->ai_bot_id,
-                    'session_id' => $followUp->session_id,
-                    'message' => $exception->getMessage(),
+                /*
+                |--------------------------------------------------------------------------
+                | İKİNCİ TAKİP ZATEN GÖNDERİLDİYSE PASİF YAP
+                |--------------------------------------------------------------------------
+                */
+
+                if ($followUp->second_follow_up_sent_at) {
+                    $followUp->update([
+                        'is_active' => false,
+                    ]);
+
+                    continue;
+                }
+
+                $secondFollowUpMinutes = max(
+                    1,
+                    (int) (
+                        $aiBot->second_follow_up_minutes
+                        ?: 4320
+                    )
+                );
+
+                $secondFollowUpTime =
+                    $lastCustomerMessageAt
+                        ->copy()
+                        ->addMinutes(
+                            $secondFollowUpMinutes
+                        );
+
+                /*
+                |--------------------------------------------------------------------------
+                | 2. TAKİP ZAMANI GELMEDİYSE GEÇ
+                |--------------------------------------------------------------------------
+                */
+
+                if (now()->lessThan($secondFollowUpTime)) {
+                    continue;
+                }
+
+                $secondMessage = trim(
+                    (string) $aiBot->second_follow_up_message
+                );
+
+                if ($secondMessage === '') {
+                    $secondMessage =
+                        'Merhaba 👋 Daha önce görüştüğümüz ürünle ilgili yardımcı olabileceğimiz bir konu var mı? Dilerseniz siparişinizi birlikte oluşturabiliriz.';
+                }
+
+                $whatsAppService->sendText(
+                    instanceName: trim(
+                        (string) $aiBot->whatsapp_instance
+                    ),
+                    number: (string) $followUp->whatsapp_number,
+                    text: $secondMessage,
+                );
+
+                $memoryService->mesajKaydet(
+                    userId: $followUp->user_id,
+                    aiBotId: $followUp->ai_bot_id,
+                    sessionId: $followUp->session_id,
+                    role: 'assistant',
+                    message: $secondMessage,
+                );
+
+                $now = now();
+
+                $followUp->update([
+                    'second_follow_up_sent_at' => $now,
+                    'follow_up_sent_at' => $now,
+                    'last_bot_message_at' => $now,
+                    'is_active' => false,
                 ]);
+
+                $this->info(
+                    "Takip #{$followUp->id}: 2. ve son takip mesajı gönderildi."
+                );
+            } catch (Throwable $exception) {
+                Log::error(
+                    'Otomatik takip mesajı gönderilemedi',
+                    [
+                        'follow_up_id' =>
+                            $followUp->id,
+
+                        'ai_bot_id' =>
+                            $followUp->ai_bot_id,
+
+                        'session_id' =>
+                            $followUp->session_id,
+
+                        'message' =>
+                            $exception->getMessage(),
+                    ]
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | BAĞLANTI / INSTANCE HATASINDA SONSUZ TEKRAR YAPMA
+                |--------------------------------------------------------------------------
+                |
+                | Mesaj içeriği veya geçici OpenAI hatası nedeniyle takip
+                | tamamen kapatılmıyor.
+                |
+                */
+
+                $errorMessage = strtolower(
+                    $exception->getMessage()
+                );
+
+                if (
+                    str_contains(
+                        $errorMessage,
+                        'connection closed'
+                    )
+                    || str_contains(
+                        $errorMessage,
+                        'instance does not exist'
+                    )
+                    || str_contains(
+                        $errorMessage,
+                        'instance is not connected'
+                    )
+                ) {
+                    $followUp->update([
+                        'is_active' => false,
+                    ]);
+                }
 
                 report($exception);
 
@@ -293,7 +362,9 @@ class SendConversationFollowUps extends Command
             }
         }
 
-        $this->info('Otomatik takip kontrolü tamamlandı.');
+        $this->info(
+            'Otomatik takip kontrolü tamamlandı.'
+        );
 
         return self::SUCCESS;
     }

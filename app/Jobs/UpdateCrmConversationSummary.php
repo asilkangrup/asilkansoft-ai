@@ -39,6 +39,20 @@ class UpdateCrmConversationSummary implements ShouldQueue
 
             /*
             |--------------------------------------------------------------------------
+            | CRM SADECE ANA YÖNETİCİ HESABINDA ÇALIŞIR
+            |--------------------------------------------------------------------------
+            |
+            | WAI normal müşteri hesaplarında CRM AI özeti oluşturulmaz.
+            | Böylece bu job normal müşteriler için OpenAI / API maliyeti üretmez.
+            |
+            */
+
+            if ((int) $conversation->user_id !== 1) {
+                return;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
             | KAPANMIŞ SATIŞLAR
             |--------------------------------------------------------------------------
             |

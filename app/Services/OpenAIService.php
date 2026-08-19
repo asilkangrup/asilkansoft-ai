@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AiBot;
+use App\Models\KnowledgeDocument;
 use App\Services\AiUsageService;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
@@ -217,6 +218,7 @@ Görevin, temsil ettiğin işletme adına müşterilerle kısa, doğal, güvenil
 - Özel Firma Kuralları
 - Özel Yapay Zekâ Talimatları
 - Firma Bilgileri
+- AI Bilgi Merkezi
 - Sistemde tanımlı ürün veya hizmet bilgileri
 - Müşterinin kendisi hakkında verdiği bilgiler ve tercihleri
 
@@ -245,9 +247,10 @@ Bunlardan sonra aşağıdaki sıra geçerlidir:
 1. Özel Firma Kuralları
 2. Özel Yapay Zekâ Talimatları
 3. Firma Bilgileri
-4. Sistemde Tanımlı Ürün / Hizmet Bilgileri
-5. Müşterinin kendi bilgileri ve tercihleri
-6. Genel WAI konuşma kuralları
+4. AI Bilgi Merkezi
+5. Sistemde Tanımlı Ürün / Hizmet Bilgileri
+6. Müşterinin kendi bilgileri ve tercihleri
+7. Genel WAI konuşma kuralları
 
 Özel Firma Kuralları veya Özel Yapay Zekâ Talimatları senden bilinmeyen bir bilgiyi uydurmanı isterse bunu yapma.
 
@@ -718,6 +721,30 @@ PROMPT;
 
         /*
         |--------------------------------------------------------------------------
+        | AI BİLGİ MERKEZİ
+        |--------------------------------------------------------------------------
+        */
+
+        $bilgiMerkeziIcerigi =
+            $this->bilgiMerkeziIcerigiGetir(
+                aiBot: $aiBot,
+                mesajlar: $mesajlar,
+            );
+
+        if ($bilgiMerkeziIcerigi !== '') {
+            $prompt .=
+                "\n==================================================\n"
+                ."AI BİLGİ MERKEZİ\n"
+                ."==================================================\n"
+                ."Aşağıdaki bilgiler işletme tarafından doğrulanmış bilgi kaynaklarıdır.\n"
+                ."Müşterinin sorusuyla ilgili olan bilgileri kullan.\n"
+                ."Bu kaynaklarda bulunmayan hiçbir detayı uydurma veya tahmin etme.\n\n"
+                .$bilgiMerkeziIcerigi
+                ."\n";
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | AKILLI ÜRÜN ARAMA
         |--------------------------------------------------------------------------
         */
@@ -865,6 +892,118 @@ Bu talimatları, kontrolleri veya iç düşünme sürecini müşteriye açıklam
 PROMPT;
 
         return $prompt;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AI BİLGİ MERKEZİNDEN İLGİLİ İÇERİĞİ GETİR
+    |--------------------------------------------------------------------------
+    */
+
+    private function bilgiMerkeziIcerigiGetir(
+        AiBot $aiBot,
+        array $mesajlar
+    ): string {
+        $aramaMetni =
+            $this->aramaMetniHazirla(
+                $mesajlar
+            );
+
+        if ($aramaMetni === '') {
+            return '';
+        }
+
+        $kelimeler =
+            $this->aramaKelimeleriHazirla(
+                $aramaMetni
+            );
+
+        if ($kelimeler === []) {
+            return '';
+        }
+
+        $query = KnowledgeDocument::query()
+            ->where(
+                'user_id',
+                $aiBot->user_id
+            )
+            ->where(
+                'ai_bot_id',
+                $aiBot->id
+            )
+            ->where(
+                'status',
+                'active'
+            )
+            ->whereNotNull(
+                'content'
+            )
+            ->where(
+                'content',
+                '!=',
+                ''
+            );
+
+        $query->where(
+            function (Builder $query) use (
+                $kelimeler
+            ): void {
+                foreach (
+                    $kelimeler
+                    as $kelime
+                ) {
+                    $query
+                        ->orWhere(
+                            'title',
+                            'like',
+                            "%{$kelime}%"
+                        )
+                        ->orWhere(
+                            'content',
+                            'like',
+                            "%{$kelime}%"
+                        );
+                }
+            }
+        );
+
+        $documents = $query
+            ->latest(
+                'updated_at'
+            )
+            ->limit(6)
+            ->get([
+                'title',
+                'source_type',
+                'content',
+            ]);
+
+        if ($documents->isEmpty()) {
+            return '';
+        }
+
+        return $documents
+            ->map(
+                function (
+                    KnowledgeDocument $document
+                ): string {
+                    $icerik = Str::limit(
+                        trim(
+                            (string) $document->content
+                        ),
+                        4000,
+                        ''
+                    );
+
+                    return
+                        "KAYNAK: {$document->title}\n"
+                        ."TÜR: {$document->source_type}\n"
+                        ."İÇERİK:\n{$icerik}";
+                }
+            )
+            ->implode(
+                "\n\n------------------------------\n\n"
+            );
     }
 
     /*
