@@ -76,11 +76,6 @@ class KurulumMerkezi extends Page
                 ->exists()
             : false;
 
-        $followUpConfigured = $bot
-            && $bot->follow_up_enabled
-            && filled($bot->first_follow_up_minutes)
-            && filled($bot->first_follow_up_message);
-
         /*
         |--------------------------------------------------------------------------
         | KURULUM ADIMLARI
@@ -199,34 +194,6 @@ class KurulumMerkezi extends Page
                     '📦',
             ],
 
-            [
-                'title' =>
-                    'Otomatik Takibi Ayarla',
-
-                'description' =>
-                    'Cevap vermeyen müşterilere otomatik hatırlatma mesajları gönder.',
-
-                'completed' =>
-                    $followUpConfigured,
-
-                'url' =>
-                    $bot
-                        ? AiBotResource::getUrl(
-                            'edit',
-                            [
-                                'record' => $bot,
-                            ]
-                        )
-                        : AiBotResource::getUrl(
-                            'create'
-                        ),
-
-                'button' =>
-                    'Takip Ayarlarını Düzenle',
-
-                'icon' =>
-                    '⏱️',
-            ],
         ];
 
         /*

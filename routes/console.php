@@ -4,18 +4,6 @@ use Illuminate\Support\Facades\Schedule;
 
 /*
 |--------------------------------------------------------------------------
-| WHATSAPP OTOMATİK TAKİP MESAJLARI
-|--------------------------------------------------------------------------
-*/
-
-Schedule::command(
-    'app:send-conversation-follow-ups'
-)
-    ->everyFiveMinutes()
-    ->withoutOverlapping();
-
-/*
-|--------------------------------------------------------------------------
 | CRM TAKİP / ÖNCELİKLİ LEAD BİLDİRİMLERİ
 |--------------------------------------------------------------------------
 */
