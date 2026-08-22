@@ -8,7 +8,6 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Schemas\Components\Wizard\Step;
 
@@ -24,7 +23,7 @@ class CreateAiBot extends CreateRecord
     {
         return [
             Step::make('1. Temel Bilgiler')
-                ->description('Kurulum %20')
+                ->description('Kurulum %25')
                 ->icon('heroicon-o-building-office')
                 ->schema([
                     TextInput::make('name')
@@ -46,9 +45,7 @@ class CreateAiBot extends CreateRecord
                         ->helperText(
                             'Yazmaya başladığınızda uygun sektörler listelenir. WAI, lead puanlama sistemini seçiminize göre otomatik ayarlar.'
                         )
-                        ->options(
-                            BusinessSectorService::options()
-                        )
+                        ->options(BusinessSectorService::options())
                         ->searchable()
                         ->native(false)
                         ->required(),
@@ -79,190 +76,75 @@ class CreateAiBot extends CreateRecord
                 ->columns(2),
 
             Step::make('2. Firma Bilgileri')
-                ->description('Kurulum %40')
+                ->description('Kurulum %50')
                 ->icon('heroicon-o-information-circle')
                 ->schema([
                     Textarea::make('company_description')
                         ->label('Firma Hakkında')
-                        ->placeholder(
-                            'Firmanız ne yapıyor? Hangi ürün veya hizmetleri sunuyorsunuz?'
-                        )
-                        ->helperText(
-                            'Yapay zekâ müşterilere firmanızı anlatırken bu bilgileri kullanacaktır.'
-                        )
+                        ->placeholder('Firmanız ne yapıyor? Hangi ürün veya hizmetleri sunuyorsunuz?')
+                        ->helperText('Yapay zekâ müşterilere firmanızı anlatırken bu bilgileri kullanacaktır.')
                         ->rows(7)
                         ->required()
                         ->columnSpanFull(),
 
                     Textarea::make('working_hours')
                         ->label('Çalışma Saatleri')
-                        ->placeholder(
-                            'Örn: Pazartesi - Cumartesi 09:00 - 18:00'
-                        )
+                        ->placeholder('Örn: Pazartesi - Cumartesi 09:00 - 18:00')
                         ->rows(4)
                         ->columnSpanFull(),
                 ]),
 
             Step::make('3. Satış ve Hizmet')
-                ->description('Kurulum %60')
+                ->description('Kurulum %75')
                 ->icon('heroicon-o-shopping-cart')
                 ->schema([
                     Textarea::make('cargo_information')
                         ->label('Kargo ve Teslimat Bilgileri')
-                        ->placeholder(
-                            'Kargo firması, teslimat süresi, ücretsiz kargo şartları veya hizmet bölgesini yazın.'
-                        )
-                        ->helperText(
-                            'Hizmet sektöründeyseniz servis bölgesi ve randevu bilgilerini yazabilirsiniz.'
-                        )
+                        ->placeholder('Kargo firması, teslimat süresi, ücretsiz kargo şartları veya hizmet bölgesini yazın.')
+                        ->helperText('Hizmet sektöründeyseniz servis bölgesi ve randevu bilgilerini yazabilirsiniz.')
                         ->rows(6),
 
                     Textarea::make('payment_information')
                         ->label('Ödeme Bilgileri')
-                        ->placeholder(
-                            'Kapıda nakit, kapıda kart, havale, kredi kartı vb.'
-                        )
+                        ->placeholder('Kapıda nakit, kapıda kart, havale, kredi kartı vb.')
                         ->rows(6),
 
                     Textarea::make('return_policy')
                         ->label('İade / Değişim / İptal Politikası')
-                        ->placeholder(
-                            'Varsa iade, değişim ve iptal koşullarınızı yazın.'
-                        )
+                        ->placeholder('Varsa iade, değişim ve iptal koşullarınızı yazın.')
                         ->rows(5)
                         ->columnSpanFull(),
                 ])
                 ->columns(2),
 
             Step::make('4. Yapay Zekâ Eğitimi')
-                ->description('Kurulum %80')
+                ->description('Kurulum %100')
                 ->icon('heroicon-o-academic-cap')
                 ->schema([
                     Textarea::make('company_rules')
                         ->label('Özel Firma Kuralları')
-                        ->placeholder(
-                            'Örn: Bilmediğin fiyatı uydurma. Kesin teslimat sözü verme. Müşteriyi uygun şekilde satışa yönlendir.'
-                        )
-                        ->helperText(
-                            'Yapay zekânın kesinlikle uyması gereken kuralları buraya yazın.'
-                        )
+                        ->placeholder('Örn: Bilmediğin fiyatı uydurma. Kesin teslimat sözü verme. Müşteriyi uygun şekilde satışa yönlendir.')
+                        ->helperText('Yapay zekânın kesinlikle uyması gereken kuralları buraya yazın.')
                         ->rows(7)
                         ->columnSpanFull(),
 
                     Textarea::make('system_prompt')
                         ->label('Konuşma ve Satış Talimatları')
-                        ->placeholder(
-                            'Örn: Samimi ve profesyonel konuş. Önce müşterinin ihtiyacını öğren. Kısa cevaplar ver.'
-                        )
-                        ->helperText(
-                            'Yapay zekânın müşterilerle nasıl konuşacağını buradan belirleyebilirsiniz.'
-                        )
+                        ->placeholder('Örn: Samimi ve profesyonel konuş. Önce müşterinin ihtiyacını öğren. Kısa cevaplar ver.')
+                        ->helperText('Yapay zekânın müşterilerle nasıl konuşacağını buradan belirleyebilirsiniz.')
                         ->rows(8)
                         ->columnSpanFull(),
                 ]),
-
-            Step::make('5. Otomatik Takip')
-                ->description('Kurulum %100')
-                ->icon('heroicon-o-check-circle')
-                ->schema([
-                    Toggle::make('follow_up_enabled')
-                        ->label('Cevap Vermeyen Müşterileri Otomatik Takip Et')
-                        ->helperText(
-                            'Müşteri görüşmeyi yarıda bırakırsa belirlediğiniz süre sonunda otomatik hatırlatma gönderilir.'
-                        )
-                        ->default(false)
-                        ->live(),
-
-                    Select::make('first_follow_up_minutes')
-                        ->label('1. Hatırlatma Ne Zaman Gönderilsin?')
-                        ->options([
-                            60 => '1 Saat Sonra',
-                            120 => '2 Saat Sonra',
-                            180 => '3 Saat Sonra',
-                            360 => '6 Saat Sonra',
-                            720 => '12 Saat Sonra',
-                            1440 => '24 Saat Sonra',
-                            2880 => '2 Gün Sonra',
-                            4320 => '3 Gün Sonra',
-                            7200 => '5 Gün Sonra',
-                            10080 => '7 Gün Sonra',
-                        ])
-                        ->default(1440)
-                        ->required()
-                        ->visible(
-                            fn ($get): bool =>
-                                (bool) $get('follow_up_enabled')
-                        ),
-
-                    Textarea::make('first_follow_up_message')
-                        ->label('1. Hatırlatma Mesajı')
-                        ->default(
-                            'Merhaba 👋 Daha önce görüştüğümüz ürünle hâlâ ilgileniyor musunuz? Size yardımcı olabilirim.'
-                        )
-                        ->rows(4)
-                        ->columnSpanFull()
-                        ->visible(
-                            fn ($get): bool =>
-                                (bool) $get('follow_up_enabled')
-                        ),
-
-                    Toggle::make('second_follow_up_enabled')
-                        ->label('2. ve Son Hatırlatma Gönder')
-                        ->default(true)
-                        ->live()
-                        ->visible(
-                            fn ($get): bool =>
-                                (bool) $get('follow_up_enabled')
-                        ),
-
-                    Select::make('second_follow_up_minutes')
-                        ->label('2. Hatırlatma Ne Zaman Gönderilsin?')
-                        ->options([
-                            1440 => '1 Gün Sonra',
-                            2880 => '2 Gün Sonra',
-                            4320 => '3 Gün Sonra',
-                            5760 => '4 Gün Sonra',
-                            7200 => '5 Gün Sonra',
-                            10080 => '7 Gün Sonra',
-                            14400 => '10 Gün Sonra',
-                            20160 => '14 Gün Sonra',
-                        ])
-                        ->default(4320)
-                        ->required()
-                        ->visible(
-                            fn ($get): bool =>
-                                (bool) $get('follow_up_enabled')
-                                && (bool) $get('second_follow_up_enabled')
-                        ),
-
-                    Textarea::make('second_follow_up_message')
-                        ->label('2. ve Son Hatırlatma Mesajı')
-                        ->default(
-                            'Merhaba 👋 Daha önce görüştüğümüz ürünle ilgili yardımcı olabileceğimiz bir konu var mı? Dilerseniz siparişinizi birlikte oluşturabiliriz.'
-                        )
-                        ->rows(4)
-                        ->columnSpanFull()
-                        ->visible(
-                            fn ($get): bool =>
-                                (bool) $get('follow_up_enabled')
-                                && (bool) $get('second_follow_up_enabled')
-                        ),
-                ])
-                ->columns(2),
         ];
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['user_id'] = auth()->id();
-
         $data['openai_model'] = 'gpt-5-mini';
-
-        $data['lead_scoring_profile'] =
-            BusinessSectorService::profileForSector(
-                $data['business_sector']
-                ?? null
-            );
+        $data['lead_scoring_profile'] = BusinessSectorService::profileForSector(
+            $data['business_sector'] ?? null
+        );
 
         return $data;
     }
