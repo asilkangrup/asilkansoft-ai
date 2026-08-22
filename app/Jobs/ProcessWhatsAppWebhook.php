@@ -32,11 +32,8 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         |--------------------------------------------------------------------------
         |
         | Coolify bu uygulamayı yalnızca `php artisan serve` ile çalıştırıyor.
-        | Bu nedenle database queue'ya atılan WhatsApp webhook işleri worker
-        | olmadığı için işlenmeden bekliyordu. Bu job yalnızca WhatsApp gelen
-        | mesaj akışı için kullanıldığı için bağlantıyı zorunlu olarak `sync`
-        | yapıyoruz. Böylece mesaj aynı HTTP isteğinde güvenilir şekilde işlenir
-        | ve yapay zeka cevabı WhatsApp'a gönderilir.
+        | Database queue'ya atılan WhatsApp işleri worker olmadığı için bekler.
+        | Bu job bu nedenle sync bağlantısında çalışır.
         |
         */
         $this->onConnection('sync');
@@ -54,6 +51,26 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         CrmCustomerExtractorService $crmCustomerExtractorService,
     ): void {
         $payload = $this->payload;
+
+        /*
+        |--------------------------------------------------------------------------
+        | EVOLUTION API EVENT ADINI NORMALIZE ET
+        |--------------------------------------------------------------------------
+        |
+        | Evolution sürümüne göre event `messages.upsert`, `MESSAGES_UPSERT`
+        | veya benzeri biçimde gelebilir. Controller noktalı biçimi bekliyor.
+        |
+        */
+        $event = strtolower(trim((string) ($payload['event'] ?? '')));
+
+        if ($event !== '') {
+            $payload['event'] = str_replace(
+                ['_', '-'],
+                '.',
+                $event
+            );
+        }
+
         $payload['_wai_queued'] = true;
 
         $request = Request::create(
