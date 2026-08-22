@@ -19,13 +19,27 @@ class ProcessWhatsAppWebhook implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 3;
+    public int $tries = 1;
 
     public int $timeout = 180;
 
     public function __construct(
         public array $payload
     ) {
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCTION'DA AYRI QUEUE WORKER YOK
+        |--------------------------------------------------------------------------
+        |
+        | Coolify bu uygulamayı yalnızca `php artisan serve` ile çalıştırıyor.
+        | Bu nedenle database queue'ya atılan WhatsApp webhook işleri worker
+        | olmadığı için işlenmeden bekliyordu. Bu job yalnızca WhatsApp gelen
+        | mesaj akışı için kullanıldığı için bağlantıyı zorunlu olarak `sync`
+        | yapıyoruz. Böylece mesaj aynı HTTP isteğinde güvenilir şekilde işlenir
+        | ve yapay zeka cevabı WhatsApp'a gönderilir.
+        |
+        */
+        $this->onConnection('sync');
     }
 
     public function handle(
@@ -39,14 +53,7 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         LeadScoringService $leadScoringService,
         CrmCustomerExtractorService $crmCustomerExtractorService,
     ): void {
-        /*
-        |--------------------------------------------------------------------------
-        | QUEUE İÇİN YENİ REQUEST OLUŞTUR
-        |--------------------------------------------------------------------------
-        */
-
         $payload = $this->payload;
-
         $payload['_wai_queued'] = true;
 
         $request = Request::create(
@@ -54,12 +61,6 @@ class ProcessWhatsAppWebhook implements ShouldQueue
             'POST',
             $payload
         );
-
-        /*
-        |--------------------------------------------------------------------------
-        | MEVCUT WEBHOOK AKIŞINI ÇALIŞTIR
-        |--------------------------------------------------------------------------
-        */
 
         $controller->handle(
             request: $request,
