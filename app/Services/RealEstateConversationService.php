@@ -178,7 +178,13 @@ PROMPT,
         ConversationControl $conversation
     ): bool {
         foreach ($conversation->etiketler() as $tag) {
-            if (is_string($tag) && str_starts_with($tag, self::TAG_PREFIX)) {
+            if (! is_string($tag) || ! str_starts_with($tag, self::TAG_PREFIX)) {
+                continue;
+            }
+
+            $route = substr($tag, strlen(self::TAG_PREFIX));
+
+            if (in_array($route, self::ROUTES, true)) {
                 return true;
             }
         }
