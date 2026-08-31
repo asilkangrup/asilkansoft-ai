@@ -6,7 +6,9 @@ use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\Organization;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 class MemoryService
 {
@@ -21,12 +23,12 @@ class MemoryService
     |--------------------------------------------------------------------------
     |
     | role:
-    | user      = OpenAI tarafÄ±nda kullanÄ±cÄ± mesajÄ±
-    | assistant = OpenAI tarafÄ±nda asistan mesajÄ±
+    | user      = OpenAI tarafında kullanıcı mesajı
+    | assistant = OpenAI tarafında asistan mesajı
     |
     | senderType:
-    | customer  = WhatsApp mÃ¼ÅŸterisi
-    | ai        = Yapay zekÃ¢
+    | customer  = WhatsApp müşterisi
+    | ai        = Yapay zekâ
     | human     = Paneldeki personel
     |
     */
@@ -42,15 +44,15 @@ class MemoryService
     ): ChatMessage {
         /*
         |--------------------------------------------------------------------------
-        | SENDER TYPE OTOMATÄ°K BELÄ°RLE
+        | SENDER TYPE OTOMATİK BELİRLE
         |--------------------------------------------------------------------------
         |
-        | Eski kodlardan senderType gÃ¶nderilmezse:
+        | Eski kodlardan senderType gönderilmezse:
         |
         | user      => customer
         | assistant => ai
         |
-        | BÃ¶ylece mevcut sistem bozulmadan Ã§alÄ±ÅŸmaya devam eder.
+        | Böylece mevcut sistem bozulmadan çalışmaya devam eder.
         |
         */
 
@@ -87,7 +89,7 @@ class MemoryService
                     );
         }
 
-        return ChatMessage::create([
+        $chatMessage = ChatMessage::create([
             'user_id' =>
                 $userId,
 
@@ -112,11 +114,57 @@ class MemoryService
             'message' =>
                 trim($message),
         ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | ASİLKAN ANA WHATSAPP İŞ YÖNLENDİRMESİ
+        |--------------------------------------------------------------------------
+        |
+        | Yalnızca ana WAI hesabında (user_id=1) müşteri mesajlarını WAI veya
+        | gayrimenkul akışına sınıflandırır. SaaS müşterilerinin bot davranışı
+        | bundan etkilenmez.
+        |
+        | Sınıflandırma ConversationControl.tags içinde kalıcı tutulur.
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $userId === 1
+            && $role === 'user'
+            && $senderType === 'customer'
+        ) {
+            try {
+                $conversation =
+                    ConversationControl::query()
+                        ->where('user_id', $userId)
+                        ->where('session_id', $sessionId)
+                        ->first();
+
+                if ($conversation) {
+                    app(BusinessContextRouterService::class)->route(
+                        conversation: $conversation,
+                        message: $message,
+                    );
+                }
+            } catch (Throwable $exception) {
+                Log::warning(
+                    'WAI BUSINESS CONTEXT ROUTER FAILED',
+                    [
+                        'user_id' => $userId,
+                        'ai_bot_id' => $aiBotId,
+                        'session_id' => $sessionId,
+                        'message' => $exception->getMessage(),
+                    ]
+                );
+            }
+        }
+
+        return $chatMessage;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | KONUÅMA GEÃ‡MÄ°ÅÄ°
+    | KONUŞMA GEÇMİŞİ
     |--------------------------------------------------------------------------
     */
 
@@ -143,7 +191,7 @@ class MemoryService
 
     /*
     |--------------------------------------------------------------------------
-    | OPENAI MESAJ FORMATINA Ã‡EVÄ°R
+    | OPENAI MESAJ FORMATINA ÇEVİR
     |--------------------------------------------------------------------------
     */
 
@@ -152,7 +200,7 @@ class MemoryService
         string $sessionId,
         int $limit = 20
     ): array {
-        return $this
+        $messages = $this
             ->gecmisiGetir(
                 $userId,
                 $sessionId,
@@ -170,11 +218,70 @@ class MemoryService
                 ]
             )
             ->all();
+
+        /*
+        |--------------------------------------------------------------------------
+        | KONUŞMAYA DAHİLİ İŞ BAĞLAMI EKLE
+        |--------------------------------------------------------------------------
+        |
+        | OpenAIService yalnızca user/assistant rollerini kabul ettiği için rota
+        | bağlamı son müşteri mesajından hemen önce assistant bağlamı olarak eklenir.
+        | Böylece son mesaj müşteri mesajı olarak kalır ve ürün/bilgi aramasında
+        | dahili rota metni kullanıcı arama verisine karışmaz.
+        |--------------------------------------------------------------------------
+        */
+
+        if ($userId === 1) {
+            try {
+                $conversation =
+                    ConversationControl::query()
+                        ->where('user_id', $userId)
+                        ->where('session_id', $sessionId)
+                        ->first();
+
+                if ($conversation) {
+                    $routingPrompt = trim(
+                        app(BusinessContextRouterService::class)
+                            ->promptFor($conversation)
+                    );
+
+                    if ($routingPrompt !== '') {
+                        $routingMessage = [
+                            'role' => 'assistant',
+                            'content' => $routingPrompt,
+                        ];
+
+                        $insertAt = max(
+                            0,
+                            count($messages) - 1
+                        );
+
+                        array_splice(
+                            $messages,
+                            $insertAt,
+                            0,
+                            [$routingMessage]
+                        );
+                    }
+                }
+            } catch (Throwable $exception) {
+                Log::warning(
+                    'WAI BUSINESS CONTEXT PROMPT FAILED',
+                    [
+                        'user_id' => $userId,
+                        'session_id' => $sessionId,
+                        'message' => $exception->getMessage(),
+                    ]
+                );
+            }
+        }
+
+        return $messages;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | SOHBETÄ° TEMÄ°ZLE
+    | SOHBETİ TEMİZLE
     |--------------------------------------------------------------------------
     */
 
