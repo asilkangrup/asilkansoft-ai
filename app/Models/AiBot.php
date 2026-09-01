@@ -19,6 +19,7 @@ class AiBot extends Model
         'logo_path',
         'role',
         'openai_model',
+        'openai_api_key',
         'system_prompt',
         'status',
 
@@ -105,6 +106,7 @@ class AiBot extends Model
 
     protected $hidden = [
         'whatsapp_token',
+        'openai_api_key',
     ];
 
     protected $casts = [
