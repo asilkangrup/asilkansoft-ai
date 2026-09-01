@@ -53,9 +53,11 @@ class RealEstateEvidenceReconciliationTest extends TestCase
         $this->assertSame(1250.0, (float) $data['area_sqm']);
         $this->assertSame('101', $data['block_no']);
         $this->assertSame('22', $data['parcel_no']);
+        $this->assertArrayNotHasKey('zoning_status', $data);
         $this->assertSame(4_500_000.0, (float) $data['asking_price']);
         $this->assertSame('whatsapp_media', $data['field_provenance']['city']['source']);
         $this->assertSame('media_observed_unverified', $data['field_provenance']['city']['status']);
+        $this->assertSame('Muğla', $data['field_provenance']['city']['observed_value']);
         $this->assertFalse($data['field_provenance']['city']['officially_verified']);
         $this->assertContains('city', $result['promoted_fields']);
         $this->assertContains('asking_price', $result['conflict_fields']);
@@ -102,6 +104,63 @@ class RealEstateEvidenceReconciliationTest extends TestCase
         );
     }
 
+    public function test_customer_profile_matching_media_is_real_corroboration_not_media_self_verification(): void
+    {
+        [$conversation, $profile] = $this->seedIsolatedProfile([
+            'intent' => 'seller',
+            'property_type' => 'arsa',
+            'city' => 'Muğla',
+            'district' => 'Marmaris',
+            'neighborhood' => 'Hisarönü',
+            'area_sqm' => 1250,
+            'block_no' => '101',
+            'parcel_no' => '22',
+            'title_deed_type' => 'arsa',
+            'zoning_status' => 'konut',
+            'asking_price' => 4_500_000,
+            'urgency' => 'medium',
+            'media_findings' => [[
+                'message_id' => 'media-corroborate-1',
+                'document_type' => 'tapu',
+                'property_type' => 'arsa',
+                'city' => 'Muğla',
+                'district' => 'Marmaris',
+                'neighborhood' => 'Hisarönü',
+                'area_sqm' => 1250,
+                'block_no' => '101',
+                'parcel_no' => '22',
+                'title_deed_type' => 'arsa',
+                'zoning_status' => 'konut',
+                'visible_asking_price' => 4_500_000,
+                'confidence_score' => 95,
+                'analyzed_at' => now()->toIso8601String(),
+            ]],
+        ]);
+
+        $evidence = app(RealEstateEvidenceReconciliationService::class)
+            ->process($conversation);
+        $verification = app(RealEstateVerificationService::class)
+            ->process($conversation);
+
+        $profile->refresh();
+
+        $this->assertContains('city', $evidence['corroborated_fields']);
+        $this->assertContains('district', $evidence['corroborated_fields']);
+        $this->assertSame(
+            'customer_profile',
+            $profile->data['field_provenance']['city']['source']
+        );
+        $this->assertSame(
+            'customer_profile_corroborated_by_media',
+            $profile->data['field_provenance']['city']['status']
+        );
+        $this->assertContains('city', $verification['corroborated_fields']);
+        $this->assertContains('district', $verification['corroborated_fields']);
+        $this->assertNotContains('city', $verification['media_only_fields']);
+        $this->assertTrue($verification['safe_to_match']);
+        $this->assertFalse($verification['legal_verification_complete']);
+    }
+
     public function test_existing_customer_value_is_never_overwritten_by_conflicting_media(): void
     {
         [$conversation, $profile] = $this->seedIsolatedProfile([
@@ -142,6 +201,41 @@ class RealEstateEvidenceReconciliationTest extends TestCase
         $this->assertContains('area_sqm', $result['conflict_fields']);
         $this->assertContains('asking_price', $result['conflict_fields']);
         $this->assertGreaterThanOrEqual(5, $result['unresolved_conflict_count']);
+    }
+
+    public function test_reprocessing_same_media_does_not_ratchet_confidence(): void
+    {
+        [$conversation, $profile] = $this->seedIsolatedProfile([
+            'intent' => 'seller',
+            'asking_price' => 4_000_000,
+            'urgency' => 'medium',
+            'media_findings' => [[
+                'message_id' => 'media-idempotent-1',
+                'document_type' => 'tapu',
+                'property_type' => 'arsa',
+                'city' => 'Muğla',
+                'district' => 'Marmaris',
+                'area_sqm' => 1000,
+                'confidence_score' => 90,
+                'analyzed_at' => now()->toIso8601String(),
+            ]],
+        ]);
+
+        $service = app(RealEstateEvidenceReconciliationService::class);
+        $first = $service->process($conversation);
+        $profile->refresh();
+        $afterFirst = $profile->confidence_score;
+
+        $second = $service->process($conversation);
+        $profile->refresh();
+
+        $this->assertGreaterThan(25, $afterFirst);
+        $this->assertSame($afterFirst, $profile->confidence_score);
+        $this->assertSame(
+            $first['confidence_boost_applied'],
+            $second['confidence_boost_applied']
+        );
+        $this->assertContains('city', $second['repeated_media_fields']);
     }
 
     public function test_low_confidence_media_is_not_promoted_and_non_isolated_conversation_is_refused(): void
