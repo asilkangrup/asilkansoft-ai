@@ -5,11 +5,15 @@ namespace Tests\Feature;
 use App\Jobs\ProcessWhatsAppWebhook;
 use App\Models\AiBot;
 use App\Models\ConversationControl;
+use App\Models\Organization;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\RealEstateDecisionService;
+use App\Services\RealEstateWhatsAppProvisioningService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -17,14 +21,27 @@ class RealEstateProductionFlowTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const WEBHOOK_SECRET = 'real-estate-webhook-test-secret-123456789';
+
+    public function test_isolated_real_estate_webhook_rejects_missing_signature(): void
+    {
+        $this->seedRealEstateBot();
+
+        $this->postJson('/api/real-estate/whatsapp/webhook', [
+            'event' => 'messages.upsert',
+            'instance' => 'emlak-ai-test',
+        ])->assertStatus(401);
+    }
+
     public function test_isolated_real_estate_webhook_rejects_foreign_instance(): void
     {
         $this->seedRealEstateBot();
 
-        $response = $this->postJson('/api/real-estate/whatsapp/webhook', [
-            'event' => 'messages.upsert',
-            'instance' => 'foreign-instance',
-        ]);
+        $response = $this->withToken($this->jwt(self::WEBHOOK_SECRET))
+            ->postJson('/api/real-estate/whatsapp/webhook', [
+                'event' => 'messages.upsert',
+                'instance' => 'foreign-instance',
+            ]);
 
         $response
             ->assertStatus(403)
@@ -33,25 +50,26 @@ class RealEstateProductionFlowTest extends TestCase
             ]);
     }
 
-    public function test_isolated_real_estate_webhook_accepts_own_instance_and_queues_processing(): void
+    public function test_isolated_real_estate_webhook_accepts_own_signed_instance_and_queues_processing(): void
     {
         $this->seedRealEstateBot();
         Queue::fake();
 
-        $response = $this->postJson('/api/real-estate/whatsapp/webhook', [
-            'event' => 'messages.upsert',
-            'instance' => 'emlak-ai-test',
-            'data' => [
-                'key' => [
-                    'id' => 'wamid-test-1',
-                    'fromMe' => false,
-                    'remoteJid' => '905551112233@s.whatsapp.net',
+        $response = $this->withToken($this->jwt(self::WEBHOOK_SECRET))
+            ->postJson('/api/real-estate/whatsapp/webhook', [
+                'event' => 'messages.upsert',
+                'instance' => 'emlak-ai-test',
+                'data' => [
+                    'key' => [
+                        'id' => 'wamid-test-1',
+                        'fromMe' => false,
+                        'remoteJid' => '905551112233@s.whatsapp.net',
+                    ],
+                    'message' => [
+                        'conversation' => 'Merhaba, arsamı satmak istiyorum.',
+                    ],
                 ],
-                'message' => [
-                    'conversation' => 'Merhaba, arsamı satmak istiyorum.',
-                ],
-            ],
-        ]);
+            ]);
 
         $response
             ->assertOk()
@@ -61,6 +79,41 @@ class RealEstateProductionFlowTest extends TestCase
             ]);
 
         Queue::assertPushed(ProcessWhatsAppWebhook::class);
+    }
+
+    public function test_secure_provisioning_uses_current_evolution_webhook_schema_and_jwt_key(): void
+    {
+        $this->seedRealEstateBot();
+
+        config([
+            'evolution.url' => 'https://evolution.example.test',
+            'evolution.api_key' => 'evolution-test-key',
+        ]);
+
+        Http::fake([
+            'https://evolution.example.test/webhook/set/emlak-ai-test' =>
+                Http::response(['ok' => true], 200),
+        ]);
+
+        app(RealEstateWhatsAppProvisioningService::class)->configureWebhook(
+            'emlak-ai-test',
+            'https://wai.example.test/api/real-estate/whatsapp/webhook'
+        );
+
+        Http::assertSent(function ($request): bool {
+            $webhook = $request['webhook'] ?? [];
+
+            return $request->url() === 'https://evolution.example.test/webhook/set/emlak-ai-test'
+                && $request->hasHeader('apikey', 'evolution-test-key')
+                && ($webhook['enabled'] ?? null) === true
+                && ($webhook['byEvents'] ?? null) === false
+                && ($webhook['base64'] ?? null) === false
+                && ($webhook['headers']['jwt_key'] ?? null) === self::WEBHOOK_SECRET
+                && ($webhook['events'] ?? []) === [
+                    'MESSAGES_UPSERT',
+                    'MESSAGES_UPDATE',
+                ];
+        });
     }
 
     public function test_seller_decision_intelligence_updates_crm_without_scheduling_follow_up(): void
@@ -174,6 +227,17 @@ class RealEstateProductionFlowTest extends TestCase
             'password' => Hash::make('test-password'),
         ]);
 
+        Organization::query()->forceCreate([
+            'id' => 37,
+            'owner_user_id' => 40,
+            'name' => 'Emlak AI',
+            'slug' => 'emlak-ai-test',
+            'status' => 'active',
+            'settings' => [
+                'real_estate_webhook_secret' => Crypt::encryptString(self::WEBHOOK_SECRET),
+            ],
+        ]);
+
         return AiBot::query()->forceCreate([
             'id' => 35,
             'user_id' => 40,
@@ -188,5 +252,30 @@ class RealEstateProductionFlowTest extends TestCase
             'second_follow_up_enabled' => false,
             'ai_enabled' => true,
         ]);
+    }
+
+    private function jwt(string $secret): string
+    {
+        $now = time();
+        $header = $this->base64Url(json_encode([
+            'alg' => 'HS256',
+            'typ' => 'JWT',
+        ], JSON_THROW_ON_ERROR));
+        $payload = $this->base64Url(json_encode([
+            'iat' => $now,
+            'exp' => $now + 600,
+            'app' => 'evolution',
+            'action' => 'webhook',
+        ], JSON_THROW_ON_ERROR));
+        $signature = $this->base64Url(
+            hash_hmac('sha256', $header.'.'.$payload, $secret, true)
+        );
+
+        return $header.'.'.$payload.'.'.$signature;
+    }
+
+    private function base64Url(string $value): string
+    {
+        return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
     }
 }
