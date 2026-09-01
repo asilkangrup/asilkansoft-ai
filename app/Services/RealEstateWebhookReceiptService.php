@@ -67,11 +67,19 @@ class RealEstateWebhookReceiptService
         }
 
         $ignored = (bool) ($result['ignored'] ?? false);
-        $status = $ignored ? 'ignored' : 'replied';
+        $deliveryUncertain = (bool) ($result['delivery_uncertain'] ?? false);
+
+        $status = match (true) {
+            $deliveryUncertain => 'processed',
+            $ignored => 'ignored',
+            default => 'replied',
+        };
 
         $receipt->forceFill([
             'status' => $status,
-            'last_error' => null,
+            'last_error' => $deliveryUncertain
+                ? 'Outbound WhatsApp teslimatı doğrulanamadı; duplicate riski nedeniyle otomatik tekrar engellendi.'
+                : null,
             'processed_at' => now(),
             'replied_at' => $status === 'replied' ? now() : null,
         ])->save();

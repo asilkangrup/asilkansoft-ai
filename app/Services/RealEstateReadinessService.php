@@ -7,6 +7,7 @@ use App\Models\ChatMessage;
 use App\Models\ConversationFollowUp;
 use App\Models\FinanceLead;
 use App\Models\Order;
+use App\Models\RealEstateOutboundDelivery;
 use App\Models\RealEstateWebhookReceipt;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -24,9 +25,13 @@ class RealEstateReadinessService
             ->first();
 
         $botIdentityValid = $isolation->supportsProductionBot($bot);
+        $instanceValid = $botIdentityValid
+            && trim((string) ($bot?->whatsapp_instance ?? '')) === RealEstateIsolationService::INSTANCE;
         $organizationIdentityValid = $isolation->organizationValid();
         $webhookAuthConfigured = app(RealEstateWebhookAuthService::class)->configured();
         $durableWebhookReceiptsReady = Schema::hasTable('real_estate_webhook_receipts');
+        $outboundDeliveryGuardReady = Schema::hasTable('real_estate_outbound_deliveries')
+            && class_exists(RealEstateOutboundDeliveryService::class);
         $audioTranscriptionReady = $this->audioTranscriptionReady();
         $apiKeyConfigured = $botIdentityValid && filled($bot?->openai_api_key);
         $apiKeyEncryptedAtRest = $apiKeyConfigured && $this->apiKeyEncryptedAtRest();
@@ -55,11 +60,22 @@ class RealEstateReadinessService
             ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
             ->count();
 
+        $unresolvedOutboundDeliveries = $outboundDeliveryGuardReady
+            ? RealEstateOutboundDelivery::query()
+                ->where('user_id', RealEstateIsolationService::USER_ID)
+                ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+                ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+                ->whereIn('status', ['sending', 'uncertain'])
+                ->count()
+            : 0;
+
         $checks = [
             'bot_identity_valid' => $botIdentityValid,
+            'instance_valid' => $instanceValid,
             'organization_identity_valid' => $organizationIdentityValid,
             'webhook_auth_configured' => $webhookAuthConfigured,
             'durable_webhook_receipts_ready' => $durableWebhookReceiptsReady,
+            'outbound_delivery_guard_ready' => $outboundDeliveryGuardReady,
             'audio_transcription_ready' => $audioTranscriptionReady,
             'openai_api_key_configured' => $apiKeyConfigured,
             'openai_api_key_encrypted_at_rest' => $apiKeyEncryptedAtRest,
@@ -71,12 +87,14 @@ class RealEstateReadinessService
             'active_follow_up_records' => $activeFollowUps,
             'generic_order_records' => $genericOrders,
             'finance_lead_records' => $financeLeads,
+            'unresolved_outbound_deliveries' => $unresolvedOutboundDeliveries,
         ];
 
         $zeroRequired = [
             'active_follow_up_records',
             'generic_order_records',
             'finance_lead_records',
+            'unresolved_outbound_deliveries',
         ];
 
         $blockingChecks = collect($checks)
@@ -92,7 +110,7 @@ class RealEstateReadinessService
             ->all();
 
         return [
-            'ok' => $botIdentityValid && $organizationIdentityValid,
+            'ok' => $botIdentityValid && $instanceValid && $organizationIdentityValid,
             'service' => 'real-estate-ai',
             'user_id' => RealEstateIsolationService::USER_ID,
             'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
@@ -106,6 +124,7 @@ class RealEstateReadinessService
             'checks' => $checks,
             'blocking_checks' => $blockingChecks,
             'webhook_telemetry_24h' => $this->webhookTelemetry($durableWebhookReceiptsReady),
+            'outbound_telemetry_24h' => $this->outboundTelemetry($outboundDeliveryGuardReady),
             'audio_telemetry_24h' => $this->audioTelemetry($audioTranscriptionReady),
         ];
     }
@@ -160,6 +179,7 @@ class RealEstateReadinessService
             return [
                 'received' => 0,
                 'replied' => 0,
+                'processed_without_confirmed_reply' => 0,
                 'ignored' => 0,
                 'failed' => 0,
                 'retried' => 0,
@@ -175,9 +195,39 @@ class RealEstateReadinessService
         return [
             'received' => (clone $base)->count(),
             'replied' => (clone $base)->where('status', 'replied')->count(),
+            'processed_without_confirmed_reply' => (clone $base)
+                ->where('status', 'processed')
+                ->count(),
             'ignored' => (clone $base)->where('status', 'ignored')->count(),
             'failed' => (clone $base)->where('status', 'failed')->count(),
             'retried' => (clone $base)->where('attempts', '>', 1)->count(),
+        ];
+    }
+
+    private function outboundTelemetry(bool $ready): array
+    {
+        if (! $ready) {
+            return [
+                'reserved' => 0,
+                'sending' => 0,
+                'sent' => 0,
+                'uncertain' => 0,
+                'network_retries' => 0,
+            ];
+        }
+
+        $base = RealEstateOutboundDelivery::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('created_at', '>=', now()->subDay());
+
+        return [
+            'reserved' => (clone $base)->where('status', 'reserved')->count(),
+            'sending' => (clone $base)->where('status', 'sending')->count(),
+            'sent' => (clone $base)->where('status', 'sent')->count(),
+            'uncertain' => (clone $base)->where('status', 'uncertain')->count(),
+            'network_retries' => (clone $base)->where('attempts', '>', 1)->count(),
         ];
     }
 

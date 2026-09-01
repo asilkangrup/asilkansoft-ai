@@ -55,7 +55,7 @@ class MemoryService
             }
         }
 
-        $chatMessage = ChatMessage::create([
+        $attributes = [
             'user_id' => $userId,
             'organization_id' => $organizationId,
             'ai_bot_id' => $aiBotId,
@@ -80,13 +80,35 @@ class MemoryService
             'status' => $senderType === 'customer'
                 ? 'received'
                 : ($isolatedRealEstate ? 'sent' : null),
-        ]);
+        ];
+
+        $isolatedInboundMessageId = $isolatedRealEstate
+            && $role === 'user'
+            && $senderType === 'customer'
+            && filled($mediaContext['message_id'] ?? null)
+                ? trim((string) $mediaContext['message_id'])
+                : '';
+
+        if ($isolatedInboundMessageId !== '') {
+            $chatMessage = ChatMessage::query()->firstOrCreate(
+                [
+                    'user_id' => self::REAL_ESTATE_USER_ID,
+                    'organization_id' => self::REAL_ESTATE_ORGANIZATION_ID,
+                    'ai_bot_id' => self::REAL_ESTATE_BOT_ID,
+                    'whatsapp_message_id' => $isolatedInboundMessageId,
+                ],
+                $attributes
+            );
+        } else {
+            $chatMessage = ChatMessage::create($attributes);
+        }
 
         if (
             $isolatedRealEstate
             && (int) $organizationId === self::REAL_ESTATE_ORGANIZATION_ID
             && $role === 'user'
             && $senderType === 'customer'
+            && $chatMessage->wasRecentlyCreated
         ) {
             try {
                 $conversation = ConversationControl::query()

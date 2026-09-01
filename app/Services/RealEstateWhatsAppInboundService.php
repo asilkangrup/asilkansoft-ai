@@ -15,10 +15,10 @@ class RealEstateWhatsAppInboundService
         private readonly RealEstateIsolationService $isolation,
         private readonly MemoryService $memoryService,
         private readonly RealEstateOpenAIService $openAIService,
-        private readonly WhatsAppService $whatsAppService,
         private readonly RealEstateWhatsAppMessageParser $messageParser,
         private readonly RealEstateWebhookReceiptService $receiptService,
         private readonly RealEstateAudioTranscriptionService $audioTranscriptionService,
+        private readonly RealEstateOutboundDeliveryService $outboundDeliveryService,
     ) {
     }
 
@@ -70,6 +70,23 @@ class RealEstateWhatsAppInboundService
         }
 
         $messageId = trim((string) data_get($payload, 'data.key.id', ''));
+
+        // Durable inbound/outbound idempotency depends on Evolution's message
+        // identifier. Refuse an unidentifiable production message rather than
+        // risk saving or replying to the same customer event multiple times.
+        if ($messageId === '') {
+            Log::warning('REAL ESTATE WHATSAPP MESSAGE WITHOUT ID IGNORED', [
+                'instance' => $instance,
+                'phone_number_suffix' => substr($phoneNumber, -4),
+            ]);
+
+            return [
+                'success' => true,
+                'ignored' => true,
+                'reason' => 'missing_message_id',
+            ];
+        }
+
         $receiptState = $this->receiptService->begin(
             instance: $instance,
             event: $event,
@@ -80,7 +97,7 @@ class RealEstateWhatsAppInboundService
 
         if (! $receiptState['should_process']) {
             Log::info('REAL ESTATE DUPLICATE WHATSAPP MESSAGE IGNORED', [
-                'message_id' => $messageId !== '' ? $messageId : null,
+                'message_id' => $messageId,
                 'instance' => $instance,
                 'reason' => $receiptState['reason'],
                 'receipt_id' => $receipt?->id,
@@ -113,7 +130,7 @@ class RealEstateWhatsAppInboundService
                 'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
                 'ai_bot_id' => RealEstateIsolationService::BOT_ID,
                 'instance' => $instance,
-                'message_id' => $messageId !== '' ? $messageId : null,
+                'message_id' => $messageId,
                 'receipt_id' => $receipt?->id,
                 'message' => $exception->getMessage(),
             ]);
@@ -259,6 +276,13 @@ class RealEstateWhatsAppInboundService
             throw new RuntimeException('İzole Emlak AI konuşma kapsamı ihlali.');
         }
 
+        $inboundAlreadyPersisted = ChatMessage::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('whatsapp_message_id', $messageId)
+            ->exists();
+
         $pushName = trim((string) data_get($payload, 'data.pushName', ''));
 
         $conversation->forceFill([
@@ -266,7 +290,9 @@ class RealEstateWhatsAppInboundService
             'customer_name' => trim((string) $conversation->customer_name) !== ''
                 ? $conversation->customer_name
                 : ($pushName !== '' ? $pushName : null),
-            'unread_count' => (int) $conversation->unread_count + 1,
+            'unread_count' => $inboundAlreadyPersisted
+                ? (int) $conversation->unread_count
+                : (int) $conversation->unread_count + 1,
             'last_contact_at' => now(),
         ])->save();
 
@@ -303,40 +329,67 @@ class RealEstateWhatsAppInboundService
             throw new RuntimeException('Emlak AI boş cevap üretti.');
         }
 
-        $sendResult = $this->whatsAppService->sendText(
-            instanceName: $instance,
-            number: $phoneNumber,
-            text: $answer,
+        $deliveryResult = $this->outboundDeliveryService->deliver(
+            bot: $bot,
+            instance: $instance,
+            inboundMessageId: $messageId,
+            sessionId: $sessionId,
+            phoneNumber: $phoneNumber,
+            answer: $answer,
         );
 
-        ChatMessage::query()->create([
-            'user_id' => RealEstateIsolationService::USER_ID,
-            'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
-            'ai_bot_id' => RealEstateIsolationService::BOT_ID,
-            'session_id' => $sessionId,
-            'role' => 'assistant',
-            'sender_type' => 'ai',
-            'message' => $answer,
-            'message_type' => 'text',
-            'whatsapp_message_id' => data_get($sendResult, 'key.id')
-                ?? data_get($sendResult, 'messageId')
-                ?? data_get($sendResult, 'id'),
-            'status' => 'sent',
-        ]);
+        $delivery = $deliveryResult['delivery'];
 
-        $this->consumeTrialMessage($bot);
+        if ($deliveryResult['state'] !== 'sent') {
+            Log::error('REAL ESTATE OUTBOUND DELIVERY UNCERTAIN', [
+                'delivery_id' => $delivery->id,
+                'conversation_id' => $conversation->id,
+                'message_id' => $messageId,
+                'instance' => $instance,
+                'attempts' => $delivery->attempts,
+            ]);
+
+            return [
+                'success' => true,
+                'delivery_uncertain' => true,
+                'reason' => 'outbound_delivery_uncertain',
+                'message' => 'Emlak AI cevabı üretildi ancak WhatsApp teslimatı doğrulanamadı; otomatik tekrar engellendi.',
+            ];
+        }
+
+        // After WhatsApp confirms the send, do not turn a local persistence or
+        // trial-accounting problem into a webhook retry that could duplicate the
+        // already-delivered customer reply. Repairable state remains in the
+        // isolated outbound ledger.
+        try {
+            $this->outboundDeliveryService->persistAssistantMessage($delivery);
+            $this->outboundDeliveryService->consumeTrialOnce($delivery, $bot);
+        } catch (Throwable $exception) {
+            Log::error('REAL ESTATE OUTBOUND POST-SEND PERSISTENCE FAILED', [
+                'delivery_id' => $delivery->id,
+                'conversation_id' => $conversation->id,
+                'message_id' => $messageId,
+                'instance' => $instance,
+                'message' => $exception->getMessage(),
+            ]);
+
+            report($exception);
+        }
 
         Log::info('REAL ESTATE WHATSAPP MESSAGE PROCESSED', [
             'conversation_id' => $conversation->id,
-            'message_id' => $messageId !== '' ? $messageId : null,
+            'message_id' => $messageId,
             'message_type' => $mediaContext['type'] ?? 'text',
             'audio_transcription_status' => $mediaContext['transcription_status'] ?? null,
             'instance' => $instance,
+            'delivery_id' => $delivery->id,
+            'sent_now' => (bool) $deliveryResult['sent_now'],
         ]);
 
         return [
             'success' => true,
             'message' => 'Emlak AI cevabı gönderildi.',
+            'delivery_deduplicated' => ! (bool) $deliveryResult['sent_now'],
         ];
     }
 
@@ -354,26 +407,6 @@ class RealEstateWhatsAppInboundService
             ->first();
 
         return $this->isolation->supportsProductionBot($bot) ? $bot : null;
-    }
-
-    private function consumeTrialMessage(AiBot $bot): void
-    {
-        if ($bot->subscription_status !== 'trial') {
-            return;
-        }
-
-        $bot->increment('trial_messages_used');
-        $bot->refresh();
-
-        if ((int) $bot->trial_messages_used < (int) $bot->trial_message_limit) {
-            return;
-        }
-
-        $bot->update([
-            'trial_messages_used' => $bot->trial_message_limit,
-            'trial_completed_at' => $bot->trial_completed_at ?: now(),
-            'subscription_status' => 'expired',
-        ]);
     }
 
     private function audioFallbackMessage(string $status): string

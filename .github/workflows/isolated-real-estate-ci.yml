@@ -1,0 +1,79 @@
+name: Isolated Real Estate CI
+
+on:
+  pull_request:
+    paths:
+      - 'app/Models/RealEstate*.php'
+      - 'app/Services/RealEstate*.php'
+      - 'app/Services/MemoryService.php'
+      - 'app/Http/Controllers/RealEstate*.php'
+      - 'app/Jobs/*RealEstate*.php'
+      - 'database/migrations/*real_estate*.php'
+      - 'routes/api.php'
+      - 'routes/console.php'
+      - 'tests/Feature/RealEstate*.php'
+      - '.github/workflows/isolated-real-estate-ci.yml'
+      - 'composer.json'
+      - 'composer.lock'
+  push:
+    branches: [main]
+    paths:
+      - 'app/Models/RealEstate*.php'
+      - 'app/Services/RealEstate*.php'
+      - 'app/Services/MemoryService.php'
+      - 'app/Http/Controllers/RealEstate*.php'
+      - 'app/Jobs/*RealEstate*.php'
+      - 'database/migrations/*real_estate*.php'
+      - 'routes/api.php'
+      - 'routes/console.php'
+      - 'tests/Feature/RealEstate*.php'
+      - '.github/workflows/isolated-real-estate-ci.yml'
+      - 'composer.json'
+      - 'composer.lock'
+
+jobs:
+  isolated-real-estate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, sqlite3
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare Laravel test environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Syntax check isolated runtime
+        run: |
+          find app/Services -maxdepth 1 -name 'RealEstate*.php' -print0 | xargs -0 -n1 php -l
+          find app/Models -maxdepth 1 -name 'RealEstate*.php' -print0 | xargs -0 -n1 php -l
+          php -l app/Services/MemoryService.php
+          php -l routes/console.php
+
+      - name: Run isolated real-estate feature tests
+        run: |
+          php artisan test \
+            tests/Feature/RealEstateReadinessTest.php \
+            tests/Feature/RealEstateInboundResilienceTest.php \
+            tests/Feature/RealEstateOutboundDeliveryGuardTest.php
