@@ -136,7 +136,8 @@ class RealEstateComparableIntegrityTest extends TestCase
     public function test_same_user_profile_outside_isolated_organization_is_rejected(): void
     {
         [$bot] = $this->seedIsolated('out-of-scope');
-        $foreignOrganization = Organization::query()->create([
+        $foreignOrganization = Organization::query()->forceCreate([
+            'id' => 99,
             'owner_user_id' => 40,
             'name' => 'Foreign Org',
             'slug' => 'foreign-org-integrity',
@@ -157,6 +158,7 @@ class RealEstateComparableIntegrityTest extends TestCase
 
         $assessment = app(RealEstateComparableIntegrityService::class)->assess($profile);
 
+        $this->assertSame(99, (int) $conversation->organization_id);
         $this->assertSame('out_of_scope', $assessment['status']);
         $this->assertFalse($assessment['sufficient_for_decision']);
         $this->assertFalse($assessment['sufficient_for_matching']);
