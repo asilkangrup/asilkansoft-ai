@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
+use App\Models\Organization;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\RealEstateMediaAnalysisService;
@@ -203,6 +204,17 @@ class RealEstateMediaPostProcessTest extends TestCase
             'name' => 'Emlak AI',
             'email' => 'media-postprocess@example.test',
             'password' => Hash::make('test-password'),
+        ]);
+
+        Organization::query()->forceCreate([
+            'id' => 37,
+            'owner_user_id' => 40,
+            'name' => 'Emlak AI',
+            'slug' => 'emlak-ai-media-postprocess',
+            'plan' => 'start',
+            'seat_limit' => 1,
+            'monthly_message_limit' => 1000,
+            'status' => 'active',
         ]);
 
         return AiBot::query()->forceCreate([
