@@ -7,25 +7,17 @@ use App\Models\RealEstateProfile;
 
 class RealEstateMatchVerificationFilterService
 {
-    private const REAL_ESTATE_USER_ID = 40;
-
-    private const REAL_ESTATE_BOT_ID = 35;
-
     private const MATCH_TAG_PREFIX = 'real_estate:match:';
 
     public function process(ConversationControl $conversation): array
     {
-        if (
-            (int) $conversation->user_id !== self::REAL_ESTATE_USER_ID
-            || (int) $conversation->ai_bot_id !== self::REAL_ESTATE_BOT_ID
-        ) {
+        if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return [];
         }
 
         $profile = RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
             ->first();
 
         if (! $profile) {
@@ -53,9 +45,8 @@ class RealEstateMatchVerificationFilterService
                     }
 
                     $seller = RealEstateProfile::query()
+                        ->isolatedProduction()
                         ->whereKey((int) $sellerProfileId)
-                        ->where('user_id', self::REAL_ESTATE_USER_ID)
-                        ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
                         ->where('profile_type', 'seller')
                         ->first();
 
@@ -89,6 +80,10 @@ class RealEstateMatchVerificationFilterService
 
     private function sellerSafe(RealEstateProfile $seller): bool
     {
+        if (! $seller->belongsToIsolatedProductionScope()) {
+            return false;
+        }
+
         $data = is_array($seller->data) ? $seller->data : [];
         $verification = is_array($data['verification_intelligence'] ?? null)
             ? $data['verification_intelligence']
