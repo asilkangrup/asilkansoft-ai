@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\RealEstateProfile;
 use App\Services\RealEstateIsolationService;
+use App\Services\RealEstateMatchLedgerService;
 use App\Services\RealEstateOperatorAlertService;
 
 class RealEstateProfileObserver
@@ -23,5 +24,6 @@ class RealEstateProfileObserver
         }
 
         app(RealEstateOperatorAlertService::class)->sync($profile);
+        app(RealEstateMatchLedgerService::class)->sync($profile);
     }
 }
