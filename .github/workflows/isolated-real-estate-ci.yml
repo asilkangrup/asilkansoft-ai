@@ -8,6 +8,8 @@ on:
       - 'app/Services/MemoryService.php'
       - 'app/Http/Controllers/RealEstate*.php'
       - 'app/Jobs/*RealEstate*.php'
+      - 'app/Observers/RealEstate*.php'
+      - 'app/Console/Commands/RealEstate*.php'
       - 'database/migrations/*real_estate*.php'
       - 'routes/api.php'
       - 'routes/console.php'
@@ -23,6 +25,8 @@ on:
       - 'app/Services/MemoryService.php'
       - 'app/Http/Controllers/RealEstate*.php'
       - 'app/Jobs/*RealEstate*.php'
+      - 'app/Observers/RealEstate*.php'
+      - 'app/Console/Commands/RealEstate*.php'
       - 'database/migrations/*real_estate*.php'
       - 'routes/api.php'
       - 'routes/console.php'
@@ -68,6 +72,8 @@ jobs:
         run: |
           find app/Services -maxdepth 1 -name 'RealEstate*.php' -print0 | xargs -0 -n1 php -l
           find app/Models -maxdepth 1 -name 'RealEstate*.php' -print0 | xargs -0 -n1 php -l
+          find app/Observers -maxdepth 1 -name 'RealEstate*.php' -print0 | xargs -0 -n1 php -l
+          find app/Console/Commands -maxdepth 1 -name 'RealEstate*.php' -print0 | xargs -0 -n1 php -l
           php -l app/Services/MemoryService.php
           php -l routes/console.php
 
@@ -76,4 +82,5 @@ jobs:
           php artisan test \
             tests/Feature/RealEstateReadinessTest.php \
             tests/Feature/RealEstateInboundResilienceTest.php \
-            tests/Feature/RealEstateOutboundDeliveryGuardTest.php
+            tests/Feature/RealEstateOutboundDeliveryGuardTest.php \
+            tests/Feature/RealEstateOperatorAlertTest.php
