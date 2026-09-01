@@ -30,8 +30,10 @@ class RealEstateReadinessService
         $apiKeyConfigured = $botIdentityValid && filled($bot->openai_api_key);
         $apiKeyEncryptedAtRest = $apiKeyConfigured
             && $this->apiKeyEncryptedAtRest();
-        $whatsappConnected = $botIdentityValid
-            && trim((string) $bot->whatsapp_status) === 'connected';
+        $whatsappConnectionState = $instanceValid
+            ? $this->liveWhatsAppState()
+            : 'invalid_instance';
+        $whatsappConnected = $whatsappConnectionState === 'open';
         $followUpsDisabled = $botIdentityValid
             && ! (bool) $bot->follow_up_enabled
             && ! (bool) $bot->second_follow_up_enabled;
@@ -68,6 +70,7 @@ class RealEstateReadinessService
             'instance' => self::REAL_ESTATE_INSTANCE,
             'isolated' => true,
             'ready_for_live_traffic' => $ready,
+            'whatsapp_connection_state' => $whatsappConnectionState,
             'checks' => $checks,
             'blocking_checks' => collect($checks)
                 ->filter(function (mixed $value, string $key): bool {
@@ -81,6 +84,16 @@ class RealEstateReadinessService
                 ->values()
                 ->all(),
         ];
+    }
+
+    private function liveWhatsAppState(): string
+    {
+        try {
+            return app(WhatsAppService::class)
+                ->connectionState(self::REAL_ESTATE_INSTANCE);
+        } catch (Throwable) {
+            return 'unreachable';
+        }
     }
 
     private function apiKeyEncryptedAtRest(): bool
