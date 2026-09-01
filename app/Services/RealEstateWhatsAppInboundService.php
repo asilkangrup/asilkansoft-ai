@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -17,6 +16,8 @@ class RealEstateWhatsAppInboundService
         private readonly MemoryService $memoryService,
         private readonly RealEstateOpenAIService $openAIService,
         private readonly WhatsAppService $whatsAppService,
+        private readonly RealEstateWhatsAppMessageParser $messageParser,
+        private readonly RealEstateWebhookReceiptService $receiptService,
     ) {
     }
 
@@ -68,35 +69,43 @@ class RealEstateWhatsAppInboundService
         }
 
         $messageId = trim((string) data_get($payload, 'data.key.id', ''));
-        $dedupeKey = $messageId !== ''
-            ? 'real_estate_whatsapp_message:'.sha1($instance.'|'.$messageId)
-            : null;
+        $receiptState = $this->receiptService->begin(
+            instance: $instance,
+            event: $event,
+            messageId: $messageId,
+            phoneNumber: $phoneNumber,
+        );
+        $receipt = $receiptState['receipt'];
 
-        if ($dedupeKey !== null && ! Cache::add($dedupeKey, true, now()->addHours(24))) {
+        if (! $receiptState['should_process']) {
             Log::info('REAL ESTATE DUPLICATE WHATSAPP MESSAGE IGNORED', [
-                'message_id' => $messageId,
+                'message_id' => $messageId !== '' ? $messageId : null,
                 'instance' => $instance,
+                'reason' => $receiptState['reason'],
+                'receipt_id' => $receipt?->id,
             ]);
 
             return [
                 'success' => true,
                 'ignored' => true,
-                'reason' => 'duplicate_message',
+                'reason' => $receiptState['reason'] ?: 'duplicate_message',
             ];
         }
 
         try {
-            return $this->processMessage(
+            $result = $this->processMessage(
                 payload: $payload,
                 bot: $bot,
                 instance: $instance,
                 phoneNumber: $phoneNumber,
                 messageId: $messageId,
             );
+
+            $this->receiptService->complete($receipt, $result);
+
+            return $result;
         } catch (Throwable $exception) {
-            if ($dedupeKey !== null) {
-                Cache::forget($dedupeKey);
-            }
+            $this->receiptService->fail($receipt, $exception);
 
             Log::error('REAL ESTATE INBOUND WHATSAPP FAILED', [
                 'user_id' => RealEstateIsolationService::USER_ID,
@@ -104,6 +113,7 @@ class RealEstateWhatsAppInboundService
                 'ai_bot_id' => RealEstateIsolationService::BOT_ID,
                 'instance' => $instance,
                 'message_id' => $messageId !== '' ? $messageId : null,
+                'receipt_id' => $receipt?->id,
                 'message' => $exception->getMessage(),
             ]);
 
@@ -192,7 +202,11 @@ class RealEstateWhatsAppInboundService
             ];
         }
 
-        [$message, $mediaContext] = $this->extractMessage($payload, $instance, $messageId);
+        [$message, $mediaContext] = $this->messageParser->extract(
+            payload: $payload,
+            instance: $instance,
+            messageId: $messageId,
+        );
 
         if ($message === '') {
             return [
@@ -303,94 +317,6 @@ class RealEstateWhatsAppInboundService
         ];
     }
 
-    private function extractMessage(
-        array $payload,
-        string $instance,
-        string $messageId,
-    ): array {
-        $messagePayload = data_get($payload, 'data.message', []);
-
-        if (! is_array($messagePayload)) {
-            return ['', []];
-        }
-
-        $message = data_get($messagePayload, 'conversation')
-            ?? data_get($messagePayload, 'extendedTextMessage.text');
-
-        $context = [
-            'type' => 'text',
-            'url' => null,
-            'mime_type' => null,
-            'filename' => null,
-            'caption' => null,
-            'message_id' => $messageId !== '' ? $messageId : null,
-            'instance_name' => $instance,
-            'message_envelope' => data_get($payload, 'data', []),
-        ];
-
-        if (is_string($message) && trim($message) !== '') {
-            return [trim($message), $context];
-        }
-
-        $image = data_get($messagePayload, 'imageMessage');
-
-        if (is_array($image)) {
-            $context['type'] = 'image';
-            $context['url'] = data_get($image, 'url');
-            $context['mime_type'] = data_get($image, 'mimetype');
-            $context['filename'] = data_get($image, 'fileName') ?? 'Fotoğraf';
-            $context['caption'] = data_get($image, 'caption');
-
-            return [
-                trim((string) ($context['caption'] ?: '[Fotoğraf]')),
-                $context,
-            ];
-        }
-
-        $document = data_get($messagePayload, 'documentMessage');
-
-        if (is_array($document)) {
-            $context['type'] = 'document';
-            $context['url'] = data_get($document, 'url');
-            $context['mime_type'] = data_get($document, 'mimetype');
-            $context['filename'] = data_get($document, 'fileName') ?? 'Belge';
-            $context['caption'] = data_get($document, 'caption');
-
-            return [
-                trim((string) ($context['caption'] ?: '[Belge]')),
-                $context,
-            ];
-        }
-
-        $video = data_get($messagePayload, 'videoMessage');
-
-        if (is_array($video)) {
-            $context['type'] = 'video';
-            $context['url'] = data_get($video, 'url');
-            $context['mime_type'] = data_get($video, 'mimetype');
-            $context['filename'] = data_get($video, 'fileName') ?? 'Video';
-            $context['caption'] = data_get($video, 'caption');
-
-            return [
-                trim((string) ($context['caption'] ?: '[Video]')),
-                $context,
-            ];
-        }
-
-        $audio = data_get($messagePayload, 'audioMessage');
-
-        if (is_array($audio)) {
-            $context['type'] = 'audio';
-            $context['url'] = data_get($audio, 'url');
-            $context['mime_type'] = data_get($audio, 'mimetype');
-            $context['filename'] = 'Sesli mesaj';
-
-            return ['[Sesli mesaj]', $context];
-        }
-
-        return ['', $context];
-    }
-
     private function botForInstance(string $instance): ?AiBot
     {
         if ($instance === '') {
@@ -404,7 +330,7 @@ class RealEstateWhatsAppInboundService
             ->where('whatsapp_instance', $instance)
             ->first();
 
-        return $this->isolation->supportsBotIdentity($bot) ? $bot : null;
+        return $this->isolation->supportsProductionBot($bot) ? $bot : null;
     }
 
     private function consumeTrialMessage(AiBot $bot): void
