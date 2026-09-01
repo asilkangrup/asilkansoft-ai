@@ -14,19 +14,43 @@ Only the following production identity is allowed to use the real-estate pipelin
 
 The real-estate services must not depend on the old WAI user/bot/instance. The bot must use its own encrypted bot-level `openai_api_key`; the real-estate AI path must not fall back to the global WAI OpenAI key.
 
-The main message-memory pipeline now requires the exact user, organization and bot identity before any real-estate extraction, valuation, decision or matching work is executed. Conversation routing and profile extraction are also scoped to this fresh identity so a second bot belonging to the same WAI user cannot accidentally inherit the real-estate workflow.
+`RealEstateIsolationService` is the central runtime boundary for this identity. The message-memory pipeline also requires the exact user, organization and bot identity before extraction, valuation, decision or matching work is executed. Conversation routing and profile extraction are scoped to the same fresh identity.
+
+## Dedicated inbound WhatsApp runtime
+
+The dedicated real-estate webhook no longer delegates customer traffic to the generic WAI controller. After JWT and tenant checks, `messages.upsert` enters `ProcessWhatsAppWebhook`; the job recognizes the exact isolated bot and immediately routes the payload to `RealEstateWhatsAppInboundService`, returning before the shared WAI commerce path can run.
+
+For bot 35 this explicitly prevents:
+
+- generic e-commerce order creation;
+- finance-lead/group routing;
+- generic WAI customer extraction/scoring side effects;
+- automatic follow-up creation;
+- accidental use of another tenant's conversation or message-status row.
+
+The dedicated inbound service owns text/media extraction, 24-hour message-id deduplication, the `whatsapp:35:<number>` conversation key, real-estate memory processing, human-takeover handling, dedicated OpenAI reply generation, WhatsApp delivery, sent-message persistence and trial-message accounting.
+
+`messages.update` is handled directly by the isolated service and updates delivery/read status only where `user_id=40`, `organization_id=37` and `ai_bot_id=35` all match. A WhatsApp message id collision in another WAI account therefore cannot mutate its message status.
+
+The public webhook rejects payloads larger than 1 MiB before processing. Evolution media bytes are still fetched through the existing authenticated media-download path rather than being embedded in webhook JSON.
 
 ## Follow-up policy
 
 Automated follow-up messages are disabled for this bot. `follow_up_enabled` and `second_follow_up_enabled` must remain false. Real-estate decision, verification, valuation or opportunity-matching services must never schedule `next_follow_up_at` by themselves.
 
+This is now a runtime invariant as well as a setting: `ConversationFollowUp` forces every `user_id=40` / `ai_bot_id=35` record to `is_active=false` during save. Even an accidental shared-panel or legacy write cannot create a sendable follow-up record for Emlak AI.
+
 ## Webhook security
 
 The dedicated Evolution webhook requires the isolated instance name and a valid short-lived HS256 JWT signed with the encrypted organization webhook secret. Unsigned, invalid or foreign-instance webhook requests must be rejected.
 
+Only `messages.upsert` and `messages.update` are accepted as active events. Other signed events are acknowledged as ignored instead of entering the application pipeline.
+
 ## Dedicated OpenAI key security
 
 The fresh real-estate bot stores its own `openai_api_key` encrypted at rest with Laravel `Crypt`/`APP_KEY`. The application decrypts it only through the bot model when creating the isolated OpenAI client. Other WAI bots retain their existing behavior and are not migrated by this real-estate-specific change.
+
+`RealEstateOpenAIClient` additionally refuses any bot that is not the exact isolated real-estate identity before it reads or uses an API key. Profile extraction, media analysis and valuation therefore cannot accidentally use this client for another WAI tenant.
 
 The public readiness endpoint never exposes the key. It reports only whether a dedicated key is configured and whether the raw stored value is decryptable as an encrypted value.
 
@@ -119,22 +143,24 @@ Use the following command after bulk imports, material criteria changes, new com
 php artisan wai:real-estate-rebuild-matches --limit=500
 ```
 
-The command is hard-scoped to `user_id=40` and `ai_bot_id=35`. It now audits valuation freshness first, then rebuilds seller decisions and verification guards, then rebuilds raw matches and applies valuation-freshness plus document-verification filters. Its output reports fresh/stale/missing valuation counts alongside verified and safely matched profile counts.
-
-This prevents an investor-side rebuild from using either stale seller pricing or stale seller verification state.
+The command is hard-scoped to `user_id=40` and `ai_bot_id=35`. It audits valuation freshness first, then rebuilds seller decisions and verification guards, then rebuilds raw matches and applies valuation-freshness plus document-verification filters.
 
 ## Production readiness gate
 
-`GET /api/real-estate/health` is the single readiness gate. `ready_for_live_traffic` becomes `true` only when all of the following are true:
+`GET /api/real-estate/health` is the single readiness gate. It now audits both connection prerequisites and cross-product contamination. `ready_for_live_traffic` becomes `true` only when all of the following are true:
 
-1. bot 35 belongs to user 40;
-2. its configured Evolution instance is exactly `emlak-ai-35`;
+1. bot 35 belongs to user 40, is a real-estate bot, and its instance is exactly `emlak-ai-35`;
+2. organization 37 belongs to user 40 and is active;
 3. webhook JWT authentication is configured;
 4. the dedicated OpenAI key is configured and encrypted at rest;
-5. WhatsApp is connected;
-6. both automatic follow-up flags are disabled;
-7. there are zero active follow-up records for bot 35.
+5. AI/subscription state allows replies;
+6. WhatsApp is connected/open;
+7. finance group routing is disabled;
+8. both automatic follow-up flags are disabled;
+9. there are zero active follow-up records for bot 35;
+10. there are zero generic e-commerce order records for bot 35;
+11. there are zero finance-lead records for bot 35.
 
-The endpoint also returns `blocking_checks`, allowing operations to see exactly what still prevents live traffic without exposing credentials.
+The endpoint also reports `dedicated_inbound_pipeline=true`, `shared_wai_commerce_pipeline=false`, `follow_up_runtime_blocked=true` and a `blocking_checks` list without exposing credentials.
 
-Before live customer traffic, also verify a signed webhook from `emlak-ai-35` is accepted while unsigned/foreign requests are rejected, ensure seller/investor smoke tests leave no synthetic data behind, verify an intentionally conflicting seller document is tagged `real_estate:verification:blocked` and produces no opportunity match, and verify a changed or expired seller valuation is tagged stale and removed from opportunity matching until refreshed.
+Before live customer traffic, verify a signed webhook from `emlak-ai-35` is accepted while unsigned/foreign requests are rejected; verify `messages.update` cannot modify another tenant's message; ensure seller/investor smoke tests leave no synthetic data; verify an intentionally conflicting seller document is blocked from matching; and verify a changed or expired valuation is removed from opportunity matching until refreshed.
