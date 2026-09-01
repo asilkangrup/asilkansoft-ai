@@ -10,9 +10,12 @@ The primary account (`user_id=1`) uses the dedicated real-estate WhatsApp AI. Ot
 2. `MemoryService` stores the message.
 3. `RealEstateConversationService` classifies seller / investor / general intent.
 4. `RealEstateProfileService` extracts explicit property or investor facts into `real_estate_profiles`.
-5. If the customer asks for a valuation and minimum location data exists, `RealEstateValuationService` performs a current-market research pass and persists the structured valuation.
-6. Persistent profile + valuation context is injected into the next OpenAI reply so already-known facts are not repeatedly requested.
-7. `RealEstateOpenAIService` produces the customer-facing professional WhatsApp reply.
+5. Incoming image and PDF messages on the primary account are detected by `ChatMessageObserver`.
+6. `EvolutionMediaService` downloads/decrypts supported WhatsApp media as base64. It retries with a full Evolution message record when message-id-only download is insufficient.
+7. `RealEstateMediaAnalysisService` sends the real image/PDF bytes to the multimodal OpenAI Responses API and stores visible property/document findings in persistent profile memory.
+8. If the customer asks for a valuation and minimum location data exists, `RealEstateValuationService` performs a current-market research pass and persists the structured valuation.
+9. Persistent profile + valuation + media findings are injected into the next OpenAI reply so already-known facts are not repeatedly requested.
+10. `RealEstateOpenAIService` produces the customer-facing professional WhatsApp reply.
 
 ## Production requirements
 
@@ -29,6 +32,7 @@ Optional model overrides:
 REAL_ESTATE_OPENAI_MODEL=gpt-5.4
 REAL_ESTATE_EXTRACTOR_MODEL=gpt-5-mini
 REAL_ESTATE_VALUATION_MODEL=gpt-5.4
+REAL_ESTATE_MEDIA_MODEL=gpt-5.4
 ```
 
 If the model names available to the configured OpenAI project differ, set these values to supported model IDs before live testing.
@@ -84,8 +88,28 @@ Expected behavior:
 - budget/location/property type/financing extracted,
 - next question focuses on investment goal or preferred district rather than repeating budget.
 
+### Tapu / parcel image
+
+Send a clear tapu or parcel screenshot.
+
+Expected behavior:
+- actual media bytes are downloaded from Evolution,
+- image is analyzed by the multimodal model,
+- only visibly readable property facts are persisted,
+- identity numbers or unnecessary personal identifiers are not extracted,
+- bot does not claim the document is officially valid merely from the image.
+
+### PDF
+
+Send a PDF property document.
+
+Expected behavior:
+- PDF bytes are sent as an `input_file`,
+- visible property facts and warnings are stored in profile `media_findings`,
+- later replies can use those findings without pretending that unreadable fields were verified.
+
 ## Known remaining production work
 
-- Real media bytes (photo/PDF/document) still need to be passed to a multimodal analysis pipeline before the AI can truthfully read tapu, parcel screenshots, listing screenshots or documents.
 - Live deployment and WhatsApp QR connection must be verified on the server.
-- Add richer panel UI for structured real-estate profiles and valuation cards.
+- Add richer panel UI for structured real-estate profiles, media findings and valuation cards.
+- Add deeper automated tests around mocked Evolution/OpenAI media responses.
