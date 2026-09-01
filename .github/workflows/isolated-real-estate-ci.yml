@@ -71,10 +71,5 @@ jobs:
           php -l app/Services/MemoryService.php
           php -l routes/console.php
 
-      - name: Run isolated real-estate feature tests
-        run: |
-          php artisan test \
-            tests/Feature/RealEstateReadinessTest.php \
-            tests/Feature/RealEstateInboundResilienceTest.php \
-            tests/Feature/RealEstateOutboundDeliveryGuardTest.php \
-            tests/Feature/RealEstateEvidenceReconciliationTest.php
+      - name: Run full isolated real-estate feature suite
+        run: php artisan test tests/Feature/RealEstate*.php
