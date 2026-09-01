@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\Organization;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -202,9 +203,17 @@ class MemoryService
         string $sessionId,
         int $limit = 20
     ): Collection {
-        return ChatMessage::query()
+        $query = ChatMessage::query()
             ->where('user_id', $userId)
-            ->where('session_id', $sessionId)
+            ->where('session_id', $sessionId);
+
+        $this->applyIsolatedRealEstateMessageScope(
+            query: $query,
+            userId: $userId,
+            sessionId: $sessionId,
+        );
+
+        return $query
             ->latest('id')
             ->limit($limit)
             ->get()
@@ -275,9 +284,50 @@ class MemoryService
         int $userId,
         string $sessionId
     ): void {
-        ChatMessage::query()
+        $query = ChatMessage::query()
             ->where('user_id', $userId)
+            ->where('session_id', $sessionId);
+
+        $this->applyIsolatedRealEstateMessageScope(
+            query: $query,
+            userId: $userId,
+            sessionId: $sessionId,
+        );
+
+        $query->delete();
+    }
+
+    private function applyIsolatedRealEstateMessageScope(
+        Builder $query,
+        int $userId,
+        string $sessionId,
+    ): void {
+        if (! $this->isIsolatedRealEstateSession($userId, $sessionId)) {
+            return;
+        }
+
+        $query
+            ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
+            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID);
+    }
+
+    private function isIsolatedRealEstateSession(
+        int $userId,
+        string $sessionId,
+    ): bool {
+        if ($userId !== self::REAL_ESTATE_USER_ID) {
+            return false;
+        }
+
+        if (str_starts_with($sessionId, 'whatsapp:'.self::REAL_ESTATE_BOT_ID.':')) {
+            return true;
+        }
+
+        return ConversationControl::query()
+            ->where('user_id', self::REAL_ESTATE_USER_ID)
+            ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
+            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
             ->where('session_id', $sessionId)
-            ->delete();
+            ->exists();
     }
 }
