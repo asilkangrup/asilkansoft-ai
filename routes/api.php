@@ -13,7 +13,7 @@ Route::get('/user', function (Request $request) {
 Route::get('/health/release', function () {
     return response()->json([
         'ok' => true,
-        'release' => 'real-estate-whatsapp-v4-readiness',
+        'release' => 'real-estate-whatsapp-v5-dedicated-inbound',
         'deployed_at' => '2026-09-01',
     ]);
 });
