@@ -130,6 +130,11 @@ class MemoryService
                     );
 
                     if ($profile) {
+                        app(RealEstateNegotiationMemoryService::class)->sync(
+                            profile: $profile,
+                            sourceMessage: $chatMessage,
+                        );
+
                         app(RealEstateValuationFreshnessService::class)
                             ->refreshMetadata($profile);
                     }
