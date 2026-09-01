@@ -7,6 +7,12 @@ use Illuminate\Support\Str;
 
 class RealEstateConversationService
 {
+    private const REAL_ESTATE_USER_ID = 40;
+
+    private const REAL_ESTATE_ORGANIZATION_ID = 37;
+
+    private const REAL_ESTATE_BOT_ID = 35;
+
     private const TAG_PREFIX = 'business:';
 
     private const ROUTES = [
@@ -19,6 +25,10 @@ class RealEstateConversationService
         ConversationControl $conversation,
         string $message
     ): string {
+        if (! $this->supports($conversation)) {
+            return 'real_estate_general';
+        }
+
         $normalized = $this->normalize($message);
         $current = $this->currentRoute($conversation);
 
@@ -118,6 +128,10 @@ class RealEstateConversationService
     public function currentRoute(
         ConversationControl $conversation
     ): string {
+        if (! $this->supports($conversation)) {
+            return 'real_estate_general';
+        }
+
         foreach ($conversation->etiketler() as $tag) {
             if (! is_string($tag) || ! str_starts_with($tag, self::TAG_PREFIX)) {
                 continue;
@@ -136,6 +150,10 @@ class RealEstateConversationService
     public function promptFor(
         ConversationControl $conversation
     ): string {
+        if (! $this->supports($conversation)) {
+            return '';
+        }
+
         return match ($this->currentRoute($conversation)) {
             'real_estate_seller' => <<<'PROMPT'
 [INTERNAL REAL ESTATE CONTEXT: SELLER]
@@ -156,6 +174,10 @@ PROMPT,
         ConversationControl $conversation,
         string $route
     ): void {
+        if (! $this->supports($conversation)) {
+            return;
+        }
+
         $tags = collect($conversation->etiketler())
             ->filter(
                 fn ($tag): bool =>
@@ -190,6 +212,13 @@ PROMPT,
         }
 
         return false;
+    }
+
+    private function supports(ConversationControl $conversation): bool
+    {
+        return (int) $conversation->user_id === self::REAL_ESTATE_USER_ID
+            && (int) $conversation->organization_id === self::REAL_ESTATE_ORGANIZATION_ID
+            && (int) $conversation->ai_bot_id === self::REAL_ESTATE_BOT_ID;
     }
 
     private function score(
