@@ -164,6 +164,9 @@ class RealEstateCaseLifecycleTest extends TestCase
             'next_follow_up_at' => null,
             'human_takeover' => false,
         ]);
+        $conversation->forceFill(['organization_id' => 38])->saveQuietly();
+        $conversation->refresh();
+        $this->assertSame(38, (int) $conversation->organization_id);
 
         $profile = RealEstateProfile::query()->create([
             'conversation_control_id' => $conversation->id,
