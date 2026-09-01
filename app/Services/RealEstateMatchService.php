@@ -88,6 +88,7 @@ class RealEstateMatchService
         $safeMatches = collect($matches)
             ->take(3)
             ->map(fn (array $match): array => [
+                'candidate_role' => $match['candidate_role'] ?? null,
                 'match_score' => $match['match_score'] ?? null,
                 'grade' => $match['grade'] ?? null,
                 'estimated_transaction_price' => $match['estimated_transaction_price'] ?? null,
@@ -117,9 +118,17 @@ PROMPT;
             ->whereIn('profile_type', ['investor', 'buyer'])
             ->where('id', '!=', $seller->id)
             ->get()
-            ->map(fn (RealEstateProfile $investor): ?array =>
-                $this->scorePair($seller, $investor)
-            )
+            ->map(function (RealEstateProfile $investor) use ($seller): ?array {
+                $match = $this->scorePair($seller, $investor);
+
+                return $match === null
+                    ? null
+                    : $this->withCandidate(
+                        match: $match,
+                        candidate: $investor,
+                        role: 'investor',
+                    );
+            })
             ->filter()
             ->sortByDesc('match_score')
             ->take(self::MAX_MATCHES)
@@ -135,9 +144,17 @@ PROMPT;
             ->where('profile_type', 'seller')
             ->where('id', '!=', $investor->id)
             ->get()
-            ->map(fn (RealEstateProfile $seller): ?array =>
-                $this->scorePair($seller, $investor)
-            )
+            ->map(function (RealEstateProfile $seller) use ($investor): ?array {
+                $match = $this->scorePair($seller, $investor);
+
+                return $match === null
+                    ? null
+                    : $this->withCandidate(
+                        match: $match,
+                        candidate: $seller,
+                        role: 'seller',
+                    );
+            })
             ->filter()
             ->sortByDesc('match_score')
             ->take(self::MAX_MATCHES)
@@ -267,10 +284,10 @@ PROMPT;
         }
 
         return [
-            'candidate_profile_id' => $investor->id,
-            'candidate_conversation_id' => $investor->conversation_control_id,
             'seller_profile_id' => $seller->id,
             'seller_conversation_id' => $seller->conversation_control_id,
+            'investor_profile_id' => $investor->id,
+            'investor_conversation_id' => $investor->conversation_control_id,
             'match_score' => $score,
             'grade' => match (true) {
                 $score >= 85 => 'strong',
@@ -281,6 +298,19 @@ PROMPT;
             'reasons' => array_values(array_unique($reasons)),
             'risks' => array_values(array_unique($risks)),
             'updated_at' => now()->toIso8601String(),
+        ];
+    }
+
+    private function withCandidate(
+        array $match,
+        RealEstateProfile $candidate,
+        string $role
+    ): array {
+        return [
+            'candidate_profile_id' => $candidate->id,
+            'candidate_conversation_id' => $candidate->conversation_control_id,
+            'candidate_role' => $role,
+            ...$match,
         ];
     }
 

@@ -84,6 +84,7 @@ class RealEstateOpportunityMatchingTest extends TestCase
         $this->assertCount(1, $matches);
         $this->assertSame($investor->id, $matches[0]['candidate_profile_id']);
         $this->assertSame($investorConversation->id, $matches[0]['candidate_conversation_id']);
+        $this->assertSame('investor', $matches[0]['candidate_role']);
         $this->assertGreaterThanOrEqual(85, $matches[0]['match_score']);
         $this->assertSame('strong', $matches[0]['grade']);
         $this->assertArrayNotHasKey('whatsapp_number', $matches[0]);
@@ -101,6 +102,74 @@ class RealEstateOpportunityMatchingTest extends TestCase
             $sellerConversation->etiketler()
         );
         $this->assertNull($sellerConversation->next_follow_up_at);
+    }
+
+    public function test_investor_perspective_points_to_seller_as_candidate(): void
+    {
+        $bot = $this->seedRealEstateBot();
+
+        $sellerConversation = $this->conversation(
+            $bot,
+            'seller-reverse-session',
+            '905557777777',
+            ['business:real_estate_seller']
+        );
+        $investorConversation = $this->conversation(
+            $bot,
+            'investor-reverse-session',
+            '905558888888',
+            ['business:real_estate_investor']
+        );
+
+        $seller = RealEstateProfile::query()->create([
+            'conversation_control_id' => $sellerConversation->id,
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'profile_type' => 'seller',
+            'data' => [
+                'property_type' => 'tarla',
+                'city' => 'Aydın',
+                'district' => 'Kuşadası',
+                'asking_price' => 5000000,
+                'title_deed_type' => 'müstakil',
+                'zoning_status' => 'tarla',
+            ],
+            'valuation' => [
+                'investor_buy_max' => 4400000,
+                'quick_sale_max' => 4700000,
+                'confidence_score' => 78,
+            ],
+            'completeness_score' => 90,
+            'confidence_score' => 78,
+        ]);
+
+        $investor = RealEstateProfile::query()->create([
+            'conversation_control_id' => $investorConversation->id,
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'profile_type' => 'investor',
+            'data' => [
+                'property_type' => 'tarla',
+                'city' => 'Aydin',
+                'district' => 'Kusadasi',
+                'budget_max' => 5000000,
+                'financing' => 'cash',
+            ],
+            'valuation' => [],
+            'completeness_score' => 85,
+            'confidence_score' => 75,
+        ]);
+
+        $matches = app(RealEstateMatchService::class)->process($investorConversation);
+
+        $this->assertCount(1, $matches);
+        $this->assertSame($seller->id, $matches[0]['candidate_profile_id']);
+        $this->assertSame($sellerConversation->id, $matches[0]['candidate_conversation_id']);
+        $this->assertSame('seller', $matches[0]['candidate_role']);
+        $this->assertSame($investor->id, $matches[0]['investor_profile_id']);
+        $this->assertSame($seller->id, $matches[0]['seller_profile_id']);
+        $this->assertGreaterThanOrEqual(85, $matches[0]['match_score']);
+        $this->assertNull($investorConversation->next_follow_up_at);
     }
 
     public function test_investor_does_not_receive_wrong_city_or_property_type_matches(): void
