@@ -136,7 +136,7 @@ class RealEstateComparableIntegrityTest extends TestCase
     public function test_same_user_profile_outside_isolated_organization_is_rejected(): void
     {
         [$bot] = $this->seedIsolated('out-of-scope');
-        $foreignOrganization = Organization::query()->forceCreate([
+        Organization::query()->forceCreate([
             'id' => 99,
             'owner_user_id' => 40,
             'name' => 'Foreign Org',
@@ -145,7 +145,6 @@ class RealEstateComparableIntegrityTest extends TestCase
         ]);
         $conversation = ConversationControl::query()->create([
             'user_id' => 40,
-            'organization_id' => $foreignOrganization->id,
             'ai_bot_id' => $bot->id,
             'session_id' => 'foreign-integrity',
             'whatsapp_number' => '905550000099',
@@ -153,6 +152,9 @@ class RealEstateComparableIntegrityTest extends TestCase
             'lead_status' => 'new',
             'next_follow_up_at' => null,
         ]);
+        $conversation->forceFill(['organization_id' => 99])->saveQuietly();
+        $conversation->refresh();
+
         $profile = $this->sellerProfile($conversation);
         $profile->update(['valuation' => $this->valuation()]);
 
