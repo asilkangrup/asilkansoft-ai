@@ -77,7 +77,9 @@ class MemoryService
             'media_duration' => $mediaContext['duration'] ?? null,
             'media_size' => $mediaContext['size'] ?? null,
             'whatsapp_message_id' => $mediaContext['message_id'] ?? null,
-            'status' => $senderType === 'customer' ? 'received' : null,
+            'status' => $senderType === 'customer'
+                ? 'received'
+                : ($isolatedRealEstate ? 'sent' : null),
         ]);
 
         if (
