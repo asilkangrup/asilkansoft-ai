@@ -13,11 +13,15 @@ class RealEstateProfileService
 {
     private const PRIMARY_USER_ID = 40;
 
+    private const PRIMARY_ORGANIZATION_ID = 37;
+
+    private const PRIMARY_BOT_ID = 35;
+
     public function process(
         ConversationControl $conversation,
         string $message
     ): ?RealEstateProfile {
-        if ((int) $conversation->user_id !== self::PRIMARY_USER_ID) {
+        if (! $this->supports($conversation)) {
             return null;
         }
 
@@ -28,7 +32,10 @@ class RealEstateProfileService
         }
 
         $profile = $this->profileFor($conversation);
-        $aiBot = AiBot::query()->find($conversation->ai_bot_id);
+        $aiBot = AiBot::query()
+            ->whereKey(self::PRIMARY_BOT_ID)
+            ->where('user_id', self::PRIMARY_USER_ID)
+            ->first();
 
         if (! $aiBot) {
             return $profile;
@@ -66,6 +73,8 @@ class RealEstateProfileService
                 meta: [
                     'conversation_control_id' => $conversation->id,
                     'dedicated_api_key' => true,
+                    'isolated_user_id' => self::PRIMARY_USER_ID,
+                    'isolated_bot_id' => self::PRIMARY_BOT_ID,
                 ],
             );
 
@@ -85,8 +94,8 @@ class RealEstateProfileService
             $profile = RealEstateProfile::updateOrCreate(
                 ['conversation_control_id' => $conversation->id],
                 [
-                    'user_id' => $conversation->user_id,
-                    'ai_bot_id' => $conversation->ai_bot_id,
+                    'user_id' => self::PRIMARY_USER_ID,
+                    'ai_bot_id' => self::PRIMARY_BOT_ID,
                     'profile_type' => $this->routeType($conversation),
                     'data' => $merged,
                     'completeness_score' => $this->completeness(
@@ -102,6 +111,9 @@ class RealEstateProfileService
         } catch (Throwable $exception) {
             Log::warning('REAL ESTATE PROFILE EXTRACTION FAILED', [
                 'conversation_control_id' => $conversation->id,
+                'user_id' => self::PRIMARY_USER_ID,
+                'organization_id' => self::PRIMARY_ORGANIZATION_ID,
+                'ai_bot_id' => self::PRIMARY_BOT_ID,
                 'message' => $exception->getMessage(),
             ]);
 
@@ -114,6 +126,10 @@ class RealEstateProfileService
     public function promptFor(
         ConversationControl $conversation
     ): string {
+        if (! $this->supports($conversation)) {
+            return '';
+        }
+
         $profile = $this->profileFor($conversation);
 
         if (! $profile || ! is_array($profile->data) || $profile->data === []) {
@@ -138,9 +154,22 @@ PROMPT;
     private function profileFor(
         ConversationControl $conversation
     ): ?RealEstateProfile {
+        if (! $this->supports($conversation)) {
+            return null;
+        }
+
         return RealEstateProfile::query()
             ->where('conversation_control_id', $conversation->id)
+            ->where('user_id', self::PRIMARY_USER_ID)
+            ->where('ai_bot_id', self::PRIMARY_BOT_ID)
             ->first();
+    }
+
+    private function supports(ConversationControl $conversation): bool
+    {
+        return (int) $conversation->user_id === self::PRIMARY_USER_ID
+            && (int) $conversation->organization_id === self::PRIMARY_ORGANIZATION_ID
+            && (int) $conversation->ai_bot_id === self::PRIMARY_BOT_ID;
     }
 
     private function instructions(): string
