@@ -14,6 +14,8 @@ class RealEstateVerificationService
 
     private const REAL_ESTATE_BOT_ID = 35;
 
+    private const MIN_MEDIA_CONFIDENCE = 70;
+
     private const TAG_PREFIX = 'real_estate:verification:';
 
     public function process(ConversationControl $conversation): ?array
@@ -32,11 +34,20 @@ class RealEstateVerificationService
         $provenance = is_array($data['field_provenance'] ?? null)
             ? $data['field_provenance']
             : [];
-        $findings = collect(
+        $allFindings = collect(
             is_array($data['media_findings'] ?? null)
                 ? $data['media_findings']
                 : []
         )->filter(fn ($finding): bool => is_array($finding));
+        $findings = $allFindings
+            ->filter(fn (array $finding): bool =>
+                (int) ($finding['confidence_score'] ?? 0) >= self::MIN_MEDIA_CONFIDENCE
+            )
+            ->values();
+        $lowConfidenceMediaCount = max(
+            0,
+            $allFindings->count() - $findings->count()
+        );
 
         $corroborated = [];
         $mediaOnly = [];
@@ -68,10 +79,9 @@ class RealEstateVerificationService
 
             if ($matches) {
                 if ($this->fieldIsMediaDerived($field, $provenance)) {
-                    // A value copied from the same class of media evidence
-                    // cannot verify itself. It remains useful CRM memory, but
-                    // it must be confirmed by the customer or an independent
-                    // official source before it counts as corroboration.
+                    // A value copied from media cannot independently verify
+                    // itself. A second screenshot is repetition, not customer
+                    // or official corroboration.
                     $mediaOnly[] = $field;
                     continue;
                 }
@@ -119,6 +129,8 @@ class RealEstateVerificationService
             'status' => $status,
             'risk_score' => $riskScore,
             'media_evidence_count' => $findings->count(),
+            'low_confidence_media_count' => $lowConfidenceMediaCount,
+            'minimum_media_confidence' => self::MIN_MEDIA_CONFIDENCE,
             'evidence_fields' => array_values(array_keys($evidence)),
             'corroborated_fields' => array_values(array_unique($corroborated)),
             'media_only_fields' => array_values(array_unique($mediaOnly)),
@@ -135,6 +147,7 @@ class RealEstateVerificationService
                 missing: $missing,
                 evidenceCount: count($evidence),
                 mediaOnlyCount: count(array_unique($mediaOnly)),
+                lowConfidenceMediaCount: $lowConfidenceMediaCount,
             ),
             'updated_at' => now()->toIso8601String(),
         ];
@@ -172,6 +185,7 @@ class RealEstateVerificationService
             'risk_score' => $verification['risk_score'] ?? null,
             'corroborated_fields' => $verification['corroborated_fields'] ?? [],
             'media_only_fields' => $verification['media_only_fields'] ?? [],
+            'low_confidence_media_count' => $verification['low_confidence_media_count'] ?? 0,
             'conflicts' => collect($verification['conflicts'] ?? [])
                 ->map(fn ($conflict): array => [
                     'field' => $conflict['field'] ?? null,
@@ -191,7 +205,7 @@ class RealEstateVerificationService
 
         return <<<PROMPT
 [INTERNAL REAL ESTATE VERIFICATION & RISK]
-Bu blok müşteri beyanı ile WhatsApp üzerinden analiz edilen belge/görseller arasındaki dahili tutarlılık kontrolüdür. Bu kontrol resmi tapu, belediye, TAKBİS veya hukuki doğrulama değildir. Müşteriye dahili risk skorunu veya alan adlarını gösterme. media_only_fields yalnızca görsel/belgeden CRM'e alınmış, bağımsız müşteri teyidi olmayan alanlardır; bunları kendi kaynaklarıyla eşleşiyor diye doğrulanmış sayma. Çelişki varsa kesin fiyat/imar/tapu iddiasında bulunma ve eşleştirmeyi aceleye getirme. status blocked/high_risk ise önce çelişkiyi açık, kısa ve profesyonel bir soruyla netleştir. status corroborated olsa bile resmi geçerlilik garantisi verme. legal_verification_complete hiçbir zaman yalnız görsel analizinden true kabul edilmez.
+Bu blok müşteri beyanı ile WhatsApp üzerinden analiz edilen belge/görseller arasındaki dahili tutarlılık kontrolüdür. Bu kontrol resmi tapu, belediye, TAKBİS veya hukuki doğrulama değildir. Müşteriye dahili risk skorunu veya alan adlarını gösterme. media_only_fields yalnızca görsel/belgeden CRM'e alınmış, bağımsız müşteri teyidi olmayan alanlardır; bunları kendi kaynaklarıyla eşleşiyor diye doğrulanmış sayma. Düşük güvenli medya bulguları çatışma, doğrulama veya eşleştirme kararında kullanılmaz; gerekirse daha net belge/görsel iste. Çelişki varsa kesin fiyat/imar/tapu iddiasında bulunma ve eşleştirmeyi aceleye getirme. status blocked/high_risk ise önce çelişkiyi açık, kısa ve profesyonel bir soruyla netleştir. status corroborated olsa bile resmi geçerlilik garantisi verme. legal_verification_complete hiçbir zaman yalnız görsel analizinden true kabul edilmez.
 Doğrulama desteği: {$json}
 PROMPT;
     }
@@ -305,9 +319,6 @@ PROMPT;
         $score += min(24, count($missing) * 8);
         $score -= min(20, $corroboratedCount * 5);
 
-        // Hard floors make the numeric risk score consistent with the status.
-        // Corroborated fields may reduce uncertainty but must never numerically
-        // hide a critical or high-severity contradiction.
         if ($severities->contains('critical')) {
             $score = max($score, 85);
         } elseif ($severities->contains('high')) {
@@ -353,6 +364,7 @@ PROMPT;
         array $missing,
         int $evidenceCount,
         int $mediaOnlyCount,
+        int $lowConfidenceMediaCount,
     ): string {
         if (in_array($status, ['blocked', 'high_risk'], true)) {
             $first = $conflicts[0]['field'] ?? null;
@@ -362,6 +374,10 @@ PROMPT;
                     .$this->fieldLabel((string) $first)
                     .' çelişkisini netleştir; doğrulamadan fiyat veya eşleşme kesinliği verme.'
                 : 'Yüksek risk sinyalini netleştir; doğrulama tamamlanmadan eşleştirme veya kesin fiyat iddiası yapma.';
+        }
+
+        if ($evidenceCount === 0 && $lowConfidenceMediaCount > 0) {
+            return 'Gönderilen belge/görsel yeterince net okunamadı. Kritik tapu/parsel bilgisini müşteriden yazılı teyit et veya daha net bir görsel iste.';
         }
 
         if ($evidenceCount === 0) {
