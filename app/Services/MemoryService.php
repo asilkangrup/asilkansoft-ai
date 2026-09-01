@@ -12,6 +12,8 @@ use Throwable;
 
 class MemoryService
 {
+    private const REAL_ESTATE_USER_ID = 40;
+
     public function yeniOturumId(): string
     {
         return (string) Str::uuid();
@@ -66,7 +68,7 @@ class MemoryService
         ]);
 
         if (
-            $userId === 1
+            $userId === self::REAL_ESTATE_USER_ID
             && $role === 'user'
             && $senderType === 'customer'
         ) {
@@ -154,7 +156,7 @@ class MemoryService
             )
             ->all();
 
-        if ($userId === 1) {
+        if ($userId === self::REAL_ESTATE_USER_ID) {
             try {
                 $conversation =
                     ConversationControl::query()

@@ -5,12 +5,11 @@ namespace App\Services;
 use App\Models\AiBot;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Exceptions\RateLimitException;
-use OpenAI\Laravel\Facades\OpenAI;
 use Throwable;
 
 class RealEstateOpenAIService extends OpenAIService
 {
-    private const PRIMARY_USER_ID = 1;
+    private const PRIMARY_USER_ID = 40;
 
     public function cevapVer(
         string|array $mesajlar,
@@ -24,6 +23,17 @@ class RealEstateOpenAIService extends OpenAIService
 
         if ($input === []) {
             return 'Mesajınızı biraz daha açık yazar mısınız?';
+        }
+
+        $apiKey = trim((string) $aiBot->openai_api_key);
+
+        if ($apiKey === '') {
+            Log::warning('REAL ESTATE AI KEY MISSING', [
+                'ai_bot_id' => $aiBot->id,
+                'user_id' => $aiBot->user_id,
+            ]);
+
+            return 'Emlak danışmanlığı bağlantısı hazırlanıyor. Lütfen kısa bir süre sonra tekrar deneyin.';
         }
 
         $model = trim((string) env(
@@ -54,7 +64,9 @@ class RealEstateOpenAIService extends OpenAIService
         }
 
         try {
-            $response = OpenAI::responses()->create($request);
+            $response = \OpenAI::client($apiKey)
+                ->responses()
+                ->create($request);
 
             app(AiUsageService::class)->record(
                 response: $response,
@@ -64,6 +76,7 @@ class RealEstateOpenAIService extends OpenAIService
                     'input_messages' => count($input),
                     'web_search_available' => true,
                     'model' => $model,
+                    'dedicated_api_key' => true,
                 ],
             );
 
@@ -91,7 +104,7 @@ class RealEstateOpenAIService extends OpenAIService
 
             report($exception);
 
-            return parent::cevapVer($mesajlar, $aiBot);
+            return 'Şu anda emlak danışmanlığı bağlantısında kısa süreli bir sorun var. Lütfen biraz sonra tekrar deneyin.';
         }
     }
 

@@ -6,12 +6,11 @@ use App\Models\AiBot;
 use App\Models\ConversationControl;
 use App\Models\RealEstateProfile;
 use Illuminate\Support\Facades\Log;
-use OpenAI\Laravel\Facades\OpenAI;
 use Throwable;
 
 class RealEstateMediaAnalysisService
 {
-    private const PRIMARY_USER_ID = 1;
+    private const PRIMARY_USER_ID = 40;
 
     public function process(
         ConversationControl $conversation,
@@ -92,7 +91,8 @@ class RealEstateMediaAnalysisService
                 $request['reasoning'] = ['effort' => 'medium'];
             }
 
-            $response = OpenAI::responses()->create($request);
+            $response = app(RealEstateOpenAIClient::class)
+                ->createResponse($aiBot, $request);
 
             app(AiUsageService::class)->record(
                 response: $response,
@@ -102,6 +102,7 @@ class RealEstateMediaAnalysisService
                     'conversation_control_id' => $conversation->id,
                     'message_type' => $type,
                     'mime_type' => $mime,
+                    'dedicated_api_key' => true,
                 ],
             );
 
