@@ -17,6 +17,7 @@ use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ProcessWhatsAppWebhook implements ShouldQueue
 {
@@ -79,8 +80,9 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         |
         | user_id=40 / bot_id=35 için e-ticaret siparişleri, finans akışı,
         | generic CRM ve otomatik takip mantığı kesinlikle çalıştırılmaz.
-        | Controller dış sınırda imza/instance doğrulaması yapar; job da ikinci
-        | bir tenant sınırı olarak bot kimliğini tekrar doğrular.
+        | Dedicated controller JWT + tenant doğrulamasından sonra payload'a
+        | `_real_estate_authorized=true` ekler. Aynı instance generic endpoint
+        | üzerinden bu job'a ulaştırılırsa marker olmayacağı için istek düşürülür.
         |
         */
         $instance = trim((string) ($payload['instance'] ?? ''));
@@ -94,6 +96,16 @@ class ProcessWhatsAppWebhook implements ShouldQueue
                 ->first();
 
             if ($realEstateIsolation->supportsBotIdentity($realEstateBot)) {
+                if (! (bool) ($payload['_real_estate_authorized'] ?? false)) {
+                    Log::warning('UNAUTHORIZED REAL ESTATE JOB PAYLOAD DROPPED', [
+                        'instance' => $instance,
+                        'event' => $payload['event'] ?? null,
+                    ]);
+
+                    return;
+                }
+
+                unset($payload['_real_estate_authorized']);
                 $realEstateInbound->process($payload);
 
                 return;
