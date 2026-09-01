@@ -114,6 +114,10 @@ class MemoryService
                         conversation: $conversation,
                     );
 
+                    app(RealEstateVerificationDecisionGuardService::class)->process(
+                        conversation: $conversation,
+                    );
+
                     app(RealEstateMatchService::class)->process(
                         conversation: $conversation,
                     );
