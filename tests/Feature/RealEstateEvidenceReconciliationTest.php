@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\RealEstateEvidenceReconciliationService;
+use App\Services\RealEstateVerificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -60,6 +61,45 @@ class RealEstateEvidenceReconciliationTest extends TestCase
         $this->assertContains('asking_price', $result['conflict_fields']);
         $this->assertFalse($result['official_verification_complete']);
         $this->assertGreaterThan(0, $profile->completeness_score);
+    }
+
+    public function test_media_promoted_fields_cannot_verify_themselves(): void
+    {
+        [$conversation, $profile] = $this->seedIsolatedProfile([
+            'intent' => 'seller',
+            'asking_price' => 4_500_000,
+            'urgency' => 'high',
+            'media_findings' => [[
+                'message_id' => 'media-self-verify-1',
+                'document_type' => 'tapu',
+                'property_type' => 'arsa',
+                'city' => 'Muğla',
+                'district' => 'Marmaris',
+                'area_sqm' => 1250,
+                'block_no' => '101',
+                'parcel_no' => '22',
+                'title_deed_type' => 'arsa',
+                'zoning_status' => 'konut',
+                'confidence_score' => 94,
+                'analyzed_at' => now()->toIso8601String(),
+            ]],
+        ]);
+
+        app(RealEstateEvidenceReconciliationService::class)->process($conversation);
+        $verification = app(RealEstateVerificationService::class)->process($conversation);
+
+        $profile->refresh();
+
+        $this->assertContains('city', $verification['media_only_fields']);
+        $this->assertContains('district', $verification['media_only_fields']);
+        $this->assertNotContains('city', $verification['corroborated_fields']);
+        $this->assertNotContains('district', $verification['corroborated_fields']);
+        $this->assertFalse($verification['safe_to_match']);
+        $this->assertFalse($verification['legal_verification_complete']);
+        $this->assertSame(
+            $verification['media_only_fields'],
+            $profile->data['verification_intelligence']['media_only_fields']
+        );
     }
 
     public function test_existing_customer_value_is_never_overwritten_by_conflicting_media(): void
@@ -131,6 +171,10 @@ class RealEstateEvidenceReconciliationTest extends TestCase
 
         $this->assertNull(
             app(RealEstateEvidenceReconciliationService::class)
+                ->process($conversation->fresh())
+        );
+        $this->assertNull(
+            app(RealEstateVerificationService::class)
                 ->process($conversation->fresh())
         );
     }
