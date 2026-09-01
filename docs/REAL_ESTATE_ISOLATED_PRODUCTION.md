@@ -22,6 +22,12 @@ Automated follow-up messages are disabled for this bot. `follow_up_enabled` and 
 
 The dedicated Evolution webhook requires the isolated instance name and a valid short-lived HS256 JWT signed with the encrypted organization webhook secret. Unsigned, invalid or foreign-instance webhook requests must be rejected.
 
+## Dedicated OpenAI key security
+
+The fresh real-estate bot stores its own `openai_api_key` encrypted at rest with Laravel `Crypt`/`APP_KEY`. The application decrypts it only through the bot model when creating the isolated OpenAI client. Other WAI bots retain their existing behavior and are not migrated by this real-estate-specific change.
+
+The public readiness endpoint never exposes the key. It reports only whether a dedicated key is configured and whether the raw stored value is decryptable as an encrypted value.
+
 ## Opportunity matching
 
 `RealEstateMatchService` performs deterministic internal seller/investor matching. It is deliberately separate from OpenAI so matching remains available even before the dedicated OpenAI key is configured.
@@ -50,13 +56,18 @@ php artisan wai:real-estate-rebuild-matches --limit=500
 
 The command is hard-scoped to `user_id=40` and `ai_bot_id=35`.
 
-## Production readiness checks
+## Production readiness gate
 
-Before live customer traffic, verify:
+`GET /api/real-estate/health` is the single readiness gate. `ready_for_live_traffic` becomes `true` only when all of the following are true:
 
-1. `/api/real-estate/health` reports `isolated=true` and webhook authentication configured.
-2. Bot 35 has a dedicated OpenAI API key configured.
-3. Evolution instance `emlak-ai-35` is connected after the user scans the QR code.
-4. Both follow-up flags remain disabled.
-5. A signed webhook from `emlak-ai-35` is accepted while unsigned/foreign requests are rejected.
-6. Seller/investor matching smoke tests leave no synthetic data behind.
+1. bot 35 belongs to user 40;
+2. its configured Evolution instance is exactly `emlak-ai-35`;
+3. webhook JWT authentication is configured;
+4. the dedicated OpenAI key is configured and encrypted at rest;
+5. WhatsApp is connected;
+6. both automatic follow-up flags are disabled;
+7. there are zero active follow-up records for bot 35.
+
+The endpoint also returns `blocking_checks`, allowing operations to see exactly what still prevents live traffic without exposing credentials.
+
+Before live customer traffic, also verify a signed webhook from `emlak-ai-35` is accepted while unsigned/foreign requests are rejected, and ensure seller/investor smoke tests leave no synthetic data behind.
