@@ -9,12 +9,12 @@ use Illuminate\Support\Facades\Schema;
 
 class RealEstateNegotiationMemoryService
 {
-    private const SOURCE_WINDOW_MINUTES = 10;
-
     private const MATERIAL_CHANGE_PERCENT = 10.0;
 
-    public function sync(RealEstateProfile $profile): array
-    {
+    public function sync(
+        RealEstateProfile $profile,
+        ?ChatMessage $sourceMessage = null
+    ): array {
         if (! $this->supports($profile) || ! Schema::hasTable('real_estate_negotiation_events')) {
             return [];
         }
@@ -25,18 +25,20 @@ class RealEstateNegotiationMemoryService
             return [];
         }
 
-        $sourceMessage = $this->latestCustomerMessage($profile);
-
-        // Negotiation memory is deliberately customer-sourced. Background
-        // recalculations and assistant/system writes must never manufacture a
-        // price position or a bargaining term.
-        if (! $sourceMessage) {
+        // Negotiation memory is deliberately customer-sourced. A profile
+        // observer/background recalculation is not allowed to guess which
+        // customer statement caused a structured value to change.
+        if (! $this->validCustomerSource($profile, $sourceMessage)) {
             return $this->persistSummary($profile);
         }
 
         $data = is_array($profile->data) ? $profile->data : [];
 
         foreach ($this->positions($profile->profile_type, $data) as $position) {
+            if (! $this->positionSupportedBySource($position, $sourceMessage)) {
+                continue;
+            }
+
             $this->recordPosition(
                 profile: $profile,
                 sourceMessage: $sourceMessage,
@@ -143,7 +145,7 @@ class RealEstateNegotiationMemoryService
 
         return <<<PROMPT
 [INTERNAL REAL ESTATE NEGOTIATION MEMORY]
-Bu blok yalnız müşterinin kendi mesajlarından çıkarılan fiyat/şart değişimlerinin kalıcı CRM hafızasıdır. Bir fiyat pozisyonunu üçüncü tarafın bağlayıcı teklifi gibi sunma; kabul, ret veya karşı teklif kaydı yoksa bunları uydurma. seller_minimum_price gizli pazarlık tabanıdır: satıcıyla kendi görüşmesinde bağlam olarak kullanılabilir ancak yatırımcıya/alıcıya otomatik olarak açıklanamaz. Fiyat düşüşünü veya yüksek aciliyeti müşteriye baskı kurmak için kullanma. En güncel pozisyonu esas al, eski pozisyonları tekrar sorma ve önemli değişiklik varsa profesyonel biçimde teyit et.
+Bu blok yalnız müşterinin kendi mesajlarından açıkça desteklenen fiyat/şart değişimlerinin kalıcı CRM hafızasıdır. Bir fiyat pozisyonunu üçüncü tarafın bağlayıcı teklifi gibi sunma; kabul, ret veya karşı teklif kaydı yoksa bunları uydurma. seller_minimum_price gizli pazarlık tabanıdır: satıcıyla kendi görüşmesinde bağlam olarak kullanılabilir ancak yatırımcıya/alıcıya otomatik olarak açıklanamaz. Fiyat düşüşünü veya yüksek aciliyeti müşteriye baskı kurmak için kullanma. En güncel pozisyonu esas al, eski pozisyonları tekrar sorma ve önemli değişiklik varsa profesyonel biçimde teyit et.
 Pazarlık hafızası: {$json}
 PROMPT;
     }
@@ -216,6 +218,7 @@ PROMPT;
                 'direction' => $direction,
                 'metadata' => [
                     'customer_sourced' => true,
+                    'source_evidence' => 'explicit_customer_message',
                     'confidential' => $confidential,
                     'change_percent' => $changePercent,
                     'material_change' => $changePercent !== null
@@ -294,33 +297,180 @@ PROMPT;
         ];
     }
 
-    private function latestCustomerMessage(RealEstateProfile $profile): ?ChatMessage
-    {
+    private function validCustomerSource(
+        RealEstateProfile $profile,
+        ?ChatMessage $sourceMessage,
+    ): bool {
+        if (! $sourceMessage || ! $sourceMessage->exists) {
+            return false;
+        }
+
         $conversation = $profile->conversation()->first();
 
-        if (! $conversation) {
-            return null;
+        return $conversation !== null
+            && (int) $sourceMessage->user_id === RealEstateIsolationService::USER_ID
+            && (int) $sourceMessage->organization_id === RealEstateIsolationService::ORGANIZATION_ID
+            && (int) $sourceMessage->ai_bot_id === RealEstateIsolationService::BOT_ID
+            && (string) $sourceMessage->session_id === (string) $conversation->session_id
+            && $sourceMessage->role === 'user'
+            && $sourceMessage->sender_type === 'customer';
+    }
+
+    private function positionSupportedBySource(array $position, ChatMessage $sourceMessage): bool
+    {
+        $text = $this->sourceText($sourceMessage);
+
+        if ($text === '') {
+            return false;
         }
 
-        $message = ChatMessage::query()
-            ->where('user_id', RealEstateIsolationService::USER_ID)
-            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
-            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
-            ->where('session_id', $conversation->session_id)
-            ->where('role', 'user')
-            ->where('sender_type', 'customer')
-            ->latest('id')
-            ->first();
+        $numericValue = $position['numeric_value'] ?? null;
 
-        if (! $message || ! $message->created_at) {
-            return null;
+        if ($numericValue !== null) {
+            return $this->numericValueMentioned((float) $numericValue, $text);
         }
 
-        if ($message->created_at->lt(now()->subMinutes(self::SOURCE_WINDOW_MINUTES))) {
-            return null;
+        return $this->textValueMentioned(
+            eventType: (string) ($position['event_type'] ?? ''),
+            value: (string) ($position['text_value'] ?? ''),
+            text: $text,
+        );
+    }
+
+    private function sourceText(ChatMessage $sourceMessage): string
+    {
+        $transcript = trim((string) ($sourceMessage->media_transcript ?? ''));
+
+        return $transcript !== ''
+            ? $transcript
+            : trim((string) $sourceMessage->message);
+    }
+
+    private function numericValueMentioned(float $value, string $text): bool
+    {
+        if ($value <= 0) {
+            return false;
         }
 
-        return $message;
+        $normalized = $this->normalizeText($text);
+        $whole = (string) (int) round($value);
+        $groupedDot = number_format($value, 0, '', '.');
+        $groupedComma = number_format($value, 0, '', ',');
+
+        foreach ([$whole, $groupedDot, $groupedComma] as $token) {
+            $pattern = '/(?<!\d)'.preg_quote($token, '/').'(?!\d)/u';
+
+            if (preg_match($pattern, $normalized) === 1) {
+                return true;
+            }
+        }
+
+        if ($value >= 1000000) {
+            $millions = $value / 1000000;
+            $canonical = rtrim(rtrim(number_format($millions, 2, '.', ''), '0'), '.');
+            $millionPattern = str_replace('\\.', '[\\.,]', preg_quote($canonical, '/'));
+
+            if (
+                preg_match(
+                    '/(?<!\d)'.$millionPattern.'\s*(?:milyon|mn)(?!\pL)/iu',
+                    $normalized
+                ) === 1
+            ) {
+                return true;
+            }
+
+            $millionWhole = (int) floor($millions);
+            $remainingThousands = (int) round(($value - ($millionWhole * 1000000)) / 1000);
+
+            if ($millionWhole > 0 && $remainingThousands > 0) {
+                $mixedPattern = '/(?<!\d)'.preg_quote((string) $millionWhole, '/')
+                    .'\s*milyon\s*'.preg_quote((string) $remainingThousands, '/')
+                    .'\s*bin(?!\pL)/iu';
+
+                if (preg_match($mixedPattern, $normalized) === 1) {
+                    return true;
+                }
+            }
+        }
+
+        if ($value >= 1000 && $value < 1000000) {
+            $thousands = $value / 1000;
+            $canonical = rtrim(rtrim(number_format($thousands, 2, '.', ''), '0'), '.');
+            $thousandPattern = str_replace('\\.', '[\\.,]', preg_quote($canonical, '/'));
+
+            if (
+                preg_match(
+                    '/(?<!\d)'.$thousandPattern.'\s*(?:bin|k)(?!\pL)/iu',
+                    $normalized
+                ) === 1
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function textValueMentioned(
+        string $eventType,
+        string $value,
+        string $text,
+    ): bool {
+        $normalized = $this->normalizeText($text);
+        $normalizedValue = $this->normalizeText($value);
+
+        if ($normalizedValue === '') {
+            return false;
+        }
+
+        return match ($eventType) {
+            'seller_urgency' => match ($normalizedValue) {
+                'high' => $this->containsAny($normalized, [
+                    'acil', 'hemen sat', 'hemen satmam', 'nakite sikis',
+                    'nakit sikis', 'cok acelem', 'çok acelem',
+                ]),
+                'low' => $this->containsAny($normalized, [
+                    'acelem yok', 'acil degil', 'acil değil',
+                ]),
+                default => str_contains($normalized, $normalizedValue),
+            },
+            'investor_financing' => match ($normalizedValue) {
+                'cash' => str_contains($normalized, 'nakit'),
+                'credit' => str_contains($normalized, 'kredi'),
+                'mixed' => str_contains($normalized, 'karma')
+                    || (
+                        str_contains($normalized, 'nakit')
+                        && str_contains($normalized, 'kredi')
+                    ),
+                default => str_contains($normalized, $normalizedValue),
+            },
+            default => mb_strlen($normalizedValue) >= 3
+                && str_contains($normalized, $normalizedValue),
+        };
+    }
+
+    private function containsAny(string $text, array $needles): bool
+    {
+        foreach ($needles as $needle) {
+            if (str_contains($text, $this->normalizeText((string) $needle))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizeText(string $text): string
+    {
+        $text = strtr($text, [
+            'İ' => 'i', 'I' => 'i', 'ı' => 'i',
+            'Ş' => 's', 'ş' => 's', 'Ğ' => 'g', 'ğ' => 'g',
+            'Ü' => 'u', 'ü' => 'u', 'Ö' => 'o', 'ö' => 'o',
+            'Ç' => 'c', 'ç' => 'c',
+        ]);
+        $text = mb_strtolower($text);
+
+        return trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
     }
 
     private function persistSummary(RealEstateProfile $profile): array
