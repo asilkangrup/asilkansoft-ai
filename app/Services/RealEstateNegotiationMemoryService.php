@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\ChatMessage;
+use App\Models\ConversationControl;
 use App\Models\RealEstateNegotiationEvent;
 use App\Models\RealEstateProfile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 class RealEstateNegotiationMemoryService
@@ -25,9 +27,9 @@ class RealEstateNegotiationMemoryService
             return [];
         }
 
-        // Negotiation memory is deliberately customer-sourced. A profile
-        // observer/background recalculation is not allowed to guess which
-        // customer statement caused a structured value to change.
+        // Only the exact inbound customer message being processed may create
+        // a negotiation event. Background/operator/profile recalculations
+        // intentionally receive no source and therefore cannot invent one.
         if (! $this->validCustomerSource($profile, $sourceMessage)) {
             return $this->persistSummary($profile);
         }
@@ -59,13 +61,7 @@ class RealEstateNegotiationMemoryService
             return [];
         }
 
-        $events = RealEstateNegotiationEvent::query()
-            ->where('user_id', RealEstateIsolationService::USER_ID)
-            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
-            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
-            ->where('real_estate_profile_id', $profile->id)
-            ->orderBy('id')
-            ->get();
+        $events = $this->eventsFor($profile);
 
         if ($events->isEmpty()) {
             return [];
@@ -73,7 +69,7 @@ class RealEstateNegotiationMemoryService
 
         $latest = $events
             ->groupBy('event_type')
-            ->map(function ($group): array {
+            ->map(function (Collection $group): array {
                 /** @var RealEstateNegotiationEvent $event */
                 $event = $group->last();
                 $metadata = is_array($event->metadata) ? $event->metadata : [];
@@ -95,11 +91,13 @@ class RealEstateNegotiationMemoryService
             })
             ->all();
 
-        $materialChanges = $events->filter(function (RealEstateNegotiationEvent $event): bool {
-            $metadata = is_array($event->metadata) ? $event->metadata : [];
+        $materialChanges = $events
+            ->filter(function (RealEstateNegotiationEvent $event): bool {
+                $metadata = is_array($event->metadata) ? $event->metadata : [];
 
-            return (bool) ($metadata['material_change'] ?? false);
-        })->count();
+                return (bool) ($metadata['material_change'] ?? false);
+            })
+            ->count();
 
         return [
             'event_count' => $events->count(),
@@ -119,7 +117,7 @@ class RealEstateNegotiationMemoryService
         ];
     }
 
-    public function promptFor(\App\Models\ConversationControl $conversation): string
+    public function promptFor(ConversationControl $conversation): string
     {
         if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return '';
@@ -141,11 +139,14 @@ class RealEstateNegotiationMemoryService
             return '';
         }
 
-        $json = json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $json = json_encode(
+            $summary,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        );
 
         return <<<PROMPT
 [INTERNAL REAL ESTATE NEGOTIATION MEMORY]
-Bu blok yalnız müşterinin kendi mesajlarından açıkça desteklenen fiyat/şart değişimlerinin kalıcı CRM hafızasıdır. Bir fiyat pozisyonunu üçüncü tarafın bağlayıcı teklifi gibi sunma; kabul, ret veya karşı teklif kaydı yoksa bunları uydurma. seller_minimum_price gizli pazarlık tabanıdır: satıcıyla kendi görüşmesinde bağlam olarak kullanılabilir ancak yatırımcıya/alıcıya otomatik olarak açıklanamaz. Fiyat düşüşünü veya yüksek aciliyeti müşteriye baskı kurmak için kullanma. En güncel pozisyonu esas al, eski pozisyonları tekrar sorma ve önemli değişiklik varsa profesyonel biçimde teyit et.
+Bu blok yalnız müşterinin kendi mesajlarından açıkça desteklenen fiyat ve işlem şartı değişimlerinin kalıcı CRM hafızasıdır. Bir fiyat pozisyonunu üçüncü tarafın bağlayıcı teklifi gibi sunma; açık bir kabul, ret veya karşı teklif kaydı yoksa bunları uydurma. seller_minimum_price gizli satıcı pazarlık tabanıdır: satıcının kendi görüşmesinde bağlam olarak kullanılabilir ancak yatırımcıya veya alıcıya otomatik olarak açıklanamaz. Fiyat düşüşünü, bütçe artışını veya yüksek aciliyeti müşteriye baskı kurmak için kullanma. En güncel müşteri pozisyonunu esas al ve eski bilgiyi tekrar sorma.
 Pazarlık hafızası: {$json}
 PROMPT;
     }
@@ -191,6 +192,7 @@ PROMPT;
         $normalizedValue = $numericValue !== null
             ? number_format($numericValue, 2, '.', '')
             : mb_strtolower(trim((string) $textValue));
+
         $positionKey = hash('sha256', implode('|', [
             (string) $profile->id,
             $eventType,
@@ -234,19 +236,59 @@ PROMPT;
     {
         if ($profileType === 'seller') {
             return array_values(array_filter([
-                $this->numericPosition('seller_asking_price', 'seller', $data['asking_price'] ?? null, false),
-                $this->numericPosition('seller_minimum_price', 'seller', $data['minimum_price'] ?? null, true),
-                $this->textPosition('seller_urgency', 'seller', $data['urgency'] ?? null, false),
+                $this->numericPosition(
+                    'seller_asking_price',
+                    'seller',
+                    $data['asking_price'] ?? null,
+                    false
+                ),
+                $this->numericPosition(
+                    'seller_minimum_price',
+                    'seller',
+                    $data['minimum_price'] ?? null,
+                    true
+                ),
+                $this->textPosition(
+                    'seller_urgency',
+                    'seller',
+                    $data['urgency'] ?? null,
+                    false
+                ),
             ]));
         }
 
         if (in_array($profileType, ['investor', 'buyer'], true)) {
             return array_values(array_filter([
-                $this->numericPosition('investor_budget_min', 'investor', $data['budget_min'] ?? null, false),
-                $this->numericPosition('investor_budget_max', 'investor', $data['budget_max'] ?? null, false),
-                $this->textPosition('investor_financing', 'investor', $data['financing'] ?? null, false),
-                $this->textPosition('investor_timeline', 'investor', $data['timeline'] ?? null, false),
-                $this->textPosition('investor_risk_preference', 'investor', $data['risk_preference'] ?? null, false),
+                $this->numericPosition(
+                    'investor_budget_min',
+                    'investor',
+                    $data['budget_min'] ?? null,
+                    false
+                ),
+                $this->numericPosition(
+                    'investor_budget_max',
+                    'investor',
+                    $data['budget_max'] ?? null,
+                    false
+                ),
+                $this->textPosition(
+                    'investor_financing',
+                    'investor',
+                    $data['financing'] ?? null,
+                    false
+                ),
+                $this->textPosition(
+                    'investor_timeline',
+                    'investor',
+                    $data['timeline'] ?? null,
+                    false
+                ),
+                $this->textPosition(
+                    'investor_risk_preference',
+                    'investor',
+                    $data['risk_preference'] ?? null,
+                    false
+                ),
             ]));
         }
 
@@ -316,8 +358,10 @@ PROMPT;
             && $sourceMessage->sender_type === 'customer';
     }
 
-    private function positionSupportedBySource(array $position, ChatMessage $sourceMessage): bool
-    {
+    private function positionSupportedBySource(
+        array $position,
+        ChatMessage $sourceMessage
+    ): bool {
         $text = $this->sourceText($sourceMessage);
 
         if ($text === '') {
@@ -367,12 +411,20 @@ PROMPT;
 
         if ($value >= 1000000) {
             $millions = $value / 1000000;
-            $canonical = rtrim(rtrim(number_format($millions, 2, '.', ''), '0'), '.');
-            $millionPattern = str_replace('\.', '[.,]', preg_quote($canonical, '/'));
+            $canonical = rtrim(
+                rtrim(number_format($millions, 2, '.', ''), '0'),
+                '.'
+            );
+            $numberPattern = str_replace(
+                '\\.',
+                '[.,]',
+                preg_quote($canonical, '/')
+            );
+            $millionUnit = '(?:milyon(?:\p{L}{0,8})?|mn)';
 
             if (
                 preg_match(
-                    '/(?<!\d)'.$millionPattern.'\s*(?:milyon|mn)(?!\p{L})/iu',
+                    '/(?<!\d)'.$numberPattern.'\s*'.$millionUnit.'(?!\p{L})/iu',
                     $normalized
                 ) === 1
             ) {
@@ -380,12 +432,16 @@ PROMPT;
             }
 
             $millionWhole = (int) floor($millions);
-            $remainingThousands = (int) round(($value - ($millionWhole * 1000000)) / 1000);
+            $remainingThousands = (int) round(
+                ($value - ($millionWhole * 1000000)) / 1000
+            );
 
             if ($millionWhole > 0 && $remainingThousands > 0) {
-                $mixedPattern = '/(?<!\d)'.preg_quote((string) $millionWhole, '/')
-                    .'\s*milyon\s*'.preg_quote((string) $remainingThousands, '/')
-                    .'\s*bin(?!\p{L})/iu';
+                $mixedPattern = '/(?<!\d)'
+                    .preg_quote((string) $millionWhole, '/')
+                    .'\s*milyon(?:\p{L}{0,8})?\s*'
+                    .preg_quote((string) $remainingThousands, '/')
+                    .'\s*bin(?:\p{L}{0,8})?(?!\p{L})/iu';
 
                 if (preg_match($mixedPattern, $normalized) === 1) {
                     return true;
@@ -395,12 +451,19 @@ PROMPT;
 
         if ($value >= 1000 && $value < 1000000) {
             $thousands = $value / 1000;
-            $canonical = rtrim(rtrim(number_format($thousands, 2, '.', ''), '0'), '.');
-            $thousandPattern = str_replace('\.', '[.,]', preg_quote($canonical, '/'));
+            $canonical = rtrim(
+                rtrim(number_format($thousands, 2, '.', ''), '0'),
+                '.'
+            );
+            $numberPattern = str_replace(
+                '\\.',
+                '[.,]',
+                preg_quote($canonical, '/')
+            );
 
             if (
                 preg_match(
-                    '/(?<!\d)'.$thousandPattern.'\s*(?:bin|k)(?!\p{L})/iu',
+                    '/(?<!\d)'.$numberPattern.'\s*(?:bin(?:\p{L}{0,8})?|k)(?!\p{L})/iu',
                     $normalized
                 ) === 1
             ) {
@@ -426,11 +489,15 @@ PROMPT;
         return match ($eventType) {
             'seller_urgency' => match ($normalizedValue) {
                 'high' => $this->containsAny($normalized, [
-                    'acil', 'hemen sat', 'hemen satmam', 'nakite sikis',
-                    'nakit sikis', 'cok acelem', 'çok acelem',
+                    'acil',
+                    'hemen sat',
+                    'nakite sikis',
+                    'nakit sikis',
+                    'cok acelem',
                 ]),
                 'low' => $this->containsAny($normalized, [
-                    'acelem yok', 'acil degil', 'acil değil',
+                    'acelem yok',
+                    'acil degil',
                 ]),
                 default => str_contains($normalized, $normalizedValue),
             },
@@ -491,6 +558,17 @@ PROMPT;
         return $summary;
     }
 
+    private function eventsFor(RealEstateProfile $profile): Collection
+    {
+        return RealEstateNegotiationEvent::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('real_estate_profile_id', $profile->id)
+            ->orderBy('id')
+            ->get();
+    }
+
     private function samePosition(
         ?RealEstateNegotiationEvent $previous,
         ?float $numericValue,
@@ -505,7 +583,8 @@ PROMPT;
                 && abs(((float) $previous->numeric_value) - $numericValue) < 0.01;
         }
 
-        return trim((string) $previous->text_value) === trim((string) $textValue);
+        return trim((string) $previous->text_value)
+            === trim((string) $textValue);
     }
 
     private function direction(
@@ -538,11 +617,16 @@ PROMPT;
         return round((($current - $previous) / $previous) * 100, 2);
     }
 
-    private function trajectoryPercent($events, string $eventType): ?float
-    {
+    private function trajectoryPercent(
+        Collection $events,
+        string $eventType
+    ): ?float {
         $typed = $events
             ->where('event_type', $eventType)
-            ->filter(fn (RealEstateNegotiationEvent $event): bool => $event->numeric_value !== null)
+            ->filter(
+                fn (RealEstateNegotiationEvent $event): bool =>
+                    $event->numeric_value !== null
+            )
             ->values();
 
         if ($typed->count() < 2) {
