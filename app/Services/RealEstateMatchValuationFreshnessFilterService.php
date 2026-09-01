@@ -17,6 +17,7 @@ class RealEstateMatchValuationFreshnessFilterService
     {
         if (
             (int) $conversation->user_id !== self::REAL_ESTATE_USER_ID
+            || (int) $conversation->organization_id !== RealEstateIsolationService::ORGANIZATION_ID
             || (int) $conversation->ai_bot_id !== self::REAL_ESTATE_BOT_ID
         ) {
             return [];
@@ -37,10 +38,11 @@ class RealEstateMatchValuationFreshnessFilterService
             : [];
 
         $freshnessService = app(RealEstateValuationFreshnessService::class);
+        $integrityService = app(RealEstateComparableIntegrityService::class);
 
         $safeMatches = collect($matches)
             ->filter(fn ($match): bool => is_array($match))
-            ->map(function (array $match) use ($freshnessService): ?array {
+            ->map(function (array $match) use ($freshnessService, $integrityService): ?array {
                 $sellerProfileId = (int) ($match['seller_profile_id'] ?? 0);
 
                 if ($sellerProfileId <= 0) {
@@ -58,9 +60,22 @@ class RealEstateMatchValuationFreshnessFilterService
                     return null;
                 }
 
-                $freshness = $freshnessService->refreshMetadata($seller);
+                $sellerConversation = $seller->conversation()->first();
 
-                if (! ($freshness['usable_for_matching'] ?? false)) {
+                if (
+                    ! $sellerConversation
+                    || (int) $sellerConversation->organization_id !== RealEstateIsolationService::ORGANIZATION_ID
+                ) {
+                    return null;
+                }
+
+                $freshness = $freshnessService->refreshMetadata($seller);
+                $integrity = $integrityService->assess($seller->fresh());
+
+                if (
+                    ! ($freshness['usable_for_matching'] ?? false)
+                    || ! ($integrity['sufficient_for_matching'] ?? false)
+                ) {
                     return null;
                 }
 
@@ -71,6 +86,16 @@ class RealEstateMatchValuationFreshnessFilterService
                     'comparable_count' => $freshness['comparable_count'] ?? 0,
                     'researched_at' => $freshness['researched_at'] ?? null,
                     'expires_at' => $freshness['expires_at'] ?? null,
+                ];
+                $match['comparable_integrity'] = [
+                    'status' => $integrity['status'] ?? null,
+                    'quality' => $integrity['quality'] ?? null,
+                    'usable_comparable_count' => $integrity['usable_comparable_count'] ?? 0,
+                    'distinct_source_host_count' => $integrity['distinct_source_host_count'] ?? 0,
+                    'median_unit_price_sqm' => $integrity['median_unit_price_sqm'] ?? null,
+                    'unit_price_spread_ratio' => $integrity['unit_price_spread_ratio'] ?? null,
+                    'price_basis' => 'asking',
+                    'official_sale_price_verified' => false,
                 ];
 
                 return $match;
@@ -87,6 +112,7 @@ class RealEstateMatchValuationFreshnessFilterService
             'strongest_score' => $safeMatches[0]['match_score'] ?? null,
             'strongest_grade' => $safeMatches[0]['grade'] ?? null,
             'valuation_freshness_enforced' => true,
+            'comparable_integrity_enforced' => true,
             'updated_at' => now()->toIso8601String(),
         ];
 
