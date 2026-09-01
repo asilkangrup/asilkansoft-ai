@@ -121,6 +121,10 @@ class MemoryService
                     app(RealEstateMatchService::class)->process(
                         conversation: $conversation,
                     );
+
+                    app(RealEstateMatchVerificationFilterService::class)->process(
+                        conversation: $conversation,
+                    );
                 }
             } catch (Throwable $exception) {
                 Log::warning(
