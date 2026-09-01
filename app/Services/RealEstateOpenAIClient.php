@@ -9,6 +9,10 @@ class RealEstateOpenAIClient
 {
     public function createResponse(AiBot $aiBot, array $request): mixed
     {
+        if (! app(RealEstateIsolationService::class)->supportsBotIdentity($aiBot)) {
+            throw new RuntimeException('İzole Emlak AI OpenAI istemcisi kapsam dışı bot için kullanılamaz.');
+        }
+
         $apiKey = trim((string) $aiBot->openai_api_key);
 
         if ($apiKey === '') {

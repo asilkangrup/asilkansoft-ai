@@ -2,8 +2,10 @@
 
 use App\Http\Controllers\RealEstateWhatsAppWebhookController;
 use App\Http\Controllers\WhatsAppWebhookController;
+use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateReadinessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/user', function (Request $request) {
@@ -13,12 +15,32 @@ Route::get('/user', function (Request $request) {
 Route::get('/health/release', function () {
     return response()->json([
         'ok' => true,
-        'release' => 'real-estate-whatsapp-v4-readiness',
+        'release' => 'real-estate-whatsapp-v5-dedicated-inbound',
         'deployed_at' => '2026-09-01',
     ]);
 });
 
-Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);
+Route::post('/whatsapp/webhook', function (Request $request) {
+    $instance = trim((string) data_get($request->all(), 'instance', ''));
+
+    if ($instance === RealEstateIsolationService::INSTANCE) {
+        Log::warning('ISOLATED REAL ESTATE INSTANCE REJECTED ON GENERIC WEBHOOK', [
+            'instance' => $instance,
+            'event' => data_get($request->all(), 'event'),
+            'ip' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Bu instance yalnızca izole Emlak AI webhook endpointini kullanabilir.',
+        ], 403);
+    }
+
+    return app()->call([
+        app(WhatsAppWebhookController::class),
+        'handle',
+    ], ['request' => $request]);
+});
 
 Route::prefix('real-estate')->group(function (): void {
     Route::get('/health', function () {
