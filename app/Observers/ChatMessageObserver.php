@@ -17,8 +17,8 @@ use Throwable;
 class ChatMessageObserver
 {
     private const REAL_ESTATE_USER_ID = 40;
-
     private const REAL_ESTATE_BOT_ID = 35;
+    private const REAL_ESTATE_INSTANCE = 'emlak-ai-35';
 
     public function created(ChatMessage $message): void
     {
@@ -33,10 +33,6 @@ class ChatMessageObserver
             return;
         }
 
-        // The legacy shared WhatsApp controller first stores a plain-text
-        // placeholder and immediately afterwards stores the real media row.
-        // For the isolated Emlak AI account, keep only the media row so the AI
-        // history does not see the same customer message twice.
         $this->removeLegacyPlaceholderDuplicate($message);
 
         $type = strtolower((string) ($message->message_type ?: 'text'));
@@ -59,19 +55,16 @@ class ChatMessageObserver
             $aiBot = AiBot::query()
                 ->whereKey(self::REAL_ESTATE_BOT_ID)
                 ->where('user_id', self::REAL_ESTATE_USER_ID)
+                ->where('whatsapp_instance', self::REAL_ESTATE_INSTANCE)
                 ->first();
 
-            if (
-                ! $conversation
-                || ! $aiBot
-                || blank($aiBot->whatsapp_instance)
-            ) {
+            if (! $conversation || ! $aiBot) {
                 return;
             }
 
             $analysis = app(RealEstateMediaAnalysisService::class)->process(
                 conversation: $conversation,
-                instanceName: (string) $aiBot->whatsapp_instance,
+                instanceName: self::REAL_ESTATE_INSTANCE,
                 mediaContext: [
                     'type' => $type,
                     'url' => $message->media_url,
@@ -80,9 +73,7 @@ class ChatMessageObserver
                     'caption' => $message->media_caption,
                     'message_id' => $message->whatsapp_message_id,
                     'message_envelope' => [
-                        'key' => [
-                            'id' => $message->whatsapp_message_id,
-                        ],
+                        'key' => ['id' => $message->whatsapp_message_id],
                     ],
                 ],
             );
@@ -91,42 +82,25 @@ class ChatMessageObserver
                 return;
             }
 
-            // Media analysis happens after the shared controller's initial text
-            // memory pipeline. Re-run the deterministic downstream stages now
-            // so a tapu/parsel/image conflict affects the same incoming message,
-            // rather than waiting for the customer's next WhatsApp message.
-            app(RealEstateVerificationService::class)->process(
-                conversation: $conversation,
-            );
-
-            app(RealEstateDecisionService::class)->process(
-                conversation: $conversation,
-            );
-
-            app(RealEstateVerificationDecisionGuardService::class)->process(
-                conversation: $conversation,
-            );
-
-            app(RealEstateMatchService::class)->process(
-                conversation: $conversation,
-            );
-
-            app(RealEstateMatchVerificationFilterService::class)->process(
-                conversation: $conversation,
-            );
+            // The shared webhook's initial text-memory pass finishes before the
+            // media row is created. Recompute downstream state immediately so
+            // document conflicts affect this same turn instead of the next one.
+            app(RealEstateVerificationService::class)->process($conversation);
+            app(RealEstateDecisionService::class)->process($conversation);
+            app(RealEstateVerificationDecisionGuardService::class)->process($conversation);
+            app(RealEstateMatchService::class)->process($conversation);
+            app(RealEstateMatchVerificationFilterService::class)->process($conversation);
         } catch (Throwable $exception) {
             Log::warning('REAL ESTATE MEDIA OBSERVER FAILED', [
                 'chat_message_id' => $message->id,
                 'message' => $exception->getMessage(),
             ]);
-
             report($exception);
         }
     }
 
-    private function removeLegacyPlaceholderDuplicate(
-        ChatMessage $mediaMessage
-    ): void {
+    private function removeLegacyPlaceholderDuplicate(ChatMessage $mediaMessage): void
+    {
         try {
             $previous = ChatMessage::query()
                 ->where('user_id', self::REAL_ESTATE_USER_ID)
@@ -144,8 +118,7 @@ class ChatMessageObserver
                 && $previous->sender_type === 'customer'
                 && (string) $previous->message_type === 'text'
                 && blank($previous->whatsapp_message_id)
-                && trim((string) $previous->message)
-                    === trim((string) $mediaMessage->message);
+                && trim((string) $previous->message) === trim((string) $mediaMessage->message);
 
             if (! $sameLogicalMessage) {
                 return;
@@ -153,12 +126,7 @@ class ChatMessageObserver
 
             $withinSameWebhookWindow = $previous->created_at
                 && $mediaMessage->created_at
-                && abs(
-                    $previous->created_at->diffInSeconds(
-                        $mediaMessage->created_at,
-                        false
-                    )
-                ) <= 15;
+                && abs($previous->created_at->diffInSeconds($mediaMessage->created_at, false)) <= 15;
 
             if (! $withinSameWebhookWindow) {
                 return;
@@ -172,7 +140,6 @@ class ChatMessageObserver
                 'session_id' => $mediaMessage->session_id,
             ]);
         } catch (Throwable $exception) {
-            // Message-history cleanup must never prevent media analysis or reply.
             Log::warning('REAL ESTATE MEDIA PLACEHOLDER CLEANUP FAILED', [
                 'chat_message_id' => $mediaMessage->id,
                 'message' => $exception->getMessage(),
