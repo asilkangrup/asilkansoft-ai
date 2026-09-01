@@ -14,26 +14,13 @@ class RealEstateVerificationService
 
     private const TAG_PREFIX = 'real_estate:verification:';
 
-    /**
-     * Deterministically compare customer-provided profile data with facts
-     * extracted from WhatsApp images/PDFs. This service never treats a visual
-     * document as legally authenticated; it only records corroboration,
-     * conflicts and missing verification evidence.
-     */
     public function process(ConversationControl $conversation): ?array
     {
-        if (
-            (int) $conversation->user_id !== self::REAL_ESTATE_USER_ID
-            || (int) $conversation->ai_bot_id !== self::REAL_ESTATE_BOT_ID
-        ) {
+        if (! $this->inScope($conversation)) {
             return null;
         }
 
-        $profile = RealEstateProfile::query()
-            ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
-            ->first();
+        $profile = $this->profileFor($conversation);
 
         if (! $profile) {
             return null;
@@ -68,12 +55,12 @@ class RealEstateVerificationService
                 continue;
             }
 
-            $matched = collect($mediaValues)
+            $matches = collect($mediaValues)
                 ->contains(fn ($mediaValue): bool =>
                     $this->valuesMatch($field, $profileValue, $mediaValue)
                 );
 
-            if ($matched) {
+            if ($matches) {
                 $corroborated[] = $field;
                 continue;
             }
@@ -86,7 +73,10 @@ class RealEstateVerificationService
             ];
         }
 
-        $missing = $this->missingVerificationFields($profile->profile_type, $data);
+        $missing = $this->missingVerificationFields(
+            profileType: (string) $profile->profile_type,
+            data: $data,
+        );
         $criticalConflicts = collect($conflicts)
             ->where('severity', 'critical')
             ->count();
@@ -146,19 +136,11 @@ class RealEstateVerificationService
 
     public function promptFor(ConversationControl $conversation): string
     {
-        if (
-            (int) $conversation->user_id !== self::REAL_ESTATE_USER_ID
-            || (int) $conversation->ai_bot_id !== self::REAL_ESTATE_BOT_ID
-        ) {
+        if (! $this->inScope($conversation)) {
             return '';
         }
 
-        $profile = RealEstateProfile::query()
-            ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
-            ->first();
-
+        $profile = $this->profileFor($conversation);
         $verification = is_array($profile?->data)
             ? ($profile->data['verification_intelligence'] ?? null)
             : null;
@@ -195,6 +177,22 @@ Doğrulama desteği: {$json}
 PROMPT;
     }
 
+    private function inScope(ConversationControl $conversation): bool
+    {
+        return (int) $conversation->user_id === self::REAL_ESTATE_USER_ID
+            && (int) $conversation->ai_bot_id === self::REAL_ESTATE_BOT_ID;
+    }
+
+    private function profileFor(
+        ConversationControl $conversation
+    ): ?RealEstateProfile {
+        return RealEstateProfile::query()
+            ->where('conversation_control_id', $conversation->id)
+            ->where('user_id', self::REAL_ESTATE_USER_ID)
+            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
+            ->first();
+    }
+
     private function comparableFields(): array
     {
         return [
@@ -211,8 +209,10 @@ PROMPT;
         ];
     }
 
-    private function missingVerificationFields(string $profileType, array $data): array
-    {
+    private function missingVerificationFields(
+        string $profileType,
+        array $data
+    ): array {
         if ($profileType !== 'seller') {
             return [];
         }
@@ -253,8 +253,13 @@ PROMPT;
             $score += 15;
         }
 
-        foreach ($conflicts as $conflict) {
-            $score += match ($conflict['severity'] ?? 'medium') {
+        $severities = collect($conflicts)
+            ->pluck('severity')
+            ->filter()
+            ->values();
+
+        foreach ($severities as $severity) {
+            $score += match ($severity) {
                 'critical' => 45,
                 'high' => 28,
                 default => 15,
@@ -263,6 +268,15 @@ PROMPT;
 
         $score += min(24, count($missing) * 8);
         $score -= min(20, $corroboratedCount * 5);
+
+        // Hard floors make the numeric risk score consistent with the status.
+        // Corroborated fields may reduce uncertainty but must never numerically
+        // hide a critical or high-severity contradiction.
+        if ($severities->contains('critical')) {
+            $score = max($score, 85);
+        } elseif ($severities->contains('high')) {
+            $score = max($score, 65);
+        }
 
         return max(0, min(100, $score));
     }
@@ -307,7 +321,9 @@ PROMPT;
             $first = $conflicts[0]['field'] ?? null;
 
             return $first
-                ? "Belge/görsel ile müşteri beyanı arasındaki {$first} çelişkisini netleştir; doğrulamadan fiyat veya eşleşme kesinliği verme."
+                ? 'Belge/görsel ile müşteri beyanı arasındaki '
+                    .$this->fieldLabel((string) $first)
+                    .' çelişkisini netleştir; doğrulamadan fiyat veya eşleşme kesinliği verme.'
                 : 'Yüksek risk sinyalini netleştir; doğrulama tamamlanmadan eşleştirme veya kesin fiyat iddiası yapma.';
         }
 
@@ -326,8 +342,27 @@ PROMPT;
         return 'Mevcut belge bulgularını kısa biçimde teyit et ve resmi doğrulama gerektiren alanları tamamla.';
     }
 
-    private function verificationTags(array $currentTags, array $verification): array
+    private function fieldLabel(string $field): string
     {
+        return match ($field) {
+            'property_type' => 'taşınmaz türü',
+            'city' => 'il',
+            'district' => 'ilçe',
+            'neighborhood' => 'mahalle',
+            'area_sqm' => 'm²',
+            'block_no' => 'ada',
+            'parcel_no' => 'parsel',
+            'title_deed_type' => 'tapu niteliği',
+            'zoning_status' => 'imar durumu',
+            'asking_price' => 'istenen fiyat',
+            default => 'bilgi',
+        };
+    }
+
+    private function verificationTags(
+        array $currentTags,
+        array $verification
+    ): array {
         $tags = collect($currentTags)
             ->filter(fn ($tag): bool =>
                 is_string($tag)
@@ -335,7 +370,9 @@ PROMPT;
             )
             ->values();
 
-        $tags->push(self::TAG_PREFIX.($verification['status'] ?? 'unverified'));
+        $tags->push(
+            self::TAG_PREFIX.($verification['status'] ?? 'unverified')
+        );
 
         if ((bool) ($verification['safe_to_match'] ?? false)) {
             $tags->push(self::TAG_PREFIX.'safe_to_match');
@@ -364,7 +401,9 @@ PROMPT;
         if (is_string($value)) {
             $value = trim($value);
 
-            return $value === '' ? null : Str::limit($value, 180, '');
+            return $value === ''
+                ? null
+                : Str::limit($value, 180, '');
         }
 
         return $value;
