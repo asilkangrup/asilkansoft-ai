@@ -34,6 +34,7 @@ This is deliberate: once a request has crossed the network boundary, a timeout d
 - `sending`: the network boundary has been entered.
 - `sent`: Evolution confirmed a successful request.
 - `uncertain`: delivery may or may not have reached WhatsApp; automatic retry is blocked.
+- `abandoned`: an operator verified that no automatic resend should occur and closed the ambiguous record.
 
 The ledger stores the first generated answer and its SHA-256 hash. If a process retry generates different wording for the same inbound message, the first reserved answer remains authoritative.
 
@@ -43,7 +44,18 @@ After a confirmed send, the assistant message is persisted idempotently to `chat
 
 Trial usage is also tied to the delivery ledger through `trial_consumed_at`; a process retry cannot consume the same trial reply twice.
 
-Inbound customer memory now uses the Evolution message id as an isolated persistence key. A failed/retried worker can continue generating a reply without duplicating the customer's message or rerunning profile/valuation/matching extraction for the same stored message.
+Inbound customer memory now uses the Evolution message id as an isolated persistence key. A failed/retried worker can continue safely without duplicating the customer's message or rerunning profile/valuation/matching extraction for the same stored message.
+
+## Manual recovery without resend
+
+An ambiguous network result must be checked in WhatsApp/Evolution before it is resolved. The recovery command never calls the WhatsApp send endpoint:
+
+```bash
+php artisan real-estate:resolve-outbound <delivery-id> sent --provider-id=<optional-provider-message-id>
+php artisan real-estate:resolve-outbound <delivery-id> abandoned
+```
+
+Use `sent` only after externally confirming the customer already received the reply. It persists the assistant memory and consumes trial usage once, without sending anything again. Use `abandoned` when the ambiguous record should be closed without recording a delivered assistant message. Only exact user 40 / organization 37 / bot 35 / `emlak-ai-35` rows in `sending` or `uncertain` state can be resolved by this command.
 
 ## Readiness and telemetry
 
@@ -72,4 +84,7 @@ Production `messages.upsert` events without `data.key.id` are ignored with `miss
 - an uncertain network result is quarantined and not sent a second time;
 - assistant persistence and trial accounting are idempotent;
 - isolated inbound memory is deduplicated by WhatsApp message id;
-- an inbound event without a message id is rejected before AI/network work.
+- an inbound event without a message id is rejected before AI/network work;
+- an uncertain delivery can be abandoned through the recovery command without any WhatsApp request.
+
+The repository also contains `.github/workflows/isolated-real-estate-ci.yml`, which syntax-checks the isolated runtime and runs the focused real-estate feature tests on relevant pull requests and changes to `main`.
