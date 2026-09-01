@@ -128,9 +128,11 @@ class RealEstateMatchLedgerTest extends TestCase
             'status' => 'active',
         ]);
 
+        // Conversation creation normalizes the isolated bot to organization 37.
+        // Force the persisted fixture to organization 38 afterward so this test
+        // exercises the actual cross-organization isolation boundary.
         $foreignConversation = ConversationControl::query()->create([
             'user_id' => 40,
-            'organization_id' => 38,
             'ai_bot_id' => 35,
             'session_id' => 'foreign-match-ledger-session',
             'whatsapp_number' => '905554040404',
@@ -138,6 +140,10 @@ class RealEstateMatchLedgerTest extends TestCase
             'lead_status' => 'new',
             'next_follow_up_at' => null,
         ]);
+        $foreignConversation->forceFill(['organization_id' => 38])->saveQuietly();
+        $foreignConversation->refresh();
+        $this->assertSame(38, (int) $foreignConversation->organization_id);
+
         $foreignSeller = RealEstateProfile::query()->create([
             'conversation_control_id' => $foreignConversation->id,
             'user_id' => 40,
