@@ -7,6 +7,7 @@ use App\Models\ChatMessage;
 use App\Models\ConversationFollowUp;
 use App\Models\FinanceLead;
 use App\Models\Order;
+use App\Models\RealEstateCaseEvent;
 use App\Models\RealEstateNegotiationEvent;
 use App\Models\RealEstateOperatorAlert;
 use App\Models\RealEstateOutboundDelivery;
@@ -39,6 +40,8 @@ class RealEstateReadinessService
         $evidenceQualityGuardReady = class_exists(RealEstateEvidenceQualityService::class);
         $negotiationMemoryReady = Schema::hasTable('real_estate_negotiation_events')
             && class_exists(RealEstateNegotiationMemoryService::class);
+        $caseLifecycleReady = Schema::hasTable('real_estate_case_events')
+            && class_exists(RealEstateCaseLifecycleService::class);
         $audioTranscriptionReady = $this->audioTranscriptionReady();
         $apiKeyConfigured = $botIdentityValid && filled($bot?->openai_api_key);
         $apiKeyEncryptedAtRest = $apiKeyConfigured && $this->apiKeyEncryptedAtRest();
@@ -86,6 +89,7 @@ class RealEstateReadinessService
             'operator_alert_queue_ready' => $operatorAlertQueueReady,
             'evidence_quality_guard_ready' => $evidenceQualityGuardReady,
             'negotiation_memory_ready' => $negotiationMemoryReady,
+            'case_lifecycle_ready' => $caseLifecycleReady,
             'audio_transcription_ready' => $audioTranscriptionReady,
             'openai_api_key_configured' => $apiKeyConfigured,
             'openai_api_key_encrypted_at_rest' => $apiKeyEncryptedAtRest,
@@ -137,6 +141,7 @@ class RealEstateReadinessService
             'outbound_telemetry_24h' => $this->outboundTelemetry($outboundDeliveryGuardReady),
             'operator_alert_telemetry' => $this->operatorAlertTelemetry($operatorAlertQueueReady),
             'negotiation_telemetry_24h' => $this->negotiationTelemetry($negotiationMemoryReady),
+            'case_lifecycle_telemetry_24h' => $this->caseLifecycleTelemetry($caseLifecycleReady),
             'audio_telemetry_24h' => $this->audioTelemetry($audioTranscriptionReady),
         ];
     }
@@ -318,6 +323,39 @@ class RealEstateReadinessService
                 ->count(),
             'confidential_floor_events' => (clone $base)
                 ->where('event_type', 'seller_minimum_price')
+                ->count(),
+        ];
+    }
+
+    private function caseLifecycleTelemetry(bool $ready): array
+    {
+        if (! $ready) {
+            return [
+                'events' => 0,
+                'case_opened' => 0,
+                'stage_changed' => 0,
+                'valuation_ready' => 0,
+                'match_ready' => 0,
+                'match_blocked' => 0,
+                'match_candidates_changed' => 0,
+            ];
+        }
+
+        $base = RealEstateCaseEvent::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('created_at', '>=', now()->subDay());
+
+        return [
+            'events' => (clone $base)->count(),
+            'case_opened' => (clone $base)->where('event_type', 'case_opened')->count(),
+            'stage_changed' => (clone $base)->where('event_type', 'stage_changed')->count(),
+            'valuation_ready' => (clone $base)->where('event_type', 'valuation_ready')->count(),
+            'match_ready' => (clone $base)->where('event_type', 'match_ready')->count(),
+            'match_blocked' => (clone $base)->where('event_type', 'match_blocked')->count(),
+            'match_candidates_changed' => (clone $base)
+                ->where('event_type', 'match_candidates_changed')
                 ->count(),
         ];
     }
