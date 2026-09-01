@@ -15,10 +15,14 @@ class RealEstateWebhookAuthService
 
     public function secret(): ?string
     {
-        $encrypted = Organization::query()
+        $organization = Organization::query()
             ->where('owner_user_id', self::REAL_ESTATE_USER_ID)
             ->where('status', 'active')
-            ->value('settings->'.self::SECRET_SETTING);
+            ->first(['settings']);
+
+        $encrypted = is_array($organization?->settings)
+            ? ($organization->settings[self::SECRET_SETTING] ?? null)
+            : null;
 
         if (! is_string($encrypted) || trim($encrypted) === '') {
             return null;
