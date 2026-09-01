@@ -7,8 +7,10 @@ use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Services\RealEstateDecisionService;
 use App\Services\RealEstateMatchService;
+use App\Services\RealEstateMatchValuationFreshnessFilterService;
 use App\Services\RealEstateMatchVerificationFilterService;
 use App\Services\RealEstateMediaAnalysisService;
+use App\Services\RealEstateValuationDecisionGuardService;
 use App\Services\RealEstateVerificationDecisionGuardService;
 use App\Services\RealEstateVerificationService;
 use Illuminate\Support\Facades\Log;
@@ -84,11 +86,13 @@ class ChatMessageObserver
 
             // The shared webhook's initial text-memory pass finishes before the
             // media row is created. Recompute downstream state immediately so
-            // document conflicts affect this same turn instead of the next one.
+            // document conflicts and valuation safety affect this same turn.
             app(RealEstateVerificationService::class)->process($conversation);
             app(RealEstateDecisionService::class)->process($conversation);
+            app(RealEstateValuationDecisionGuardService::class)->process($conversation);
             app(RealEstateVerificationDecisionGuardService::class)->process($conversation);
             app(RealEstateMatchService::class)->process($conversation);
+            app(RealEstateMatchValuationFreshnessFilterService::class)->process($conversation);
             app(RealEstateMatchVerificationFilterService::class)->process($conversation);
         } catch (Throwable $exception) {
             Log::warning('REAL ESTATE MEDIA OBSERVER FAILED', [
