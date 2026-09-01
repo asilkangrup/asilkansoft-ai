@@ -23,6 +23,13 @@ class RealEstateWhatsAppMessageParser
             'mime_type' => null,
             'filename' => null,
             'caption' => null,
+            'duration' => null,
+            'size' => null,
+            'transcript' => null,
+            'transcription_status' => null,
+            'transcription_model' => null,
+            'transcription_language' => null,
+            'transcribed_at' => null,
             'message_id' => $messageId !== '' ? $messageId : null,
             'instance_name' => $instance,
             'message_envelope' => data_get($payload, 'data', []),
@@ -43,6 +50,7 @@ class RealEstateWhatsAppMessageParser
             $context['mime_type'] = data_get($image, 'mimetype');
             $context['filename'] = data_get($image, 'fileName') ?? 'Fotoğraf';
             $context['caption'] = data_get($image, 'caption');
+            $context['size'] = $this->numericMeta(data_get($image, 'fileLength'));
 
             return [
                 trim((string) ($context['caption'] ?: '[Fotoğraf]')),
@@ -58,6 +66,7 @@ class RealEstateWhatsAppMessageParser
             $context['mime_type'] = data_get($document, 'mimetype');
             $context['filename'] = data_get($document, 'fileName') ?? 'Belge';
             $context['caption'] = data_get($document, 'caption');
+            $context['size'] = $this->numericMeta(data_get($document, 'fileLength'));
 
             return [
                 trim((string) ($context['caption'] ?: '[Belge]')),
@@ -73,6 +82,8 @@ class RealEstateWhatsAppMessageParser
             $context['mime_type'] = data_get($video, 'mimetype');
             $context['filename'] = data_get($video, 'fileName') ?? 'Video';
             $context['caption'] = data_get($video, 'caption');
+            $context['duration'] = $this->numericMeta(data_get($video, 'seconds'));
+            $context['size'] = $this->numericMeta(data_get($video, 'fileLength'));
 
             return [
                 trim((string) ($context['caption'] ?: '[Video]')),
@@ -87,10 +98,12 @@ class RealEstateWhatsAppMessageParser
             $context['url'] = data_get($audio, 'url');
             $context['mime_type'] = data_get($audio, 'mimetype');
             $context['filename'] = 'Sesli mesaj';
+            $context['duration'] = $this->numericMeta(data_get($audio, 'seconds'));
+            $context['size'] = $this->numericMeta(data_get($audio, 'fileLength'));
+            $context['transcription_status'] = 'pending';
 
-            // Do not imply that the AI heard audio when no transcription has
-            // actually been produced. This placeholder makes that limitation
-            // explicit to the conversation model.
+            // This text is replaced by the dedicated transcription pipeline
+            // before CRM/profile processing whenever transcription succeeds.
             return ['[Sesli mesaj - içerik henüz metne çevrilmedi]', $context];
         }
 
@@ -128,9 +141,6 @@ class RealEstateWhatsAppMessageParser
             'documentWithCaptionMessage.message',
         ];
 
-        // WhatsApp can nest wrappers (for example ephemeral -> view-once).
-        // Eight levels is intentionally conservative and prevents malformed
-        // payloads from causing an unbounded loop.
         for ($depth = 0; $depth < 8; $depth++) {
             $nested = null;
 
@@ -193,5 +203,16 @@ class RealEstateWhatsAppMessageParser
         $context['caption'] = trim(implode(' ', array_filter([$name, $address])));
 
         return [trim(implode(' ', $parts)), $context];
+    }
+
+    private function numericMeta(mixed $value): ?int
+    {
+        if (! is_numeric($value)) {
+            return null;
+        }
+
+        $value = (int) $value;
+
+        return $value >= 0 ? $value : null;
     }
 }

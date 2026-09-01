@@ -18,6 +18,7 @@ class RealEstateWhatsAppInboundService
         private readonly WhatsAppService $whatsAppService,
         private readonly RealEstateWhatsAppMessageParser $messageParser,
         private readonly RealEstateWebhookReceiptService $receiptService,
+        private readonly RealEstateAudioTranscriptionService $audioTranscriptionService,
     ) {
     }
 
@@ -208,6 +209,27 @@ class RealEstateWhatsAppInboundService
             messageId: $messageId,
         );
 
+        if (($mediaContext['type'] ?? null) === 'audio') {
+            $transcription = $this->audioTranscriptionService->transcribe(
+                bot: $bot,
+                instance: $instance,
+                mediaContext: $mediaContext,
+            );
+
+            $mediaContext['transcript'] = $transcription['text'];
+            $mediaContext['transcription_status'] = $transcription['status'];
+            $mediaContext['transcription_model'] = $transcription['model'];
+            $mediaContext['transcription_language'] = $transcription['language'];
+            $mediaContext['transcribed_at'] = $transcription['transcribed_at'];
+            $mediaContext['size'] = $transcription['bytes'] ?? ($mediaContext['size'] ?? null);
+
+            if (filled($transcription['text'])) {
+                $message = trim((string) $transcription['text']);
+            } else {
+                $message = $this->audioFallbackMessage((string) $transcription['status']);
+            }
+        }
+
         if ($message === '') {
             return [
                 'success' => true,
@@ -308,6 +330,7 @@ class RealEstateWhatsAppInboundService
             'conversation_id' => $conversation->id,
             'message_id' => $messageId !== '' ? $messageId : null,
             'message_type' => $mediaContext['type'] ?? 'text',
+            'audio_transcription_status' => $mediaContext['transcription_status'] ?? null,
             'instance' => $instance,
         ]);
 
@@ -351,6 +374,15 @@ class RealEstateWhatsAppInboundService
             'trial_completed_at' => $bot->trial_completed_at ?: now(),
             'subscription_status' => 'expired',
         ]);
+    }
+
+    private function audioFallbackMessage(string $status): string
+    {
+        return match ($status) {
+            'too_large' => '[Sesli mesaj - dosya transkripsiyon sınırını aşıyor. Kullanıcıdan daha kısa ses kaydı veya yazılı mesaj istemelisin.]',
+            'unsupported_format' => '[Sesli mesaj - ses formatı desteklenmedi. Kullanıcıdan içeriği yazılı göndermesini istemelisin.]',
+            default => '[Sesli mesaj - içerik güvenilir biçimde metne çevrilemedi. Duyduğunu varsayma; kullanıcıdan içeriği yazılı göndermesini istemelisin.]',
+        };
     }
 
     private function normalizeEvent(mixed $event): string

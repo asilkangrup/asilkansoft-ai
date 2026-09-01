@@ -21,6 +21,11 @@ class ChatMessage extends Model
         'media_mime_type',
         'media_filename',
         'media_caption',
+        'media_transcript',
+        'media_transcription_status',
+        'media_transcription_model',
+        'media_transcription_language',
+        'media_transcribed_at',
         'media_duration',
         'media_size',
         'whatsapp_message_id',
@@ -30,66 +35,28 @@ class ChatMessage extends Model
     protected $casts = [
         'media_duration' => 'integer',
         'media_size' => 'integer',
+        'media_transcribed_at' => 'datetime',
     ];
-
-    /*
-    |--------------------------------------------------------------------------
-    | HESAP SAHİBİ
-    |--------------------------------------------------------------------------
-    */
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(
-            User::class
-        );
+        return $this->belongsTo(User::class);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | ORGANİZASYON
-    |--------------------------------------------------------------------------
-    */
 
     public function organization(): BelongsTo
     {
-        return $this->belongsTo(
-            Organization::class
-        );
+        return $this->belongsTo(Organization::class);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | AI BOT
-    |--------------------------------------------------------------------------
-    */
 
     public function aiBot(): BelongsTo
     {
-        return $this->belongsTo(
-            AiBot::class
-        );
+        return $this->belongsTo(AiBot::class);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | MESAJI GÖNDEREN PERSONEL
-    |--------------------------------------------------------------------------
-    */
 
     public function sentByUser(): BelongsTo
     {
-        return $this->belongsTo(
-            User::class,
-            'sent_by_user_id'
-        );
+        return $this->belongsTo(User::class, 'sent_by_user_id');
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | MESAJ KAYNAĞI
-    |--------------------------------------------------------------------------
-    */
 
     public function musteridenMi(): bool
     {
@@ -106,31 +73,16 @@ class ChatMessage extends Model
         return $this->sender_type === 'human';
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | MESAJ TİPİ
-    |--------------------------------------------------------------------------
-    */
-
     public function isText(): bool
     {
-        return (
-            $this->message_type
-            ?: 'text'
-        ) === 'text';
+        return ($this->message_type ?: 'text') === 'text';
     }
 
     public function isMedia(): bool
     {
         return in_array(
-            $this->message_type
-            ?: 'text',
-            [
-                'image',
-                'video',
-                'audio',
-                'document',
-            ],
+            $this->message_type ?: 'text',
+            ['image', 'video', 'audio', 'document'],
             true
         );
     }

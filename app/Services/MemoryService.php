@@ -13,9 +13,7 @@ use Throwable;
 class MemoryService
 {
     private const REAL_ESTATE_USER_ID = 40;
-
     private const REAL_ESTATE_ORGANIZATION_ID = 37;
-
     private const REAL_ESTATE_BOT_ID = 35;
 
     public function yeniOturumId(): string
@@ -34,23 +32,27 @@ class MemoryService
         array $mediaContext = []
     ): ChatMessage {
         if ($senderType === null) {
-            $senderType =
-                $role === 'assistant'
-                    ? 'ai'
-                    : 'customer';
+            $senderType = $role === 'assistant' ? 'ai' : 'customer';
         }
 
-        $organizationId =
-            ConversationControl::query()
+        $isolatedRealEstate = $userId === self::REAL_ESTATE_USER_ID
+            && (int) $aiBotId === self::REAL_ESTATE_BOT_ID;
+
+        if ($isolatedRealEstate) {
+            // Never let the fresh Emlak AI memory fall through to another
+            // organization owned by user 40.
+            $organizationId = self::REAL_ESTATE_ORGANIZATION_ID;
+        } else {
+            $organizationId = ConversationControl::query()
                 ->where('user_id', $userId)
                 ->where('session_id', $sessionId)
                 ->value('organization_id');
 
-        if ($organizationId === null) {
-            $organizationId =
-                Organization::query()
+            if ($organizationId === null) {
+                $organizationId = Organization::query()
                     ->where('owner_user_id', $userId)
                     ->value('id');
+            }
         }
 
         $chatMessage = ChatMessage::create([
@@ -67,25 +69,30 @@ class MemoryService
             'media_mime_type' => $mediaContext['mime_type'] ?? null,
             'media_filename' => $mediaContext['filename'] ?? null,
             'media_caption' => $mediaContext['caption'] ?? null,
+            'media_transcript' => $mediaContext['transcript'] ?? null,
+            'media_transcription_status' => $mediaContext['transcription_status'] ?? null,
+            'media_transcription_model' => $mediaContext['transcription_model'] ?? null,
+            'media_transcription_language' => $mediaContext['transcription_language'] ?? null,
+            'media_transcribed_at' => $mediaContext['transcribed_at'] ?? null,
+            'media_duration' => $mediaContext['duration'] ?? null,
+            'media_size' => $mediaContext['size'] ?? null,
             'whatsapp_message_id' => $mediaContext['message_id'] ?? null,
             'status' => $senderType === 'customer' ? 'received' : null,
         ]);
 
         if (
-            $userId === self::REAL_ESTATE_USER_ID
-            && (int) $aiBotId === self::REAL_ESTATE_BOT_ID
+            $isolatedRealEstate
             && (int) $organizationId === self::REAL_ESTATE_ORGANIZATION_ID
             && $role === 'user'
             && $senderType === 'customer'
         ) {
             try {
-                $conversation =
-                    ConversationControl::query()
-                        ->where('user_id', self::REAL_ESTATE_USER_ID)
-                        ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
-                        ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
-                        ->where('session_id', $sessionId)
-                        ->first();
+                $conversation = ConversationControl::query()
+                    ->where('user_id', self::REAL_ESTATE_USER_ID)
+                    ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
+                    ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
+                    ->where('session_id', $sessionId)
+                    ->first();
 
                 if ($conversation) {
                     app(RealEstateConversationService::class)->route(
@@ -148,16 +155,13 @@ class MemoryService
                     );
                 }
             } catch (Throwable $exception) {
-                Log::warning(
-                    'REAL ESTATE MEMORY PIPELINE FAILED',
-                    [
-                        'user_id' => $userId,
-                        'organization_id' => $organizationId,
-                        'ai_bot_id' => $aiBotId,
-                        'session_id' => $sessionId,
-                        'message' => $exception->getMessage(),
-                    ]
-                );
+                Log::warning('REAL ESTATE MEMORY PIPELINE FAILED', [
+                    'user_id' => $userId,
+                    'organization_id' => $organizationId,
+                    'ai_bot_id' => $aiBotId,
+                    'session_id' => $sessionId,
+                    'message' => $exception->getMessage(),
+                ]);
             }
         }
 
@@ -185,55 +189,30 @@ class MemoryService
         int $limit = 20
     ): array {
         $messages = $this
-            ->gecmisiGetir(
-                $userId,
-                $sessionId,
-                $limit
-            )
-            ->map(
-                fn (ChatMessage $mesaj): array => [
-                    'role' => $mesaj->role,
-                    'content' => $mesaj->message,
-                ]
-            )
+            ->gecmisiGetir($userId, $sessionId, $limit)
+            ->map(fn (ChatMessage $mesaj): array => [
+                'role' => $mesaj->role,
+                'content' => $mesaj->message,
+            ])
             ->all();
 
         if ($userId === self::REAL_ESTATE_USER_ID) {
             try {
-                $conversation =
-                    ConversationControl::query()
-                        ->where('user_id', self::REAL_ESTATE_USER_ID)
-                        ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
-                        ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
-                        ->where('session_id', $sessionId)
-                        ->first();
+                $conversation = ConversationControl::query()
+                    ->where('user_id', self::REAL_ESTATE_USER_ID)
+                    ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
+                    ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
+                    ->where('session_id', $sessionId)
+                    ->first();
 
                 if ($conversation) {
                     $internalContext = collect([
-                        trim(
-                            app(RealEstateConversationService::class)
-                                ->promptFor($conversation)
-                        ),
-                        trim(
-                            app(RealEstateProfileService::class)
-                                ->promptFor($conversation)
-                        ),
-                        trim(
-                            app(RealEstateVerificationService::class)
-                                ->promptFor($conversation)
-                        ),
-                        trim(
-                            app(RealEstateValuationService::class)
-                                ->promptFor($conversation)
-                        ),
-                        trim(
-                            app(RealEstateDecisionService::class)
-                                ->promptFor($conversation)
-                        ),
-                        trim(
-                            app(RealEstateMatchService::class)
-                                ->promptFor($conversation)
-                        ),
+                        trim(app(RealEstateConversationService::class)->promptFor($conversation)),
+                        trim(app(RealEstateProfileService::class)->promptFor($conversation)),
+                        trim(app(RealEstateVerificationService::class)->promptFor($conversation)),
+                        trim(app(RealEstateValuationService::class)->promptFor($conversation)),
+                        trim(app(RealEstateDecisionService::class)->promptFor($conversation)),
+                        trim(app(RealEstateMatchService::class)->promptFor($conversation)),
                     ])
                         ->filter()
                         ->implode("\n\n");
@@ -245,26 +224,17 @@ class MemoryService
                         ];
 
                         $insertAt = max(0, count($messages) - 1);
-
-                        array_splice(
-                            $messages,
-                            $insertAt,
-                            0,
-                            [$contextMessage]
-                        );
+                        array_splice($messages, $insertAt, 0, [$contextMessage]);
                     }
                 }
             } catch (Throwable $exception) {
-                Log::warning(
-                    'REAL ESTATE INTERNAL MEMORY PROMPT FAILED',
-                    [
-                        'user_id' => $userId,
-                        'organization_id' => self::REAL_ESTATE_ORGANIZATION_ID,
-                        'ai_bot_id' => self::REAL_ESTATE_BOT_ID,
-                        'session_id' => $sessionId,
-                        'message' => $exception->getMessage(),
-                    ]
-                );
+                Log::warning('REAL ESTATE INTERNAL MEMORY PROMPT FAILED', [
+                    'user_id' => $userId,
+                    'organization_id' => self::REAL_ESTATE_ORGANIZATION_ID,
+                    'ai_bot_id' => self::REAL_ESTATE_BOT_ID,
+                    'session_id' => $sessionId,
+                    'message' => $exception->getMessage(),
+                ]);
             }
         }
 
