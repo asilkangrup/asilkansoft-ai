@@ -15,6 +15,7 @@ class RealEstateOperatorAlertService
         'verification_risk',
         'hot_lead',
         'valuation_attention',
+        'evidence_attention',
     ];
 
     public function sync(RealEstateProfile $profile): array
@@ -196,6 +197,34 @@ class RealEstateOperatorAlertService
                         'source_count' => (int) ($freshness['source_count'] ?? 0),
                         'comparable_count' => (int) ($freshness['comparable_count'] ?? 0),
                         'usable_for_matching' => (bool) ($freshness['usable_for_matching'] ?? false),
+                    ],
+                ];
+            }
+
+            $evidenceQuality = app(RealEstateEvidenceQualityService::class)
+                ->assess($profile, persist: false);
+
+            if (! (bool) ($evidenceQuality['sufficient_for_matching'] ?? false)) {
+                $alerts[] = [
+                    'alert_key' => 'evidence_attention:'.$profile->id,
+                    'type' => 'evidence_attention',
+                    'severity' => (bool) ($decision['ready_for_match'] ?? false) ? 'high' : 'medium',
+                    'title' => 'Belge desteği yetersiz',
+                    'message' => (string) ($evidenceQuality['next_best_action']
+                        ?? 'Nitelikli satıcı için yatırımcı eşleştirmesinden önce yeterli taşınmaz belge desteğini tamamla.'),
+                    'payload' => [
+                        'evidence_status' => $evidenceQuality['status'] ?? null,
+                        'documentary_evidence_count' => (int) (
+                            $evidenceQuality['qualified_documentary_evidence_count'] ?? 0
+                        ),
+                        'identity_signals' => array_values(
+                            $evidenceQuality['identity_signals'] ?? []
+                        ),
+                        'reason_codes' => array_values(
+                            $evidenceQuality['reason_codes'] ?? []
+                        ),
+                        'sufficient_for_matching' => false,
+                        'official_verification_complete' => false,
                     ],
                 ];
             }
