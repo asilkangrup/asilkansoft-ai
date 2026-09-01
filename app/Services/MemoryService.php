@@ -14,6 +14,10 @@ class MemoryService
 {
     private const REAL_ESTATE_USER_ID = 40;
 
+    private const REAL_ESTATE_ORGANIZATION_ID = 37;
+
+    private const REAL_ESTATE_BOT_ID = 35;
+
     public function yeniOturumId(): string
     {
         return (string) Str::uuid();
@@ -69,13 +73,17 @@ class MemoryService
 
         if (
             $userId === self::REAL_ESTATE_USER_ID
+            && (int) $aiBotId === self::REAL_ESTATE_BOT_ID
+            && (int) $organizationId === self::REAL_ESTATE_ORGANIZATION_ID
             && $role === 'user'
             && $senderType === 'customer'
         ) {
             try {
                 $conversation =
                     ConversationControl::query()
-                        ->where('user_id', $userId)
+                        ->where('user_id', self::REAL_ESTATE_USER_ID)
+                        ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
+                        ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
                         ->where('session_id', $sessionId)
                         ->first();
 
@@ -85,10 +93,15 @@ class MemoryService
                         message: $message,
                     );
 
-                    app(RealEstateProfileService::class)->process(
+                    $profile = app(RealEstateProfileService::class)->process(
                         conversation: $conversation,
                         message: $message,
                     );
+
+                    if ($profile) {
+                        app(RealEstateValuationFreshnessService::class)
+                            ->refreshMetadata($profile);
+                    }
 
                     if (
                         $mediaContext !== []
@@ -114,11 +127,19 @@ class MemoryService
                         conversation: $conversation,
                     );
 
+                    app(RealEstateValuationDecisionGuardService::class)->process(
+                        conversation: $conversation,
+                    );
+
                     app(RealEstateVerificationDecisionGuardService::class)->process(
                         conversation: $conversation,
                     );
 
                     app(RealEstateMatchService::class)->process(
+                        conversation: $conversation,
+                    );
+
+                    app(RealEstateMatchValuationFreshnessFilterService::class)->process(
                         conversation: $conversation,
                     );
 
@@ -131,6 +152,7 @@ class MemoryService
                     'REAL ESTATE MEMORY PIPELINE FAILED',
                     [
                         'user_id' => $userId,
+                        'organization_id' => $organizationId,
                         'ai_bot_id' => $aiBotId,
                         'session_id' => $sessionId,
                         'message' => $exception->getMessage(),
@@ -180,7 +202,9 @@ class MemoryService
             try {
                 $conversation =
                     ConversationControl::query()
-                        ->where('user_id', $userId)
+                        ->where('user_id', self::REAL_ESTATE_USER_ID)
+                        ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
+                        ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
                         ->where('session_id', $sessionId)
                         ->first();
 
@@ -235,6 +259,8 @@ class MemoryService
                     'REAL ESTATE INTERNAL MEMORY PROMPT FAILED',
                     [
                         'user_id' => $userId,
+                        'organization_id' => self::REAL_ESTATE_ORGANIZATION_ID,
+                        'ai_bot_id' => self::REAL_ESTATE_BOT_ID,
                         'session_id' => $sessionId,
                         'message' => $exception->getMessage(),
                     ]

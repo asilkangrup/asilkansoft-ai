@@ -14,9 +14,11 @@ Only the following production identity is allowed to use the real-estate pipelin
 
 The real-estate services must not depend on the old WAI user/bot/instance. The bot must use its own encrypted bot-level `openai_api_key`; the real-estate AI path must not fall back to the global WAI OpenAI key.
 
+The main message-memory pipeline now requires the exact user, organization and bot identity before any real-estate extraction, valuation, decision or matching work is executed. Conversation routing and profile extraction are also scoped to this fresh identity so a second bot belonging to the same WAI user cannot accidentally inherit the real-estate workflow.
+
 ## Follow-up policy
 
-Automated follow-up messages are disabled for this bot. `follow_up_enabled` and `second_follow_up_enabled` must remain false. Real-estate decision, verification or opportunity-matching services must never schedule `next_follow_up_at` by themselves.
+Automated follow-up messages are disabled for this bot. `follow_up_enabled` and `second_follow_up_enabled` must remain false. Real-estate decision, verification, valuation or opportunity-matching services must never schedule `next_follow_up_at` by themselves.
 
 ## Webhook security
 
@@ -27,6 +29,34 @@ The dedicated Evolution webhook requires the isolated instance name and a valid 
 The fresh real-estate bot stores its own `openai_api_key` encrypted at rest with Laravel `Crypt`/`APP_KEY`. The application decrypts it only through the bot model when creating the isolated OpenAI client. Other WAI bots retain their existing behavior and are not migrated by this real-estate-specific change.
 
 The public readiness endpoint never exposes the key. It reports only whether a dedicated key is configured and whether the raw stored value is decryptable as an encrypted value.
+
+## Current comparable research and valuation freshness
+
+A persisted valuation is not treated as permanently valid. `RealEstateValuationFreshnessService` protects pricing, negotiation and matching from stale market research.
+
+Every new valuation is stamped server-side with:
+
+- a SHA-256 fingerprint of material property facts;
+- `researched_at`;
+- a seven-day `expires_at` window;
+- source count;
+- structured comparable count;
+- comparable quality;
+- `usable_for_decision` and `usable_for_matching` flags.
+
+The fingerprint covers material valuation inputs such as property type, city/district/neighborhood, m², block/parcel, title-deed type, zoning, shared-title status, asking price and location URL. If one of these facts changes, the old valuation becomes stale immediately even when its seven-day clock has not expired.
+
+A valuation also becomes unusable when the research timestamp is missing/expired, no real source is recorded, structured comparables are missing, or confidence is below the safety threshold. Matching is stricter than conversational decision support: it requires at least two structured comparables and adequate confidence.
+
+`RealEstateValuationService` reuses a still-fresh valuation for ordinary repeat questions, avoiding unnecessary API spend. Explicit requests such as “güncel”, “bugün”, “yeniden araştır” or “yeni emsal” force a new research pass. New research uses the dedicated bot-level OpenAI key only.
+
+The research response persists structured comparables rather than only an opaque price conclusion. Each comparable can contain source, URL, listing/asking price, m², normalized TL/m², location, property type and an observed date when the source actually exposes one. Comparable URLs are deduplicated. The service also stores min/median/max asking-price-per-m² statistics when enough numeric data exists.
+
+**Important pricing invariant:** listing/asking prices are not realized sale prices. The AI prompt, stored comparable payload and customer-facing context keep that distinction explicit. Unknown URLs, dates, prices or m² must never be invented.
+
+`RealEstateValuationDecisionGuardService` runs after the normal decision engine. If a seller valuation is stale or insufficient it removes match readiness, changes negotiation posture to `refresh_valuation`, replaces the next-best action with a research-refresh instruction, and removes the `real_estate:state:ready_for_match` tag. It never schedules a follow-up.
+
+`RealEstateMatchValuationFreshnessFilterService` runs after raw deterministic matching. A candidate seller is removed unless its valuation is currently safe for matching. Surviving match payloads include only non-sensitive valuation freshness metadata (status, quality, source/comparable counts and expiry), not customer contact information.
 
 ## Property verification and risk intelligence
 
@@ -60,7 +90,7 @@ Critical conflicts such as city, district, block or parcel mismatches block matc
 
 ## Opportunity matching
 
-`RealEstateMatchService` performs deterministic internal seller/investor matching. It is deliberately separate from OpenAI so matching remains available even before the dedicated OpenAI key is configured.
+`RealEstateMatchService` performs deterministic internal seller/investor matching. It is deliberately separate from OpenAI so raw matching remains available even before the dedicated OpenAI key is configured.
 
 Matching considers:
 
@@ -72,19 +102,26 @@ Matching considers:
 - profile confidence;
 - missing tapu and zoning information as risk signals.
 
-Only matches scoring at least 55/100 are initially produced. `RealEstateMatchVerificationFilterService` then removes any match whose seller is not verification-safe. Contact information is not copied into match payloads. Stored match data uses internal profile/conversation IDs plus reasons, risks and an estimated transaction price.
+Only matches scoring at least 55/100 are initially produced. Safety filtering is then applied in two independent layers:
 
-The AI receives a privacy-safe summary of the strongest verification-safe matches and is explicitly instructed not to claim a ready buyer, guaranteed sale or binding offer without real human verification.
+1. `RealEstateMatchValuationFreshnessFilterService` removes sellers whose current pricing research is stale, source-less, under-supported by comparables or too low-confidence for matching.
+2. `RealEstateMatchVerificationFilterService` removes sellers whose property/document verification is unsafe.
+
+Contact information is not copied into match payloads. Stored match data uses internal profile/conversation IDs plus reasons, risks, estimated transaction price and non-sensitive freshness/verification metadata.
+
+The AI receives a privacy-safe summary of the strongest safety-filtered matches and is explicitly instructed not to claim a ready buyer, guaranteed sale or binding offer without real human verification.
 
 ### Rebuild command
 
-Use the following command after bulk imports, material criteria changes or newly analyzed documents:
+Use the following command after bulk imports, material criteria changes, new comparable research or newly analyzed documents:
 
 ```bash
 php artisan wai:real-estate-rebuild-matches --limit=500
 ```
 
-The command is hard-scoped to `user_id=40` and `ai_bot_id=35`. It now uses two passes: first every seller in scope is re-verified and decision-guarded, then opportunity matches are rebuilt and verification-filtered. This prevents investor-side rebuilds from using stale seller verification state.
+The command is hard-scoped to `user_id=40` and `ai_bot_id=35`. It now audits valuation freshness first, then rebuilds seller decisions and verification guards, then rebuilds raw matches and applies valuation-freshness plus document-verification filters. Its output reports fresh/stale/missing valuation counts alongside verified and safely matched profile counts.
+
+This prevents an investor-side rebuild from using either stale seller pricing or stale seller verification state.
 
 ## Production readiness gate
 
@@ -100,4 +137,4 @@ The command is hard-scoped to `user_id=40` and `ai_bot_id=35`. It now uses two p
 
 The endpoint also returns `blocking_checks`, allowing operations to see exactly what still prevents live traffic without exposing credentials.
 
-Before live customer traffic, also verify a signed webhook from `emlak-ai-35` is accepted while unsigned/foreign requests are rejected, ensure seller/investor smoke tests leave no synthetic data behind, and verify that an intentionally conflicting seller document is tagged `real_estate:verification:blocked` and produces no opportunity match.
+Before live customer traffic, also verify a signed webhook from `emlak-ai-35` is accepted while unsigned/foreign requests are rejected, ensure seller/investor smoke tests leave no synthetic data behind, verify an intentionally conflicting seller document is tagged `real_estate:verification:blocked` and produces no opportunity match, and verify a changed or expired seller valuation is tagged stale and removed from opportunity matching until refreshed.
