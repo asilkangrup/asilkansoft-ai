@@ -6,8 +6,10 @@ use App\Models\AiBot;
 use App\Models\ConversationFollowUp;
 use App\Models\FinanceLead;
 use App\Models\Order;
+use App\Models\RealEstateWebhookReceipt;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class RealEstateReadinessService
@@ -23,6 +25,7 @@ class RealEstateReadinessService
         $botIdentityValid = $isolation->supportsProductionBot($bot);
         $organizationIdentityValid = $isolation->organizationValid();
         $webhookAuthConfigured = app(RealEstateWebhookAuthService::class)->configured();
+        $durableWebhookReceiptsReady = Schema::hasTable('real_estate_webhook_receipts');
         $apiKeyConfigured = $botIdentityValid && filled($bot?->openai_api_key);
         $apiKeyEncryptedAtRest = $apiKeyConfigured && $this->apiKeyEncryptedAtRest();
         $whatsappStatus = strtolower(trim((string) ($bot?->whatsapp_status ?? '')));
@@ -54,6 +57,7 @@ class RealEstateReadinessService
             'bot_identity_valid' => $botIdentityValid,
             'organization_identity_valid' => $organizationIdentityValid,
             'webhook_auth_configured' => $webhookAuthConfigured,
+            'durable_webhook_receipts_ready' => $durableWebhookReceiptsReady,
             'openai_api_key_configured' => $apiKeyConfigured,
             'openai_api_key_encrypted_at_rest' => $apiKeyEncryptedAtRest,
             'ai_enabled' => $aiEnabled,
@@ -98,6 +102,7 @@ class RealEstateReadinessService
             'ready_for_live_traffic' => $blockingChecks === [],
             'checks' => $checks,
             'blocking_checks' => $blockingChecks,
+            'webhook_telemetry_24h' => $this->webhookTelemetry($durableWebhookReceiptsReady),
         ];
     }
 
@@ -119,5 +124,32 @@ class RealEstateReadinessService
         } catch (Throwable) {
             return false;
         }
+    }
+
+    private function webhookTelemetry(bool $tableReady): array
+    {
+        if (! $tableReady) {
+            return [
+                'received' => 0,
+                'replied' => 0,
+                'ignored' => 0,
+                'failed' => 0,
+                'retried' => 0,
+            ];
+        }
+
+        $base = RealEstateWebhookReceipt::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('created_at', '>=', now()->subDay());
+
+        return [
+            'received' => (clone $base)->count(),
+            'replied' => (clone $base)->where('status', 'replied')->count(),
+            'ignored' => (clone $base)->where('status', 'ignored')->count(),
+            'failed' => (clone $base)->where('status', 'failed')->count(),
+            'retried' => (clone $base)->where('attempts', '>', 1)->count(),
+        ];
     }
 }

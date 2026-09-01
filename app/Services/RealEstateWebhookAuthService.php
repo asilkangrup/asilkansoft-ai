@@ -9,14 +9,13 @@ use Throwable;
 
 class RealEstateWebhookAuthService
 {
-    private const REAL_ESTATE_USER_ID = 40;
-
     private const SECRET_SETTING = 'real_estate_webhook_secret';
 
     public function secret(): ?string
     {
         $organization = Organization::query()
-            ->where('owner_user_id', self::REAL_ESTATE_USER_ID)
+            ->whereKey(RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('owner_user_id', RealEstateIsolationService::USER_ID)
             ->where('status', 'active')
             ->first(['settings']);
 
