@@ -57,16 +57,6 @@ class MemoryService
             'message' => trim($message),
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | ANA WHATSAPP: SADECE GAYRİMENKUL YÖNLENDİRMESİ
-        |--------------------------------------------------------------------------
-        |
-        | user_id=1 artık WAI satışına yönlenmez. Konuşmalar yalnızca
-        | gayrimenkul satıcısı / yatırımcı / genel emlak olarak sınıflandırılır.
-        | Diğer SaaS kullanıcıları etkilenmez.
-        */
-
         if (
             $userId === 1
             && $role === 'user'
@@ -84,10 +74,20 @@ class MemoryService
                         conversation: $conversation,
                         message: $message,
                     );
+
+                    app(RealEstateProfileService::class)->process(
+                        conversation: $conversation,
+                        message: $message,
+                    );
+
+                    app(RealEstateValuationService::class)->process(
+                        conversation: $conversation,
+                        message: $message,
+                    );
                 }
             } catch (Throwable $exception) {
                 Log::warning(
-                    'REAL ESTATE CONTEXT ROUTER FAILED',
+                    'REAL ESTATE MEMORY PIPELINE FAILED',
                     [
                         'user_id' => $userId,
                         'ai_bot_id' => $aiBotId,
@@ -144,15 +144,27 @@ class MemoryService
                         ->first();
 
                 if ($conversation) {
-                    $routingPrompt = trim(
-                        app(RealEstateConversationService::class)
-                            ->promptFor($conversation)
-                    );
+                    $internalContext = collect([
+                        trim(
+                            app(RealEstateConversationService::class)
+                                ->promptFor($conversation)
+                        ),
+                        trim(
+                            app(RealEstateProfileService::class)
+                                ->promptFor($conversation)
+                        ),
+                        trim(
+                            app(RealEstateValuationService::class)
+                                ->promptFor($conversation)
+                        ),
+                    ])
+                        ->filter()
+                        ->implode("\n\n");
 
-                    if ($routingPrompt !== '') {
-                        $routingMessage = [
+                    if ($internalContext !== '') {
+                        $contextMessage = [
                             'role' => 'assistant',
-                            'content' => $routingPrompt,
+                            'content' => $internalContext,
                         ];
 
                         $insertAt = max(0, count($messages) - 1);
@@ -161,13 +173,13 @@ class MemoryService
                             $messages,
                             $insertAt,
                             0,
-                            [$routingMessage]
+                            [$contextMessage]
                         );
                     }
                 }
             } catch (Throwable $exception) {
                 Log::warning(
-                    'REAL ESTATE CONTEXT PROMPT FAILED',
+                    'REAL ESTATE INTERNAL MEMORY PROMPT FAILED',
                     [
                         'user_id' => $userId,
                         'session_id' => $sessionId,
