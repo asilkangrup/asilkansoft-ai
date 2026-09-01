@@ -290,7 +290,6 @@ class RealEstateValuationFreshnessService
         $valuation['comparable_quality'] = $assessment['quality'];
         $valuation['usable_for_decision'] = $assessment['usable_for_decision'];
         $valuation['usable_for_matching'] = $assessment['usable_for_matching'];
-        $valuation['freshness_checked_at'] = now()->toIso8601String();
 
         return $valuation;
     }
