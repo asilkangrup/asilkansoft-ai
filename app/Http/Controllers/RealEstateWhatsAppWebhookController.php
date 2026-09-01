@@ -95,6 +95,11 @@ class RealEstateWhatsAppWebhookController extends Controller
                 );
             }
 
+            // This marker is created only after successful JWT + scope checks.
+            // The job refuses isolated-instance traffic without it, preventing
+            // the generic WAI endpoint from becoming an auth bypass.
+            $payload['_real_estate_authorized'] = true;
+
             ProcessWhatsAppWebhook::dispatch($payload);
 
             return response()->json([
