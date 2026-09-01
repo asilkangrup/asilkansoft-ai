@@ -12,12 +12,17 @@ class RealEstateMediaAnalysisService
 {
     private const PRIMARY_USER_ID = 40;
 
+    private const PRIMARY_BOT_ID = 35;
+
     public function process(
         ConversationControl $conversation,
         string $instanceName,
         array $mediaContext
     ): ?array {
-        if ((int) $conversation->user_id !== self::PRIMARY_USER_ID) {
+        if (
+            (int) $conversation->user_id !== self::PRIMARY_USER_ID
+            || (int) $conversation->ai_bot_id !== self::PRIMARY_BOT_ID
+        ) {
             return null;
         }
 
@@ -37,13 +42,25 @@ class RealEstateMediaAnalysisService
             return null;
         }
 
+        $existing = $this->existingAnalysis(
+            conversation: $conversation,
+            messageId: (string) ($mediaContext['message_id'] ?? ''),
+        );
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
         try {
             $base64 = app(EvolutionMediaService::class)->downloadBase64(
                 instanceName: $instanceName,
                 messageEnvelope: $messageEnvelope,
             );
 
-            $aiBot = AiBot::query()->find($conversation->ai_bot_id);
+            $aiBot = AiBot::query()
+                ->whereKey(self::PRIMARY_BOT_ID)
+                ->where('user_id', self::PRIMARY_USER_ID)
+                ->first();
 
             if (! $aiBot) {
                 return null;
@@ -124,6 +141,7 @@ class RealEstateMediaAnalysisService
                 'conversation_control_id' => $conversation->id,
                 'type' => $type,
                 'mime_type' => $mime,
+                'message_id' => trim((string) ($mediaContext['message_id'] ?? '')) ?: null,
                 'message' => $exception->getMessage(),
             ]);
 
@@ -131,6 +149,42 @@ class RealEstateMediaAnalysisService
 
             return null;
         }
+    }
+
+    private function existingAnalysis(
+        ConversationControl $conversation,
+        string $messageId
+    ): ?array {
+        $messageId = trim($messageId);
+
+        if ($messageId === '') {
+            return null;
+        }
+
+        $profile = RealEstateProfile::query()
+            ->where('conversation_control_id', $conversation->id)
+            ->where('user_id', self::PRIMARY_USER_ID)
+            ->where('ai_bot_id', self::PRIMARY_BOT_ID)
+            ->first();
+
+        if (! $profile || ! is_array($profile->data)) {
+            return null;
+        }
+
+        $findings = is_array($profile->data['media_findings'] ?? null)
+            ? $profile->data['media_findings']
+            : [];
+
+        foreach ($findings as $finding) {
+            if (
+                is_array($finding)
+                && trim((string) ($finding['message_id'] ?? '')) === $messageId
+            ) {
+                return $finding;
+            }
+        }
+
+        return null;
     }
 
     private function persist(
@@ -154,6 +208,17 @@ class RealEstateMediaAnalysisService
         $findings = is_array($data['media_findings'] ?? null)
             ? $data['media_findings']
             : [];
+        $messageId = trim((string) ($analysis['message_id'] ?? ''));
+
+        if ($messageId !== '') {
+            $findings = collect($findings)
+                ->reject(fn ($finding): bool =>
+                    is_array($finding)
+                    && trim((string) ($finding['message_id'] ?? '')) === $messageId
+                )
+                ->values()
+                ->all();
+        }
 
         $findings[] = $analysis;
         $data['media_findings'] = array_slice($findings, -8);
