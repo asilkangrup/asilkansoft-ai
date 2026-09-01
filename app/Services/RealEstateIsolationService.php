@@ -16,7 +16,7 @@ class RealEstateIsolationService
 
     public const INSTANCE = 'emlak-ai-35';
 
-    public function supportsBot(?AiBot $bot): bool
+    public function supportsBotIdentity(?AiBot $bot): bool
     {
         if (! $bot) {
             return false;
@@ -24,8 +24,13 @@ class RealEstateIsolationService
 
         return (int) $bot->id === self::BOT_ID
             && (int) $bot->user_id === self::USER_ID
-            && trim((string) $bot->business_sector) === 'real_estate'
-            && trim((string) $bot->whatsapp_instance) === self::INSTANCE;
+            && trim((string) $bot->business_sector) === 'real_estate';
+    }
+
+    public function supportsProductionBot(?AiBot $bot): bool
+    {
+        return $this->supportsBotIdentity($bot)
+            && trim((string) $bot?->whatsapp_instance) === self::INSTANCE;
     }
 
     public function supportsConversation(?ConversationControl $conversation): bool
@@ -52,12 +57,12 @@ class RealEstateIsolationService
     {
         $bot = AiBot::query()->find(self::BOT_ID);
 
-        return $this->supportsBot($bot);
+        return $this->supportsProductionBot($bot);
     }
 
     public function organizationIdFor(AiBot $bot): ?int
     {
-        if (! $this->supportsBot($bot) || ! $this->organizationValid()) {
+        if (! $this->supportsBotIdentity($bot) || ! $this->organizationValid()) {
             return null;
         }
 
@@ -66,7 +71,7 @@ class RealEstateIsolationService
 
     public function blocksGenericCommerce(AiBot $bot): bool
     {
-        return $this->supportsBot($bot);
+        return $this->supportsBotIdentity($bot);
     }
 
     public function blocksFollowUps(AiBot $bot): bool
