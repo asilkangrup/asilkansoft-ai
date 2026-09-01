@@ -261,15 +261,19 @@ class RealEstateEvidenceReconciliationTest extends TestCase
         $this->assertArrayNotHasKey('city', $profile->data);
         $this->assertSame(0, $result['high_confidence_media_count']);
 
-        $conversation->forceFill(['organization_id' => 999])->save();
+        // ConversationControlObserver intentionally rewrites any saved bot-35
+        // row back to user 40 / org 37. Mutate an in-memory copy instead so
+        // the services' own exact-scope guard is exercised directly.
+        $outOfScope = $conversation->fresh();
+        $outOfScope->organization_id = 999;
 
         $this->assertNull(
             app(RealEstateEvidenceReconciliationService::class)
-                ->process($conversation->fresh())
+                ->process($outOfScope)
         );
         $this->assertNull(
             app(RealEstateVerificationService::class)
-                ->process($conversation->fresh())
+                ->process($outOfScope)
         );
     }
 
