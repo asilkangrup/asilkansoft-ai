@@ -109,10 +109,16 @@ class RealEstateEvidenceLedgerTest extends TestCase
         $conversation = $this->conversation($bot, 'evidence-ledger-scope');
         $profile = $this->profile($conversation, []);
 
-        $conversation->forceFill(['organization_id' => null])->save();
+        // ConversationControl normalization intentionally repairs persisted
+        // organization drift. Use an in-memory drifted instance to prove the
+        // evidence service itself fails closed before any write.
+        $drifted = $conversation->replicate();
+        $drifted->setAttribute('id', $conversation->id);
+        $drifted->setAttribute('organization_id', null);
+        $drifted->exists = true;
 
         $result = app(RealEstateEvidenceLedgerService::class)->record(
-            conversation: $conversation->fresh(),
+            conversation: $drifted,
             profile: $profile,
             analysis: [
                 'message_id' => 'wamid.should-not-write',
