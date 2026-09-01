@@ -13,6 +13,8 @@ class RealEstateValuationService
 {
     private const PRIMARY_USER_ID = 40;
 
+    private const PRIMARY_ORGANIZATION_ID = 37;
+
     private const PRIMARY_BOT_ID = 35;
 
     public function process(
@@ -21,6 +23,7 @@ class RealEstateValuationService
     ): ?array {
         if (
             (int) $conversation->user_id !== self::PRIMARY_USER_ID
+            || (int) $conversation->organization_id !== self::PRIMARY_ORGANIZATION_ID
             || (int) $conversation->ai_bot_id !== self::PRIMARY_BOT_ID
             || ! $this->valuationIntent($message)
         ) {
@@ -44,8 +47,10 @@ class RealEstateValuationService
             ($freshness['usable_for_decision'] ?? false)
             && ! $this->forceRefreshIntent($message)
         ) {
-            return is_array($profile->fresh()->valuation)
-                ? $profile->fresh()->valuation
+            $cached = $profile->fresh()->valuation;
+
+            return is_array($cached)
+                ? $this->normalizeStoredValuation($cached)
                 : null;
         }
 
@@ -96,6 +101,7 @@ class RealEstateValuationService
                 aiBot: $aiBot,
                 meta: [
                     'conversation_control_id' => $conversation->id,
+                    'organization_id' => self::PRIMARY_ORGANIZATION_ID,
                     'dedicated_api_key' => true,
                     'forced_refresh' => $this->forceRefreshIntent($message),
                     'previous_freshness_status' => $freshness['status'] ?? null,
@@ -124,11 +130,12 @@ class RealEstateValuationService
                 ),
             ]);
 
-            return $valuation;
+            return $this->normalizeStoredValuation($valuation);
         } catch (Throwable $exception) {
             Log::warning('REAL ESTATE VALUATION FAILED', [
                 'conversation_control_id' => $conversation->id,
                 'user_id' => self::PRIMARY_USER_ID,
+                'organization_id' => self::PRIMARY_ORGANIZATION_ID,
                 'ai_bot_id' => self::PRIMARY_BOT_ID,
                 'message' => $exception->getMessage(),
             ]);
@@ -144,6 +151,7 @@ class RealEstateValuationService
     ): string {
         if (
             (int) $conversation->user_id !== self::PRIMARY_USER_ID
+            || (int) $conversation->organization_id !== self::PRIMARY_ORGANIZATION_ID
             || (int) $conversation->ai_bot_id !== self::PRIMARY_BOT_ID
         ) {
             return '';
@@ -175,7 +183,7 @@ PROMPT;
         }
 
         $json = json_encode(
-            $profile->valuation,
+            $this->normalizeStoredValuation($profile->valuation),
             JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
         );
 
@@ -325,6 +333,61 @@ PROMPT;
             : 'web_search';
 
         return $result;
+    }
+
+    /**
+     * JSON databases may decode whole-number values as ints while a freshly
+     * researched valuation is normalized to floats. Keep the public service
+     * contract identical for fresh and cached paths without discarding
+     * freshness metadata stamped by RealEstateValuationFreshnessService.
+     */
+    private function normalizeStoredValuation(array $valuation): array
+    {
+        foreach ([
+            'market_min', 'market_max', 'quick_sale_min', 'quick_sale_max',
+            'investor_buy_min', 'investor_buy_max', 'market_gap_percent',
+        ] as $field) {
+            if (array_key_exists($field, $valuation) && is_numeric($valuation[$field])) {
+                $valuation[$field] = (float) $valuation[$field];
+            }
+        }
+
+        if (isset($valuation['confidence_score']) && is_numeric($valuation['confidence_score'])) {
+            $valuation['confidence_score'] = max(
+                0,
+                min(100, (int) $valuation['confidence_score'])
+            );
+        }
+
+        if (is_array($valuation['comparables'] ?? null)) {
+            foreach ($valuation['comparables'] as $index => $comparable) {
+                if (! is_array($comparable)) {
+                    continue;
+                }
+
+                foreach (['listing_price', 'area_sqm', 'unit_price_sqm'] as $field) {
+                    if (isset($comparable[$field]) && is_numeric($comparable[$field])) {
+                        $comparable[$field] = (float) $comparable[$field];
+                    }
+                }
+
+                $valuation['comparables'][$index] = $comparable;
+            }
+        }
+
+        if (is_array($valuation['comparable_stats'] ?? null)) {
+            foreach (['unit_price_min', 'unit_price_median', 'unit_price_max'] as $field) {
+                if (
+                    isset($valuation['comparable_stats'][$field])
+                    && is_numeric($valuation['comparable_stats'][$field])
+                ) {
+                    $valuation['comparable_stats'][$field] =
+                        (float) $valuation['comparable_stats'][$field];
+                }
+            }
+        }
+
+        return $valuation;
     }
 
     private function comparableArray(mixed $value): array
