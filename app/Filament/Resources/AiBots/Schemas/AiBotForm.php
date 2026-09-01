@@ -76,6 +76,23 @@ class AiBotForm
                     ])
                     ->columns(2),
 
+                Section::make('Emlak AI API')
+                    ->description('Bu alan yalnızca bağımsız Emlak AI hesabı içindir. Anahtar WAI genel anahtarından ayrıdır.')
+                    ->icon('heroicon-o-key')
+                    ->visible(fn (?AiBot $record): bool => (int) ($record?->id ?? 0) === 35)
+                    ->schema([
+                        TextInput::make('openai_api_key')
+                            ->label('OpenAI API Anahtarı')
+                            ->password()
+                            ->revealable()
+                            ->autocomplete(false)
+                            ->formatStateUsing(fn (): string => '')
+                            ->dehydrated(fn (?string $state): bool => filled($state))
+                            ->helperText('Anahtarı yalnızca burada girin. Mevcut anahtar ekranda tekrar gösterilmez; alanı boş bırakırsanız kayıtlı anahtar değişmez.')
+                            ->placeholder('sk-proj-...')
+                            ->columnSpanFull(),
+                    ]),
+
                 Section::make('WhatsApp Grup Yönlendirme')
                     ->description('Tamamlanan finans başvurularını bağlı WhatsApp hesabınızdaki doğru gruplara otomatik yönlendirin.')
                     ->icon('heroicon-o-user-group')
@@ -182,6 +199,7 @@ class AiBotForm
                                 'support' => 'Müşteri Temsilcisi',
                                 'technical' => 'Teknik Destek',
                                 'assistant' => 'Sekreter / Asistan',
+                                'real_estate' => 'Gayrimenkul Danışmanı',
                             ])
                             ->required(),
 
