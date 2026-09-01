@@ -10,8 +10,10 @@ use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\CrmConversationSummaryService;
 use App\Services\CrmManagerSummaryService;
+use App\Services\FinanceLeadExtractorService;
 use App\Services\RealEstateAwareCrmConversationSummaryService;
 use App\Services\RealEstateAwareCrmManagerSummaryService;
+use App\Services\RealEstateAwareFinanceLeadExtractorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -140,6 +142,35 @@ class RealEstateSharedOpenAiFirewallTest extends TestCase
         $this->assertSame(0, (int) $summary->metrics['overdue_follow_ups']);
         $this->assertStringContainsString('Emlak AI', (string) $summary->summary);
         $this->assertStringContainsString('4.000.000,00 TL', (string) $summary->summary);
+    }
+
+    public function test_isolated_finance_extractor_is_hard_blocked_even_if_group_routing_is_misconfigured(): void
+    {
+        [, $bot] = $this->seedIsolatedTenant();
+        $bot->forceFill(['group_routing_enabled' => true])->save();
+
+        OpenAI::shouldReceive('responses')->never();
+
+        $service = app(FinanceLeadExtractorService::class);
+        $this->assertInstanceOf(RealEstateAwareFinanceLeadExtractorService::class, $service);
+
+        $result = $service->extract($bot, [[
+            'role' => 'user',
+            'content' => 'Adım Test, kredi başvurusu yapmak istiyorum.',
+        ]]);
+
+        $this->assertSame([
+            'type' => null,
+            'name' => null,
+            'phone' => null,
+            'city' => null,
+            'line_owner' => null,
+            'mother_maiden_surname' => null,
+            'limit_score' => null,
+            'birth_date' => null,
+            'tc_identity_number' => null,
+            'limit' => null,
+        ], $result);
     }
 
     public function test_scope_drift_blocks_shared_crm_openai_instead_of_falling_back(): void
