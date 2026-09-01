@@ -33,7 +33,7 @@ Artisan::command(
         if (! $delivery) {
             $this->error('İzole Emlak AI outbound kaydı bulunamadı.');
 
-            return self::FAILURE;
+            return 1;
         }
 
         $resolution = strtolower(trim((string) $this->argument('resolution')));
@@ -41,13 +41,13 @@ Artisan::command(
         if (! in_array($resolution, ['sent', 'abandoned'], true)) {
             $this->error('resolution yalnızca sent veya abandoned olabilir.');
 
-            return self::FAILURE;
+            return 1;
         }
 
         if (! in_array($delivery->status, ['sending', 'uncertain'], true)) {
             $this->error('Yalnız sending/uncertain kayıtlar manuel olarak çözülebilir.');
 
-            return self::FAILURE;
+            return 1;
         }
 
         if ($resolution === 'abandoned') {
@@ -58,7 +58,7 @@ Artisan::command(
 
             $this->info('Outbound kayıt abandoned olarak kapatıldı; hiçbir WhatsApp mesajı gönderilmedi.');
 
-            return self::SUCCESS;
+            return 0;
         }
 
         $providerId = trim((string) $this->option('provider-id'));
@@ -84,7 +84,7 @@ Artisan::command(
 
         $this->info('Outbound kayıt sent olarak doğrulandı; hiçbir yeni WhatsApp mesajı gönderilmedi.');
 
-        return self::SUCCESS;
+        return 0;
     }
 )->purpose('Resolve an isolated Emlak AI uncertain outbound without resending it.');
 
