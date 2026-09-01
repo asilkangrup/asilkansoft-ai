@@ -101,6 +101,10 @@ class MemoryService
                         );
                     }
 
+                    app(RealEstateVerificationService::class)->process(
+                        conversation: $conversation,
+                    );
+
                     app(RealEstateValuationService::class)->process(
                         conversation: $conversation,
                         message: $message,
@@ -110,7 +114,15 @@ class MemoryService
                         conversation: $conversation,
                     );
 
+                    app(RealEstateVerificationDecisionGuardService::class)->process(
+                        conversation: $conversation,
+                    );
+
                     app(RealEstateMatchService::class)->process(
+                        conversation: $conversation,
+                    );
+
+                    app(RealEstateMatchVerificationFilterService::class)->process(
                         conversation: $conversation,
                     );
                 }
@@ -180,6 +192,10 @@ class MemoryService
                         ),
                         trim(
                             app(RealEstateProfileService::class)
+                                ->promptFor($conversation)
+                        ),
+                        trim(
+                            app(RealEstateVerificationService::class)
                                 ->promptFor($conversation)
                         ),
                         trim(
