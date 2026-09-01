@@ -46,6 +46,7 @@ class RealEstateReadinessTest extends TestCase
             ->assertJsonPath('checks.durable_webhook_receipts_ready', true)
             ->assertJsonPath('checks.outbound_delivery_guard_ready', true)
             ->assertJsonPath('checks.operator_alert_queue_ready', true)
+            ->assertJsonPath('checks.evidence_quality_guard_ready', true)
             ->assertJsonPath('checks.openai_api_key_configured', true)
             ->assertJsonPath('checks.openai_api_key_encrypted_at_rest', true)
             ->assertJsonPath('checks.whatsapp_connected', true)
@@ -87,6 +88,7 @@ class RealEstateReadinessTest extends TestCase
             ->assertJsonPath('checks.durable_webhook_receipts_ready', true)
             ->assertJsonPath('checks.outbound_delivery_guard_ready', true)
             ->assertJsonPath('checks.operator_alert_queue_ready', true)
+            ->assertJsonPath('checks.evidence_quality_guard_ready', true)
             ->assertJsonPath('checks.openai_api_key_configured', false)
             ->assertJsonPath('checks.openai_api_key_encrypted_at_rest', false)
             ->assertJsonPath('checks.whatsapp_connected', false)
@@ -101,6 +103,7 @@ class RealEstateReadinessTest extends TestCase
         $this->assertContains('openai_api_key_encrypted_at_rest', $blocking);
         $this->assertContains('whatsapp_connected', $blocking);
         $this->assertNotContains('operator_alert_queue_ready', $blocking);
+        $this->assertNotContains('evidence_quality_guard_ready', $blocking);
         $this->assertNotContains('outbound_delivery_guard_ready', $blocking);
         $this->assertNotContains('unresolved_outbound_deliveries', $blocking);
         $this->assertNotContains('follow_ups_disabled', $blocking);
