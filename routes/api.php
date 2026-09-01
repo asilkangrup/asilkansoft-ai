@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\RealEstateWhatsAppWebhookController;
 use App\Http\Controllers\WhatsAppWebhookController;
+use App\Services\RealEstateEvidenceLedgerService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
 use App\Services\RealEstateReadinessService;
@@ -49,6 +50,8 @@ Route::prefix('real-estate')->group(function (): void {
         $snapshot = app(RealEstateReadinessService::class)->snapshot();
         $matchLedgerReady = Schema::hasTable('real_estate_match_events')
             && class_exists(RealEstateMatchLedgerService::class);
+        $evidenceLedgerReady = Schema::hasTable('real_estate_evidence_events')
+            && class_exists(RealEstateEvidenceLedgerService::class);
 
         $snapshot['checks']['match_ledger_ready'] = $matchLedgerReady;
         $snapshot['match_ledger_telemetry_24h'] = $matchLedgerReady
@@ -60,11 +63,29 @@ Route::prefix('real-estate')->group(function (): void {
                 'strong_activated' => 0,
                 'current_active_pairs' => 0,
             ];
+        $snapshot['checks']['evidence_ledger_ready'] = $evidenceLedgerReady;
+        $snapshot['evidence_ledger_telemetry_24h'] = $evidenceLedgerReady
+            ? app(RealEstateEvidenceLedgerService::class)->telemetry24h()
+            : [
+                'events' => 0,
+                'documentary' => 0,
+                'supporting' => 0,
+                'unknown' => 0,
+                'qualified_documentary' => 0,
+                'unique_profiles' => 0,
+            ];
 
-        if (! $matchLedgerReady) {
+        foreach ([
+            'match_ledger_ready' => $matchLedgerReady,
+            'evidence_ledger_ready' => $evidenceLedgerReady,
+        ] as $check => $ready) {
+            if ($ready) {
+                continue;
+            }
+
             $snapshot['blocking_checks'] = array_values(array_unique([
                 ...($snapshot['blocking_checks'] ?? []),
-                'match_ledger_ready',
+                $check,
             ]));
             $snapshot['ready_for_live_traffic'] = false;
         }
