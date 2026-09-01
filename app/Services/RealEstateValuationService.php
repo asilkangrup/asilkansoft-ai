@@ -13,12 +13,15 @@ class RealEstateValuationService
 {
     private const PRIMARY_USER_ID = 40;
 
+    private const PRIMARY_BOT_ID = 35;
+
     public function process(
         ConversationControl $conversation,
         string $message
     ): ?array {
         if (
             (int) $conversation->user_id !== self::PRIMARY_USER_ID
+            || (int) $conversation->ai_bot_id !== self::PRIMARY_BOT_ID
             || ! $this->valuationIntent($message)
         ) {
             return null;
@@ -26,13 +29,30 @@ class RealEstateValuationService
 
         $profile = RealEstateProfile::query()
             ->where('conversation_control_id', $conversation->id)
+            ->where('user_id', self::PRIMARY_USER_ID)
+            ->where('ai_bot_id', self::PRIMARY_BOT_ID)
             ->first();
 
         if (! $profile || ! $this->minimumDataAvailable($profile->data ?? [])) {
             return null;
         }
 
-        $aiBot = AiBot::query()->find($conversation->ai_bot_id);
+        $freshnessService = app(RealEstateValuationFreshnessService::class);
+        $freshness = $freshnessService->refreshMetadata($profile);
+
+        if (
+            ($freshness['usable_for_decision'] ?? false)
+            && ! $this->forceRefreshIntent($message)
+        ) {
+            return is_array($profile->fresh()->valuation)
+                ? $profile->fresh()->valuation
+                : null;
+        }
+
+        $aiBot = AiBot::query()
+            ->whereKey(self::PRIMARY_BOT_ID)
+            ->where('user_id', self::PRIMARY_USER_ID)
+            ->first();
 
         if (! $aiBot) {
             return null;
@@ -53,9 +73,10 @@ class RealEstateValuationService
                         'property_profile' => $profile->data ?? [],
                         'customer_question' => trim($message),
                         'previous_valuation' => $profile->valuation ?? [],
+                        'previous_freshness' => $freshness,
                     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 ]],
-                'max_output_tokens' => 1000,
+                'max_output_tokens' => 1500,
                 'tools' => [[
                     'type' => 'web_search_preview',
                 ]],
@@ -76,6 +97,8 @@ class RealEstateValuationService
                 meta: [
                     'conversation_control_id' => $conversation->id,
                     'dedicated_api_key' => true,
+                    'forced_refresh' => $this->forceRefreshIntent($message),
+                    'previous_freshness_status' => $freshness['status'] ?? null,
                 ],
             );
 
@@ -88,7 +111,10 @@ class RealEstateValuationService
                 return null;
             }
 
-            $valuation = $this->normalize($result);
+            $valuation = $freshnessService->stamp(
+                profile: $profile,
+                valuation: $this->normalize($result),
+            );
 
             $profile->update([
                 'valuation' => $valuation,
@@ -102,6 +128,8 @@ class RealEstateValuationService
         } catch (Throwable $exception) {
             Log::warning('REAL ESTATE VALUATION FAILED', [
                 'conversation_control_id' => $conversation->id,
+                'user_id' => self::PRIMARY_USER_ID,
+                'ai_bot_id' => self::PRIMARY_BOT_ID,
                 'message' => $exception->getMessage(),
             ]);
 
@@ -114,12 +142,36 @@ class RealEstateValuationService
     public function promptFor(
         ConversationControl $conversation
     ): string {
+        if (
+            (int) $conversation->user_id !== self::PRIMARY_USER_ID
+            || (int) $conversation->ai_bot_id !== self::PRIMARY_BOT_ID
+        ) {
+            return '';
+        }
+
         $profile = RealEstateProfile::query()
             ->where('conversation_control_id', $conversation->id)
+            ->where('user_id', self::PRIMARY_USER_ID)
+            ->where('ai_bot_id', self::PRIMARY_BOT_ID)
             ->first();
 
         if (! $profile || ! is_array($profile->valuation) || $profile->valuation === []) {
             return '';
+        }
+
+        $freshness = app(RealEstateValuationFreshnessService::class)->assess($profile);
+
+        if (! ($freshness['usable_for_decision'] ?? false)) {
+            $reasonJson = json_encode(
+                $freshness['reasons'] ?? [],
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            );
+
+            return <<<PROMPT
+[INTERNAL STALE REAL ESTATE VALUATION]
+Önceki bir değerleme kaydı var ancak artık güncel karar desteği için güvenilir kabul edilmemelidir. Eski fiyat aralıklarını müşteriye güncel gerçek gibi aktarma, eşleşme veya pazarlık ankrajı olarak kullanma. Yeni değerleme isteniyorsa güncel emsal araştırmasını yeniden çalıştır.
+Geçersizlik nedenleri: {$reasonJson}
+PROMPT;
         }
 
         $json = json_encode(
@@ -128,8 +180,8 @@ class RealEstateValuationService
         );
 
         return <<<PROMPT
-[INTERNAL REAL ESTATE VALUATION MEMORY]
-Aşağıdaki değerleme daha önce bu konuşmanın yapılandırılmış taşınmaz verisi ve gerektiğinde güncel web araştırması üzerinden üretilmiştir. Müşteriye dahili JSON'u gösterme. Yeni bilgi geldiyse eski değerlemeyi kesin gerçek gibi savunma; gerekirse yeniden değerlendir. İlan fiyatlarının gerçekleşmiş satış olmadığını hatırla.
+[INTERNAL FRESH REAL ESTATE VALUATION MEMORY]
+Aşağıdaki değerleme bu taşınmazın güncel yapılandırılmış verisiyle eşleşen, süre kontrollü araştırma kaydıdır. Müşteriye dahili JSON'u veya freshness alanlarını gösterme. İlan/emsal fiyatlarının gerçekleşmiş satış fiyatı olmadığını açıkça ayır. Kaynak ve emsal kalitesi düşükse kesinlik dilini azalt. Yeni temel taşınmaz bilgisi gelirse bu değerlemeyi otomatik olarak eski kabul et.
 Değerleme: {$json}
 PROMPT;
     }
@@ -162,24 +214,44 @@ PROMPT;
         return false;
     }
 
+    private function forceRefreshIntent(string $message): bool
+    {
+        $normalized = Str::lower($this->turkishNormalize($message));
+
+        foreach ([
+            'guncel', 'bugun', 'yeniden', 'tekrar arastir', 'tekrar bak',
+            'son durum', 'simdi ne kadar', 'su an ne kadar', 'yeni emsal',
+        ] as $signal) {
+            if (str_contains($normalized, $signal)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function instructions(): string
     {
         return <<<'PROMPT'
 Sen yalnızca Türkiye gayrimenkul değerleme araştırması yapan dahili bir analiz motorusun.
 Müşteriyle konuşma. JSON dışında metin yazma.
 
-Amaç: Verilen taşınmaz profiline göre mümkünse güncel kamuya açık web kaynaklarını araştırıp temkinli fiyat aralıkları üretmek.
+Amaç: Verilen taşınmaz profiline göre güncel kamuya açık web kaynaklarını araştırıp temkinli fiyat aralıkları ve doğrulanabilir emsal özeti üretmek.
 
 KURALLAR
 - Yetersiz veri varsa sayı uydurma; ilgili fiyat alanlarını null bırak.
-- İlan fiyatını gerçekleşmiş satış fiyatı gibi sunma.
-- Tek ilana dayanma. Mümkün olduğunda birden fazla güncel emsal veya bölgesel veri karşılaştır.
+- Web araştırması yapmadan güncel piyasa fiyatı üretme.
+- İlan fiyatını gerçekleşmiş satış fiyatı gibi sunma. comparables içindeki listing_price yalnızca ilan/istenen fiyatıdır.
+- Tek ilana dayanma. Mümkün olduğunda en az 2, tercihen 3+ güncel ve benzer emsal karşılaştır.
 - Taşınmazın imar/tapu/hukuki durumunu doğrulanmadıysa varsayma.
-- Çok geniş lokasyon veya yetersiz özellik varsa confidence_score düşük olsun.
+- Çok geniş lokasyon, az emsal veya yetersiz özellik varsa confidence_score düşük olsun.
 - Hızlı satış aralığı piyasa aralığından mantıksız biçimde yüksek olamaz.
 - Yatırımcı alım aralığı piyasa aralığından mantıksız biçimde yüksek olamaz.
-- Tüm fiyatlar TL ve tam sayısal değer olsun.
-- sources alanına yalnızca gerçekten araştırmada kullandığın kaynakların kısa adı veya URL'sini yaz; kaynak yoksa boş dizi.
+- Tüm fiyatlar TL ve sayısal değer olsun.
+- sources alanına yalnızca gerçekten araştırmada kullandığın URL veya kaynak adını yaz; kaynak kullanmadıysan boş dizi.
+- comparables alanına yalnızca gerçekten web araştırmasında gördüğün emsalleri ekle. URL, fiyat veya m² uydurma.
+- observed_at için kaynak sayfasında tarih açıkça görünüyorsa YYYY-MM-DD yaz, görünmüyorsa null bırak.
+- Aynı ilanı/URL'yi birden fazla emsal gibi çoğaltma.
 
 SADECE şu JSON yapısını döndür:
 {
@@ -195,14 +267,23 @@ SADECE şu JSON yapısını döndür:
   "next_best_action": null,
   "missing_data": [],
   "sources": [],
-  "researched_at": null
+  "comparables": [
+    {
+      "source": null,
+      "url": null,
+      "listing_price": null,
+      "area_sqm": null,
+      "location": null,
+      "property_type": null,
+      "observed_at": null
+    }
+  ]
 }
 
 confidence_score 0-100 arası tam sayı olsun.
-market_gap_percent yalnızca müşterinin asking_price bilgisi varsa, tahmini piyasa orta noktasına göre yaklaşık fark yüzdesi olsun.
+market_gap_percent yalnızca müşterinin asking_price bilgisi varsa tahmini piyasa orta noktasına göre yaklaşık fark yüzdesi olsun.
 summary kısa ve karar vermeye yarayan dahili özet olsun.
 next_best_action kısa bir sonraki pazarlık/araştırma aksiyonu olsun.
-researched_at bugünün YYYY-MM-DD tarihi olabilir.
 PROMPT;
     }
 
@@ -227,10 +308,118 @@ PROMPT;
         $result['summary'] = $this->nullableString($data['summary'] ?? null);
         $result['next_best_action'] = $this->nullableString($data['next_best_action'] ?? null);
         $result['missing_data'] = $this->stringArray($data['missing_data'] ?? []);
-        $result['sources'] = $this->stringArray($data['sources'] ?? []);
-        $result['researched_at'] = $this->nullableString($data['researched_at'] ?? null);
+        $result['comparables'] = $this->comparableArray($data['comparables'] ?? []);
+
+        $sources = $this->stringArray($data['sources'] ?? []);
+
+        foreach ($result['comparables'] as $comparable) {
+            if (filled($comparable['url'] ?? null)) {
+                $sources[] = $comparable['url'];
+            }
+        }
+
+        $result['sources'] = array_values(array_unique($sources));
+        $result['comparable_stats'] = $this->comparableStats($result['comparables']);
+        $result['research_basis'] = $result['sources'] === []
+            ? 'no_verified_sources'
+            : 'web_search';
 
         return $result;
+    }
+
+    private function comparableArray(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $result = [];
+
+        foreach (array_slice($value, 0, 8) as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $listingPrice = is_numeric($item['listing_price'] ?? null)
+                ? (float) $item['listing_price']
+                : null;
+            $area = is_numeric($item['area_sqm'] ?? null)
+                ? (float) $item['area_sqm']
+                : null;
+            $unitPrice = $listingPrice !== null
+                && $listingPrice > 0
+                && $area !== null
+                && $area > 0
+                    ? round($listingPrice / $area, 2)
+                    : null;
+
+            $comparable = [
+                'source' => $this->nullableString($item['source'] ?? null),
+                'url' => $this->nullableString($item['url'] ?? null),
+                'listing_price' => $listingPrice,
+                'area_sqm' => $area,
+                'unit_price_sqm' => $unitPrice,
+                'location' => $this->nullableString($item['location'] ?? null),
+                'property_type' => $this->nullableString($item['property_type'] ?? null),
+                'observed_at' => $this->nullableString($item['observed_at'] ?? null),
+                'price_basis' => 'asking',
+            ];
+
+            if (
+                $comparable['url'] === null
+                && $comparable['listing_price'] === null
+                && $comparable['location'] === null
+            ) {
+                continue;
+            }
+
+            $result[] = $comparable;
+        }
+
+        return collect($result)
+            ->unique(fn (array $item): string =>
+                (string) ($item['url'] ?? '')
+                .'|'.(string) ($item['listing_price'] ?? '')
+                .'|'.(string) ($item['location'] ?? '')
+            )
+            ->values()
+            ->all();
+    }
+
+    private function comparableStats(array $comparables): array
+    {
+        $unitPrices = collect($comparables)
+            ->pluck('unit_price_sqm')
+            ->filter(fn ($value): bool => is_numeric($value) && (float) $value > 0)
+            ->map(fn ($value): float => (float) $value)
+            ->sort()
+            ->values();
+
+        if ($unitPrices->isEmpty()) {
+            return [
+                'count' => count($comparables),
+                'priced_per_sqm_count' => 0,
+                'unit_price_min' => null,
+                'unit_price_median' => null,
+                'unit_price_max' => null,
+                'price_basis' => 'asking',
+            ];
+        }
+
+        $count = $unitPrices->count();
+        $middle = intdiv($count, 2);
+        $median = $count % 2 === 1
+            ? $unitPrices[$middle]
+            : (($unitPrices[$middle - 1] + $unitPrices[$middle]) / 2);
+
+        return [
+            'count' => count($comparables),
+            'priced_per_sqm_count' => $count,
+            'unit_price_min' => round((float) $unitPrices->first(), 2),
+            'unit_price_median' => round((float) $median, 2),
+            'unit_price_max' => round((float) $unitPrices->last(), 2),
+            'price_basis' => 'asking',
+        ];
     }
 
     private function nullableString(mixed $value): ?string
@@ -255,7 +444,7 @@ PROMPT;
             ->map(fn ($item): string => trim((string) $item))
             ->filter()
             ->unique()
-            ->take(10)
+            ->take(12)
             ->values()
             ->all();
     }
