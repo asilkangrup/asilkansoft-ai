@@ -35,6 +35,7 @@ class RealEstateReadinessService
             && class_exists(RealEstateOutboundDeliveryService::class);
         $operatorAlertQueueReady = Schema::hasTable('real_estate_operator_alerts')
             && class_exists(RealEstateOperatorAlertService::class);
+        $evidenceQualityGuardReady = class_exists(RealEstateEvidenceQualityService::class);
         $audioTranscriptionReady = $this->audioTranscriptionReady();
         $apiKeyConfigured = $botIdentityValid && filled($bot?->openai_api_key);
         $apiKeyEncryptedAtRest = $apiKeyConfigured && $this->apiKeyEncryptedAtRest();
@@ -80,6 +81,7 @@ class RealEstateReadinessService
             'durable_webhook_receipts_ready' => $durableWebhookReceiptsReady,
             'outbound_delivery_guard_ready' => $outboundDeliveryGuardReady,
             'operator_alert_queue_ready' => $operatorAlertQueueReady,
+            'evidence_quality_guard_ready' => $evidenceQualityGuardReady,
             'audio_transcription_ready' => $audioTranscriptionReady,
             'openai_api_key_configured' => $apiKeyConfigured,
             'openai_api_key_encrypted_at_rest' => $apiKeyEncryptedAtRest,
