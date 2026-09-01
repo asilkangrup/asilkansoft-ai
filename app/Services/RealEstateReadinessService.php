@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AiBot;
+use App\Models\ChatMessage;
 use App\Models\ConversationFollowUp;
 use App\Models\FinanceLead;
 use App\Models\Order;
@@ -26,6 +27,7 @@ class RealEstateReadinessService
         $organizationIdentityValid = $isolation->organizationValid();
         $webhookAuthConfigured = app(RealEstateWebhookAuthService::class)->configured();
         $durableWebhookReceiptsReady = Schema::hasTable('real_estate_webhook_receipts');
+        $audioTranscriptionReady = $this->audioTranscriptionReady();
         $apiKeyConfigured = $botIdentityValid && filled($bot?->openai_api_key);
         $apiKeyEncryptedAtRest = $apiKeyConfigured && $this->apiKeyEncryptedAtRest();
         $whatsappStatus = strtolower(trim((string) ($bot?->whatsapp_status ?? '')));
@@ -58,6 +60,7 @@ class RealEstateReadinessService
             'organization_identity_valid' => $organizationIdentityValid,
             'webhook_auth_configured' => $webhookAuthConfigured,
             'durable_webhook_receipts_ready' => $durableWebhookReceiptsReady,
+            'audio_transcription_ready' => $audioTranscriptionReady,
             'openai_api_key_configured' => $apiKeyConfigured,
             'openai_api_key_encrypted_at_rest' => $apiKeyEncryptedAtRest,
             'ai_enabled' => $aiEnabled,
@@ -103,6 +106,7 @@ class RealEstateReadinessService
             'checks' => $checks,
             'blocking_checks' => $blockingChecks,
             'webhook_telemetry_24h' => $this->webhookTelemetry($durableWebhookReceiptsReady),
+            'audio_telemetry_24h' => $this->audioTelemetry($audioTranscriptionReady),
         ];
     }
 
@@ -124,6 +128,30 @@ class RealEstateReadinessService
         } catch (Throwable) {
             return false;
         }
+    }
+
+    private function audioTranscriptionReady(): bool
+    {
+        if (! Schema::hasTable('chat_messages')) {
+            return false;
+        }
+
+        $columns = [
+            'media_transcript',
+            'media_transcription_status',
+            'media_transcription_model',
+            'media_transcription_language',
+            'media_transcribed_at',
+        ];
+
+        foreach ($columns as $column) {
+            if (! Schema::hasColumn('chat_messages', $column)) {
+                return false;
+            }
+        }
+
+        return method_exists(RealEstateOpenAIClient::class, 'transcribeAudio')
+            && class_exists(RealEstateAudioTranscriptionService::class);
     }
 
     private function webhookTelemetry(bool $tableReady): array
@@ -150,6 +178,42 @@ class RealEstateReadinessService
             'ignored' => (clone $base)->where('status', 'ignored')->count(),
             'failed' => (clone $base)->where('status', 'failed')->count(),
             'retried' => (clone $base)->where('attempts', '>', 1)->count(),
+        ];
+    }
+
+    private function audioTelemetry(bool $ready): array
+    {
+        if (! $ready) {
+            return [
+                'received' => 0,
+                'transcribed' => 0,
+                'failed' => 0,
+                'too_large' => 0,
+                'unsupported_format' => 0,
+            ];
+        }
+
+        $base = ChatMessage::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('message_type', 'audio')
+            ->where('created_at', '>=', now()->subDay());
+
+        return [
+            'received' => (clone $base)->count(),
+            'transcribed' => (clone $base)
+                ->where('media_transcription_status', 'transcribed')
+                ->count(),
+            'failed' => (clone $base)
+                ->where('media_transcription_status', 'failed')
+                ->count(),
+            'too_large' => (clone $base)
+                ->where('media_transcription_status', 'too_large')
+                ->count(),
+            'unsupported_format' => (clone $base)
+                ->where('media_transcription_status', 'unsupported_format')
+                ->count(),
         ];
     }
 }
