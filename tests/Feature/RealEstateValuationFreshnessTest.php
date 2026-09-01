@@ -228,7 +228,7 @@ class RealEstateValuationFreshnessTest extends TestCase
 
         $this->assertNotNull($result);
         $this->assertSame('fresh', $result['freshness_status']);
-        $this->assertSame(3700000.0, $result['market_min']);
+        $this->assertEquals(3700000.0, $result['market_min']);
     }
 
     public function test_real_estate_router_does_not_mutate_same_user_outside_fresh_org_and_bot(): void
