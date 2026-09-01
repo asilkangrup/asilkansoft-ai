@@ -44,6 +44,37 @@ class RealEstateIsolationService
             && (int) $conversation->ai_bot_id === self::BOT_ID;
     }
 
+    /**
+     * Any code path that sees the fresh Emlak AI bot identity must refuse the
+     * shared/global WAI OpenAI client, even if the WhatsApp instance has not yet
+     * been connected or has temporarily drifted from its expected value.
+     */
+    public function dedicatedOpenAiOnlyForBot(?AiBot $bot): bool
+    {
+        return $this->supportsBotIdentity($bot);
+    }
+
+    /**
+     * Conversation-level firewall intentionally keys on user+bot first. A bad
+     * or missing organization id must never become a reason to fall through to
+     * the shared/global OpenAI client.
+     */
+    public function dedicatedOpenAiOnlyForConversation(
+        ?ConversationControl $conversation
+    ): bool {
+        if (! $conversation) {
+            return false;
+        }
+
+        return (int) $conversation->user_id === self::USER_ID
+            && (int) $conversation->ai_bot_id === self::BOT_ID;
+    }
+
+    public function isIsolatedUserId(int $userId): bool
+    {
+        return $userId === self::USER_ID;
+    }
+
     public function organizationValid(): bool
     {
         return Organization::query()
