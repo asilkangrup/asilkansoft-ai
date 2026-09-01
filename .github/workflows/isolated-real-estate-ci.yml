@@ -76,4 +76,5 @@ jobs:
           php artisan test \
             tests/Feature/RealEstateReadinessTest.php \
             tests/Feature/RealEstateInboundResilienceTest.php \
-            tests/Feature/RealEstateOutboundDeliveryGuardTest.php
+            tests/Feature/RealEstateOutboundDeliveryGuardTest.php \
+            tests/Feature/RealEstateEvidenceReconciliationTest.php
