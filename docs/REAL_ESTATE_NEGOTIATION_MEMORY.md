@@ -16,7 +16,7 @@ For seller profiles:
 
 - asking-price changes;
 - seller minimum-price changes;
-- urgency changes.
+- urgency changes when explicitly supported by the message.
 
 For investor/buyer profiles:
 
@@ -33,11 +33,12 @@ A negotiation event may be created only when all of the following are true:
 
 1. the profile belongs to the isolated production identity;
 2. the conversation also matches the isolated production identity;
-3. a real customer-authored chat message exists for that conversation;
-4. that customer message is recent enough to be the source of the profile update;
-5. the structured value differs from the last stored position.
+3. the currently processed inbound `ChatMessage` is explicitly passed to the negotiation service;
+4. that message belongs to user 40 / organization 37 / bot 35 / the same conversation and has `role=user`, `sender_type=customer`;
+5. the structured numeric or text position is actually supported by the current customer message (or its audio transcript);
+6. the structured value differs from the last stored position.
 
-Background recalculations, operator-side profile saves, assistant messages, verification updates, valuation refreshes, and match rebuilds cannot manufacture a new customer price position without a recent customer source message.
+This is intentionally stricter than looking for the “latest recent message.” Background recalculations, operator-side profile saves, assistant messages, verification updates, valuation refreshes, and match rebuilds receive no explicit customer source and therefore cannot manufacture a new customer price position. A phone number or unrelated numeric value also cannot prove a price position; price/budget values must match supported price formats such as `5 milyon`, `4,5 milyon`, `4.500.000`, or equivalent bounded numeric forms.
 
 ## Confidential seller floor
 
@@ -83,6 +84,8 @@ This feature does not write `next_follow_up_at`, does not enable either bot foll
 - durable seller asking/floor trajectory;
 - confidentiality of the seller floor;
 - investor budget/term trajectory;
+- explicit source-message evidence for every recorded position;
+- rejection of profile values not actually supported by the customer message;
 - idempotence under background profile recalculation;
 - no raw phone/message leakage in AI memory;
 - hard isolation from non-production users/bots;
