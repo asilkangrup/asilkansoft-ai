@@ -101,6 +101,10 @@ class MemoryService
                         );
                     }
 
+                    app(RealEstateVerificationService::class)->process(
+                        conversation: $conversation,
+                    );
+
                     app(RealEstateValuationService::class)->process(
                         conversation: $conversation,
                         message: $message,
@@ -180,6 +184,10 @@ class MemoryService
                         ),
                         trim(
                             app(RealEstateProfileService::class)
+                                ->promptFor($conversation)
+                        ),
+                        trim(
+                            app(RealEstateVerificationService::class)
                                 ->promptFor($conversation)
                         ),
                         trim(
