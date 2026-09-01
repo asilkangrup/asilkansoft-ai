@@ -11,26 +11,22 @@ use Throwable;
 
 class RealEstateValuationService
 {
-    private const PRIMARY_USER_ID = 40;
-
-    private const PRIMARY_BOT_ID = 35;
-
     public function process(
         ConversationControl $conversation,
         string $message
     ): ?array {
+        $isolation = app(RealEstateIsolationService::class);
+
         if (
-            (int) $conversation->user_id !== self::PRIMARY_USER_ID
-            || (int) $conversation->ai_bot_id !== self::PRIMARY_BOT_ID
+            ! $isolation->supportsConversation($conversation)
             || ! $this->valuationIntent($message)
         ) {
             return null;
         }
 
         $profile = RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::PRIMARY_USER_ID)
-            ->where('ai_bot_id', self::PRIMARY_BOT_ID)
             ->first();
 
         if (! $profile || ! $this->minimumDataAvailable($profile->data ?? [])) {
@@ -50,11 +46,11 @@ class RealEstateValuationService
         }
 
         $aiBot = AiBot::query()
-            ->whereKey(self::PRIMARY_BOT_ID)
-            ->where('user_id', self::PRIMARY_USER_ID)
+            ->whereKey(RealEstateIsolationService::BOT_ID)
+            ->where('user_id', RealEstateIsolationService::USER_ID)
             ->first();
 
-        if (! $aiBot) {
+        if (! $isolation->supportsProductionBot($aiBot)) {
             return null;
         }
 
@@ -128,8 +124,9 @@ class RealEstateValuationService
         } catch (Throwable $exception) {
             Log::warning('REAL ESTATE VALUATION FAILED', [
                 'conversation_control_id' => $conversation->id,
-                'user_id' => self::PRIMARY_USER_ID,
-                'ai_bot_id' => self::PRIMARY_BOT_ID,
+                'user_id' => RealEstateIsolationService::USER_ID,
+                'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+                'ai_bot_id' => RealEstateIsolationService::BOT_ID,
                 'message' => $exception->getMessage(),
             ]);
 
@@ -142,17 +139,13 @@ class RealEstateValuationService
     public function promptFor(
         ConversationControl $conversation
     ): string {
-        if (
-            (int) $conversation->user_id !== self::PRIMARY_USER_ID
-            || (int) $conversation->ai_bot_id !== self::PRIMARY_BOT_ID
-        ) {
+        if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return '';
         }
 
         $profile = RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::PRIMARY_USER_ID)
-            ->where('ai_bot_id', self::PRIMARY_BOT_ID)
             ->first();
 
         if (! $profile || ! is_array($profile->valuation) || $profile->valuation === []) {
