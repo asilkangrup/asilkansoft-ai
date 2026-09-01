@@ -36,6 +36,21 @@ class ConversationFollowUp extends Model
         'is_active' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (ConversationFollowUp $followUp): void {
+            // Emlak AI için otomatik takip mesajı ürün gereği kesinlikle yasaktır.
+            // Yanlış panel ayarı veya başka bir ortak WAI akışı aktif kayıt üretmeye
+            // çalışsa dahi kayıt gönderilebilir duruma gelemez.
+            if (
+                (int) $followUp->user_id === 40
+                && (int) $followUp->ai_bot_id === 35
+            ) {
+                $followUp->is_active = false;
+            }
+        });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
