@@ -24,7 +24,8 @@ class MemoryService
         string $role,
         string $message,
         ?string $senderType = null,
-        ?int $sentByUserId = null
+        ?int $sentByUserId = null,
+        array $mediaContext = []
     ): ChatMessage {
         if ($senderType === null) {
             $senderType =
@@ -55,6 +56,13 @@ class MemoryService
             'sender_type' => $senderType,
             'sent_by_user_id' => $sentByUserId,
             'message' => trim($message),
+            'message_type' => $mediaContext['type'] ?? 'text',
+            'media_url' => $mediaContext['url'] ?? null,
+            'media_mime_type' => $mediaContext['mime_type'] ?? null,
+            'media_filename' => $mediaContext['filename'] ?? null,
+            'media_caption' => $mediaContext['caption'] ?? null,
+            'whatsapp_message_id' => $mediaContext['message_id'] ?? null,
+            'status' => $senderType === 'customer' ? 'received' : null,
         ]);
 
         if (
@@ -79,6 +87,17 @@ class MemoryService
                         conversation: $conversation,
                         message: $message,
                     );
+
+                    if (
+                        $mediaContext !== []
+                        && filled($mediaContext['instance_name'] ?? null)
+                    ) {
+                        app(RealEstateMediaAnalysisService::class)->process(
+                            conversation: $conversation,
+                            instanceName: (string) $mediaContext['instance_name'],
+                            mediaContext: $mediaContext,
+                        );
+                    }
 
                     app(RealEstateValuationService::class)->process(
                         conversation: $conversation,
