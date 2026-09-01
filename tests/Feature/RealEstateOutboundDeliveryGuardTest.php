@@ -11,6 +11,7 @@ use App\Services\MemoryService;
 use App\Services\RealEstateOutboundDeliveryService;
 use App\Services\RealEstateWhatsAppInboundService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -150,6 +151,7 @@ class RealEstateOutboundDeliveryGuardTest extends TestCase
     public function test_inbound_without_message_id_is_ignored_before_ai_or_delivery(): void
     {
         $this->seedScope();
+        Http::fake();
 
         $result = app(RealEstateWhatsAppInboundService::class)->process([
             'event' => 'messages.upsert',
@@ -170,6 +172,38 @@ class RealEstateOutboundDeliveryGuardTest extends TestCase
         $this->assertSame('missing_message_id', $result['reason']);
         $this->assertSame(0, RealEstateOutboundDelivery::query()->count());
         $this->assertSame(0, ChatMessage::query()->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_uncertain_delivery_can_be_abandoned_without_resending(): void
+    {
+        $this->seedScope();
+        Http::fake();
+
+        $delivery = RealEstateOutboundDelivery::query()->create([
+            'user_id' => 40,
+            'organization_id' => 37,
+            'ai_bot_id' => 35,
+            'instance' => 'emlak-ai-35',
+            'delivery_key' => hash('sha256', 'emlak-ai-35|manual-resolution-1'),
+            'inbound_whatsapp_message_id' => 'manual-resolution-1',
+            'session_id' => 'whatsapp:35:905550000005',
+            'phone_number' => '905550000005',
+            'answer_hash' => hash('sha256', 'Belirsiz teslim edilmiş cevap.'),
+            'answer' => 'Belirsiz teslim edilmiş cevap.',
+            'status' => 'uncertain',
+            'attempts' => 1,
+            'sending_started_at' => now(),
+        ]);
+
+        $exit = Artisan::call('real-estate:resolve-outbound', [
+            'id' => $delivery->id,
+            'resolution' => 'abandoned',
+        ]);
+
+        $this->assertSame(0, $exit);
+        $this->assertSame('abandoned', $delivery->fresh()->status);
+        $this->assertNull($delivery->fresh()->sent_at);
         Http::assertNothingSent();
     }
 
