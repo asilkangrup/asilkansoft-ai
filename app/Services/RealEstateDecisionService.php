@@ -7,17 +7,16 @@ use App\Models\RealEstateProfile;
 
 class RealEstateDecisionService
 {
-    private const REAL_ESTATE_USER_ID = 40;
-
     private const STATE_TAG_PREFIX = 'real_estate:state:';
 
     public function process(ConversationControl $conversation): ?array
     {
-        if ((int) $conversation->user_id !== self::REAL_ESTATE_USER_ID) {
+        if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return null;
         }
 
         $profile = RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
             ->first();
 
@@ -65,11 +64,12 @@ class RealEstateDecisionService
 
     public function promptFor(ConversationControl $conversation): string
     {
-        if ((int) $conversation->user_id !== self::REAL_ESTATE_USER_ID) {
+        if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return '';
         }
 
         $profile = RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
             ->first();
 
