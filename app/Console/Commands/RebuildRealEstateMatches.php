@@ -21,10 +21,6 @@ use Throwable;
 #[Description('İzole Emlak AI hesabında değerleme tazeliği, doğrulama/risk kontrolü ve güvenli satıcı-yatırımcı eşleşmelerini yeniden hesaplar.')]
 class RebuildRealEstateMatches extends Command
 {
-    private const REAL_ESTATE_USER_ID = 40;
-
-    private const REAL_ESTATE_BOT_ID = 35;
-
     public function handle(
         RealEstateValuationFreshnessService $valuationFreshnessService,
         RealEstateDecisionService $decisionService,
@@ -38,9 +34,8 @@ class RebuildRealEstateMatches extends Command
         $limit = max(1, min(5000, (int) $this->option('limit')));
 
         $profiles = RealEstateProfile::query()
+            ->isolatedProduction()
             ->with('conversation')
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
             ->whereIn('profile_type', ['seller', 'investor', 'buyer'])
             ->orderByDesc('id')
             ->limit($limit)
