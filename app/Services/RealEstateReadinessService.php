@@ -7,6 +7,7 @@ use App\Models\ChatMessage;
 use App\Models\ConversationFollowUp;
 use App\Models\FinanceLead;
 use App\Models\Order;
+use App\Models\RealEstateOperatorAlert;
 use App\Models\RealEstateOutboundDelivery;
 use App\Models\RealEstateWebhookReceipt;
 use Illuminate\Support\Facades\Crypt;
@@ -32,6 +33,8 @@ class RealEstateReadinessService
         $durableWebhookReceiptsReady = Schema::hasTable('real_estate_webhook_receipts');
         $outboundDeliveryGuardReady = Schema::hasTable('real_estate_outbound_deliveries')
             && class_exists(RealEstateOutboundDeliveryService::class);
+        $operatorAlertQueueReady = Schema::hasTable('real_estate_operator_alerts')
+            && class_exists(RealEstateOperatorAlertService::class);
         $audioTranscriptionReady = $this->audioTranscriptionReady();
         $apiKeyConfigured = $botIdentityValid && filled($bot?->openai_api_key);
         $apiKeyEncryptedAtRest = $apiKeyConfigured && $this->apiKeyEncryptedAtRest();
@@ -76,6 +79,7 @@ class RealEstateReadinessService
             'webhook_auth_configured' => $webhookAuthConfigured,
             'durable_webhook_receipts_ready' => $durableWebhookReceiptsReady,
             'outbound_delivery_guard_ready' => $outboundDeliveryGuardReady,
+            'operator_alert_queue_ready' => $operatorAlertQueueReady,
             'audio_transcription_ready' => $audioTranscriptionReady,
             'openai_api_key_configured' => $apiKeyConfigured,
             'openai_api_key_encrypted_at_rest' => $apiKeyEncryptedAtRest,
@@ -125,6 +129,7 @@ class RealEstateReadinessService
             'blocking_checks' => $blockingChecks,
             'webhook_telemetry_24h' => $this->webhookTelemetry($durableWebhookReceiptsReady),
             'outbound_telemetry_24h' => $this->outboundTelemetry($outboundDeliveryGuardReady),
+            'operator_alert_telemetry' => $this->operatorAlertTelemetry($operatorAlertQueueReady),
             'audio_telemetry_24h' => $this->audioTelemetry($audioTranscriptionReady),
         ];
     }
@@ -228,6 +233,47 @@ class RealEstateReadinessService
             'sent' => (clone $base)->where('status', 'sent')->count(),
             'uncertain' => (clone $base)->where('status', 'uncertain')->count(),
             'network_retries' => (clone $base)->where('attempts', '>', 1)->count(),
+        ];
+    }
+
+    private function operatorAlertTelemetry(bool $ready): array
+    {
+        if (! $ready) {
+            return [
+                'open' => 0,
+                'critical_open' => 0,
+                'high_open' => 0,
+                'medium_open' => 0,
+                'opened_24h' => 0,
+                'resolved_24h' => 0,
+            ];
+        }
+
+        $base = RealEstateOperatorAlert::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID);
+
+        return [
+            'open' => (clone $base)->where('status', 'open')->count(),
+            'critical_open' => (clone $base)
+                ->where('status', 'open')
+                ->where('severity', 'critical')
+                ->count(),
+            'high_open' => (clone $base)
+                ->where('status', 'open')
+                ->where('severity', 'high')
+                ->count(),
+            'medium_open' => (clone $base)
+                ->where('status', 'open')
+                ->where('severity', 'medium')
+                ->count(),
+            'opened_24h' => (clone $base)
+                ->where('opened_at', '>=', now()->subDay())
+                ->count(),
+            'resolved_24h' => (clone $base)
+                ->where('resolved_at', '>=', now()->subDay())
+                ->count(),
         ];
     }
 
