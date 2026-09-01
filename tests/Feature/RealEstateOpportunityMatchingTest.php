@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AiBot;
 use App\Models\ConversationControl;
+use App\Models\Organization;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\RealEstateMatchService;
@@ -299,6 +300,14 @@ class RealEstateOpportunityMatchingTest extends TestCase
             'name' => 'Emlak AI',
             'email' => 'emlak-match@example.test',
             'password' => Hash::make('test-password'),
+        ]);
+
+        Organization::query()->forceCreate([
+            'id' => 37,
+            'owner_user_id' => 40,
+            'name' => 'Emlak AI',
+            'slug' => 'emlak-match-isolated',
+            'status' => 'active',
         ]);
 
         return AiBot::query()->forceCreate([
