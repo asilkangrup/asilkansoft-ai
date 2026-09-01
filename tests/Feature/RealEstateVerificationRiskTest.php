@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AiBot;
 use App\Models\ConversationControl;
+use App\Models\Organization;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\RealEstateMatchVerificationFilterService;
@@ -250,6 +251,14 @@ class RealEstateVerificationRiskTest extends TestCase
             'name' => 'Emlak AI',
             'email' => 'verification@example.test',
             'password' => Hash::make('test-password'),
+        ]);
+
+        Organization::query()->forceCreate([
+            'id' => 37,
+            'owner_user_id' => 40,
+            'name' => 'Emlak AI',
+            'slug' => 'verification-risk-isolated',
+            'status' => 'active',
         ]);
 
         return AiBot::query()->forceCreate([
