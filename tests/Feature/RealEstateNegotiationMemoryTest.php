@@ -22,29 +22,23 @@ class RealEstateNegotiationMemoryTest extends TestCase
     {
         $bot = $this->seedIsolatedAccount();
         $conversation = $this->conversation($bot, 'negotiation-seller');
+        $service = app(RealEstateNegotiationMemoryService::class);
 
-        $this->customerMessage(
+        $firstMessage = $this->customerMessage(
             $conversation,
             'İstediğim fiyat 5 milyon, 4.5 milyonun altında düşünmüyorum. Telefonum 05550000000.'
         );
 
-        $profile = RealEstateProfile::query()->create([
-            'conversation_control_id' => $conversation->id,
-            'user_id' => 40,
-            'ai_bot_id' => 35,
-            'profile_type' => 'seller',
-            'data' => [
-                'property_type' => 'arsa',
-                'city' => 'Muğla',
-                'district' => 'Marmaris',
-                'asking_price' => 5000000,
-                'minimum_price' => 4500000,
-                'urgency' => 'medium',
-            ],
-            'valuation' => [],
-            'completeness_score' => 85,
-            'confidence_score' => 80,
+        $profile = $this->profile($conversation, 'seller', [
+            'property_type' => 'arsa',
+            'city' => 'Muğla',
+            'district' => 'Marmaris',
+            'asking_price' => 5000000,
+            'minimum_price' => 4500000,
+            'urgency' => 'medium',
         ]);
+
+        $service->sync($profile, $firstMessage);
 
         $this->assertDatabaseHas('real_estate_negotiation_events', [
             'user_id' => 40,
@@ -63,8 +57,10 @@ class RealEstateNegotiationMemoryTest extends TestCase
         $this->assertSame('4500000.00', $floor->numeric_value);
         $this->assertTrue((bool) $floor->metadata['confidential']);
         $this->assertTrue((bool) $floor->metadata['customer_sourced']);
+        $this->assertSame('explicit_customer_message', $floor->metadata['source_evidence']);
+        $this->assertSame($firstMessage->id, $floor->source_chat_message_id);
 
-        $this->customerMessage(
+        $secondMessage = $this->customerMessage(
             $conversation,
             'Piyasayı düşündüm, ilanı 4.6 milyona çekebilirim; alt sınırım 4 milyon olsun.'
         );
@@ -74,8 +70,8 @@ class RealEstateNegotiationMemoryTest extends TestCase
         $data['minimum_price'] = 4000000;
         $data['urgency'] = 'high';
         $profile->update(['data' => $data]);
+        $service->sync($profile->fresh(), $secondMessage);
 
-        $service = app(RealEstateNegotiationMemoryService::class);
         $summary = $service->summaryForProfile($profile->fresh());
 
         $this->assertSame(-8.0, $summary['seller_asking_trajectory_percent']);
@@ -93,6 +89,7 @@ class RealEstateNegotiationMemoryTest extends TestCase
         $data = $profile->fresh()->data;
         $data['decision_intelligence'] = ['lead_score' => 91];
         $profile->update(['data' => $data]);
+        $service->sync($profile->fresh());
 
         $this->assertSame(
             $eventCount,
@@ -120,39 +117,44 @@ class RealEstateNegotiationMemoryTest extends TestCase
             'negotiation-investor',
             ['business:real_estate_investor']
         );
+        $service = app(RealEstateNegotiationMemoryService::class);
 
-        $this->customerMessage(
+        $firstMessage = $this->customerMessage(
             $conversation,
             'Maksimum bütçem 5 milyon, nakit alırım ve bu ay içinde işlem yaparım.'
         );
 
-        $profile = RealEstateProfile::query()->create([
-            'conversation_control_id' => $conversation->id,
-            'user_id' => 40,
-            'ai_bot_id' => 35,
-            'profile_type' => 'investor',
-            'data' => [
-                'city' => 'Muğla',
-                'property_type' => 'arsa',
-                'budget_max' => 5000000,
-                'financing' => 'cash',
-                'timeline' => 'bu ay',
-            ],
-            'valuation' => [],
-            'completeness_score' => 80,
-            'confidence_score' => 80,
+        $profile = $this->profile($conversation, 'investor', [
+            'city' => 'Muğla',
+            'property_type' => 'arsa',
+            'budget_max' => 5000000,
+            'financing' => 'cash',
+            'timeline' => 'bu ay',
         ]);
 
-        $this->customerMessage(
+        $service->sync($profile, $firstMessage);
+
+        $this->assertDatabaseHas('real_estate_negotiation_events', [
+            'real_estate_profile_id' => $profile->id,
+            'event_type' => 'investor_financing',
+            'text_value' => 'cash',
+        ]);
+        $this->assertDatabaseHas('real_estate_negotiation_events', [
+            'real_estate_profile_id' => $profile->id,
+            'event_type' => 'investor_timeline',
+            'text_value' => 'bu ay',
+        ]);
+
+        $secondMessage = $this->customerMessage(
             $conversation,
             'Uygun fırsatsa 5.5 milyona kadar çıkabilirim ama yine nakit alacağım.'
         );
         $data = $profile->fresh()->data;
         $data['budget_max'] = 5500000;
         $profile->update(['data' => $data]);
+        $service->sync($profile->fresh(), $secondMessage);
 
-        $summary = app(RealEstateNegotiationMemoryService::class)
-            ->summaryForProfile($profile->fresh());
+        $summary = $service->summaryForProfile($profile->fresh());
 
         $this->assertSame(10.0, $summary['investor_budget_max_trajectory_percent']);
         $this->assertSame('up', $summary['latest_positions']['investor_budget_max']['direction']);
@@ -161,24 +163,16 @@ class RealEstateNegotiationMemoryTest extends TestCase
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
-    public function test_background_profile_recalculation_without_a_recent_customer_message_cannot_invent_negotiation_events(): void
+    public function test_background_profile_recalculation_without_explicit_customer_source_cannot_invent_negotiation_events(): void
     {
         $bot = $this->seedIsolatedAccount();
         $conversation = $this->conversation($bot, 'negotiation-background');
-
-        $profile = RealEstateProfile::query()->create([
-            'conversation_control_id' => $conversation->id,
-            'user_id' => 40,
-            'ai_bot_id' => 35,
-            'profile_type' => 'seller',
-            'data' => [
-                'asking_price' => 7000000,
-                'minimum_price' => 6500000,
-            ],
-            'valuation' => [],
-            'completeness_score' => 40,
-            'confidence_score' => 40,
+        $profile = $this->profile($conversation, 'seller', [
+            'asking_price' => 7000000,
+            'minimum_price' => 6500000,
         ]);
+
+        app(RealEstateNegotiationMemoryService::class)->sync($profile);
 
         $this->assertSame(
             0,
@@ -189,6 +183,32 @@ class RealEstateNegotiationMemoryTest extends TestCase
         $this->assertArrayNotHasKey(
             'negotiation_memory_intelligence',
             $profile->fresh()->data
+        );
+    }
+
+    public function test_profile_value_not_explicitly_supported_by_source_message_is_not_recorded(): void
+    {
+        $bot = $this->seedIsolatedAccount();
+        $conversation = $this->conversation($bot, 'negotiation-evidence');
+        $sourceMessage = $this->customerMessage(
+            $conversation,
+            'Arsa Marmaris Hisarönü tarafında, konum linkini birazdan yollayacağım. Telefonum 05555000000.'
+        );
+        $profile = $this->profile($conversation, 'seller', [
+            'property_type' => 'arsa',
+            'city' => 'Muğla',
+            'district' => 'Marmaris',
+            'asking_price' => 5000000,
+            'minimum_price' => 4500000,
+        ]);
+
+        app(RealEstateNegotiationMemoryService::class)->sync($profile, $sourceMessage);
+
+        $this->assertSame(
+            0,
+            RealEstateNegotiationEvent::query()
+                ->where('real_estate_profile_id', $profile->id)
+                ->count()
         );
     }
 
@@ -223,7 +243,7 @@ class RealEstateNegotiationMemoryTest extends TestCase
             'lead_status' => 'new',
             'next_follow_up_at' => null,
         ]);
-        ChatMessage::query()->create([
+        $sourceMessage = ChatMessage::query()->create([
             'user_id' => $otherUser->id,
             'organization_id' => $otherOrganization->id,
             'ai_bot_id' => $otherBot->id,
@@ -245,7 +265,8 @@ class RealEstateNegotiationMemoryTest extends TestCase
             'confidence_score' => 30,
         ]);
 
-        $summary = app(RealEstateNegotiationMemoryService::class)->sync($profile);
+        $summary = app(RealEstateNegotiationMemoryService::class)
+            ->sync($profile, $sourceMessage);
 
         $this->assertSame([], $summary);
         $this->assertSame(0, RealEstateNegotiationEvent::query()->count());
@@ -319,6 +340,23 @@ class RealEstateNegotiationMemoryTest extends TestCase
             'message' => $message,
             'message_type' => 'text',
             'status' => 'received',
+        ]);
+    }
+
+    private function profile(
+        ConversationControl $conversation,
+        string $type,
+        array $data
+    ): RealEstateProfile {
+        return RealEstateProfile::query()->create([
+            'conversation_control_id' => $conversation->id,
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'profile_type' => $type,
+            'data' => $data,
+            'valuation' => [],
+            'completeness_score' => 80,
+            'confidence_score' => 80,
         ]);
     }
 }
