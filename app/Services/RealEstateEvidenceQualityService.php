@@ -139,6 +139,25 @@ class RealEstateEvidenceQualityService
             return 'unknown';
         }
 
+        // Supporting-media markers take precedence. A listing screenshot that
+        // happens to contain words such as "parsel" or "tapu" must never be
+        // promoted to documentary evidence by keyword overlap.
+        foreach ([
+            'ilan',
+            'listing',
+            'screenshot',
+            'ekran goruntusu',
+            'foto',
+            'photo',
+            'harita',
+            'map',
+            'konum',
+        ] as $signal) {
+            if (str_contains($documentType, $signal)) {
+                return 'supporting';
+            }
+        }
+
         foreach ([
             'tapu',
             'title deed',
@@ -153,22 +172,6 @@ class RealEstateEvidenceQualityService
         ] as $signal) {
             if (str_contains($documentType, $signal)) {
                 return 'documentary';
-            }
-        }
-
-        foreach ([
-            'ilan',
-            'listing',
-            'screenshot',
-            'ekran goruntusu',
-            'foto',
-            'photo',
-            'harita',
-            'map',
-            'konum',
-        ] as $signal) {
-            if (str_contains($documentType, $signal)) {
-                return 'supporting';
             }
         }
 
