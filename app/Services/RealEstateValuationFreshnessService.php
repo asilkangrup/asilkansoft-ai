@@ -19,6 +19,10 @@ class RealEstateValuationFreshnessService
 
     private const MIN_MATCH_CONFIDENCE = 55;
 
+    private const MIN_DECISION_COMPARABLES = 1;
+
+    private const MIN_MATCH_COMPARABLES = 2;
+
     private const FINGERPRINT_FIELDS = [
         'property_type',
         'city',
@@ -215,6 +219,10 @@ class RealEstateValuationFreshnessService
             $reasons[] = 'missing_sources';
         }
 
+        if ($comparableCount < self::MIN_DECISION_COMPARABLES) {
+            $reasons[] = 'missing_comparables';
+        }
+
         if ($confidence < self::MIN_DECISION_CONFIDENCE) {
             $reasons[] = 'low_confidence';
         }
@@ -224,12 +232,13 @@ class RealEstateValuationFreshnessService
         $usableForDecision = $status === 'fresh';
         $usableForMatching = $usableForDecision
             && $confidence >= self::MIN_MATCH_CONFIDENCE
-            && $sourceCount >= 1;
+            && $sourceCount >= 1
+            && $comparableCount >= self::MIN_MATCH_COMPARABLES;
 
         $quality = match (true) {
             ! $usableForDecision => 'insufficient',
             $sourceCount >= 3 && $comparableCount >= 3 && $confidence >= 75 => 'high',
-            $sourceCount >= 2 && $confidence >= 60 => 'medium',
+            $sourceCount >= 2 && $comparableCount >= 2 && $confidence >= 60 => 'medium',
             default => 'low',
         };
 
