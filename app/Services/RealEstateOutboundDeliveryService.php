@@ -154,19 +154,20 @@ class RealEstateOutboundDeliveryService
     ): ?ChatMessage {
         $this->assertDeliveryScope($delivery);
 
-        if (
-            $delivery->status !== 'sent'
-            || blank($delivery->whatsapp_message_id)
-        ) {
+        if ($delivery->status !== 'sent') {
             return null;
         }
+
+        $messageId = filled($delivery->whatsapp_message_id)
+            ? (string) $delivery->whatsapp_message_id
+            : 'real-estate-outbound:'.$delivery->delivery_key;
 
         return ChatMessage::query()->firstOrCreate(
             [
                 'user_id' => RealEstateIsolationService::USER_ID,
                 'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
                 'ai_bot_id' => RealEstateIsolationService::BOT_ID,
-                'whatsapp_message_id' => (string) $delivery->whatsapp_message_id,
+                'whatsapp_message_id' => $messageId,
             ],
             [
                 'session_id' => $delivery->session_id,
