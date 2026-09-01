@@ -10,18 +10,16 @@ use Throwable;
 
 class RealEstateMediaAnalysisService
 {
-    private const PRIMARY_USER_ID = 40;
-
-    private const PRIMARY_BOT_ID = 35;
-
     public function process(
         ConversationControl $conversation,
         string $instanceName,
         array $mediaContext
     ): ?array {
+        $isolation = app(RealEstateIsolationService::class);
+
         if (
-            (int) $conversation->user_id !== self::PRIMARY_USER_ID
-            || (int) $conversation->ai_bot_id !== self::PRIMARY_BOT_ID
+            ! $isolation->supportsConversation($conversation)
+            || trim($instanceName) !== RealEstateIsolationService::INSTANCE
         ) {
             return null;
         }
@@ -52,19 +50,21 @@ class RealEstateMediaAnalysisService
         }
 
         try {
+            $aiBot = AiBot::query()
+                ->whereKey(RealEstateIsolationService::BOT_ID)
+                ->where('user_id', RealEstateIsolationService::USER_ID)
+                ->first();
+
+            if (! $isolation->supportsProductionBot($aiBot)) {
+                return null;
+            }
+
+            // Do not fetch media bytes until the exact tenant, bot and instance
+            // have all passed their production-scope checks.
             $base64 = app(EvolutionMediaService::class)->downloadBase64(
                 instanceName: $instanceName,
                 messageEnvelope: $messageEnvelope,
             );
-
-            $aiBot = AiBot::query()
-                ->whereKey(self::PRIMARY_BOT_ID)
-                ->where('user_id', self::PRIMARY_USER_ID)
-                ->first();
-
-            if (! $aiBot) {
-                return null;
-            }
 
             $content = [[
                 'type' => 'input_text',
@@ -162,9 +162,8 @@ class RealEstateMediaAnalysisService
         }
 
         $profile = RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::PRIMARY_USER_ID)
-            ->where('ai_bot_id', self::PRIMARY_BOT_ID)
             ->first();
 
         if (! $profile || ! is_array($profile->data)) {
@@ -191,18 +190,35 @@ class RealEstateMediaAnalysisService
         ConversationControl $conversation,
         array $analysis
     ): void {
-        $profile = RealEstateProfile::firstOrCreate(
-            ['conversation_control_id' => $conversation->id],
-            [
-                'user_id' => $conversation->user_id,
-                'ai_bot_id' => $conversation->ai_bot_id,
+        if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
+            return;
+        }
+
+        $profile = RealEstateProfile::query()
+            ->isolatedProduction()
+            ->where('conversation_control_id', $conversation->id)
+            ->first();
+
+        if (! $profile) {
+            // A profile already attached to this conversation but outside the
+            // exact production scope indicates corruption; never overwrite it.
+            if (RealEstateProfile::query()
+                ->where('conversation_control_id', $conversation->id)
+                ->exists()) {
+                return;
+            }
+
+            $profile = RealEstateProfile::query()->create([
+                'conversation_control_id' => $conversation->id,
+                'user_id' => RealEstateIsolationService::USER_ID,
+                'ai_bot_id' => RealEstateIsolationService::BOT_ID,
                 'profile_type' => 'general',
                 'data' => [],
                 'valuation' => [],
                 'completeness_score' => 0,
                 'confidence_score' => 0,
-            ]
-        );
+            ]);
+        }
 
         $data = is_array($profile->data) ? $profile->data : [];
         $findings = is_array($data['media_findings'] ?? null)

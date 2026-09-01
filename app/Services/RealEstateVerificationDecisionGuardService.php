@@ -7,25 +7,17 @@ use App\Models\RealEstateProfile;
 
 class RealEstateVerificationDecisionGuardService
 {
-    private const REAL_ESTATE_USER_ID = 40;
-
-    private const REAL_ESTATE_BOT_ID = 35;
-
     private const EVIDENCE_TAG_PREFIX = 'real_estate:evidence:';
 
     public function process(ConversationControl $conversation): ?array
     {
-        if (
-            (int) $conversation->user_id !== self::REAL_ESTATE_USER_ID
-            || (int) $conversation->ai_bot_id !== self::REAL_ESTATE_BOT_ID
-        ) {
+        if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return null;
         }
 
         $profile = RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
             ->first();
 
         if (! $profile || $profile->profile_type !== 'seller') {

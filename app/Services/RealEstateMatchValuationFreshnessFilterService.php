@@ -7,26 +7,17 @@ use App\Models\RealEstateProfile;
 
 class RealEstateMatchValuationFreshnessFilterService
 {
-    private const REAL_ESTATE_USER_ID = 40;
-
-    private const REAL_ESTATE_BOT_ID = 35;
-
     private const MATCH_TAG_PREFIX = 'real_estate:match:';
 
     public function process(ConversationControl $conversation): array
     {
-        if (
-            (int) $conversation->user_id !== self::REAL_ESTATE_USER_ID
-            || (int) $conversation->organization_id !== RealEstateIsolationService::ORGANIZATION_ID
-            || (int) $conversation->ai_bot_id !== self::REAL_ESTATE_BOT_ID
-        ) {
+        if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return [];
         }
 
         $profile = RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
             ->first();
 
         if (! $profile || ! is_array($profile->data)) {
@@ -50,22 +41,12 @@ class RealEstateMatchValuationFreshnessFilterService
                 }
 
                 $seller = RealEstateProfile::query()
+                    ->isolatedProduction()
                     ->whereKey($sellerProfileId)
-                    ->where('user_id', self::REAL_ESTATE_USER_ID)
-                    ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
                     ->where('profile_type', 'seller')
                     ->first();
 
                 if (! $seller) {
-                    return null;
-                }
-
-                $sellerConversation = $seller->conversation()->first();
-
-                if (
-                    ! $sellerConversation
-                    || (int) $sellerConversation->organization_id !== RealEstateIsolationService::ORGANIZATION_ID
-                ) {
                     return null;
                 }
 

@@ -9,14 +9,26 @@ use Throwable;
 
 class RealEstateOpenAIService extends OpenAIService
 {
-    private const PRIMARY_USER_ID = 40;
-
     public function cevapVer(
         string|array $mesajlar,
         ?AiBot $aiBot = null
     ): string {
-        if (! $aiBot || (int) $aiBot->user_id !== self::PRIMARY_USER_ID) {
+        $isolation = app(RealEstateIsolationService::class);
+
+        if (! $isolation->dedicatedOpenAiOnlyForBot($aiBot)) {
             return parent::cevapVer($mesajlar, $aiBot);
+        }
+
+        // Bot 35 must never fall through to shared WAI credentials. Metadata
+        // drift (sector/instance) is therefore a hard stop, not a reason to
+        // call the parent/global OpenAI path.
+        if (! $isolation->supportsBotIdentity($aiBot)) {
+            Log::error('REAL ESTATE AI BOT IDENTITY INVALID', [
+                'ai_bot_id' => $aiBot?->id,
+                'user_id' => $aiBot?->user_id,
+            ]);
+
+            return 'Emlak danışmanlığı yapılandırması doğrulanamadı. Lütfen daha sonra tekrar deneyin.';
         }
 
         $input = $this->normalizeInput($mesajlar);

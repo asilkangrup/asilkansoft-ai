@@ -8,27 +8,19 @@ use Illuminate\Support\Str;
 
 class RealEstateMatchService
 {
-    private const REAL_ESTATE_USER_ID = 40;
-
-    private const REAL_ESTATE_BOT_ID = 35;
-
     private const MATCH_TAG_PREFIX = 'real_estate:match:';
 
     private const MAX_MATCHES = 5;
 
     public function process(ConversationControl $conversation): array
     {
-        if (
-            (int) $conversation->user_id !== self::REAL_ESTATE_USER_ID
-            || (int) $conversation->ai_bot_id !== self::REAL_ESTATE_BOT_ID
-        ) {
+        if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return [];
         }
 
         $profile = RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
             ->first();
 
         if (! $profile) {
@@ -64,17 +56,13 @@ class RealEstateMatchService
 
     public function promptFor(ConversationControl $conversation): string
     {
-        if (
-            (int) $conversation->user_id !== self::REAL_ESTATE_USER_ID
-            || (int) $conversation->ai_bot_id !== self::REAL_ESTATE_BOT_ID
-        ) {
+        if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return '';
         }
 
         $profile = RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
             ->first();
 
         $matches = is_array($profile?->data)
@@ -112,9 +100,12 @@ PROMPT;
 
     private function matchesForSeller(RealEstateProfile $seller): array
     {
+        if (! $seller->belongsToIsolatedProductionScope()) {
+            return [];
+        }
+
         return RealEstateProfile::query()
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
+            ->isolatedProduction()
             ->whereIn('profile_type', ['investor', 'buyer'])
             ->where('id', '!=', $seller->id)
             ->get()
@@ -138,9 +129,12 @@ PROMPT;
 
     private function matchesForInvestor(RealEstateProfile $investor): array
     {
+        if (! $investor->belongsToIsolatedProductionScope()) {
+            return [];
+        }
+
         return RealEstateProfile::query()
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
+            ->isolatedProduction()
             ->where('profile_type', 'seller')
             ->where('id', '!=', $investor->id)
             ->get()
@@ -166,6 +160,13 @@ PROMPT;
         RealEstateProfile $seller,
         RealEstateProfile $investor
     ): ?array {
+        if (
+            ! $seller->belongsToIsolatedProductionScope()
+            || ! $investor->belongsToIsolatedProductionScope()
+        ) {
+            return null;
+        }
+
         $sellerData = is_array($seller->data) ? $seller->data : [];
         $investorData = is_array($investor->data) ? $investor->data : [];
         $valuation = is_array($seller->valuation) ? $seller->valuation : [];

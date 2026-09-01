@@ -45,13 +45,19 @@ class RealEstateIsolationService
     }
 
     /**
-     * Any code path that sees the fresh Emlak AI bot identity must refuse the
-     * shared/global WAI OpenAI client, even if the WhatsApp instance has not yet
-     * been connected or has temporarily drifted from its expected value.
+     * The immutable user+bot identity is enough to prohibit shared OpenAI.
+     *
+     * business_sector or whatsapp_instance drift must fail closed rather than
+     * turning into a credential-routing escape hatch to the global WAI key.
      */
     public function dedicatedOpenAiOnlyForBot(?AiBot $bot): bool
     {
-        return $this->supportsBotIdentity($bot);
+        if (! $bot) {
+            return false;
+        }
+
+        return (int) $bot->id === self::BOT_ID
+            && (int) $bot->user_id === self::USER_ID;
     }
 
     /**
@@ -102,7 +108,7 @@ class RealEstateIsolationService
 
     public function blocksGenericCommerce(AiBot $bot): bool
     {
-        return $this->supportsBotIdentity($bot);
+        return $this->dedicatedOpenAiOnlyForBot($bot);
     }
 
     public function blocksFollowUps(AiBot $bot): bool
