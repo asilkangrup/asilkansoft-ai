@@ -48,7 +48,7 @@ class RealEstateEvidenceReconciliationService
      */
     public function process(ConversationControl $conversation): ?array
     {
-        if (! $this->isolation->conversationIsIsolated($conversation)) {
+        if (! $this->isolation->supportsConversation($conversation)) {
             return null;
         }
 
@@ -152,7 +152,7 @@ class RealEstateEvidenceReconciliationService
             ->unique(fn (array $conflict): string => implode('|', [
                 (string) ($conflict['field'] ?? ''),
                 (string) ($conflict['message_id'] ?? ''),
-                json_encode($conflict['media_value'] ?? null),
+                (string) json_encode($conflict['media_value'] ?? null),
             ]))
             ->take(-20)
             ->values()
@@ -200,7 +200,7 @@ class RealEstateEvidenceReconciliationService
 
     public function promptFor(ConversationControl $conversation): string
     {
-        if (! $this->isolation->conversationIsIsolated($conversation)) {
+        if (! $this->isolation->supportsConversation($conversation)) {
             return '';
         }
 
@@ -272,7 +272,7 @@ PROMPT;
 
     private function sanitizeValue(string $field, mixed $value): mixed
     {
-        if (!$this->present($value)) {
+        if (! $this->present($value)) {
             return null;
         }
 
