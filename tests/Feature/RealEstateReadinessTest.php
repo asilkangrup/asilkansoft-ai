@@ -43,11 +43,14 @@ class RealEstateReadinessTest extends TestCase
             ->assertJsonPath('checks.bot_identity_valid', true)
             ->assertJsonPath('checks.instance_valid', true)
             ->assertJsonPath('checks.webhook_auth_configured', true)
+            ->assertJsonPath('checks.durable_webhook_receipts_ready', true)
+            ->assertJsonPath('checks.outbound_delivery_guard_ready', true)
             ->assertJsonPath('checks.openai_api_key_configured', true)
             ->assertJsonPath('checks.openai_api_key_encrypted_at_rest', true)
             ->assertJsonPath('checks.whatsapp_connected', true)
             ->assertJsonPath('checks.follow_ups_disabled', true)
             ->assertJsonPath('checks.active_follow_up_records', 0)
+            ->assertJsonPath('checks.unresolved_outbound_deliveries', 0)
             ->assertJsonPath('blocking_checks', []);
     }
 
@@ -78,17 +81,22 @@ class RealEstateReadinessTest extends TestCase
             ->assertJsonPath('checks.bot_identity_valid', true)
             ->assertJsonPath('checks.instance_valid', true)
             ->assertJsonPath('checks.webhook_auth_configured', true)
+            ->assertJsonPath('checks.durable_webhook_receipts_ready', true)
+            ->assertJsonPath('checks.outbound_delivery_guard_ready', true)
             ->assertJsonPath('checks.openai_api_key_configured', false)
             ->assertJsonPath('checks.openai_api_key_encrypted_at_rest', false)
             ->assertJsonPath('checks.whatsapp_connected', false)
             ->assertJsonPath('checks.follow_ups_disabled', true)
-            ->assertJsonPath('checks.active_follow_up_records', 0);
+            ->assertJsonPath('checks.active_follow_up_records', 0)
+            ->assertJsonPath('checks.unresolved_outbound_deliveries', 0);
 
         $blocking = $response->json('blocking_checks');
 
         $this->assertContains('openai_api_key_configured', $blocking);
         $this->assertContains('openai_api_key_encrypted_at_rest', $blocking);
         $this->assertContains('whatsapp_connected', $blocking);
+        $this->assertNotContains('outbound_delivery_guard_ready', $blocking);
+        $this->assertNotContains('unresolved_outbound_deliveries', $blocking);
         $this->assertNotContains('follow_ups_disabled', $blocking);
         $this->assertNotContains('active_follow_up_records', $blocking);
     }
