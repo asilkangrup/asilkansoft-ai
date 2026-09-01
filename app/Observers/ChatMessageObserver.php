@@ -11,10 +11,12 @@ use Throwable;
 
 class ChatMessageObserver
 {
+    private const REAL_ESTATE_USER_ID = 40;
+
     public function created(ChatMessage $message): void
     {
         if (
-            (int) $message->user_id !== 1
+            (int) $message->user_id !== self::REAL_ESTATE_USER_ID
             || $message->role !== 'user'
             || $message->sender_type !== 'customer'
             || ! $message->isMedia()
