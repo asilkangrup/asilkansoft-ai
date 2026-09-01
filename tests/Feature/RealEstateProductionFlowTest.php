@@ -12,6 +12,7 @@ use App\Services\RealEstateDecisionService;
 use App\Services\RealEstateWhatsAppProvisioningService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -114,6 +115,47 @@ class RealEstateProductionFlowTest extends TestCase
                     'MESSAGES_UPDATE',
                 ];
         });
+    }
+
+    public function test_isolated_openai_key_is_encrypted_at_rest_without_changing_other_bots(): void
+    {
+        $bot = $this->seedRealEstateBot();
+        $plainKey = 'sk-proj-real-estate-test-secret';
+
+        $bot->openai_api_key = $plainKey;
+        $bot->save();
+        $bot->refresh();
+
+        $stored = (string) DB::table('ai_bots')
+            ->where('id', 35)
+            ->value('openai_api_key');
+
+        $this->assertSame($plainKey, $bot->openai_api_key);
+        $this->assertNotSame($plainKey, $stored);
+        $this->assertStringNotContainsString('sk-proj-', $stored);
+        $this->assertSame($plainKey, Crypt::decryptString($stored));
+
+        $otherUser = User::query()->create([
+            'name' => 'Other Key User',
+            'email' => 'other-key@example.test',
+            'password' => Hash::make('test-password'),
+        ]);
+        $otherBot = AiBot::query()->create([
+            'user_id' => $otherUser->id,
+            'name' => 'Other Bot',
+            'company_name' => 'Other Company',
+            'openai_model' => 'gpt-5-mini',
+            'openai_api_key' => 'other-existing-key-behavior',
+            'status' => 'active',
+            'business_sector' => 'ecommerce',
+        ]);
+
+        $this->assertSame(
+            'other-existing-key-behavior',
+            DB::table('ai_bots')
+                ->where('id', $otherBot->id)
+                ->value('openai_api_key')
+        );
     }
 
     public function test_seller_decision_intelligence_updates_crm_without_scheduling_follow_up(): void

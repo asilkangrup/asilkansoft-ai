@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Services\BusinessSectorService;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Crypt;
 
 class AiBot extends Model
 {
@@ -126,6 +128,60 @@ class AiBot extends Model
         'subscription_started_at' => 'datetime',
         'subscription_ends_at' => 'datetime',
     ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | İZOLE EMLAK AI OPENAI ANAHTARI
+    |--------------------------------------------------------------------------
+    |
+    | Yalnızca fresh Emlak AI botunun (user_id=40, bot_id=35) özel anahtarını
+    | APP_KEY ile veritabanında şifreli saklarız. Diğer WAI botlarının mevcut
+    | anahtar davranışına dokunmayız. Eski/plaintext bir Emlak AI değeri varsa
+    | getter geriye dönük uyumluluk için okuyabilir; bir sonraki kayıtta şifrelenir.
+    |
+    */
+
+    public function setOpenaiApiKeyAttribute(mixed $value): void
+    {
+        $normalized = trim((string) ($value ?? ''));
+
+        if (! $this->isIsolatedRealEstateBot()) {
+            $this->attributes['openai_api_key'] =
+                $normalized === '' ? null : $normalized;
+
+            return;
+        }
+
+        $this->attributes['openai_api_key'] =
+            $normalized === ''
+                ? null
+                : Crypt::encryptString($normalized);
+    }
+
+    public function getOpenaiApiKeyAttribute(mixed $value): ?string
+    {
+        $stored = trim((string) ($value ?? ''));
+
+        if ($stored === '') {
+            return null;
+        }
+
+        if (! $this->isIsolatedRealEstateBot()) {
+            return $stored;
+        }
+
+        try {
+            return Crypt::decryptString($stored);
+        } catch (DecryptException) {
+            return $stored;
+        }
+    }
+
+    private function isIsolatedRealEstateBot(): bool
+    {
+        return (int) ($this->attributes['user_id'] ?? 0) === 40
+            && (int) ($this->attributes['id'] ?? 0) === 35;
+    }
 
     /*
     |--------------------------------------------------------------------------
