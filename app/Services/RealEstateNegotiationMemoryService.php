@@ -368,11 +368,11 @@ PROMPT;
         if ($value >= 1000000) {
             $millions = $value / 1000000;
             $canonical = rtrim(rtrim(number_format($millions, 2, '.', ''), '0'), '.');
-            $millionPattern = str_replace('\\.', '[\\.,]', preg_quote($canonical, '/'));
+            $millionPattern = str_replace('\.', '[.,]', preg_quote($canonical, '/'));
 
             if (
                 preg_match(
-                    '/(?<!\d)'.$millionPattern.'\s*(?:milyon|mn)(?!\pL)/iu',
+                    '/(?<!\d)'.$millionPattern.'\s*(?:milyon|mn)(?!\p{L})/iu',
                     $normalized
                 ) === 1
             ) {
@@ -385,7 +385,7 @@ PROMPT;
             if ($millionWhole > 0 && $remainingThousands > 0) {
                 $mixedPattern = '/(?<!\d)'.preg_quote((string) $millionWhole, '/')
                     .'\s*milyon\s*'.preg_quote((string) $remainingThousands, '/')
-                    .'\s*bin(?!\pL)/iu';
+                    .'\s*bin(?!\p{L})/iu';
 
                 if (preg_match($mixedPattern, $normalized) === 1) {
                     return true;
@@ -396,11 +396,11 @@ PROMPT;
         if ($value >= 1000 && $value < 1000000) {
             $thousands = $value / 1000;
             $canonical = rtrim(rtrim(number_format($thousands, 2, '.', ''), '0'), '.');
-            $thousandPattern = str_replace('\\.', '[\\.,]', preg_quote($canonical, '/'));
+            $thousandPattern = str_replace('\.', '[.,]', preg_quote($canonical, '/'));
 
             if (
                 preg_match(
-                    '/(?<!\d)'.$thousandPattern.'\s*(?:bin|k)(?!\pL)/iu',
+                    '/(?<!\d)'.$thousandPattern.'\s*(?:bin|k)(?!\p{L})/iu',
                     $normalized
                 ) === 1
             ) {
