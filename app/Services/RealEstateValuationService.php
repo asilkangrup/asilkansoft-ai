@@ -7,7 +7,6 @@ use App\Models\ConversationControl;
 use App\Models\RealEstateProfile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use OpenAI\Laravel\Facades\OpenAI;
 use Throwable;
 
 class RealEstateValuationService
@@ -67,7 +66,8 @@ class RealEstateValuationService
                 $request['reasoning'] = ['effort' => 'medium'];
             }
 
-            $response = OpenAI::responses()->create($request);
+            $response = app(RealEstateOpenAIClient::class)
+                ->createResponse($aiBot, $request);
 
             app(AiUsageService::class)->record(
                 response: $response,
@@ -75,6 +75,7 @@ class RealEstateValuationService
                 aiBot: $aiBot,
                 meta: [
                     'conversation_control_id' => $conversation->id,
+                    'dedicated_api_key' => true,
                 ],
             );
 
