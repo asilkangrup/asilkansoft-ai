@@ -25,6 +25,8 @@ class RealEstateReadinessService
             ->first();
 
         $botIdentityValid = $isolation->supportsProductionBot($bot);
+        $instanceValid = $botIdentityValid
+            && trim((string) ($bot?->whatsapp_instance ?? '')) === RealEstateIsolationService::INSTANCE;
         $organizationIdentityValid = $isolation->organizationValid();
         $webhookAuthConfigured = app(RealEstateWebhookAuthService::class)->configured();
         $durableWebhookReceiptsReady = Schema::hasTable('real_estate_webhook_receipts');
@@ -69,6 +71,7 @@ class RealEstateReadinessService
 
         $checks = [
             'bot_identity_valid' => $botIdentityValid,
+            'instance_valid' => $instanceValid,
             'organization_identity_valid' => $organizationIdentityValid,
             'webhook_auth_configured' => $webhookAuthConfigured,
             'durable_webhook_receipts_ready' => $durableWebhookReceiptsReady,
@@ -107,7 +110,7 @@ class RealEstateReadinessService
             ->all();
 
         return [
-            'ok' => $botIdentityValid && $organizationIdentityValid,
+            'ok' => $botIdentityValid && $instanceValid && $organizationIdentityValid,
             'service' => 'real-estate-ai',
             'user_id' => RealEstateIsolationService::USER_ID,
             'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
@@ -209,7 +212,7 @@ class RealEstateReadinessService
                 'sending' => 0,
                 'sent' => 0,
                 'uncertain' => 0,
-                'deduplicated_candidates' => 0,
+                'network_retries' => 0,
             ];
         }
 
@@ -224,7 +227,7 @@ class RealEstateReadinessService
             'sending' => (clone $base)->where('status', 'sending')->count(),
             'sent' => (clone $base)->where('status', 'sent')->count(),
             'uncertain' => (clone $base)->where('status', 'uncertain')->count(),
-            'deduplicated_candidates' => (clone $base)->where('attempts', '>', 1)->count(),
+            'network_retries' => (clone $base)->where('attempts', '>', 1)->count(),
         ];
     }
 
