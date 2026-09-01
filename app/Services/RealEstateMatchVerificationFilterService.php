@@ -71,6 +71,7 @@ class RealEstateMatchVerificationFilterService
             'strongest_score' => $matches[0]['match_score'] ?? null,
             'strongest_grade' => $matches[0]['grade'] ?? null,
             'verification_filtered' => true,
+            'evidence_quality_filtered' => true,
             'updated_at' => now()->toIso8601String(),
         ];
 
@@ -92,6 +93,8 @@ class RealEstateMatchVerificationFilterService
         $verification = is_array($data['verification_intelligence'] ?? null)
             ? $data['verification_intelligence']
             : [];
+        $evidenceQuality = app(RealEstateEvidenceQualityService::class)
+            ->assess($seller, persist: false);
 
         return (bool) ($verification['safe_to_match'] ?? false)
             && ! in_array(
@@ -99,7 +102,8 @@ class RealEstateMatchVerificationFilterService
                 ['blocked', 'high_risk', 'unverified'],
                 true
             )
-            && (int) ($verification['risk_score'] ?? 100) < 55;
+            && (int) ($verification['risk_score'] ?? 100) < 55
+            && (bool) ($evidenceQuality['sufficient_for_matching'] ?? false);
     }
 
     private function matchTags(array $currentTags, array $matches): array
