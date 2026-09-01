@@ -57,17 +57,6 @@ class MemoryService
             'message' => trim($message),
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | ANA WHATSAPP: EMLAK YÖNLENDİRME + KALICI CRM HAFIZASI
-        |--------------------------------------------------------------------------
-        |
-        | user_id=1 için önce satıcı/yatırımcı/genel emlak rotası güncellenir,
-        | ardından müşterinin açıkça verdiği taşınmaz veya yatırım kriterleri
-        | real_estate_profiles tablosuna yapılandırılmış şekilde kaydedilir.
-        | Diğer SaaS kullanıcılarının davranışı etkilenmez.
-        */
-
         if (
             $userId === 1
             && $role === 'user'
@@ -87,6 +76,11 @@ class MemoryService
                     );
 
                     app(RealEstateProfileService::class)->process(
+                        conversation: $conversation,
+                        message: $message,
+                    );
+
+                    app(RealEstateValuationService::class)->process(
                         conversation: $conversation,
                         message: $message,
                     );
@@ -157,6 +151,10 @@ class MemoryService
                         ),
                         trim(
                             app(RealEstateProfileService::class)
+                                ->promptFor($conversation)
+                        ),
+                        trim(
+                            app(RealEstateValuationService::class)
                                 ->promptFor($conversation)
                         ),
                     ])
