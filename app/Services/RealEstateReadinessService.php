@@ -7,6 +7,7 @@ use App\Models\ChatMessage;
 use App\Models\ConversationFollowUp;
 use App\Models\FinanceLead;
 use App\Models\Order;
+use App\Models\RealEstateNegotiationEvent;
 use App\Models\RealEstateOperatorAlert;
 use App\Models\RealEstateOutboundDelivery;
 use App\Models\RealEstateWebhookReceipt;
@@ -36,6 +37,8 @@ class RealEstateReadinessService
         $operatorAlertQueueReady = Schema::hasTable('real_estate_operator_alerts')
             && class_exists(RealEstateOperatorAlertService::class);
         $evidenceQualityGuardReady = class_exists(RealEstateEvidenceQualityService::class);
+        $negotiationMemoryReady = Schema::hasTable('real_estate_negotiation_events')
+            && class_exists(RealEstateNegotiationMemoryService::class);
         $audioTranscriptionReady = $this->audioTranscriptionReady();
         $apiKeyConfigured = $botIdentityValid && filled($bot?->openai_api_key);
         $apiKeyEncryptedAtRest = $apiKeyConfigured && $this->apiKeyEncryptedAtRest();
@@ -82,6 +85,7 @@ class RealEstateReadinessService
             'outbound_delivery_guard_ready' => $outboundDeliveryGuardReady,
             'operator_alert_queue_ready' => $operatorAlertQueueReady,
             'evidence_quality_guard_ready' => $evidenceQualityGuardReady,
+            'negotiation_memory_ready' => $negotiationMemoryReady,
             'audio_transcription_ready' => $audioTranscriptionReady,
             'openai_api_key_configured' => $apiKeyConfigured,
             'openai_api_key_encrypted_at_rest' => $apiKeyEncryptedAtRest,
@@ -132,6 +136,7 @@ class RealEstateReadinessService
             'webhook_telemetry_24h' => $this->webhookTelemetry($durableWebhookReceiptsReady),
             'outbound_telemetry_24h' => $this->outboundTelemetry($outboundDeliveryGuardReady),
             'operator_alert_telemetry' => $this->operatorAlertTelemetry($operatorAlertQueueReady),
+            'negotiation_telemetry_24h' => $this->negotiationTelemetry($negotiationMemoryReady),
             'audio_telemetry_24h' => $this->audioTelemetry($audioTranscriptionReady),
         ];
     }
@@ -275,6 +280,44 @@ class RealEstateReadinessService
                 ->count(),
             'resolved_24h' => (clone $base)
                 ->where('resolved_at', '>=', now()->subDay())
+                ->count(),
+        ];
+    }
+
+    private function negotiationTelemetry(bool $ready): array
+    {
+        if (! $ready) {
+            return [
+                'events' => 0,
+                'seller_asking_changes' => 0,
+                'seller_floor_changes' => 0,
+                'investor_budget_changes' => 0,
+                'confidential_floor_events' => 0,
+            ];
+        }
+
+        $base = RealEstateNegotiationEvent::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('created_at', '>=', now()->subDay());
+
+        return [
+            'events' => (clone $base)->count(),
+            'seller_asking_changes' => (clone $base)
+                ->where('event_type', 'seller_asking_price')
+                ->whereIn('direction', ['up', 'down'])
+                ->count(),
+            'seller_floor_changes' => (clone $base)
+                ->where('event_type', 'seller_minimum_price')
+                ->whereIn('direction', ['up', 'down'])
+                ->count(),
+            'investor_budget_changes' => (clone $base)
+                ->where('event_type', 'investor_budget_max')
+                ->whereIn('direction', ['up', 'down'])
+                ->count(),
+            'confidential_floor_events' => (clone $base)
+                ->where('event_type', 'seller_minimum_price')
                 ->count(),
         ];
     }

@@ -130,6 +130,11 @@ class MemoryService
                     );
 
                     if ($profile) {
+                        app(RealEstateNegotiationMemoryService::class)->sync(
+                            profile: $profile,
+                            sourceMessage: $chatMessage,
+                        );
+
                         app(RealEstateValuationFreshnessService::class)
                             ->refreshMetadata($profile);
                     }
@@ -233,6 +238,7 @@ class MemoryService
                     $internalContext = collect([
                         trim(app(RealEstateConversationService::class)->promptFor($conversation)),
                         trim(app(RealEstateProfileService::class)->promptFor($conversation)),
+                        trim(app(RealEstateNegotiationMemoryService::class)->promptFor($conversation)),
                         trim(app(RealEstateVerificationService::class)->promptFor($conversation)),
                         trim(app(RealEstateValuationService::class)->promptFor($conversation)),
                         trim(app(RealEstateDecisionService::class)->promptFor($conversation)),
