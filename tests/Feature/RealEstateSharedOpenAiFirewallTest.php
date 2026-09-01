@@ -14,19 +14,37 @@ use App\Services\FinanceLeadExtractorService;
 use App\Services\RealEstateAwareCrmConversationSummaryService;
 use App\Services\RealEstateAwareCrmManagerSummaryService;
 use App\Services\RealEstateAwareFinanceLeadExtractorService;
+use App\Services\RealEstateCrmSummaryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use OpenAI\Laravel\Facades\OpenAI;
+use ReflectionClass;
 use Tests\TestCase;
 
 class RealEstateSharedOpenAiFirewallTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_isolated_firewall_services_do_not_reference_shared_openai_facade(): void
+    {
+        foreach ([
+            RealEstateCrmSummaryService::class,
+            RealEstateAwareCrmConversationSummaryService::class,
+            RealEstateAwareCrmManagerSummaryService::class,
+            RealEstateAwareFinanceLeadExtractorService::class,
+        ] as $class) {
+            $reflection = new ReflectionClass($class);
+            $source = file_get_contents((string) $reflection->getFileName());
+
+            $this->assertIsString($source);
+            $this->assertStringNotContainsString('OpenAI\\Laravel\\Facades\\OpenAI', $source);
+            $this->assertStringNotContainsString('OpenAI::', $source);
+        }
+    }
+
     public function test_isolated_crm_summary_uses_structured_memory_without_shared_openai(): void
     {
-        [$user, $bot] = $this->seedIsolatedTenant();
+        [, $bot] = $this->seedIsolatedTenant();
         $conversation = $this->sellerConversation($bot);
 
         RealEstateProfile::query()->create([
@@ -76,8 +94,6 @@ class RealEstateSharedOpenAiFirewallTest extends TestCase
             ]);
         }
 
-        OpenAI::shouldReceive('responses')->never();
-
         $service = app(CrmConversationSummaryService::class);
         $this->assertInstanceOf(RealEstateAwareCrmConversationSummaryService::class, $service);
 
@@ -123,13 +139,12 @@ class RealEstateSharedOpenAiFirewallTest extends TestCase
             'user_id' => 40,
             'ai_bot_id' => $otherBot->id,
             'session_id' => 'foreign-bot-session',
+            'whatsapp_number' => '905550000036',
             'lead_status' => 'qualified',
             'lead_temperature' => 'hot',
             'lead_score' => 99,
         ]);
         $otherConversation->forceFill(['organization_id' => 37])->saveQuietly();
-
-        OpenAI::shouldReceive('responses')->never();
 
         $service = app(CrmManagerSummaryService::class);
         $this->assertInstanceOf(RealEstateAwareCrmManagerSummaryService::class, $service);
@@ -148,8 +163,6 @@ class RealEstateSharedOpenAiFirewallTest extends TestCase
     {
         [, $bot] = $this->seedIsolatedTenant();
         $bot->forceFill(['group_routing_enabled' => true])->save();
-
-        OpenAI::shouldReceive('responses')->never();
 
         $service = app(FinanceLeadExtractorService::class);
         $this->assertInstanceOf(RealEstateAwareFinanceLeadExtractorService::class, $service);
@@ -189,8 +202,6 @@ class RealEstateSharedOpenAiFirewallTest extends TestCase
             ->where('id', $conversation->id)
             ->update(['organization_id' => 38]);
         $conversation->refresh();
-
-        OpenAI::shouldReceive('responses')->never();
 
         $result = app(CrmConversationSummaryService::class)
             ->updateIfNeeded($conversation, true);
