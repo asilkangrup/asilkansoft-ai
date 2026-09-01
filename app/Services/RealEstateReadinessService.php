@@ -4,90 +4,108 @@ namespace App\Services;
 
 use App\Models\AiBot;
 use App\Models\ConversationFollowUp;
+use App\Models\FinanceLead;
+use App\Models\Order;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class RealEstateReadinessService
 {
-    private const REAL_ESTATE_USER_ID = 40;
-
-    private const REAL_ESTATE_BOT_ID = 35;
-
-    private const REAL_ESTATE_INSTANCE = 'emlak-ai-35';
-
     public function snapshot(): array
     {
+        $isolation = app(RealEstateIsolationService::class);
         $bot = AiBot::query()
-            ->whereKey(self::REAL_ESTATE_BOT_ID)
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
+            ->whereKey(RealEstateIsolationService::BOT_ID)
+            ->where('user_id', RealEstateIsolationService::USER_ID)
             ->first();
 
-        $botIdentityValid = $bot !== null;
-        $instanceValid = $botIdentityValid
-            && trim((string) $bot->whatsapp_instance) === self::REAL_ESTATE_INSTANCE;
+        $botIdentityValid = $isolation->supportsProductionBot($bot);
+        $organizationIdentityValid = $isolation->organizationValid();
         $webhookAuthConfigured = app(RealEstateWebhookAuthService::class)->configured();
-        $apiKeyConfigured = $botIdentityValid && filled($bot->openai_api_key);
-        $apiKeyEncryptedAtRest = $apiKeyConfigured
-            && $this->apiKeyEncryptedAtRest();
-        $whatsappConnected = $botIdentityValid
-            && trim((string) $bot->whatsapp_status) === 'connected';
+        $apiKeyConfigured = $botIdentityValid && filled($bot?->openai_api_key);
+        $apiKeyEncryptedAtRest = $apiKeyConfigured && $this->apiKeyEncryptedAtRest();
+        $whatsappStatus = strtolower(trim((string) ($bot?->whatsapp_status ?? '')));
+        $whatsappConnected = in_array($whatsappStatus, ['connected', 'open'], true);
+        $aiEnabled = $botIdentityValid && (bool) $bot?->ai_enabled;
+        $subscriptionAllowsAi = $botIdentityValid
+            && $bot !== null
+            && $bot->whatsappAiKullanilabilirMi();
+        $groupRoutingDisabled = $botIdentityValid && ! (bool) $bot?->group_routing_enabled;
         $followUpsDisabled = $botIdentityValid
-            && ! (bool) $bot->follow_up_enabled
-            && ! (bool) $bot->second_follow_up_enabled;
+            && ! (bool) $bot?->follow_up_enabled
+            && ! (bool) $bot?->second_follow_up_enabled;
+
         $activeFollowUps = ConversationFollowUp::query()
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
             ->where('is_active', true)
+            ->count();
+
+        $genericOrders = Order::query()
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->count();
+
+        $financeLeads = FinanceLead::query()
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
             ->count();
 
         $checks = [
             'bot_identity_valid' => $botIdentityValid,
-            'instance_valid' => $instanceValid,
+            'organization_identity_valid' => $organizationIdentityValid,
             'webhook_auth_configured' => $webhookAuthConfigured,
             'openai_api_key_configured' => $apiKeyConfigured,
             'openai_api_key_encrypted_at_rest' => $apiKeyEncryptedAtRest,
+            'ai_enabled' => $aiEnabled,
+            'subscription_allows_ai' => $subscriptionAllowsAi,
             'whatsapp_connected' => $whatsappConnected,
+            'group_routing_disabled' => $groupRoutingDisabled,
             'follow_ups_disabled' => $followUpsDisabled,
             'active_follow_up_records' => $activeFollowUps,
+            'generic_order_records' => $genericOrders,
+            'finance_lead_records' => $financeLeads,
         ];
 
-        $ready = $botIdentityValid
-            && $instanceValid
-            && $webhookAuthConfigured
-            && $apiKeyConfigured
-            && $apiKeyEncryptedAtRest
-            && $whatsappConnected
-            && $followUpsDisabled
-            && $activeFollowUps === 0;
+        $zeroRequired = [
+            'active_follow_up_records',
+            'generic_order_records',
+            'finance_lead_records',
+        ];
+
+        $blockingChecks = collect($checks)
+            ->filter(function (mixed $value, string $key) use ($zeroRequired): bool {
+                if (in_array($key, $zeroRequired, true)) {
+                    return (int) $value !== 0;
+                }
+
+                return $value !== true;
+            })
+            ->keys()
+            ->values()
+            ->all();
 
         return [
-            'ok' => $botIdentityValid,
+            'ok' => $botIdentityValid && $organizationIdentityValid,
             'service' => 'real-estate-ai',
-            'user_id' => self::REAL_ESTATE_USER_ID,
-            'bot_id' => self::REAL_ESTATE_BOT_ID,
-            'instance' => self::REAL_ESTATE_INSTANCE,
+            'user_id' => RealEstateIsolationService::USER_ID,
+            'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+            'bot_id' => RealEstateIsolationService::BOT_ID,
+            'instance' => RealEstateIsolationService::INSTANCE,
             'isolated' => true,
-            'ready_for_live_traffic' => $ready,
+            'dedicated_inbound_pipeline' => true,
+            'shared_wai_commerce_pipeline' => false,
+            'follow_up_runtime_blocked' => true,
+            'ready_for_live_traffic' => $blockingChecks === [],
             'checks' => $checks,
-            'blocking_checks' => collect($checks)
-                ->filter(function (mixed $value, string $key): bool {
-                    if ($key === 'active_follow_up_records') {
-                        return (int) $value !== 0;
-                    }
-
-                    return $value !== true;
-                })
-                ->keys()
-                ->values()
-                ->all(),
+            'blocking_checks' => $blockingChecks,
         ];
     }
 
     private function apiKeyEncryptedAtRest(): bool
     {
         $raw = DB::table('ai_bots')
-            ->where('id', self::REAL_ESTATE_BOT_ID)
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
+            ->where('id', RealEstateIsolationService::BOT_ID)
+            ->where('user_id', RealEstateIsolationService::USER_ID)
             ->value('openai_api_key');
 
         $raw = trim((string) ($raw ?? ''));
