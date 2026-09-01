@@ -105,6 +105,10 @@ class MemoryService
                         conversation: $conversation,
                         message: $message,
                     );
+
+                    app(RealEstateDecisionService::class)->process(
+                        conversation: $conversation,
+                    );
                 }
             } catch (Throwable $exception) {
                 Log::warning(
@@ -176,6 +180,10 @@ class MemoryService
                         ),
                         trim(
                             app(RealEstateValuationService::class)
+                                ->promptFor($conversation)
+                        ),
+                        trim(
+                            app(RealEstateDecisionService::class)
                                 ->promptFor($conversation)
                         ),
                     ])
