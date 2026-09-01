@@ -4,7 +4,6 @@ namespace App\Observers;
 
 use App\Models\RealEstateProfile;
 use App\Services\RealEstateIsolationService;
-use App\Services\RealEstateNegotiationMemoryService;
 use App\Services\RealEstateOperatorAlertService;
 
 class RealEstateProfileObserver
@@ -23,7 +22,6 @@ class RealEstateProfileObserver
             return;
         }
 
-        app(RealEstateNegotiationMemoryService::class)->sync($profile);
-        app(RealEstateOperatorAlertService::class)->sync($profile->fresh() ?? $profile);
+        app(RealEstateOperatorAlertService::class)->sync($profile);
     }
 }
