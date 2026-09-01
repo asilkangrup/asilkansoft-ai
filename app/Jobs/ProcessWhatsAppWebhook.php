@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Http\Controllers\WhatsAppWebhookController;
+use App\Models\AiBot;
 use App\Services\CrmCustomerExtractorService;
 use App\Services\FinanceLeadExtractorService;
 use App\Services\FinanceLeadService;
@@ -10,6 +11,8 @@ use App\Services\LeadScoringService;
 use App\Services\MemoryService;
 use App\Services\OpenAIService;
 use App\Services\OrderService;
+use App\Services\RealEstateIsolationService;
+use App\Services\RealEstateWhatsAppInboundService;
 use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -49,6 +52,8 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         FinanceLeadExtractorService $financeLeadExtractorService,
         LeadScoringService $leadScoringService,
         CrmCustomerExtractorService $crmCustomerExtractorService,
+        RealEstateIsolationService $realEstateIsolation,
+        RealEstateWhatsAppInboundService $realEstateInbound,
     ): void {
         $payload = $this->payload;
 
@@ -56,10 +61,6 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         |--------------------------------------------------------------------------
         | EVOLUTION API EVENT ADINI NORMALIZE ET
         |--------------------------------------------------------------------------
-        |
-        | Evolution sürümüne göre event `messages.upsert`, `MESSAGES_UPSERT`
-        | veya benzeri biçimde gelebilir. Controller noktalı biçimi bekliyor.
-        |
         */
         $event = strtolower(trim((string) ($payload['event'] ?? '')));
 
@@ -69,6 +70,34 @@ class ProcessWhatsAppWebhook implements ShouldQueue
                 '.',
                 $event
             );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | İZOLE EMLAK AI: SHARED WAI PIPELINE'A ASLA GİRME
+        |--------------------------------------------------------------------------
+        |
+        | user_id=40 / bot_id=35 için e-ticaret siparişleri, finans akışı,
+        | generic CRM ve otomatik takip mantığı kesinlikle çalıştırılmaz.
+        | Controller dış sınırda imza/instance doğrulaması yapar; job da ikinci
+        | bir tenant sınırı olarak bot kimliğini tekrar doğrular.
+        |
+        */
+        $instance = trim((string) ($payload['instance'] ?? ''));
+
+        if ($instance !== '') {
+            $realEstateBot = AiBot::query()
+                ->whereKey(RealEstateIsolationService::BOT_ID)
+                ->where('user_id', RealEstateIsolationService::USER_ID)
+                ->where('business_sector', 'real_estate')
+                ->where('whatsapp_instance', $instance)
+                ->first();
+
+            if ($realEstateIsolation->supportsBotIdentity($realEstateBot)) {
+                $realEstateInbound->process($payload);
+
+                return;
+            }
         }
 
         $payload['_wai_queued'] = true;
