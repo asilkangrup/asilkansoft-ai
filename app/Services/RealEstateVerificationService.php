@@ -10,6 +10,8 @@ class RealEstateVerificationService
 {
     private const TAG_PREFIX = 'real_estate:verification:';
 
+    private const MIN_MEDIA_CONFIDENCE = 70;
+
     public function process(ConversationControl $conversation): ?array
     {
         if (! $this->inScope($conversation)) {
@@ -23,13 +25,26 @@ class RealEstateVerificationService
         }
 
         $data = is_array($profile->data) ? $profile->data : [];
-        $findings = collect(
+        $provenance = is_array($data['field_provenance'] ?? null)
+            ? $data['field_provenance']
+            : [];
+        $allFindings = collect(
             is_array($data['media_findings'] ?? null)
                 ? $data['media_findings']
                 : []
         )->filter(fn ($finding): bool => is_array($finding));
+        $findings = $allFindings
+            ->filter(fn (array $finding): bool =>
+                (int) ($finding['confidence_score'] ?? 0) >= self::MIN_MEDIA_CONFIDENCE
+            )
+            ->values();
+        $lowConfidenceMediaCount = max(
+            0,
+            $allFindings->count() - $findings->count()
+        );
 
         $corroborated = [];
+        $mediaOnly = [];
         $conflicts = [];
         $evidence = [];
 
@@ -57,6 +72,13 @@ class RealEstateVerificationService
                 );
 
             if ($matches) {
+                if ($this->fieldIsMediaDerived($field, $provenance)) {
+                    // A value copied from media cannot verify itself. Repeated
+                    // screenshots/documents are supporting repetition only.
+                    $mediaOnly[] = $field;
+                    continue;
+                }
+
                 $corroborated[] = $field;
                 continue;
             }
@@ -100,19 +122,25 @@ class RealEstateVerificationService
             'status' => $status,
             'risk_score' => $riskScore,
             'media_evidence_count' => $findings->count(),
+            'low_confidence_media_count' => $lowConfidenceMediaCount,
+            'minimum_media_confidence' => self::MIN_MEDIA_CONFIDENCE,
             'evidence_fields' => array_values(array_keys($evidence)),
             'corroborated_fields' => array_values(array_unique($corroborated)),
+            'media_only_fields' => array_values(array_unique($mediaOnly)),
             'conflicts' => array_values($conflicts),
             'missing_verification_fields' => array_values($missing),
             'safe_to_match' => in_array($status, ['corroborated', 'review'], true)
                 && $riskScore < 55
-                && $criticalConflicts === 0,
+                && $criticalConflicts === 0
+                && count(array_unique($corroborated)) > 0,
             'legal_verification_complete' => false,
             'next_best_action' => $this->nextBestAction(
                 status: $status,
                 conflicts: $conflicts,
                 missing: $missing,
                 evidenceCount: count($evidence),
+                mediaOnlyCount: count(array_unique($mediaOnly)),
+                lowConfidenceMediaCount: $lowConfidenceMediaCount,
             ),
             'updated_at' => now()->toIso8601String(),
         ];
@@ -149,6 +177,8 @@ class RealEstateVerificationService
             'status' => $verification['status'] ?? null,
             'risk_score' => $verification['risk_score'] ?? null,
             'corroborated_fields' => $verification['corroborated_fields'] ?? [],
+            'media_only_fields' => $verification['media_only_fields'] ?? [],
+            'low_confidence_media_count' => $verification['low_confidence_media_count'] ?? 0,
             'conflicts' => collect($verification['conflicts'] ?? [])
                 ->map(fn ($conflict): array => [
                     'field' => $conflict['field'] ?? null,
@@ -168,7 +198,7 @@ class RealEstateVerificationService
 
         return <<<PROMPT
 [INTERNAL REAL ESTATE VERIFICATION & RISK]
-Bu blok müşteri beyanı ile WhatsApp üzerinden analiz edilen belge/görseller arasındaki dahili tutarlılık kontrolüdür. Bu kontrol resmi tapu, belediye, TAKBİS veya hukuki doğrulama değildir. Müşteriye dahili risk skorunu veya alan adlarını gösterme. Çelişki varsa kesin fiyat/imar/tapu iddiasında bulunma ve eşleştirmeyi aceleye getirme. status blocked/high_risk ise önce çelişkiyi açık, kısa ve profesyonel bir soruyla netleştir. status corroborated olsa bile resmi geçerlilik garantisi verme. legal_verification_complete hiçbir zaman yalnız görsel analizinden true kabul edilmez.
+Bu blok müşteri beyanı ile WhatsApp üzerinden analiz edilen belge/görseller arasındaki dahili tutarlılık kontrolüdür. Bu kontrol resmi tapu, belediye, TAKBİS veya hukuki doğrulama değildir. Müşteriye dahili risk skorunu veya alan adlarını gösterme. media_only_fields yalnızca görsel/belgeden CRM'e alınmış, bağımsız müşteri teyidi olmayan alanlardır; bunları kendi kaynaklarıyla eşleşiyor diye doğrulanmış sayma. Düşük güvenli medya bulguları çatışma, doğrulama veya eşleştirme kararında kullanılmaz; gerekirse daha net belge/görsel iste. Çelişki varsa kesin fiyat/imar/tapu iddiasında bulunma ve eşleştirmeyi aceleye getirme. status blocked/high_risk ise önce çelişkiyi açık, kısa ve profesyonel bir soruyla netleştir. status corroborated olsa bile resmi geçerlilik garantisi verme. legal_verification_complete hiçbir zaman yalnız görsel analizinden true kabul edilmez.
 Doğrulama desteği: {$json}
 PROMPT;
     }
@@ -201,6 +231,22 @@ PROMPT;
             'zoning_status' => 'zoning_status',
             'asking_price' => 'visible_asking_price',
         ];
+    }
+
+    private function fieldIsMediaDerived(string $field, array $provenance): bool
+    {
+        $meta = $provenance[$field] ?? null;
+
+        if (! is_array($meta)) {
+            return false;
+        }
+
+        return ($meta['source'] ?? null) === 'whatsapp_media'
+            && in_array(
+                $meta['status'] ?? null,
+                ['media_observed_unverified', 'media_corroborated_unverified'],
+                true,
+            );
     }
 
     private function missingVerificationFields(
@@ -307,6 +353,8 @@ PROMPT;
         array $conflicts,
         array $missing,
         int $evidenceCount,
+        int $mediaOnlyCount,
+        int $lowConfidenceMediaCount,
     ): string {
         if (in_array($status, ['blocked', 'high_risk'], true)) {
             $first = $conflicts[0]['field'] ?? null;
@@ -318,8 +366,16 @@ PROMPT;
                 : 'Yüksek risk sinyalini netleştir; doğrulama tamamlanmadan eşleştirme veya kesin fiyat iddiası yapma.';
         }
 
+        if ($evidenceCount === 0 && $lowConfidenceMediaCount > 0) {
+            return 'Gönderilen belge/görsel yeterince net okunamadı. Kritik tapu/parsel bilgisini müşteriden yazılı teyit et veya daha net bir görsel iste.';
+        }
+
         if ($evidenceCount === 0) {
             return 'Satıcıdan mümkünse tapu/parsel veya ilan ekran görüntüsü gibi doğrulayıcı belge/görsel iste; kişisel kimlik bilgilerini isteme.';
+        }
+
+        if ($mediaOnlyCount > 0) {
+            return 'Belge/görselden alınan kritik taşınmaz bilgilerini müşteriye kısa biçimde teyit ettir; görselin kendi verisini doğruladığını varsayma.';
         }
 
         if ($missing !== []) {
