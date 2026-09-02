@@ -16,6 +16,8 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
 
     public int $timeout = 240;
 
+    public array $backoff = [2, 5, 10, 20, 30, 60];
+
     public function __construct(
         public string $cacheKey,
         public string $generation,
@@ -52,23 +54,93 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
         return 'real-estate-chat:'.$hash;
     }
 
+    private function isImagePayload(array $payload): bool
+    {
+        $message = data_get($payload, 'data.message', []);
+
+        if (! is_array($message)) {
+            return false;
+        }
+
+        $encoded = json_encode($message);
+
+        return is_string($encoded) && str_contains($encoded, '"imageMessage"');
+    }
+
     public function handle(RealEstateWhatsAppInboundService $inbound): void
     {
         $batch = Cache::get($this->cacheKey);
+        $scheduledKey = $this->cacheKey.':scheduled';
 
-        if (! is_array($batch) || ($batch['generation'] ?? null) !== $this->generation) {
+        if (! is_array($batch)) {
+            Cache::forget($scheduledKey);
+
+            return;
+        }
+
+        $quietUntil = (int) ($batch['quiet_until'] ?? 0);
+
+        if ($quietUntil > now()->timestamp) {
+            $this->release(max(1, $quietUntil - now()->timestamp));
+
+            return;
+        }
+
+        // Pull first so a message arriving during slow media/valuation work
+        // creates a fresh batch and its own scheduled job instead of being
+        // deleted when this batch completes.
+        $batch = Cache::pull($this->cacheKey);
+        Cache::forget($scheduledKey);
+
+        if (! is_array($batch)) {
             return;
         }
 
         $payloads = is_array($batch['payloads'] ?? null) ? $batch['payloads'] : [];
-        Cache::forget($this->cacheKey);
-
         $payloads = array_values(array_filter($payloads, 'is_array'));
         $last = count($payloads) - 1;
+        $imageIndexes = array_keys(array_filter(
+            $payloads,
+            fn (array $payload): bool => $this->isImagePayload($payload)
+        ));
+        $representativeImageIndexes = count($imageIndexes) <= 3
+            ? $imageIndexes
+            : array_values(array_unique([
+                $imageIndexes[0],
+                $imageIndexes[(int) floor((count($imageIndexes) - 1) / 2)],
+                $imageIndexes[count($imageIndexes) - 1],
+            ]));
 
         foreach ($payloads as $index => $payload) {
             unset($payload['_real_estate_authorized']);
-            $inbound->process($payload, suppressReply: $index < $last);
+
+            try {
+                $analyzeMedia = ! in_array($index, $imageIndexes, true)
+                    || in_array($index, $representativeImageIndexes, true);
+
+                $inbound->process(
+                    $payload,
+                    suppressReply: $index < $last,
+                    analyzeMedia: $analyzeMedia,
+                );
+            } catch (\Throwable $exception) {
+                // Preserve the failed turn and all following fragments. The
+                // queue will retry internally with backoff; customers never
+                // need to resend their first message after a transient AI or
+                // provider error.
+                Cache::put($this->cacheKey, [
+                    'generation' => $this->generation,
+                    'payloads' => array_slice($payloads, $index),
+                    'quiet_until' => now()->timestamp,
+                ], now()->addMinutes(10));
+                Cache::put(
+                    $scheduledKey,
+                    true,
+                    now()->addMinutes(10)
+                );
+
+                throw $exception;
+            }
         }
     }
 }

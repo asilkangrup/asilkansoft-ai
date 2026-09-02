@@ -151,10 +151,19 @@ class RealEstateWhatsAppWebhookController extends Controller
             Cache::put($cacheKey, [
                 'generation' => $generation,
                 'payloads' => array_slice($payloads, -12),
-            ], now()->addSeconds(45));
+                'quiet_until' => now()->addSeconds(10)->timestamp,
+            ], now()->addSeconds(60));
 
-            ProcessRealEstateMediaBatch::dispatch($cacheKey, $generation)
-                ->delay(now()->addSeconds(7));
+            // One delayed job per contact is enough. Further fragments only
+            // extend quiet_until; the queued job releases itself until the
+            // customer has been silent for ten seconds. This prevents ad
+            // bursts from flooding the queue with obsolete no-op jobs.
+            $scheduledKey = $cacheKey.':scheduled';
+
+            if (Cache::add($scheduledKey, true, now()->addSeconds(90))) {
+                ProcessRealEstateMediaBatch::dispatch($cacheKey, $generation)
+                    ->delay(now()->addSeconds(10));
+            }
 
             return response()->json([
                 'success' => true,

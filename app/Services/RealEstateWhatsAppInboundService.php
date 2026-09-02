@@ -24,7 +24,11 @@ class RealEstateWhatsAppInboundService
     ) {
     }
 
-    public function process(array $payload, bool $suppressReply = false): array
+    public function process(
+        array $payload,
+        bool $suppressReply = false,
+        bool $analyzeMedia = true,
+    ): array
     {
         $event = $this->normalizeEvent($payload['event'] ?? null);
 
@@ -124,6 +128,7 @@ class RealEstateWhatsAppInboundService
                 phoneNumber: $phoneNumber,
                 messageId: $messageId,
                 suppressReply: $suppressReply,
+                analyzeMedia: $analyzeMedia,
             );
 
             $this->receiptService->complete($receipt, $result);
@@ -209,6 +214,7 @@ class RealEstateWhatsAppInboundService
         string $phoneNumber,
         string $messageId,
         bool $suppressReply = false,
+        bool $analyzeMedia = true,
     ): array {
         if (! $this->isolation->organizationValid()) {
             throw new RuntimeException('İzole Emlak AI organizasyon kimliği geçersiz.');
@@ -233,6 +239,10 @@ class RealEstateWhatsAppInboundService
             instance: $instance,
             messageId: $messageId,
         );
+
+        if (! $analyzeMedia && ($mediaContext['type'] ?? null) === 'image') {
+            $mediaContext['skip_analysis'] = true;
+        }
 
         if (($mediaContext['type'] ?? null) === 'audio') {
             $transcription = $this->audioTranscriptionService->transcribe(

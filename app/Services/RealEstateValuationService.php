@@ -35,7 +35,6 @@ class RealEstateValuationService
         $explicitIntent = $this->valuationIntent($message);
         $pendingResearchAction = $this->pendingResearchAction($profile, $conversation);
         $sellerAutoReady = $profile->profile_type === 'seller'
-            && filled($data['asking_price'] ?? null)
             && filled($data['area_sqm'] ?? null);
 
         if (! $explicitIntent && ! $pendingResearchAction && ! $sellerAutoReady) {
@@ -334,7 +333,9 @@ PROMPT;
             'kac para eder', 'ne kadar eder', 'degeri ne', 'degeri nedir',
             'kaca gider', 'kaca satilir', 'kaca satariz', 'emsal',
             'piyasa fiyati', 'hizli satis', 'yatirimci kaca', 'kaca alir',
-            'fiyat bic', 'fiyatlama', 'degerleme',
+            'fiyat bic', 'fiyatlama', 'degerleme', 'fiyat belirle',
+            'siz fiyat belirleyin', 'siz bir fiyat belirleyin',
+            'siz soyleyin', 'fiyat soyle',
         ] as $signal) {
             if (str_contains($normalized, $signal)) {
                 return true;

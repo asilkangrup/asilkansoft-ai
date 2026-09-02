@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiBot;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Exceptions\RateLimitException;
+use RuntimeException;
 use Throwable;
 
 class RealEstateOpenAIService extends OpenAIService
@@ -169,7 +170,7 @@ class RealEstateOpenAIService extends OpenAIService
                     : $answer;
             }
 
-            return 'Bu konuda sağlıklı bir cevap verebilmem için taşınmazın konumunu ve temel özelliklerini biraz daha netleştirelim.';
+            throw new RuntimeException('Emlak AI boş cevap üretti; müşteri mesajı dahili olarak yeniden denenecek.');
         } catch (RateLimitException $exception) {
             Log::warning('REAL ESTATE AI RATE LIMIT', [
                 'ai_bot_id' => $aiBot->id,
@@ -177,7 +178,10 @@ class RealEstateOpenAIService extends OpenAIService
                 'message' => $exception->getMessage(),
             ]);
 
-            return 'Şu anda kısa süreli bir yoğunluk var. Mesajınızı tekrar gönderirseniz kaldığımız yerden devam edeceğim.';
+            throw new RuntimeException(
+                'Emlak AI geçici yoğunluk nedeniyle yeniden denenecek.',
+                previous: $exception,
+            );
         } catch (Throwable $exception) {
             Log::error('REAL ESTATE AI ERROR', [
                 'ai_bot_id' => $aiBot->id,
@@ -187,7 +191,10 @@ class RealEstateOpenAIService extends OpenAIService
 
             report($exception);
 
-            return 'Şu anda emlak danışmanlığı bağlantısında kısa süreli bir sorun var. Lütfen biraz sonra tekrar deneyin.';
+            throw new RuntimeException(
+                'Emlak AI geçici bağlantı hatası nedeniyle yeniden denenecek.',
+                previous: $exception,
+            );
         }
     }
 
@@ -349,6 +356,8 @@ KONUŞMA TARZI
 - Kısa soruya kısa cevap ver; detay istenirse derinleş.
 - Aynı anda en fazla 1-2 kritik soru sor; dahili next-best-action tek soru veriyorsa yalnız onu sor.
 - Müşterinin daha önce verdiği bilgiyi tekrar isteme.
+- Yapılandırılmış profil veya recent_media_analysis içinde m², il/ilçe, taşınmaz türü, ada/parsel ya da fiyat açıkça doluysa aynı alanı hiçbir biçimde yeniden sorma. Görselden okunan 9.712 m² gibi bilgiyi konuşmada kullanmışsan sonraki turda onu bilinmiyor sayma.
+- Satıcı "siz fiyat belirleyin", "siz söyleyin", "ona göre konuşalım" diyorsa satıcı fiyatını tekrar isteme. Kimlik ve m² yeterliyse güncel araştırma hafızasındaki gerçekçi satış ile hızlı nakit yatırımcı seviyesini doğrudan açıkla; fiyat farkını veriye dayalı ve baskısız pazarlıkla çerçevele.
 - 'Nasıl yardımcı olabilirim?' gibi boş cümleleri gereksiz kullanma; konuşmayı bir sonraki mantıklı adıma taşı.
 - Müşterinin ne demek istediği belliyse gereksiz teyit isteme.
 - Her turda tüm profil özetini tekrar etme. Yalnız yeni öğrenilen kritik bilgiyi gerekiyorsa tek cümlede teyit et ve ilerle.
