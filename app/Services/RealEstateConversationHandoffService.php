@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
+use App\Models\RealEstateProfile;
 use Illuminate\Support\Carbon;
 
 class RealEstateConversationHandoffService
@@ -75,11 +76,18 @@ class RealEstateConversationHandoffService
 
     public function telemetry(): array
     {
+        $conversationIds = RealEstateProfile::query()
+            ->isolatedProduction()
+            ->pluck('conversation_control_id')
+            ->filter()
+            ->unique()
+            ->values();
+
         $conversations = ConversationControl::query()
             ->where('user_id', RealEstateIsolationService::USER_ID)
             ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
             ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
-            ->whereHas('realEstateProfiles', fn ($query) => $query->isolatedProduction())
+            ->whereIn('id', $conversationIds)
             ->get();
 
         $statuses = $conversations->map(fn (ConversationControl $conversation): array => $this->status($conversation));
