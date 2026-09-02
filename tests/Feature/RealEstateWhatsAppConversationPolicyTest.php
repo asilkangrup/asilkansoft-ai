@@ -51,6 +51,14 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
             $prompt
         );
         $this->assertStringContainsString(
+            'recent_media_analysis içinde m²',
+            $prompt
+        );
+        $this->assertStringContainsString(
+            'Satıcı "siz fiyat belirleyin"',
+            $prompt
+        );
+        $this->assertStringContainsString(
             '1200 => 1.200.000 TL',
             $prompt
         );
