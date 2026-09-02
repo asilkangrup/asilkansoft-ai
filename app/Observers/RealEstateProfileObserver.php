@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\RealEstateProfile;
 use App\Services\RealEstateCaseLifecycleService;
 use App\Services\RealEstateEvidenceLedgerService;
+use App\Services\RealEstateInvestorMandateService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
 use App\Services\RealEstateOperatorAlertService;
@@ -24,6 +25,9 @@ class RealEstateProfileObserver
         if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return;
         }
+
+        app(RealEstateInvestorMandateService::class)->sync($profile);
+        $profile->refresh();
 
         $this->recordEvidence($profile, $conversation);
         app(RealEstateOperatorAlertService::class)->sync($profile);
