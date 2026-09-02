@@ -344,7 +344,17 @@ PROMPT;
 
     private function supports(RealEstateProfile $profile): bool
     {
-        return $profile->profile_type === 'seller'
-            && $profile->belongsToIsolatedProductionScope();
+        if (
+            $profile->profile_type !== 'seller'
+            || (int) $profile->user_id !== RealEstateIsolationService::USER_ID
+            || (int) $profile->ai_bot_id !== RealEstateIsolationService::BOT_ID
+        ) {
+            return false;
+        }
+
+        $conversation = $profile->conversation()->first();
+
+        return app(RealEstateIsolationService::class)
+            ->supportsConversation($conversation);
     }
 }

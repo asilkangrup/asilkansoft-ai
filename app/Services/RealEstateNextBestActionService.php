@@ -254,7 +254,7 @@ PROMPT;
             );
         }
 
-        if ($offerMissing !== []) {
+        if ($offerMissing !== [] && $matchCount === 0) {
             return $this->payload(
                 actionCode: 'complete_seller_offer_packet',
                 priority: 'medium',

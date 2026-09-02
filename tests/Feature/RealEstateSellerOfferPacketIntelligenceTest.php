@@ -10,6 +10,8 @@ use App\Models\User;
 use App\Services\RealEstateNextBestActionService;
 use App\Services\RealEstateSellerOfferPacketService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -154,7 +156,15 @@ class RealEstateSellerOfferPacketIntelligenceTest extends TestCase
             'monthly_message_limit' => 1000,
             'status' => 'active',
         ]);
-        $conversation = $this->conversation($bot, 38, 'offer-packet-foreign');
+        // Production conversation creation normalizes the isolated bot back to
+        // organization 37. Force a post-create organization drift here so the
+        // service is tested against an actual foreign-organization row.
+        $conversation = $this->conversation($bot, 37, 'offer-packet-foreign');
+        DB::table('conversation_controls')
+            ->where('id', $conversation->id)
+            ->update(['organization_id' => 38]);
+        $conversation->refresh();
+
         $profile = $this->profileQuietly($conversation, [
             'property_type' => 'arsa',
             'city' => 'Muğla',
@@ -187,12 +197,14 @@ class RealEstateSellerOfferPacketIntelligenceTest extends TestCase
             'notes' => 'private-customer-note-should-never-appear',
         ]);
 
-        $this->artisan('real-estate:offer-packets', ['--json' => true])
-            ->expectsOutputToContain('"seller_profiles": 1')
-            ->doesntExpectOutputToContain('private-customer-note-should-never-appear')
-            ->expectsOutputToContain('"contains_customer_pii": false')
-            ->expectsOutputToContain('"follow_up_scheduling_allowed": false')
-            ->assertSuccessful();
+        $exitCode = Artisan::call('real-estate:offer-packets', ['--json' => true]);
+        $output = Artisan::output();
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('"seller_profiles": 1', $output);
+        $this->assertStringNotContainsString('private-customer-note-should-never-appear', $output);
+        $this->assertStringContainsString('"contains_customer_pii": false', $output);
+        $this->assertStringContainsString('"follow_up_scheduling_allowed": false', $output);
     }
 
     private function profileQuietly(
