@@ -144,14 +144,15 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $this->assertStringContainsString('private', (string) $privateResponse->headers->get('cache-control'));
         $this->assertStringContainsString('no-store', (string) $privateResponse->headers->get('cache-control'));
 
-        $privatePath = 'real-estate-inbound/999/original.jpg';
-        Storage::disk('local')->put($privatePath, 'private-image');
         $whatsappMedia = ChatMessage::query()->forceCreate([
-            'id'=>999,'user_id'=>40,'organization_id'=>37,'ai_bot_id'=>35,
+            'user_id'=>40,'organization_id'=>37,'ai_bot_id'=>35,
             'session_id'=>$customer->session_id,'role'=>'user','sender_type'=>'customer',
-            'message'=>'[Fotoğraf]','message_type'=>'image','media_url'=>'private:'.$privatePath,
+            'message'=>'[Fotoğraf]','message_type'=>'image','media_url'=>'pending-private-copy',
             'media_mime_type'=>'image/jpeg','whatsapp_message_id'=>'private-photo','status'=>'received',
         ]);
+        $privatePath = 'real-estate-inbound/'.$whatsappMedia->id.'/original.jpg';
+        Storage::disk('local')->put($privatePath, 'private-image');
+        $whatsappMedia->forceFill(['media_url'=>'private:'.$privatePath])->saveQuietly();
         $profileData = $profile->data;
         $profileData['media_findings'][] = [
             'message_id'=>'private-photo','media_category'=>'property_photo','summary'=>'Özel WhatsApp fotoğrafı',
