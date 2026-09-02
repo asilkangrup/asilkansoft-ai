@@ -9,6 +9,7 @@ on:
       - 'app/Http/Controllers/RealEstate*.php'
       - 'app/Jobs/*RealEstate*.php'
       - 'app/Observers/RealEstate*.php'
+      - 'app/Observers/ChatMessageObserver.php'
       - 'app/Console/Commands/*RealEstate*.php'
       - 'database/migrations/*real_estate*.php'
       - 'routes/api.php'
@@ -26,6 +27,7 @@ on:
       - 'app/Http/Controllers/RealEstate*.php'
       - 'app/Jobs/*RealEstate*.php'
       - 'app/Observers/RealEstate*.php'
+      - 'app/Observers/ChatMessageObserver.php'
       - 'app/Console/Commands/*RealEstate*.php'
       - 'database/migrations/*real_estate*.php'
       - 'routes/api.php'
@@ -74,6 +76,7 @@ jobs:
           find app/Models -maxdepth 1 -name 'RealEstate*.php' -print0 | xargs -0 -n1 php -l
           find app/Observers -maxdepth 1 -name 'RealEstate*.php' -print0 | xargs -0 -n1 php -l
           find app/Console/Commands -maxdepth 1 -name '*RealEstate*.php' -print0 | xargs -0 -n1 php -l
+          php -l app/Observers/ChatMessageObserver.php
           php -l app/Services/MemoryService.php
           php -l routes/console.php
 
