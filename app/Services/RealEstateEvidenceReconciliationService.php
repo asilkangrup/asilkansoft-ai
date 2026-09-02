@@ -189,11 +189,10 @@ class RealEstateEvidenceReconciliationService
             }
         }
 
-        $existingConflicts = is_array($data['evidence_conflicts'] ?? null)
-            ? $data['evidence_conflicts']
-            : [];
-
-        $allConflicts = collect(array_merge($existingConflicts, $conflicts))
+        // All retained media findings are evaluated on every pass. Therefore
+        // the current conflict set is fully recomputable and old conflicts must
+        // not remain marked "unresolved" after the canonical value is corrected.
+        $allConflicts = collect($conflicts)
             ->filter(fn ($conflict): bool => is_array($conflict))
             ->unique(fn (array $conflict): string => implode('|', [
                 (string) ($conflict['field'] ?? ''),
