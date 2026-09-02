@@ -7,6 +7,8 @@ use App\Models\RealEstateOutboundSafetyEvent;
 use App\Services\RealEstateEvidenceLedgerService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
+use App\Services\RealEstateMediaProcessingLedgerService;
+use App\Services\RealEstateMediaSafetyService;
 use App\Services\RealEstateNextBestActionService;
 use App\Services\RealEstateOutboundSafetyService;
 use App\Services\RealEstateReadinessService;
@@ -63,6 +65,9 @@ Route::prefix('real-estate')->group(function (): void {
             && class_exists(RealEstateNextBestActionService::class);
         $valuationResearchLedgerReady = Schema::hasTable('real_estate_valuation_research_events')
             && class_exists(RealEstateValuationResearchLedgerService::class);
+        $mediaSafetyReady = Schema::hasTable('real_estate_media_processing_events')
+            && class_exists(RealEstateMediaSafetyService::class)
+            && class_exists(RealEstateMediaProcessingLedgerService::class);
 
         $snapshot['checks']['match_ledger_ready'] = $matchLedgerReady;
         $snapshot['match_ledger_telemetry_24h'] = $matchLedgerReady
@@ -204,12 +209,18 @@ Route::prefix('real-estate')->group(function (): void {
             ? app(RealEstateValuationResearchLedgerService::class)->telemetry24h()
             : app(RealEstateValuationResearchLedgerService::class)->emptyTelemetry();
 
+        $snapshot['checks']['media_analysis_firewall_ready'] = $mediaSafetyReady;
+        $snapshot['media_processing_telemetry_24h'] = $mediaSafetyReady
+            ? app(RealEstateMediaProcessingLedgerService::class)->telemetry24h()
+            : app(RealEstateMediaProcessingLedgerService::class)->emptyTelemetry();
+
         foreach ([
             'match_ledger_ready' => $matchLedgerReady,
             'evidence_ledger_ready' => $evidenceLedgerReady,
             'outbound_safety_firewall_ready' => $outboundSafetyReady,
             'next_best_action_orchestrator_ready' => $nextBestActionReady,
             'valuation_research_ledger_ready' => $valuationResearchLedgerReady,
+            'media_analysis_firewall_ready' => $mediaSafetyReady,
         ] as $check => $ready) {
             if ($ready) {
                 continue;
