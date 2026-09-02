@@ -60,13 +60,20 @@ class RealEstateWhatsAppInboundService
             ];
         }
 
-        $phoneNumber = trim((string) explode('@', $remoteJid)[0]);
+        $phoneNumber = $this->resolvePhoneNumber($payload);
 
-        if ($phoneNumber === '') {
+        if ($phoneNumber === null) {
+            Log::warning('REAL ESTATE WHATSAPP LID WITHOUT PHONE MAPPING IGNORED', [
+                'instance' => $instance,
+                'remote_jid_type' => str_ends_with($remoteJid, '@lid') ? 'lid' : 'unknown',
+            ]);
+
             return [
                 'success' => true,
                 'ignored' => true,
-                'reason' => 'missing_phone',
+                'reason' => str_ends_with($remoteJid, '@lid')
+                    ? 'unresolved_lid'
+                    : 'missing_phone',
             ];
         }
 
@@ -575,6 +582,52 @@ class RealEstateWhatsAppInboundService
             'unsupported_format' => '[Sesli mesaj - ses formatı desteklenmedi. Kullanıcıdan içeriği yazılı göndermesini istemelisin.]',
             default => '[Sesli mesaj - içerik güvenilir biçimde metne çevrilemedi. Duyduğunu varsayma; kullanıcıdan içeriği yazılı göndermesini istemelisin.]',
         };
+    }
+
+    private function resolvePhoneNumber(array $payload): ?string
+    {
+        $remoteJid = trim((string) data_get($payload, 'data.key.remoteJid', ''));
+        $remoteIsLid = str_ends_with(strtolower($remoteJid), '@lid');
+
+        $candidates = $remoteIsLid
+            ? [
+                data_get($payload, 'data.key.remoteJidAlt'),
+                data_get($payload, 'data.key.senderPn'),
+                data_get($payload, 'data.key.participantPn'),
+                data_get($payload, 'data.senderPn'),
+                data_get($payload, 'data.participantPn'),
+            ]
+            : [$remoteJid];
+
+        foreach ($candidates as $candidate) {
+            if (! is_string($candidate)) {
+                continue;
+            }
+
+            $candidate = trim($candidate);
+
+            if ($candidate === '' || str_ends_with(strtolower($candidate), '@lid')) {
+                continue;
+            }
+
+            if (str_contains($candidate, '@')) {
+                $suffix = strtolower((string) strrchr($candidate, '@'));
+
+                if (! in_array($suffix, ['@s.whatsapp.net', '@c.us'], true)) {
+                    continue;
+                }
+
+                $candidate = (string) strstr($candidate, '@', true);
+            }
+
+            $digits = preg_replace('/\D+/', '', $candidate);
+
+            if (is_string($digits) && strlen($digits) >= 8 && strlen($digits) <= 15) {
+                return $digits;
+            }
+        }
+
+        return null;
     }
 
     private function normalizeEvent(mixed $event): string
