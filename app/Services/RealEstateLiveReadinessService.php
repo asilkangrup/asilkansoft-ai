@@ -18,17 +18,21 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
         $connected = $state === 'open';
         $factConsistencyReady = class_exists(RealEstateFactConsistencyService::class)
             && class_exists(RealEstateFactConsistencyActionService::class);
+        $mediaAdmissionGateReady = app(RealEstateMediaAnalysisService::class)
+            instanceof RealEstateGuardedMediaAnalysisService;
 
         $snapshot['whatsapp_connection_state'] = $state;
         $snapshot['whatsapp_connection_source'] = 'evolution_live';
         $snapshot['checks']['whatsapp_connected'] = $connected;
         $snapshot['checks']['fact_consistency_guard_ready'] = $factConsistencyReady;
+        $snapshot['checks']['media_admission_gate_ready'] = $mediaAdmissionGateReady;
 
         $blocking = array_values(array_filter(
             $snapshot['blocking_checks'] ?? [],
             fn (mixed $check): bool => is_string($check)
                 && $check !== 'whatsapp_connected'
                 && $check !== 'fact_consistency_guard_ready'
+                && $check !== 'media_admission_gate_ready'
         ));
 
         if (! $connected) {
@@ -37,6 +41,10 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
 
         if (! $factConsistencyReady) {
             $blocking[] = 'fact_consistency_guard_ready';
+        }
+
+        if (! $mediaAdmissionGateReady) {
+            $blocking[] = 'media_admission_gate_ready';
         }
 
         $snapshot['blocking_checks'] = array_values(array_unique($blocking));
