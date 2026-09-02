@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Jobs\ProcessRealEstateMediaBatch;
 use App\Services\RealEstateMediaAnalysisService;
 use App\Services\RealEstateValuationService;
 use ReflectionMethod;
@@ -73,6 +74,34 @@ class RealEstateMediaFactPromotionTest extends TestCase
         ]);
 
         $this->assertArrayNotHasKey('area_sqm', $result);
+    }
+
+    public function test_photo_burst_uses_representative_analysis_and_keeps_retry_payloads(): void
+    {
+        $source = file_get_contents(app_path(
+            'Jobs/ProcessRealEstateMediaBatch.php'
+        ));
+        $memory = file_get_contents(app_path('Services/MemoryService.php'));
+        $openAi = file_get_contents(app_path(
+            'Services/RealEstateOpenAIService.php'
+        ));
+
+        $this->assertStringContainsString(
+            '$representativeImageIndexes',
+            $source
+        );
+        $this->assertStringContainsString(
+            "'payloads' => array_slice(\$payloads, \$index)",
+            $source
+        );
+        $this->assertStringContainsString(
+            "'skip_analysis'",
+            $memory
+        );
+        $this->assertStringNotContainsString(
+            'Mesajınızı tekrar gönderirseniz',
+            $openAi
+        );
     }
 
     public function test_seller_auto_research_no_longer_requires_asking_price(): void
