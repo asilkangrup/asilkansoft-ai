@@ -59,6 +59,17 @@ class RealEstateInboundRecoveryService
                         // make retrying the saved customer message safe.
                         $ignored
                             ->where('status', 'ignored')
+                            ->where(function ($reason): void {
+                                $reason
+                                    ->whereNull('last_error')
+                                    ->orWhereNotIn('last_error', [
+                                        'no_saved_customer_message',
+                                        'superseded_by_newer_customer_message',
+                                        'reply_already_exists',
+                                        'conversation_not_ai_eligible',
+                                        'superseded_before_recovery_delivery',
+                                    ]);
+                            })
                             ->whereNotNull('processed_at')
                             ->where('processed_at', '<=', $failedBefore);
                     })
@@ -108,6 +119,8 @@ class RealEstateInboundRecoveryService
             ->first();
 
         if (! $message) {
+            $this->closeIgnored($receipt, 'no_saved_customer_message');
+
             return 'skipped';
         }
 
@@ -138,6 +151,18 @@ class RealEstateInboundRecoveryService
             $this->closeIgnored($receipt, 'reply_already_exists');
 
             return 'already_answered';
+        }
+
+        // Normal receipt deduplication intentionally rejects ignored rows.
+        // At this point the saved message is proven to be the latest customer
+        // turn with no AI/human reply, so reopen only this exact receipt for the
+        // recovery service's locked begin transition.
+        if ($receipt->status === 'ignored') {
+            $receipt->forceFill([
+                'status' => 'failed',
+                'last_error' => 'safe_unanswered_recovery',
+                'processed_at' => now()->subSeconds(61),
+            ])->save();
         }
 
         $receiptState = $this->receiptService->begin(
