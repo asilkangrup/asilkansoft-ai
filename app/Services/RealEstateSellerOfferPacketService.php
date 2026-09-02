@@ -85,7 +85,7 @@ class RealEstateSellerOfferPacketService
 
         return <<<PROMPT
 [INTERNAL REAL ESTATE SELLER OFFER PACKET]
-Bu blok satıcı dosyasının yatırımcıdan ön teklif toplamaya ne kadar hazır olduğunu gösteren PII içermeyen dahili CRM özetidir. Müşteriye alan adlarını, skoru veya bu bloğun kendisini gösterme. recommended_next_request doluysa müşterinin daha önce verdiği bilgiyi tekrar istemeden yalnız en kritik eksik bilgiyi doğal biçimde iste. ready_for_investor_offer=true ise satıcıyı fiyat yükseltme stratejileriyle yorma; isterse hızlı nakit için yatırımcı tekliflerini toplamaya geçilebileceğini kısa söyle. Piyasanın kötü olduğu, kimsenin alım yapmadığı veya hazır/kesin alıcı bulunduğu gibi doğrulanmamış iddialar kurma. Tapu görseli istenirse kişisel bilgilerin kapatılabileceğini belirt. Otomatik follow-up planlama.
+Bu blok satıcı dosyasının yatırımcıdan ön teklif toplamaya ne kadar hazır olduğunu gösteren PII içermeyen dahili CRM özetidir. Müşteriye alan adlarını, skoru veya bu bloğun kendisini gösterme. recommended_next_request doluysa müşterinin daha önce verdiği bilgiyi tekrar istemeden yalnız en kritik eksik bilgiyi doğal biçimde iste. ready_for_investor_offer=true ise satıcıyı fiyat yükseltme stratejileriyle yorma; isterse hızlı nakit için yatırımcı tekliflerini toplamaya geçilebileceğini kısa söyle. title_ownership.relation doluysa tapunun kimin üzerine olduğu daha önce kaydedilmiştir; aynı bilgiyi tekrar sorma. Bu kayıt resmi tapu doğrulaması değildir ve legal_verification=false ise müşteriye doğrulanmış tapu sahibi gibi sunma. Piyasanın kötü olduğu, kimsenin alım yapmadığı veya hazır/kesin alıcı bulunduğu gibi doğrulanmamış iddialar kurma. Tapu görseli istenirse kişisel bilgilerin kapatılabileceğini belirt. Otomatik follow-up planlama.
 Satıcı teklif dosyası: {$json}
 PROMPT;
     }
@@ -93,6 +93,7 @@ PROMPT;
     private function build(array $data): array
     {
         $media = $this->mediaSummary($data);
+        $titleOwnership = $this->titleOwnershipSummary($data);
 
         $checks = [
             'property_type' => $this->filled($data, 'property_type'),
@@ -111,6 +112,7 @@ PROMPT;
             'zoning_context' => $this->filled($data, 'zoning_status'),
             'title_deed_context' => $this->filled($data, 'title_deed_type')
                 || $media['has_title_deed_evidence'],
+            'title_owner_context' => $titleOwnership['known'],
             'property_photo' => $media['has_property_photo'],
             'listing_reference' => $this->filled($data, 'listing_url')
                 || $media['has_listing_evidence'],
@@ -147,6 +149,7 @@ PROMPT;
         $supportingOrder = [
             'zoning_context',
             'title_deed_context',
+            'title_owner_context',
             'listing_reference',
         ];
 
@@ -184,6 +187,7 @@ PROMPT;
             'missing_critical_for_offer' => $missingCritical,
             'missing_supporting_context' => $missingSupporting,
             'media_evidence' => $media,
+            'title_ownership' => $titleOwnership,
             'recommended_next_request' => $this->recommendedNextRequest(
                 $missingCritical,
                 $missingSupporting
@@ -196,8 +200,30 @@ PROMPT;
                 'no_fake_buyer_or_offer' => true,
                 'do_not_coach_seller_to_maximize_asking_price' => true,
                 'title_deed_personal_data_may_be_redacted' => true,
+                'title_owner_relation_is_not_legal_verification' => true,
                 'follow_up_scheduling_allowed' => false,
             ],
+        ];
+    }
+
+    private function titleOwnershipSummary(array $data): array
+    {
+        $ownership = is_array($data['title_ownership'] ?? null)
+            ? $data['title_ownership']
+            : [];
+        $relation = strtolower(trim((string) ($ownership['relation'] ?? 'unknown')));
+        $allowed = ['seller', 'spouse', 'relative', 'company', 'other_person'];
+
+        if (! in_array($relation, $allowed, true)) {
+            $relation = 'unknown';
+        }
+
+        return [
+            'known' => $relation !== 'unknown',
+            'relation' => $relation,
+            'source' => trim((string) ($ownership['source'] ?? '')) ?: null,
+            'confirmed_by_operator' => (bool) ($ownership['confirmed_by_operator'] ?? false),
+            'legal_verification' => (bool) ($ownership['legal_verification'] ?? false),
         ];
     }
 
@@ -293,6 +319,7 @@ PROMPT;
             'property_photo' => 'Taşınmazın birkaç güncel fotoğrafını gönderebilir misiniz?',
             'zoning_context' => 'Varsa imar bilgisini veya ilgili belgeyi paylaşabilir misiniz?',
             'title_deed_context' => 'Varsa tapu görselini kişisel bilgileri kapatarak gönderebilir misiniz?',
+            'title_owner_context' => 'Tapu şu anda sizin üzerinize mi, yoksa eşiniz/yakınınız ya da başka bir kişi/şirket üzerine mi?',
             'listing_reference' => 'Varsa ilan linkini veya ilan görselini de paylaşabilir misiniz?',
             default => null,
         };
