@@ -22,7 +22,7 @@ class RealEstateWhatsAppInboundService
     ) {
     }
 
-    public function process(array $payload): array
+    public function process(array $payload, bool $suppressReply = false): array
     {
         $event = $this->normalizeEvent($payload['event'] ?? null);
 
@@ -71,9 +71,6 @@ class RealEstateWhatsAppInboundService
 
         $messageId = trim((string) data_get($payload, 'data.key.id', ''));
 
-        // Durable inbound/outbound idempotency depends on Evolution's message
-        // identifier. Refuse an unidentifiable production message rather than
-        // risk saving or replying to the same customer event multiple times.
         if ($messageId === '') {
             Log::warning('REAL ESTATE WHATSAPP MESSAGE WITHOUT ID IGNORED', [
                 'instance' => $instance,
@@ -117,6 +114,7 @@ class RealEstateWhatsAppInboundService
                 instance: $instance,
                 phoneNumber: $phoneNumber,
                 messageId: $messageId,
+                suppressReply: $suppressReply,
             );
 
             $this->receiptService->complete($receipt, $result);
@@ -201,6 +199,7 @@ class RealEstateWhatsAppInboundService
         string $instance,
         string $phoneNumber,
         string $messageId,
+        bool $suppressReply = false,
     ): array {
         if (! $this->isolation->organizationValid()) {
             throw new RuntimeException('İzole Emlak AI organizasyon kimliği geçersiz.');
@@ -314,6 +313,14 @@ class RealEstateWhatsAppInboundService
             ];
         }
 
+        if ($suppressReply) {
+            return [
+                'success' => true,
+                'ignored' => true,
+                'reason' => 'media_batch_buffered',
+            ];
+        }
+
         $history = $this->memoryService->openAIMesajlariHazirla(
             userId: RealEstateIsolationService::USER_ID,
             sessionId: $sessionId,
@@ -357,10 +364,6 @@ class RealEstateWhatsAppInboundService
             ];
         }
 
-        // After WhatsApp confirms the send, do not turn a local persistence or
-        // trial-accounting problem into a webhook retry that could duplicate the
-        // already-delivered customer reply. Repairable state remains in the
-        // isolated outbound ledger.
         try {
             $this->outboundDeliveryService->persistAssistantMessage($delivery);
             $this->outboundDeliveryService->consumeTrialOnce($delivery, $bot);
