@@ -112,8 +112,9 @@ class RealEstateInvestorMandateService
                 default => 'early',
             },
             'core_ready' => $checks['budget_max']
-                && $checks['city']
-                && $checks['property_type'],
+                && $checks['property_type']
+                && ($checks['city'] || ($data['location_flexibility'] ?? null) === 'flexible')
+                && $checks['investment_goal'],
             'criteria_presence' => $checks,
             'missing_high_value_criteria' => $missing,
             'recommended_next_question' => $this->recommendedNextQuestion($checks),
@@ -143,18 +144,10 @@ class RealEstateInvestorMandateService
     private function recommendedNextQuestion(array $checks): ?string
     {
         return match (true) {
-            ! $checks['budget_max'] => 'Gerçekçi maksimum bütçeyi tek kısa soruyla netleştir.',
-            ! $checks['city'] => 'Hedef ili netleştir.',
-            ! $checks['property_type'] => 'Aradığı taşınmaz türünü netleştir.',
-            ! $checks['investment_goal'] => 'Yatırım hedefini: al-sat, kira getirisi veya değer artışı olarak netleştir.',
-            ! $checks['timeline'] => 'Alım zamanlamasını netleştir.',
-            ! $checks['location'] => 'Hedef ilçe veya mahalleyi netleştir.',
-            ! $checks['area_range'] => 'Aradığı yaklaşık m² aralığını tek kısa soruyla netleştir.',
-            ! $checks['location_flexibility'] => 'Hedef ilçenin kesin şart mı yoksa aynı il içinde esnek mi olduğunu sor.',
-            ! $checks['financing'] => 'Nakit, kredi veya karma finansman durumunu netleştir.',
-            ! $checks['risk_preference'] => 'Risk tercihini kısa biçimde netleştir; resmi durumu belirsiz fırsatı varsayma.',
-            ! $checks['shared_title_preference'] => 'Hisseli tapulu taşınmazları değerlendirip değerlendirmediğini sor.',
-            ! $checks['target_discount'] => 'Varsa fırsat saydığı minimum iskonto eşiğini yüzde olarak netleştir.',
+            ! $checks['budget_max'] => 'Yaklaşık maksimum yatırım bütçesini netleştir.',
+            ! $checks['city'] && ! $checks['location_flexibility'] => 'Belirli bir bölge mi aradığını, yoksa Türkiye genelinde fırsata açık mı olduğunu sor.',
+            ! $checks['property_type'] => 'Öncelikli taşınmaz türünü netleştir; birden fazla tür kabul ediyorsa bunu olduğu gibi kaydet.',
+            ! $checks['investment_goal'] => 'Yatırım hedefini kısa biçimde netleştir: al-sat, kira getirisi veya değer artışı.',
             default => null,
         };
     }
