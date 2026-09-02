@@ -51,6 +51,17 @@ class RealEstateInboundRecoveryService
                             ->whereNotNull('processed_at')
                             ->where('processed_at', '<=', $failedBefore);
                     })
+                    ->orWhere(function ($ignored) use ($failedBefore): void {
+                        // An earlier worker may have marked a valid inbound as
+                        // ignored while a newer debounce job was expected to
+                        // answer it. If that job never produced an AI/human
+                        // reply, recoverReceipt's latest-turn and reply checks
+                        // make retrying the saved customer message safe.
+                        $ignored
+                            ->where('status', 'ignored')
+                            ->whereNotNull('processed_at')
+                            ->where('processed_at', '<=', $failedBefore);
+                    })
                     ->orWhere(function ($processing) use ($staleProcessingBefore): void {
                         $processing
                             ->where('status', 'processing')
