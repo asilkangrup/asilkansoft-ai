@@ -30,7 +30,18 @@ class RealEstateCustomerDetailAccessTest extends TestCase
             'ai_bot_id' => 35,
             'profile_type' => 'seller',
             'data' => [
-                'location' => 'Marmaris', 'property_type' => 'arsa',
+                'location' => 'Marmaris Hisarönü', 'city'=>'Muğla','district'=>'Marmaris','property_type' => 'arsa',
+                'area_sqm'=>1200,'block_no'=>'123','parcel_no'=>'45','asking_price'=>4_300_000,
+                'title_deed_type'=>'Arsa','zoning_status'=>'Konut','urgency'=>'high',
+                'commercial_terms'=>['commission_rate_percent'=>4],
+                'seller_offer_packet_intelligence'=>[
+                    'status'=>'nearly_ready','missing_critical_for_offer'=>['property_photo'],
+                    'missing_supporting_context'=>['listing_reference'],
+                ],
+                'investor_offer_handoff_intelligence'=>[
+                    'ready_for_operator_handoff'=>false,'candidate_count'=>0,
+                    'recommended_operator_action'=>'Satıcıdan güncel fotoğrafları iste.',
+                ],
                 'media_findings' => [
                     ['message_id'=>'photo-1','media_category'=>'property_photo','summary'=>'Arsanın güncel görünümü'],
                     ['message_id'=>'deed-1','media_category'=>'title_deed','summary'=>'Tapu görseli'],
@@ -38,7 +49,7 @@ class RealEstateCustomerDetailAccessTest extends TestCase
                     ['message_id'=>'map-1','media_category'=>'location_map','summary'=>'Konum görseli'],
                 ],
             ],
-            'valuation' => [],
+            'valuation' => ['realistic_sale_min'=>3_500_000,'realistic_sale_max'=>3_900_000,'investor_buy_min'=>3_100_000,'investor_buy_max'=>3_120_000,'confidence_score'=>82],
         ]));
 
         foreach ([
@@ -66,6 +77,15 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $this->assertCount(1, $gallery['Tapu / Parsel Belgeleri']);
         $this->assertCount(1, $gallery['İlan Görselleri']);
         $this->assertArrayNotHasKey('Konum Görselleri', $gallery);
+        $dossier = $detail->getDossierProperty();
+        $this->assertSame('123', $dossier['property']['Ada']);
+        $this->assertSame('45', $dossier['property']['Parsel']);
+        $this->assertSame(3_120_000, $dossier['pricing']['Yatırımcı hedef üst']);
+        $this->assertSame(124_800, $dossier['pricing']['Tahmini komisyon']);
+        $this->assertNotContains('property_photo', $dossier['missing']);
+        $this->assertNotContains('listing_reference', $dossier['missing']);
+        $this->assertNotSame('', trim($dossier['call_script']));
+        $this->assertCount(4, $detail->getMessagesProperty());
 
         $detail->customerId = $foreign->id;
         $this->assertNull($detail->getCustomerProperty());
