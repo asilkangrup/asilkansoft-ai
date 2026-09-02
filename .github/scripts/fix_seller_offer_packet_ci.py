@@ -29,9 +29,34 @@ s = p.read_text()
 if 'use Illuminate\\Support\\Facades\\Artisan;' not in s:
     s = s.replace(
         'use Illuminate\\Support\\Facades\\Hash;\n',
-        'use Illuminate\\Support\\Facades\\Artisan;\nuse Illuminate\\Support\\Facades\\Hash;\n',
+        'use Illuminate\\Support\\Facades\\Artisan;\nuse Illuminate\\Support\\Facades\\DB;\nuse Illuminate\\Support\\Facades\\Hash;\n',
         1,
     )
+elif 'use Illuminate\\Support\\Facades\\DB;' not in s:
+    s = s.replace(
+        'use Illuminate\\Support\\Facades\\Artisan;\n',
+        'use Illuminate\\Support\\Facades\\Artisan;\nuse Illuminate\\Support\\Facades\\DB;\n',
+        1,
+    )
+
+old = """        $conversation = $this->conversation($bot, 38, 'offer-packet-foreign');
+        $profile = $this->profileQuietly($conversation, [
+"""
+new = """        // Production conversation creation normalizes the isolated bot back to
+        // organization 37. Force a post-create organization drift here so the
+        // service is tested against an actual foreign-organization row.
+        $conversation = $this->conversation($bot, 37, 'offer-packet-foreign');
+        DB::table('conversation_controls')
+            ->where('id', $conversation->id)
+            ->update(['organization_id' => 38]);
+        $conversation->refresh();
+
+        $profile = $this->profileQuietly($conversation, [
+"""
+if old not in s:
+    raise SystemExit('foreign organization setup block not found')
+s = s.replace(old, new, 1)
+
 old = """        $this->artisan('real-estate:offer-packets', ['--json' => true])
             ->expectsOutputToContain('\"seller_profiles\": 1')
             ->doesntExpectOutputToContain('private-customer-note-should-never-appear')
