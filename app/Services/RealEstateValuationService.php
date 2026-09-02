@@ -235,14 +235,28 @@ Geçersizlik nedenleri: {$reasonJson}
 PROMPT;
         }
 
+        $customerValuation = $profile->valuation;
+
+        // Only expose the commercial two-level pricing view to the chat model.
+        // Active-listing market and raw quick-sale research bands remain internal
+        // so they cannot accidentally become a third customer-facing price band.
+        foreach ([
+            'market_min', 'market_max',
+            'quick_sale_min', 'quick_sale_max',
+            'research_realistic_sale_min', 'research_realistic_sale_max',
+            'market_gap_percent',
+        ] as $internalField) {
+            unset($customerValuation[$internalField]);
+        }
+
         $json = json_encode(
-            $profile->valuation,
+            $customerValuation,
             JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
         );
 
         return <<<PROMPT
 [INTERNAL FRESH REAL ESTATE VALUATION MEMORY]
-Aşağıdaki değerleme bu taşınmazın güncel yapılandırılmış verisiyle eşleşen, süre kontrollü araştırma kaydıdır. Müşteriye dahili JSON'u veya freshness alanlarını gösterme. İlan/emsal fiyatlarının gerçekleşmiş satış fiyatı olmadığını açıkça ayır. Kaynak ve emsal kalitesi düşükse kesinlik dilini azalt. Yeni temel taşınmaz bilgisi gelirse bu değerlemeyi otomatik olarak eski kabul et.
+Aşağıdaki değerleme bu taşınmazın güncel yapılandırılmış verisiyle eşleşen, süre kontrollü araştırma kaydıdır. Müşteriye dahili JSON'u veya freshness alanlarını gösterme. Fiyat sorularında yalnız iki müşteri seviyesi kullan: realistic_sale_min/max = gerçekçi satış bandı; investor_buy_min/max = yatırımcı / hızlı nakit alım seviyesi. Üçüncü bir "normal piyasa satış bandı" üretme. İlan/emsal fiyatlarının gerçekleşmiş satış fiyatı olmadığını açıkça ayır. Kaynak ve emsal kalitesi düşükse kesinlik dilini azalt. Yeni temel taşınmaz bilgisi gelirse bu değerlemeyi otomatik olarak eski kabul et.
 Değerleme: {$json}
 PROMPT;
     }
@@ -383,7 +397,7 @@ KURALLAR
 - realistic_sale_min/realistic_sale_max, birden fazla yakın emsalin m² fiyatı, ilan yaşı/konumu/özellikleri ve normal pazarlık payı dikkate alınarak tahmin edilen gerçekçi satar fiyatıdır. Tek bir ilana dayanma.
 - Kullanıcının ticari modeli gereği investor_buy_max, gerçekçi satar fiyatı bandının en az %20 altında olmalıdır. Normal hedef %20-30 iskontodur; ancak bu oranı sağlamak için emsal veya sayı uydurma.
 - investor_buy_min/investor_buy_max hesabını ilan fiyatından değil realistic_sale bandından yap. investor_buy_max hiçbir durumda realistic_sale_max * 0.80 değerini aşmasın.
-- quick_sale bandı, gerçekçi normal satıştan daha düşük/hızlı nakde dönüş bandıdır ve gerçekçi satış bandından mantıksız biçimde yüksek olamaz.
+- quick_sale bandı, araştırma sırasında alt/hızlı gerçekleşebilir satış bandıdır. Uygulama müşteriye gösterilecek gerçekçi satış bandını bu daha temkinli alt/hızlı band üzerinden deterministik olarak kurabilir.
 - sources alanına yalnızca gerçekten araştırmada kullandığın URL veya kaynak adını yaz; kaynak kullanmadıysan boş dizi.
 - comparables alanına yalnızca gerçekten web araştırmasında gördüğün emsalleri ekle. URL, fiyat veya m² uydurma.
 - observed_at için kaynak sayfasında tarih açıkça görünüyorsa YYYY-MM-DD yaz, görünmüyorsa null bırak.
@@ -462,16 +476,44 @@ PROMPT;
             ? 'no_verified_sources'
             : 'web_search';
 
-        // Commercial guardrail: investor opportunity is anchored to the
-        // researched realistic sale range, never directly to seller ask/listing price.
+        // Preserve the research model's broader realistic-sale estimate for
+        // diagnostics, but use the lower/faster executable band as the commercial
+        // "realistic sale" shown to sellers.
+        $result['research_realistic_sale_min'] = $result['realistic_sale_min'] ?? null;
+        $result['research_realistic_sale_max'] = $result['realistic_sale_max'] ?? null;
+
+        $quickMin = $result['quick_sale_min'] ?? null;
+        $quickMax = $result['quick_sale_max'] ?? null;
+
+        if (is_numeric($quickMin) && (float) $quickMin > 0) {
+            $result['realistic_sale_min'] = (float) $quickMin;
+        }
+        if (is_numeric($quickMax) && (float) $quickMax > 0) {
+            $result['realistic_sale_max'] = (float) $quickMax;
+        }
+
+        // Commercial guardrail: investor / fast-cash opportunity is anchored
+        // to the customer-facing realistic sale range, never directly to seller
+        // ask or active-listing market prices.
         $realisticMax = $result['realistic_sale_max'] ?? null;
         if (is_numeric($realisticMax) && (float) $realisticMax > 0) {
             $maxInvestorBuy = round((float) $realisticMax * 0.80, 2);
-            if (! is_numeric($result['investor_buy_max'] ?? null) || (float) $result['investor_buy_max'] > $maxInvestorBuy) {
+
+            if (
+                ! is_numeric($result['investor_buy_max'] ?? null)
+                || (float) $result['investor_buy_max'] > $maxInvestorBuy
+            ) {
                 $result['investor_buy_max'] = $maxInvestorBuy;
             }
-            if (is_numeric($result['investor_buy_min'] ?? null) && (float) $result['investor_buy_min'] > (float) $result['investor_buy_max']) {
-                $result['investor_buy_min'] = round((float) $result['investor_buy_max'] * 0.90, 2);
+
+            if (
+                is_numeric($result['investor_buy_min'] ?? null)
+                && (float) $result['investor_buy_min'] > (float) $result['investor_buy_max']
+            ) {
+                $result['investor_buy_min'] = round(
+                    (float) $result['investor_buy_max'] * 0.90,
+                    2
+                );
             }
         }
 

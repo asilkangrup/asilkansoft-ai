@@ -68,6 +68,10 @@ class RealEstateValuationResearchOutputGuardService
         $sanitized = [
             'market_min' => $this->positiveNumber($valuation['market_min'] ?? null),
             'market_max' => $this->positiveNumber($valuation['market_max'] ?? null),
+            'realistic_sale_min' => $this->positiveNumber($valuation['realistic_sale_min'] ?? null),
+            'realistic_sale_max' => $this->positiveNumber($valuation['realistic_sale_max'] ?? null),
+            'research_realistic_sale_min' => $this->positiveNumber($valuation['research_realistic_sale_min'] ?? null),
+            'research_realistic_sale_max' => $this->positiveNumber($valuation['research_realistic_sale_max'] ?? null),
             'quick_sale_min' => $this->positiveNumber($valuation['quick_sale_min'] ?? null),
             'quick_sale_max' => $this->positiveNumber($valuation['quick_sale_max'] ?? null),
             'investor_buy_min' => $this->positiveNumber($valuation['investor_buy_min'] ?? null),
@@ -273,9 +277,23 @@ class RealEstateValuationResearchOutputGuardService
             return null;
         }
 
-        return $this->normalizeText((string) $value) === $this->normalizeText($expected)
-            ? $expected
-            : 'mismatch';
+        $actual = $this->normalizeText((string) $value);
+        $expectedNormalized = $this->normalizeText($expected);
+
+        if ($actual === '' || $expectedNormalized === '') {
+            return null;
+        }
+
+        $matches = $actual === $expectedNormalized;
+
+        // Research sources frequently return descriptive labels such as
+        // "konut imarlı arsa" or "satılık daire". Accept the same core type
+        // without weakening a genuine cross-category mismatch.
+        if (! $matches && mb_strlen($expectedNormalized) >= 4) {
+            $matches = str_contains($actual, $expectedNormalized);
+        }
+
+        return $matches ? $expected : 'mismatch';
     }
 
     private function profileLocation(array $profileData): ?string

@@ -259,27 +259,27 @@ PROMPT;
     private function sellerNegotiation(array $data, array $valuation): array
     {
         $asking = $this->number($data['asking_price'] ?? null);
-        $marketMax = $this->number($valuation['market_max'] ?? null);
+        $realisticMax = $this->number($valuation['realistic_sale_max'] ?? null);
         $investorMax = $this->number($valuation['investor_buy_max'] ?? null);
 
         if (($data['urgency'] ?? null) === 'high' && ! $this->hasValuation($valuation)) {
             return [
                 'protect_urgent_seller',
-                'Aciliyeti fırsat bilerek baskı kurma. Önce değerleme verisini güçlendir, sonra hızlı satış seçeneğini piyasa aralığından ayrı ve açık biçimde anlat.',
+                'Aciliyeti fırsat bilerek baskı kurma. Önce değerleme verisini güçlendir, sonra gerçekçi satış ile yatırımcı/hızlı nakit seviyesini açık biçimde ayır.',
             ];
         }
 
-        if ($asking !== null && $marketMax !== null && $asking > ($marketMax * 1.12)) {
+        if ($asking !== null && $realisticMax !== null && $asking > ($realisticMax * 1.12)) {
             return [
                 'reframe_high_ask',
-                'Fiyat beklentisini tek bir ilana değil güncel emsal aralığına dayandırarak yeniden çerçevele; satıcının esnekliğini doğal biçimde ölç.',
+                'Fiyat beklentisini aktif ilanların üst beklentisine değil araştırılmış gerçekçi satış bandına göre yeniden çerçevele; satıcının esnekliğini doğal biçimde ölç.',
             ];
         }
 
         if ($asking !== null && $investorMax !== null && $asking > $investorMax) {
             return [
                 'negotiate_to_investor_range',
-                'Satıcıya piyasa, hızlı satış ve yatırımcı alım aralığını şeffaf biçimde ayır. Yatırımcıya sunulabilir gerçek bir fırsat oluşturmak için fiyatın yatırımcı alım bandına yaklaşması gerektiğini emsal ve hız/fiyat dengesiyle anlat; makul bir karşı teklif aralığı öner ve pazarlık esnekliğini ölç. Aciliyet üzerinden baskı kurma, sahte alıcı/teklif kullanma.',
+                'Satıcıya yalnız gerçekçi satış bandı ile yatırımcı/hızlı nakit alım seviyesini şeffaf biçimde ayır. Üst aktif ilan bandını müşteri-facing piyasa satış fiyatı gibi sunma. Yatırımcıya sunulabilir gerçek bir fırsat oluşturmak için fiyatın yatırımcı alım seviyesine yaklaşması gerektiğini emsal ve hız/fiyat dengesiyle anlat; makul bir karşı teklif öner ve pazarlık esnekliğini ölç. Aciliyet üzerinden baskı kurma, sahte alıcı/teklif kullanma.',
             ];
         }
 
@@ -293,7 +293,7 @@ PROMPT;
         if ($this->hasValuation($valuation)) {
             return [
                 'protect_value',
-                'Piyasa, hızlı satış ve yatırımcı alım aralıklarını birbirinden ayır; satıcıya hangi hız/fiyat dengesini tercih ettiğini netleştir.',
+                'Müşteriye gerçekçi satış bandı ile yatırımcı/hızlı nakit alım seviyesini ayır; üçüncü bir piyasa bandı üretme ve hız/fiyat dengesini net biçimde anlat.',
             ];
         }
 
@@ -391,7 +391,13 @@ PROMPT;
 
     private function hasValuation(array $valuation): bool
     {
-        return $this->number($valuation['market_min'] ?? null) !== null
+        return $this->number($valuation['realistic_sale_min'] ?? null) !== null
+            || $this->number($valuation['realistic_sale_max'] ?? null) !== null
+            || $this->number($valuation['investor_buy_min'] ?? null) !== null
+            || $this->number($valuation['investor_buy_max'] ?? null) !== null
+            || $this->number($valuation['quick_sale_min'] ?? null) !== null
+            || $this->number($valuation['quick_sale_max'] ?? null) !== null
+            || $this->number($valuation['market_min'] ?? null) !== null
             || $this->number($valuation['market_max'] ?? null) !== null;
     }
 }

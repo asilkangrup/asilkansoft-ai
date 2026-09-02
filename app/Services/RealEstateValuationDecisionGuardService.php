@@ -77,7 +77,7 @@ class RealEstateValuationDecisionGuardService
 
             if (! $freshEnough) {
                 $decision['negotiation_posture'] = 'refresh_valuation';
-                $decision['negotiation_strategy'] = 'Eski veya kaynaksız fiyat verisini pazarlık ankrajı yapma. Güncel emsal araştırmasını yenile, ardından piyasa / hızlı satış / yatırımcı alım aralıklarını yeniden karşılaştır.';
+                $decision['negotiation_strategy'] = 'Eski veya kaynaksız fiyat verisini pazarlık ankrajı yapma. Güncel emsal araştırmasını yenile, ardından gerçekçi satış ile yatırımcı/hızlı nakit alım seviyesini yeniden karşılaştır.';
                 $decision['next_best_action'] = 'Güncel emsal araştırmasını yenile; yeni araştırma doğrulanmadan eski değerlemeyi yatırımcı eşleştirmesinde veya fiyat pazarlığında kullanma.';
             } else {
                 $decision['negotiation_posture'] = 'repair_comparable_integrity';

@@ -330,6 +330,8 @@ class RealEstateValuationFreshnessService
         foreach ([
             'market_min',
             'market_max',
+            'realistic_sale_min',
+            'realistic_sale_max',
             'quick_sale_min',
             'quick_sale_max',
             'investor_buy_min',

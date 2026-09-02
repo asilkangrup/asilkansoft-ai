@@ -232,9 +232,16 @@ class RealEstateComparableIntegrityService
         $comparableType = $this->normalizeText($comparableType);
         $profileType = $this->normalizeText($profileType);
 
-        return $comparableType !== ''
-            && $profileType !== ''
-            && $comparableType === $profileType;
+        if ($comparableType === '' || $profileType === '') {
+            return false;
+        }
+
+        if ($comparableType === $profileType) {
+            return true;
+        }
+
+        return mb_strlen($profileType) >= 4
+            && str_contains($comparableType, $profileType);
     }
 
     private function observedTooOld(mixed $value): bool
@@ -254,6 +261,7 @@ class RealEstateComparableIntegrityService
     {
         foreach ([
             ['market_min', 'market_max'],
+            ['realistic_sale_min', 'realistic_sale_max'],
             ['quick_sale_min', 'quick_sale_max'],
             ['investor_buy_min', 'investor_buy_max'],
         ] as [$minField, $maxField]) {
@@ -266,8 +274,17 @@ class RealEstateComparableIntegrityService
         }
 
         $marketMax = $this->positiveNumber($valuation['market_max'] ?? null);
+        $realisticMax = $this->positiveNumber($valuation['realistic_sale_max'] ?? null);
         $quickMax = $this->positiveNumber($valuation['quick_sale_max'] ?? null);
         $investorMax = $this->positiveNumber($valuation['investor_buy_max'] ?? null);
+
+        if (
+            $realisticMax !== null
+            && $investorMax !== null
+            && $investorMax > ($realisticMax * 0.8001)
+        ) {
+            return false;
+        }
 
         if ($marketMax !== null) {
             if ($quickMax !== null && $quickMax > ($marketMax * 1.05)) {
