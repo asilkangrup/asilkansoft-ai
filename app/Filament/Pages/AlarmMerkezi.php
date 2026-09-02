@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\CrmAlarm;
 use App\Services\CrmAlarmAuditService;
 use App\Services\OrganizationAccessService;
+use App\Services\RealEstateIsolationService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Pages\Page;
@@ -29,6 +30,8 @@ class AlarmMerkezi extends Page
     protected static ?int $navigationSort =
         33;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'CRM';
+
     public string $statusFilter =
         'active';
 
@@ -44,11 +47,8 @@ class AlarmMerkezi extends Page
 
     public static function canAccess(): bool
     {
-        return app(
-            OrganizationAccessService::class
-        )->can(
-            'alarms'
-        );
+        return app(RealEstateIsolationService::class)->currentOperatorHasAccess()
+            || app(OrganizationAccessService::class)->can('alarms');
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -79,9 +79,8 @@ class AlarmMerkezi extends Page
 
     protected function canWriteAlarms(): bool
     {
-        return $this
-            ->accessService()
-            ->canWriteCrm();
+        return app(RealEstateIsolationService::class)->currentOperatorHasAccess()
+            || $this->accessService()->canWriteCrm();
     }
 
     protected function alarmScopeQuery(): Builder
