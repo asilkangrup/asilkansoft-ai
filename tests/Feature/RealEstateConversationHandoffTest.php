@@ -62,10 +62,12 @@ class RealEstateConversationHandoffTest extends TestCase
         $this->assertTrue($status['operator_contact_eligible']);
         $this->assertSame('no_whatsapp_history', $status['reason']);
 
-        $foreign = ConversationControl::query()->forceCreate([
-            'user_id'=>40,'organization_id'=>999,'ai_bot_id'=>35,'session_id'=>'foreign-handoff',
-            'whatsapp_number'=>'905559999999','tags'=>[],'lead_status'=>'new','lead_score'=>0,
-            'lead_temperature'=>'cold','next_follow_up_at'=>null,'human_takeover'=>false,
+        $foreign = new ConversationControl;
+        $foreign->forceFill([
+            'user_id'=>40,
+            'organization_id'=>999,
+            'ai_bot_id'=>35,
+            'session_id'=>'foreign-handoff',
         ]);
 
         $foreignStatus = $service->status($foreign);
