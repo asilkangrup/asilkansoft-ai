@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\RealEstateProfile;
 use App\Services\RealEstateIsolationService;
@@ -60,6 +61,61 @@ class EmlakMusteriDetay extends Page
             ->isolatedProduction()
             ->where('conversation_control_id', $this->customerId)
             ->first();
+    }
+
+    public function getMediaGalleryProperty(): array
+    {
+        $profile = $this->profile;
+
+        if (! $profile || $profile->profile_type !== 'seller') {
+            return [];
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $findings = collect(is_array($data['media_findings'] ?? null) ? $data['media_findings'] : [])
+            ->filter(fn ($finding): bool => is_array($finding) && filled($finding['message_id'] ?? null))
+            ->keyBy(fn (array $finding): string => trim((string) $finding['message_id']));
+
+        return ChatMessage::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('session_id', $this->customer?->session_id)
+            ->where('sender_type', 'customer')
+            ->whereNotNull('media_url')
+            ->whereIn('message_type', ['image', 'document'])
+            ->latest('id')
+            ->get()
+            ->map(function (ChatMessage $message) use ($findings): ?array {
+                $finding = $findings->get(trim((string) $message->whatsapp_message_id), []);
+                $category = (string) ($finding['media_category'] ?? '');
+
+                if (! in_array($category, ['property_photo', 'title_deed', 'parcel_document', 'listing'], true)) {
+                    return null;
+                }
+
+                $url = trim((string) $message->media_url);
+                if (! preg_match('/^https?:\/\//i', $url)) {
+                    return null;
+                }
+
+                return [
+                    'id' => $message->id,
+                    'url' => $url,
+                    'category' => $category,
+                    'group' => match ($category) {
+                        'property_photo' => 'Arsa Fotoğrafları',
+                        'listing' => 'İlan Görselleri',
+                        default => 'Tapu / Parsel Belgeleri',
+                    },
+                    'is_image' => str_starts_with(strtolower((string) $message->media_mime_type), 'image/'),
+                    'summary' => trim((string) ($finding['summary'] ?? '')),
+                    'received_at' => $message->created_at?->format('d.m.Y H:i'),
+                ];
+            })
+            ->filter()
+            ->groupBy('group')
+            ->all();
     }
 
     public function getActivitiesProperty(): Collection
