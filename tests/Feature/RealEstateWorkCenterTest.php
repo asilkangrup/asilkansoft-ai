@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Filament\Pages\EmlakIsMerkezi;
 use App\Models\AiBot;
+use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\CrmActivity;
 use App\Models\Organization;
@@ -41,6 +42,41 @@ class RealEstateWorkCenterTest extends TestCase
         $this->assertNull($sellerConversation->fresh()->next_follow_up_at);
         $this->assertNull($investorConversation->fresh()->next_follow_up_at);
         $this->assertSame($seller->id, $task['seller_profile_id']);
+    }
+
+    public function test_active_whatsapp_chat_waits_for_thirty_minutes_of_silence_before_call_task(): void
+    {
+        $this->seedAccount();
+
+        $sellerConversation = $this->conversation('seller-idle-gate', '905550000031', 'Satıcı');
+        $investorConversation = $this->conversation('investor-idle-gate', '905550000032', 'Aktif Yatırımcı');
+        $investor = $this->investor($investorConversation);
+        $this->seller($sellerConversation, [[
+            'investor_profile_id' => $investor->id,
+            'match_score' => 92,
+            'grade' => 'strong',
+        ]]);
+
+        $message = ChatMessage::query()->forceCreate([
+            'user_id'=>40,'organization_id'=>37,'ai_bot_id'=>35,
+            'session_id'=>$investorConversation->session_id,
+            'role'=>'user','sender_type'=>'customer','message'=>'Detayları gönderir misiniz?',
+            'message_type'=>'text','status'=>'received',
+        ]);
+
+        $this->assertCount(0, (new EmlakIsMerkezi)->getTasksProperty());
+
+        $message->forceFill([
+            'created_at'=>now()->subMinutes(31),
+            'updated_at'=>now()->subMinutes(31),
+        ])->saveQuietly();
+
+        $task = (new EmlakIsMerkezi)->getTasksProperty()->first();
+
+        $this->assertSame('investor', $task['kind']);
+        $this->assertSame('Aktif Yatırımcı', $task['target_name']);
+        $this->assertNull($sellerConversation->fresh()->next_follow_up_at);
+        $this->assertNull($investorConversation->fresh()->next_follow_up_at);
     }
 
     public function test_unsuitable_investor_is_skipped_and_next_candidate_is_recommended(): void
