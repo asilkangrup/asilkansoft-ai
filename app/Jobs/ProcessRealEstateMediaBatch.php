@@ -36,10 +36,14 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
 
     public function overlapKey(): string
     {
-        $prefix = 'real-estate-media-batch:';
-        $hash = str_starts_with($this->cacheKey, $prefix)
-            ? substr($this->cacheKey, strlen($prefix))
-            : '';
+        $hash = '';
+
+        foreach (['real-estate-inbound-burst:', 'real-estate-media-batch:'] as $prefix) {
+            if (str_starts_with($this->cacheKey, $prefix)) {
+                $hash = substr($this->cacheKey, strlen($prefix));
+                break;
+            }
+        }
 
         if (! is_string($hash) || ! preg_match('/^[a-f0-9]{64}$/', $hash)) {
             $hash = hash('sha256', $this->cacheKey);
