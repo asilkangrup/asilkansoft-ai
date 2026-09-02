@@ -103,7 +103,8 @@ class EmlakIsMerkezi extends Page
                 return [
                     'key' => 'sourcing-'.$seller->id,
                     'seller_profile_id' => $seller->id,
-                    'target_profile_id' => $seller->id,
+                    'investor_profile_id' => null,
+                    'contact_profile_id' => $seller->id,
                     'target_conversation_id' => $seller->conversation?->id,
                     'target_name' => 'Yeni yatırımcı adayı bul',
                     'phone' => null,
@@ -194,7 +195,7 @@ class EmlakIsMerkezi extends Page
         $targetProfile = RealEstateProfile::query()
             ->isolatedProduction()
             ->with('conversation')
-            ->whereKey((int) $task['target_profile_id'])
+            ->whereKey((int) $task['contact_profile_id'])
             ->first();
         $seller = RealEstateProfile::query()
             ->isolatedProduction()
@@ -238,7 +239,10 @@ class EmlakIsMerkezi extends Page
             meta: [
                 'scope' => 'isolated_real_estate',
                 'seller_profile_id' => (int) $seller->id,
-                'target_profile_id' => (int) $targetProfile->id,
+                'investor_profile_id' => is_numeric($task['investor_profile_id'] ?? null)
+                    ? (int) $task['investor_profile_id']
+                    : null,
+                'contact_profile_id' => (int) $targetProfile->id,
                 'task_kind' => (string) $task['kind'],
                 'outcome' => $result,
                 'offer_amount' => $amount,
@@ -313,11 +317,7 @@ class EmlakIsMerkezi extends Page
             );
         }
 
-        if ($sellerOutcome === 'Kabul etti') {
-            return null;
-        }
-
-        if ($sellerOutcome === 'Reddetti') {
+        if (in_array($sellerOutcome, ['Kabul etti', 'Reddetti'], true)) {
             return null;
         }
 
@@ -397,7 +397,8 @@ class EmlakIsMerkezi extends Page
         return [
             'key' => 'investor-'.$seller->id.'-'.$investor->id,
             'seller_profile_id' => $seller->id,
-            'target_profile_id' => $investor->id,
+            'investor_profile_id' => $investor->id,
+            'contact_profile_id' => $investor->id,
             'target_conversation_id' => $conversation?->id,
             'target_name' => $name,
             'phone' => $conversation?->whatsapp_number,
@@ -435,7 +436,8 @@ class EmlakIsMerkezi extends Page
         return [
             'key' => 'seller-offer-'.$seller->id.'-'.$investor->id.'-'.$sourceActivityId,
             'seller_profile_id' => $seller->id,
-            'target_profile_id' => $seller->id,
+            'investor_profile_id' => $investor->id,
+            'contact_profile_id' => $seller->id,
             'target_conversation_id' => $conversation?->id,
             'target_name' => $conversation?->customer_name ?: 'Satıcı',
             'phone' => $conversation?->whatsapp_number,
@@ -464,7 +466,8 @@ class EmlakIsMerkezi extends Page
         return [
             'key' => 'investor-counter-'.$seller->id.'-'.$investor->id.'-'.$sourceActivityId,
             'seller_profile_id' => $seller->id,
-            'target_profile_id' => $investor->id,
+            'investor_profile_id' => $investor->id,
+            'contact_profile_id' => $investor->id,
             'target_conversation_id' => $conversation?->id,
             'target_name' => $conversation?->customer_name ?: 'Yatırımcı',
             'phone' => $conversation?->whatsapp_number,
@@ -494,7 +497,8 @@ class EmlakIsMerkezi extends Page
         return [
             'key' => 'seller-final-'.$seller->id.'-'.$investor->id.'-'.$sourceActivityId,
             'seller_profile_id' => $seller->id,
-            'target_profile_id' => $seller->id,
+            'investor_profile_id' => $investor->id,
+            'contact_profile_id' => $seller->id,
             'target_conversation_id' => $conversation?->id,
             'target_name' => $conversation?->customer_name ?: 'Satıcı',
             'phone' => $conversation?->whatsapp_number,
@@ -523,7 +527,8 @@ class EmlakIsMerkezi extends Page
         return [
             'key' => 'seller-'.$seller->id,
             'seller_profile_id' => $seller->id,
-            'target_profile_id' => $seller->id,
+            'investor_profile_id' => null,
+            'contact_profile_id' => $seller->id,
             'target_conversation_id' => $conversation?->id,
             'target_name' => $conversation?->customer_name ?: 'Satıcı',
             'phone' => $conversation?->whatsapp_number,
@@ -557,17 +562,17 @@ class EmlakIsMerkezi extends Page
             ->filter(fn (CrmActivity $activity): bool =>
                 is_array($activity->meta)
                 && is_numeric($activity->meta['seller_profile_id'] ?? null)
-                && is_numeric($activity->meta['target_profile_id'] ?? null)
+                && is_numeric($activity->meta['investor_profile_id'] ?? null)
                 && is_string($activity->meta['task_kind'] ?? null)
             )
             ->unique(fn (CrmActivity $activity): string =>
                 (int) $activity->meta['seller_profile_id']
-                .':'.(int) $activity->meta['target_profile_id']
+                .':'.(int) $activity->meta['investor_profile_id']
                 .':'.$activity->meta['task_kind']
             )
             ->keyBy(fn (CrmActivity $activity): string =>
                 (int) $activity->meta['seller_profile_id']
-                .':'.(int) $activity->meta['target_profile_id']
+                .':'.(int) $activity->meta['investor_profile_id']
                 .':'.$activity->meta['task_kind']
             );
     }
@@ -584,7 +589,10 @@ class EmlakIsMerkezi extends Page
             : [];
 
         $history[] = [
-            'target_profile_id' => (int) $task['target_profile_id'],
+            'investor_profile_id' => is_numeric($task['investor_profile_id'] ?? null)
+                ? (int) $task['investor_profile_id']
+                : null,
+            'contact_profile_id' => (int) $task['contact_profile_id'],
             'task_kind' => (string) $task['kind'],
             'outcome' => $result,
             'offer_amount' => $amount,
