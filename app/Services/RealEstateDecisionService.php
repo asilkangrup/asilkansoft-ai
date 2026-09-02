@@ -259,7 +259,9 @@ PROMPT;
     private function sellerNegotiation(array $data, array $valuation): array
     {
         $asking = $this->number($data['asking_price'] ?? null);
-        $realisticMax = $this->number($valuation['realistic_sale_max'] ?? null);
+        $realisticMax = $this->number($valuation['realistic_sale_max'] ?? null)
+            ?? $this->number($valuation['quick_sale_max'] ?? null)
+            ?? $this->number($valuation['market_max'] ?? null);
         $investorMax = $this->number($valuation['investor_buy_max'] ?? null);
 
         if (($data['urgency'] ?? null) === 'high' && ! $this->hasValuation($valuation)) {
