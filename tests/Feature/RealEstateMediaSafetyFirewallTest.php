@@ -132,15 +132,18 @@ class RealEstateMediaSafetyFirewallTest extends TestCase
             'status' => 'active',
         ]);
 
-        $conversation = ConversationControl::query()->create([
-            'user_id' => 40,
+        // ConversationControl normalizes bot 35 back to its production
+        // organization on normal saves. Persist an intentionally corrupt foreign
+        // tenant row quietly so this regression test exercises the fail-closed
+        // boundary rather than the model's normalization behavior.
+        $conversation = $this->conversation($bot, 'foreign-media-conversation');
+        $conversation->forceFill([
             'organization_id' => 38,
-            'ai_bot_id' => $bot->id,
-            'session_id' => 'foreign-media-conversation',
             'whatsapp_number' => '905550004444',
-            'lead_status' => 'new',
-            'next_follow_up_at' => null,
-        ]);
+        ])->saveQuietly();
+        $conversation->refresh();
+
+        $this->assertSame(38, (int) $conversation->organization_id);
 
         $assessment = app(RealEstateMediaSafetyService::class)->preflight(
             conversation: $conversation,
