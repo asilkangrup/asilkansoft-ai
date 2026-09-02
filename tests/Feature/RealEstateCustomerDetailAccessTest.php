@@ -154,6 +154,7 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         Storage::disk('local')->put($privatePath, 'private-image');
         $whatsappMedia->forceFill(['media_url'=>'private:'.$privatePath])->saveQuietly();
         $profileData = $profile->data;
+        $profileData['property_type'] = 'dubleks daire';
         $profileData['media_findings'][] = [
             'message_id'=>'private-photo','media_category'=>'property_photo','summary'=>'Özel WhatsApp fotoğrafı',
         ];
@@ -163,8 +164,8 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $detail->customerId = $customer->id;
         $privateGallery = $detail->getMediaGalleryProperty();
         $this->assertSame(
-            route('real-estate.private-inbound-media', ['message'=>$whatsappMedia->id]),
-            $privateGallery['Arsa Fotoğrafları']->first()['url']
+            route('real-estate.private-inbound-media', ['message'=>$whatsappMedia->id], false),
+            $privateGallery['Daire Fotoğrafları']->first()['url']
         );
         $this->get(route('real-estate.private-inbound-media', ['message'=>$whatsappMedia->id]))
             ->assertOk()->assertHeader('x-content-type-options', 'nosniff');
