@@ -68,7 +68,7 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
             $source
         );
         $this->assertStringContainsString(
-            '\$bot->refresh();',
+            '$bot->refresh();',
             $source
         );
     }
