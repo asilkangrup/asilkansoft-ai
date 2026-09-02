@@ -1,0 +1,379 @@
+name: Apply Auto Valuation Research Hotfix
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.ref == 'fix/auto-valuation-research'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Apply isolated valuation research patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('app/Services/RealEstateValuationService.php')
+          s = p.read_text()
+          s = s.replace(
+              'use Illuminate\\Support\\Facades\\Log;\n',
+              'use Illuminate\\Support\\Facades\\Cache;\nuse Illuminate\\Support\\Facades\\Log;\n',
+              1,
+          )
+
+          old = '''        $isolation = app(RealEstateIsolationService::class);
+
+          if (
+              ! $isolation->supportsConversation($conversation)
+              || ! $this->valuationIntent($message)
+          ) {
+              return null;
+          }
+
+          $profile = RealEstateProfile::query()
+              ->isolatedProduction()
+              ->where('conversation_control_id', $conversation->id)
+              ->first();
+
+          if (! $profile || ! $this->minimumDataAvailable($profile->data ?? [])) {
+              return null;
+          }
+
+          $freshnessService = app(RealEstateValuationFreshnessService::class);
+          $freshness = $freshnessService->refreshMetadata($profile);
+          $forceRefresh = $this->forceRefreshIntent($message);
+
+          if (
+              ($freshness['usable_for_decision'] ?? false)
+              && ! $forceRefresh
+          ) {
+              return is_array($profile->fresh()->valuation)
+                  ? $profile->fresh()->valuation
+                  : null;
+          }
+          '''
+          new = '''        $isolation = app(RealEstateIsolationService::class);
+
+          if (! $isolation->supportsConversation($conversation)) {
+              return null;
+          }
+
+          $profile = RealEstateProfile::query()
+              ->isolatedProduction()
+              ->where('conversation_control_id', $conversation->id)
+              ->first();
+
+          if (! $profile || ! $this->minimumDataAvailable($profile->data ?? [])) {
+              return null;
+          }
+
+          $data = is_array($profile->data) ? $profile->data : [];
+          $explicitIntent = $this->valuationIntent($message);
+          $pendingResearchAction = $this->pendingResearchAction($profile, $conversation);
+          $sellerAutoReady = $profile->profile_type === 'seller'
+              && filled($data['asking_price'] ?? null)
+              && filled($data['area_sqm'] ?? null);
+
+          if (! $explicitIntent && ! $pendingResearchAction && ! $sellerAutoReady) {
+              return null;
+          }
+
+          $freshnessService = app(RealEstateValuationFreshnessService::class);
+          $freshness = $freshnessService->refreshMetadata($profile);
+          $forceRefresh = $explicitIntent && $this->forceRefreshIntent($message);
+
+          if (
+              ($freshness['usable_for_decision'] ?? false)
+              && ! $forceRefresh
+          ) {
+              return is_array($profile->fresh()->valuation)
+                  ? $profile->fresh()->valuation
+                  : null;
+          }
+
+          $automaticResearch = ! $explicitIntent
+              && ($pendingResearchAction || $sellerAutoReady);
+
+          if (
+              $automaticResearch
+              && ! $this->reserveAutomaticResearchAttempt($profile, $freshnessService)
+          ) {
+              return null;
+          }
+          '''
+          if old not in s:
+              raise SystemExit('valuation entry block not found')
+          s = s.replace(old, new, 1)
+          s = s.replace("'max_output_tokens' => 1500,", "'max_output_tokens' => 4000,", 1)
+          s = s.replace("$request['reasoning'] = ['effort' => 'medium'];", "$request['reasoning'] = ['effort' => 'low'];", 1)
+
+          old = '''            $result = json_decode(
+              $this->cleanJson(trim((string) ($response->outputText ?? ''))),
+              true
+          );
+
+          if (! is_array($result)) {
+              return null;
+          }
+          '''
+          new = '''            $outputText = trim((string) ($response->outputText ?? ''));
+
+          if ($outputText === '') {
+              Log::warning('REAL ESTATE VALUATION RESPONSE EMPTY OR INCOMPLETE', [
+                  'conversation_control_id' => $conversation->id,
+                  'user_id' => RealEstateIsolationService::USER_ID,
+                  'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+                  'ai_bot_id' => RealEstateIsolationService::BOT_ID,
+                  'response_status' => is_scalar($response->status ?? null)
+                      ? (string) $response->status
+                      : null,
+                  'automatic_research' => $automaticResearch,
+              ]);
+
+              return null;
+          }
+
+          $result = json_decode(
+              $this->cleanJson($outputText),
+              true
+          );
+
+          if (! is_array($result)) {
+              Log::warning('REAL ESTATE VALUATION RESPONSE INVALID JSON', [
+                  'conversation_control_id' => $conversation->id,
+                  'user_id' => RealEstateIsolationService::USER_ID,
+                  'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+                  'ai_bot_id' => RealEstateIsolationService::BOT_ID,
+                  'response_status' => is_scalar($response->status ?? null)
+                      ? (string) $response->status
+                      : null,
+                  'automatic_research' => $automaticResearch,
+              ]);
+
+              return null;
+          }
+          '''
+          if old not in s:
+              raise SystemExit('valuation response block not found')
+          s = s.replace(old, new, 1)
+
+          marker = '''    private function valuationIntent(string $message): bool
+          {
+          '''
+          helpers = '''    private function pendingResearchAction(
+              RealEstateProfile $profile,
+              ConversationControl $conversation
+          ): bool {
+              $data = is_array($profile->data) ? $profile->data : [];
+              $plan = is_array($data['next_best_action_intelligence'] ?? null)
+                  ? $data['next_best_action_intelligence']
+                  : [];
+              $actionCode = trim((string) ($plan['action_code'] ?? ''));
+
+              if (in_array(
+                  $actionCode,
+                  ['refresh_valuation_research', 'repair_comparable_integrity'],
+                  true
+              )) {
+                  return true;
+              }
+
+              $action = Str::lower($this->turkishNormalize(
+                  trim((string) $conversation->next_best_action)
+              ));
+
+              return $action !== '' && (
+                  str_contains($action, 'guncel emsal arastirmasini yenile')
+                  || str_contains($action, 'emsal arastirmasini yenile')
+                  || str_contains($action, 'degerlemeyi yenile')
+              );
+          }
+
+          private function reserveAutomaticResearchAttempt(
+              RealEstateProfile $profile,
+              RealEstateValuationFreshnessService $freshnessService
+          ): bool {
+              $data = is_array($profile->data) ? $profile->data : [];
+              $fingerprint = $freshnessService->fingerprint($data);
+              $valuation = is_array($profile->valuation) ? $profile->valuation : [];
+              $storedFingerprint = trim((string) ($valuation['profile_fingerprint'] ?? ''));
+              $researchedAt = trim((string) ($valuation['researched_at'] ?? ''));
+
+              if (
+                  $storedFingerprint !== ''
+                  && hash_equals($storedFingerprint, $fingerprint)
+                  && $researchedAt !== ''
+              ) {
+                  try {
+                      if (\\Carbon\\CarbonImmutable::parse($researchedAt)->greaterThan(now()->subMinutes(10))) {
+                          return false;
+                      }
+                  } catch (Throwable) {
+                      // Invalid legacy timestamp must not disable a safe new attempt.
+                  }
+              }
+
+              $key = 'real-estate:auto-valuation:'
+                  .RealEstateIsolationService::ORGANIZATION_ID.':'
+                  .RealEstateIsolationService::BOT_ID.':'
+                  .$profile->id.':'
+                  .$fingerprint;
+
+              return Cache::add($key, true, now()->addMinutes(10));
+          }
+
+          '''
+          if marker not in s:
+              raise SystemExit('valuation intent marker not found')
+          s = s.replace(marker, helpers + marker, 1)
+          p.write_text(s)
+
+          test = r'''<?php
+
+          namespace Tests\Feature;
+
+          use App\Models\AiBot;
+          use App\Models\ConversationControl;
+          use App\Models\Organization;
+          use App\Models\RealEstateProfile;
+          use App\Models\User;
+          use App\Services\RealEstateOpenAIClient;
+          use App\Services\RealEstateValuationService;
+          use Illuminate\Foundation\Testing\RefreshDatabase;
+          use Illuminate\Support\Facades\Hash;
+          use Tests\TestCase;
+
+          class RealEstateAutomaticValuationResearchTest extends TestCase
+          {
+              use RefreshDatabase;
+
+              public function test_short_confirmation_runs_pending_research_with_sufficient_web_search_budget(): void
+              {
+                  [, $conversation] = $this->seedSeller();
+
+                  $client = new class extends RealEstateOpenAIClient
+                  {
+                      public int $calls = 0;
+                      public array $requests = [];
+
+                      public function createResponse(AiBot $aiBot, array $request): mixed
+                      {
+                          $this->calls++;
+                          $this->requests[] = $request;
+
+                          return new class
+                          {
+                              public string $status = 'completed';
+                              public string $outputText;
+
+                              public function __construct()
+                              {
+                                  $this->outputText = json_encode([
+                                      'market_min' => 4_250_000,
+                                      'market_max' => 5_250_000,
+                                      'quick_sale_min' => 3_600_000,
+                                      'quick_sale_max' => 4_100_000,
+                                      'investor_buy_min' => 3_150_000,
+                                      'investor_buy_max' => 3_800_000,
+                                      'confidence_score' => 72,
+                                      'market_gap_percent' => -9,
+                                      'summary' => 'Test araştırma özeti.',
+                                      'next_best_action' => 'Emsal setini pazarlıkta kullan.',
+                                      'missing_data' => [],
+                                      'sources' => ['https://example.test/a', 'https://example.test/b'],
+                                      'comparables' => [
+                                          ['source'=>'A','url'=>'https://example.test/a','listing_price'=>4_250_000,'area_sqm'=>400,'location'=>'İstanbul, Silivri','property_type'=>'arsa','observed_at'=>'2026-09-01'],
+                                          ['source'=>'B','url'=>'https://example.test/b','listing_price'=>4_900_000,'area_sqm'=>405,'location'=>'İstanbul, Silivri','property_type'=>'arsa','observed_at'=>'2026-09-01'],
+                                      ],
+                                  ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                              }
+
+                              public function toArray(): array
+                              {
+                                  return ['id'=>'resp_auto_valuation','model'=>'gpt-5.4','usage'=>['input_tokens'=>100,'output_tokens'=>250,'total_tokens'=>350]];
+                              }
+                          };
+                      }
+                  };
+                  $this->app->instance(RealEstateOpenAIClient::class, $client);
+
+                  $result = app(RealEstateValuationService::class)->process($conversation, 'Olur');
+
+                  $this->assertNotNull($result);
+                  $this->assertSame(1, $client->calls);
+                  $this->assertSame(4000, $client->requests[0]['max_output_tokens']);
+                  $this->assertSame('low', $client->requests[0]['reasoning']['effort']);
+                  $this->assertSame('web_search_preview', $client->requests[0]['tools'][0]['type']);
+                  $this->assertSame('fresh', $result['freshness_status']);
+                  $this->assertTrue($result['usable_for_decision']);
+                  $this->assertTrue($result['usable_for_matching']);
+                  $this->assertNull($conversation->fresh()->next_follow_up_at);
+
+                  $cached = app(RealEstateValuationService::class)->process($conversation, 'Olur');
+                  $this->assertNotNull($cached);
+                  $this->assertSame(1, $client->calls);
+              }
+
+              public function test_short_confirmation_without_research_readiness_does_not_search(): void
+              {
+                  [, $conversation, $profile] = $this->seedSeller();
+                  $data = $profile->data;
+                  unset($data['asking_price']);
+                  $data['next_best_action_intelligence']['action_code'] = 'complete_seller_core_data';
+                  $profile->forceFill(['data' => $data])->saveQuietly();
+                  $conversation->forceFill(['next_best_action' => 'Eksik temel bilgiyi tamamla.'])->saveQuietly();
+
+                  $client = new class extends RealEstateOpenAIClient
+                  {
+                      public int $calls = 0;
+                      public function createResponse(AiBot $aiBot, array $request): mixed
+                      {
+                          $this->calls++;
+                          throw new \RuntimeException('Unexpected web search.');
+                      }
+                  };
+                  $this->app->instance(RealEstateOpenAIClient::class, $client);
+
+                  $this->assertNull(app(RealEstateValuationService::class)->process($conversation, 'Olur'));
+                  $this->assertSame(0, $client->calls);
+                  $this->assertNull($conversation->fresh()->next_follow_up_at);
+              }
+
+              private function seedSeller(): array
+              {
+                  User::query()->forceCreate(['id'=>40,'name'=>'Emlak AI','email'=>'auto-valuation@example.test','password'=>Hash::make('test-password')]);
+                  Organization::query()->forceCreate(['id'=>37,'owner_user_id'=>40,'name'=>'Emlak AI','slug'=>'auto-valuation','plan'=>'start','seat_limit'=>1,'monthly_message_limit'=>1000,'status'=>'active']);
+                  $bot = AiBot::query()->forceCreate(['id'=>35,'user_id'=>40,'name'=>'Emlak AI','company_name'=>'Asilkan Gayrimenkul','openai_model'=>'gpt-5-mini','openai_api_key'=>'sk-test-dedicated-real-estate','status'=>'active','business_sector'=>'real_estate','lead_scoring_profile'=>'real_estate','whatsapp_instance'=>'emlak-ai-35','follow_up_enabled'=>false,'second_follow_up_enabled'=>false,'ai_enabled'=>true]);
+                  $conversation = ConversationControl::query()->forceCreate(['user_id'=>40,'organization_id'=>37,'ai_bot_id'=>35,'session_id'=>'auto-valuation-seller','whatsapp_number'=>'905550000035','tags'=>['business:real_estate_seller'],'lead_status'=>'new','lead_score'=>0,'lead_temperature'=>'cold','next_follow_up_at'=>null,'human_takeover'=>false]);
+                  $profile = RealEstateProfile::query()->create(['conversation_control_id'=>$conversation->id,'user_id'=>40,'ai_bot_id'=>35,'profile_type'=>'seller','data'=>['property_type'=>'arsa','city'=>'İstanbul','district'=>'Silivri','neighborhood'=>'Büyükçavuşlu','area_sqm'=>400.01,'asking_price'=>4_300_000],'valuation'=>[],'completeness_score'=>90,'confidence_score'=>80]);
+                  $data = $profile->fresh()->data;
+                  $data['next_best_action_intelligence'] = ['action_code'=>'refresh_valuation_research','priority'=>'high','action_text'=>'Güncel emsal araştırmasını yenile.','single_question'=>null,'blocking'=>true,'reason_codes'=>['valuation_missing_or_stale']];
+                  $profile->forceFill(['data'=>$data])->saveQuietly();
+                  $conversation->forceFill(['next_best_action'=>'Güncel emsal araştırmasını yenile.'])->saveQuietly();
+                  return [$bot, $conversation->fresh(), $profile->fresh()];
+              }
+          }
+          '''
+          Path('tests/Feature/RealEstateAutomaticValuationResearchTest.php').write_text(test)
+
+          Path('.github/workflows/apply-auto-valuation-hotfix.yml').unlink()
+      - name: Syntax check
+        run: |
+          php -l app/Services/RealEstateValuationService.php
+          php -l tests/Feature/RealEstateAutomaticValuationResearchTest.php
+      - name: Commit patch
+        run: |
+          git config user.name asilkangrup
+          git config user.email asilkangrup@gmail.com
+          git add -A
+          git commit -m "Auto-run isolated valuation research"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
