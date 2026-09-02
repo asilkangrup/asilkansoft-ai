@@ -91,6 +91,14 @@ class RealEstateMediaFactPromotionTest extends TestCase
             $source
         );
         $this->assertStringContainsString(
+            ': [$imageIndexes[0]]',
+            $source
+        );
+        $this->assertStringNotContainsString(
+            'floor((count($imageIndexes)',
+            $source
+        );
+        $this->assertStringContainsString(
             "'payloads' => array_slice(\$payloads, \$index)",
             $source
         );
