@@ -100,6 +100,9 @@ class RealEstateFactConsistencyActionService
             'strongest_score' => null,
             'strongest_grade' => null,
             'mandate_aware' => true,
+            'verification_filtered' => (bool) ($existingSummary['verification_filtered'] ?? false),
+            'evidence_quality_filtered' => (bool) ($existingSummary['evidence_quality_filtered'] ?? false),
+            'fact_consistency_filtered' => true,
             'blocked_by_fact_consistency' => true,
             'blocking_profile_type' => $profile->profile_type,
             'quarantined_match_count' => $quarantinedMatchCount,
@@ -125,9 +128,9 @@ class RealEstateFactConsistencyActionService
             'tags' => $this->withoutMatchTags($conversation->etiketler()),
         ]);
 
-        // If a pair was previously persisted as active, immediately reconcile
-        // the privacy-safe match ledger after quarantine. This never sends a
-        // message and cannot schedule follow-ups.
+        // If a pair was previously persisted as active and the final filters
+        // had already run, immediately reconcile the privacy-safe ledger after
+        // quarantine. This never sends a message or schedules a follow-up.
         app(RealEstateMatchLedgerService::class)->sync($profile->fresh());
 
         $this->recordState($profile, $conversation, $stored);
