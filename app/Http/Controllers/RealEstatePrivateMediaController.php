@@ -4,12 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\RealEstateProfile;
 use App\Services\RealEstateIsolationService;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Support\Facades\Storage;
 
 class RealEstatePrivateMediaController extends Controller
 {
-    public function show(int $profile, string $media): Response
+    public function show(int $profile, string $media): BinaryFileResponse
     {
         $user = auth()->user();
 
