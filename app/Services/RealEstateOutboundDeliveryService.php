@@ -75,6 +75,7 @@ class RealEstateOutboundDeliveryService
             inboundMessageId: $inboundMessageId,
         );
         $answer = trim((string) $safety['answer']);
+        $answer = str_replace('*', '', $answer);
 
         if ($answer === '') {
             throw new RuntimeException('İzole Emlak AI outbound güvenlik filtresi boş cevap üretti.');
