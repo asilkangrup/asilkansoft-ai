@@ -1,0 +1,134 @@
+name: Apply Real Estate Valuation V2
+
+on:
+  push:
+    branches:
+      - fix/real-estate-auto-valuation-v2
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/real-estate-auto-valuation-v2
+          fetch-depth: 0
+
+      - name: Apply valuation trigger and investor discount policy
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          p = Path('app/Services/RealEstateValuationService.php')
+          s = p.read_text()
+
+          old = """        if (\n            ! $isolation->supportsConversation($conversation)\n            || ! $this->valuationIntent($message)\n        ) {\n            return null;\n        }\n\n        $profile = RealEstateProfile::query()\n"""
+          new = """        if (! $isolation->supportsConversation($conversation)) {\n            return null;\n        }\n\n        $profile = RealEstateProfile::query()\n"""
+          if old not in s:
+              raise SystemExit('valuation intent gate not found')
+          s = s.replace(old, new, 1)
+
+          old = """        if (! $profile || ! $this->minimumDataAvailable($profile->data ?? [])) {\n            return null;\n        }\n\n        $freshnessService = app(RealEstateValuationFreshnessService::class);\n        $freshness = $freshnessService->refreshMetadata($profile);\n        $forceRefresh = $this->forceRefreshIntent($message);\n"""
+          new = """        if (! $profile || ! $this->minimumDataAvailable($profile->data ?? [])) {\n            return null;\n        }\n\n        $data = is_array($profile->data) ? $profile->data : [];\n        $explicitIntent = $this->valuationIntent($message);\n        $pendingResearchAction = $this->pendingResearchAction($conversation);\n        $sellerAutoReady = $profile->profile_type === 'seller'\n            && filled($data['asking_price'] ?? null)\n            && filled($data['area_sqm'] ?? null);\n\n        if (! $explicitIntent && ! $pendingResearchAction && ! $sellerAutoReady) {\n            return null;\n        }\n\n        $freshnessService = app(RealEstateValuationFreshnessService::class);\n        $freshness = $freshnessService->refreshMetadata($profile);\n        $forceRefresh = $this->forceRefreshIntent($message) || $pendingResearchAction;\n"""
+          if old not in s:
+              raise SystemExit('valuation pre-research block not found')
+          s = s.replace(old, new, 1)
+
+          marker = "    private function valuationIntent(string $message): bool\n"
+          helper = """    private function pendingResearchAction(ConversationControl $conversation): bool\n    {\n        $action = Str::lower($this->turkishNormalize(\n            trim((string) $conversation->next_best_action)\n        ));\n\n        if ($action === '') {\n            return false;\n        }\n\n        return str_contains($action, 'guncel emsal arastirmasini yenile')\n            || str_contains($action, 'emsal arastirmasini yenile')\n            || str_contains($action, 'degerlemeyi yenile');\n    }\n\n"""
+          if marker not in s:
+              raise SystemExit('valuationIntent marker not found')
+          s = s.replace(marker, helper + marker, 1)
+
+          s = s.replace("'max_output_tokens' => 1500,", "'max_output_tokens' => 6000,", 1)
+          s = s.replace("$request['reasoning'] = ['effort' => 'medium'];", "$request['reasoning'] = ['effort' => 'low'];", 1)
+
+          old = "- Tek ilana dayanma. Mümkün olduğunda en az 2, tercihen 3+ güncel ve benzer emsal karşılaştır.\n"
+          new = "- Tek ilana dayanma. En az 3 güçlü yakın emsal bulmaya çalış; 3-5 yeterince benzer ve güncel kaynak bulunduğunda gereksiz ek web araması yapma. Maksimum 5 emsali nihai JSON'a koy.\n"
+          if old not in s:
+              raise SystemExit('comparable policy line not found')
+          s = s.replace(old, new, 1)
+
+          needle = "- Tüm fiyatlar TL ve sayısal değer olsun.\n"
+          extra = """- market_min/market_max, benzer aktif ilanların güncel istenen fiyatlarından türetilen ilan/piyasa bandıdır; gerçekleşmiş satış gibi sunma.\n- realistic_sale_min/realistic_sale_max, birden fazla yakın emsalin m² fiyatı, ilan yaşı/konumu/özellikleri ve normal pazarlık payı dikkate alınarak tahmin edilen gerçekçi satar fiyatıdır. Tek bir ilana dayanma.\n- Kullanıcının ticari modeli gereği investor_buy_max, gerçekçi satar fiyatı bandının en az %20 altında olmalıdır. Normal hedef %20-30 iskontodur; ancak bu oranı sağlamak için emsal veya sayı uydurma.\n- investor_buy_min/investor_buy_max hesabını ilan fiyatından değil realistic_sale bandından yap. investor_buy_max hiçbir durumda realistic_sale_max * 0.80 değerini aşmasın.\n- quick_sale bandı, gerçekçi normal satıştan daha düşük/hızlı nakde dönüş bandıdır ve gerçekçi satış bandından mantıksız biçimde yüksek olamaz.\n"""
+          if needle not in s:
+              raise SystemExit('valuation price policy insertion point not found')
+          s = s.replace(needle, needle + extra, 1)
+
+          s = s.replace('  "quick_sale_min": null,\n  "quick_sale_max": null,', '  "realistic_sale_min": null,\n  "realistic_sale_max": null,\n  "quick_sale_min": null,\n  "quick_sale_max": null,', 1)
+          s = s.replace("'market_min', 'market_max', 'quick_sale_min', 'quick_sale_max',\n            'investor_buy_min'", "'market_min', 'market_max', 'realistic_sale_min', 'realistic_sale_max',\n            'quick_sale_min', 'quick_sale_max', 'investor_buy_min'", 1)
+
+          marker = """        $result['research_basis'] = $result['sources'] === []\n            ? 'no_verified_sources'\n            : 'web_search';\n\n        return $result;\n"""
+          replacement = """        $result['research_basis'] = $result['sources'] === []\n            ? 'no_verified_sources'\n            : 'web_search';\n\n        // Commercial guardrail: investor opportunity is anchored to the\n        // researched realistic sale range, never directly to seller ask/listing price.\n        $realisticMax = $result['realistic_sale_max'] ?? null;\n        if (is_numeric($realisticMax) && (float) $realisticMax > 0) {\n            $maxInvestorBuy = round((float) $realisticMax * 0.80, 2);\n            if (! is_numeric($result['investor_buy_max'] ?? null) || (float) $result['investor_buy_max'] > $maxInvestorBuy) {\n                $result['investor_buy_max'] = $maxInvestorBuy;\n            }\n            if (is_numeric($result['investor_buy_min'] ?? null) && (float) $result['investor_buy_min'] > (float) $result['investor_buy_max']) {\n                $result['investor_buy_min'] = round((float) $result['investor_buy_max'] * 0.90, 2);\n            }\n        }\n\n        return $result;\n"""
+          if marker not in s:
+              raise SystemExit('normalize return block not found')
+          s = s.replace(marker, replacement, 1)
+          p.write_text(s)
+
+          test = Path('tests/Feature/RealEstateValuationCommercialPolicyTest.php')
+          test.write_text(r'''<?php
+
+namespace Tests\Feature;
+
+use App\Services\RealEstateValuationService;
+use ReflectionClass;
+use Tests\TestCase;
+
+class RealEstateValuationCommercialPolicyTest extends TestCase
+{
+    public function test_valuation_source_contains_auto_research_and_bounded_research_budget(): void
+    {
+        $source = file_get_contents(app_path('Services/RealEstateValuationService.php'));
+
+        $this->assertStringContainsString('sellerAutoReady', $source);
+        $this->assertStringContainsString('pendingResearchAction', $source);
+        $this->assertStringContainsString("'max_output_tokens' => 6000", $source);
+        $this->assertStringContainsString("['effort' => 'low']", $source);
+        $this->assertStringContainsString('realistic_sale_max', $source);
+        $this->assertStringContainsString('* 0.80', $source);
+    }
+
+    public function test_investor_buy_max_is_capped_twenty_percent_below_realistic_sale_max(): void
+    {
+        $service = app(RealEstateValuationService::class);
+        $reflection = new ReflectionClass($service);
+        $method = $reflection->getMethod('normalize');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($service, [
+            'market_min' => 5_000_000,
+            'market_max' => 5_500_000,
+            'realistic_sale_min' => 4_200_000,
+            'realistic_sale_max' => 5_000_000,
+            'quick_sale_min' => 3_700_000,
+            'quick_sale_max' => 4_100_000,
+            'investor_buy_min' => 3_800_000,
+            'investor_buy_max' => 4_500_000,
+            'confidence_score' => 75,
+            'sources' => ['https://example.test/1'],
+            'comparables' => [],
+        ]);
+
+        $this->assertSame(4_000_000.0, $result['investor_buy_max']);
+        $this->assertLessThanOrEqual(
+            $result['realistic_sale_max'] * 0.80,
+            $result['investor_buy_max']
+        );
+    }
+}
+''')
+
+          Path('.github/workflows/apply-real-estate-valuation-v2.yml').unlink()
+          PY
+
+          php -l app/Services/RealEstateValuationService.php
+          php -l tests/Feature/RealEstateValuationCommercialPolicyTest.php
+
+          git config user.name "asilkangrup"
+          git config user.email "asilkangrup@gmail.com"
+          git add -A
+          git commit -m "Auto-run researched valuation and enforce investor discount guard"
+          git push origin fix/real-estate-auto-valuation-v2
