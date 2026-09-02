@@ -97,7 +97,23 @@ class RealEstateInvestorOnboardingReliabilityTest extends TestCase
             $recoveryService
         );
         $this->assertStringContainsString(
-            "'status' => 'failed'",
+            "->whereIn('whatsapp_message_id', \$recoverableMessageIds)",
+            $recoveryService
+        );
+        $this->assertStringContainsString(
+            "->orderByDesc('id')",
+            $recoveryService
+        );
+        $this->assertStringContainsString(
+            'claimForRecovery',
+            $recoveryService
+        );
+        $this->assertStringContainsString(
+            'lockForUpdate()',
+            $recoveryService
+        );
+        $this->assertStringNotContainsString(
+            "'last_error' => 'safe_unanswered_recovery'",
             $recoveryService
         );
         $this->assertStringContainsString(
