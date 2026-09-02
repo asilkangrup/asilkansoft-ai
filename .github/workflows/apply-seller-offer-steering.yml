@@ -1,0 +1,23 @@
+name: Apply Seller Offer Steering
+on:
+  push:
+    branches: [fix/seller-offer-steering]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/seller-offer-steering
+          fetch-depth: 0
+      - run: python3 scripts/patch_seller_offer_steering.py
+      - run: php -l app/Services/RealEstateWhatsAppInboundService.php && php -l app/Services/RealEstateOpenAIService.php
+      - run: |
+          rm scripts/patch_seller_offer_steering.py .github/workflows/apply-seller-offer-steering.yml
+          git config user.name asilkangrup
+          git config user.email asilkangrup@gmail.com
+          git add -A
+          git commit -m "Steer sellers toward investor offers"
+          git push origin fix/seller-offer-steering
