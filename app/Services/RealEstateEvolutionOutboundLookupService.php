@@ -26,6 +26,12 @@ class RealEstateEvolutionOutboundLookupService
      * This method is intentionally read-only. It never sends a WhatsApp
      * message and returns no customer text or phone number to callers.
      *
+     * Exact provider messages that are already attached to another isolated
+     * outbound row are excluded before ambiguity is evaluated. This matters
+     * when two separate customer turns legitimately receive the same answer
+     * within the reconciliation window: a provider message already owned by
+     * the later turn must not keep the earlier turn quarantined forever.
+     *
      * @return array{provider_message_id:string, provider_timestamp:int}|null
      */
     public function findExactMatch(
@@ -113,11 +119,47 @@ class RealEstateEvolutionOutboundLookupService
             ];
         }
 
+        $matches = $this->withoutProviderMessagesClaimedByOtherDeliveries(
+            delivery: $delivery,
+            matches: $matches,
+        );
+
         if (count($matches) !== 1) {
             return null;
         }
 
         return array_values($matches)[0];
+    }
+
+    /**
+     * @param array<string, array{provider_message_id:string, provider_timestamp:int}> $matches
+     * @return array<string, array{provider_message_id:string, provider_timestamp:int}>
+     */
+    private function withoutProviderMessagesClaimedByOtherDeliveries(
+        RealEstateOutboundDelivery $delivery,
+        array $matches,
+    ): array {
+        if ($matches === []) {
+            return [];
+        }
+
+        $claimed = RealEstateOutboundDelivery::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('instance', RealEstateIsolationService::INSTANCE)
+            ->where('id', '!=', $delivery->id)
+            ->whereIn('whatsapp_message_id', array_keys($matches))
+            ->pluck('whatsapp_message_id')
+            ->filter(fn ($value): bool => is_string($value) && trim($value) !== '')
+            ->map(fn (string $value): string => trim($value))
+            ->all();
+
+        foreach ($claimed as $providerMessageId) {
+            unset($matches[$providerMessageId]);
+        }
+
+        return $matches;
     }
 
     private function records(mixed $payload): array

@@ -134,6 +134,27 @@ class RealEstateOutboundReconciliationService
                 return null;
             }
 
+            // Fail closed if another isolated delivery acquired this provider
+            // message id after the read-only lookup but before this transaction.
+            // One Evolution message may belong to one outbound row only.
+            $alreadyClaimed = RealEstateOutboundDelivery::query()
+                ->where('user_id', RealEstateIsolationService::USER_ID)
+                ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+                ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+                ->where('instance', RealEstateIsolationService::INSTANCE)
+                ->where('id', '!=', $locked->id)
+                ->where('whatsapp_message_id', $providerMessageId)
+                ->exists();
+
+            if ($alreadyClaimed) {
+                Log::warning('REAL ESTATE OUTBOUND PROVIDER MESSAGE ALREADY CLAIMED', [
+                    'delivery_id' => $locked->id,
+                    'provider_message_id_hash' => hash('sha256', $providerMessageId),
+                ]);
+
+                return null;
+            }
+
             $locked->forceFill([
                 'status' => 'sent',
                 'whatsapp_message_id' => $providerMessageId,
