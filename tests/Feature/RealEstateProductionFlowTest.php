@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\ProcessRealEstateWhatsAppWebhook;
+use App\Jobs\ProcessRealEstateMediaBatch;
 use App\Jobs\ProcessWhatsAppWebhook;
 use App\Models\AiBot;
 use App\Models\ConversationControl;
@@ -98,9 +98,10 @@ class RealEstateProductionFlowTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'queued' => true,
+                'batched_inbound' => true,
             ]);
 
-        Queue::assertPushed(ProcessRealEstateWhatsAppWebhook::class);
+        Queue::assertPushed(ProcessRealEstateMediaBatch::class);
     }
 
     public function test_secure_provisioning_uses_exact_instance_canonical_url_and_jwt_key(): void
