@@ -252,6 +252,7 @@ class MemoryService
                         trim(app(RealEstateConversationService::class)->promptFor($conversation)),
                         trim(app(RealEstateProfileService::class)->promptFor($conversation)),
                         trim(app(RealEstateNegotiationMemoryService::class)->promptFor($conversation)),
+                        trim(app(RealEstateSellerMotivationService::class)->promptFor($conversation)),
                         trim(app(RealEstateEvidenceReconciliationService::class)->promptFor($conversation)),
                         trim(app(RealEstateVerificationService::class)->promptFor($conversation)),
                         trim(app(RealEstateValuationService::class)->promptFor($conversation)),
