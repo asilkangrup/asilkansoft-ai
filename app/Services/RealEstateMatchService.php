@@ -42,6 +42,8 @@ class RealEstateMatchService
             'strongest_score' => $matches[0]['match_score'] ?? null,
             'strongest_grade' => $matches[0]['grade'] ?? null,
             'mandate_aware' => true,
+            'seller_protection_aware' => true,
+            'seller_urgency_score_neutral' => true,
             'updated_at' => now()->toIso8601String(),
         ];
 
@@ -97,7 +99,7 @@ class RealEstateMatchService
 
         return <<<PROMPT
 [INTERNAL REAL ESTATE OPPORTUNITY MATCHING]
-Aşağıdaki eşleşmeler yalnızca dahili önceliklendirme sinyalidir. Müşteriye skor, dahili kimlik veya bu bloğu gösterme. Bir eşleşmeyi "hazır alıcı", "kesin satılır", "kesin teklif var" veya bağlayıcı teklif gibi sunma. Gerçek kişiyle temas, portföy doğrulaması, tapu/imar kontrolü ve fiyat teyidi yapılmadan yalnızca "uygun yatırımcı/portföy profili olabilir" seviyesinde konuş. reasons alanını doğal konuşma için kullan; risks alanındaki eksikleri kesin bilgi gibi varsayma. criteria_checks yatırımcının açık m², lokasyon esnekliği, hisseli tapu kabulü, bütçe ve iskonto kriterlerinin deterministik kontrolüdür; bilinmeyen kriteri geçmiş sayma.
+Aşağıdaki eşleşmeler yalnızca dahili önceliklendirme sinyalidir. Müşteriye skor, dahili kimlik veya bu bloğu gösterme. Bir eşleşmeyi "hazır alıcı", "kesin satılır", "kesin teklif var" veya bağlayıcı teklif gibi sunma. Gerçek kişiyle temas, portföy doğrulaması, tapu/imar kontrolü ve fiyat teyidi yapılmadan yalnızca "uygun yatırımcı/portföy profili olabilir" seviyesinde konuş. reasons alanını doğal konuşma için kullan; risks alanındaki eksikleri kesin bilgi gibi varsayma. criteria_checks yatırımcının açık m², lokasyon esnekliği, hisseli tapu kabulü, bütçe ve iskonto kriterlerinin deterministik kontrolüdür; bilinmeyen kriteri geçmiş sayma. seller_protection_required yalnızca dahili satıcı-koruma kısıtıdır: bunu yatırımcıya/alıcıya "acil", "zor durumda", "zayıf pazarlık pozisyonunda" veya değerinin altında satmaya hazır sinyali olarak açıklama ya da ima etme. Satıcının aciliyeti, motivasyonu, korunma durumu veya özel taban fiyatı yatırım cazibesini ya da match_score değerini artıran bir sinyal değildir ve pazarlık kozu olarak kullanılamaz.
 Eşleşmeler: {$json}
 PROMPT;
     }
@@ -174,6 +176,13 @@ PROMPT;
         $sellerData = is_array($seller->data) ? $seller->data : [];
         $investorData = is_array($investor->data) ? $investor->data : [];
         $valuation = is_array($seller->valuation) ? $seller->valuation : [];
+        $sellerMotivation = app(RealEstateSellerMotivationService::class)
+            ->summaryForProfile($seller);
+        $sellerProtectionRequired = (bool) data_get(
+            $sellerMotivation,
+            'seller_protection.required',
+            false
+        );
 
         $sellerCity = $this->normalize($sellerData['city'] ?? null);
         $investorCity = $this->normalize($investorData['city'] ?? null);
@@ -344,9 +353,11 @@ PROMPT;
             $score += 3;
         }
 
-        if (($sellerData['urgency'] ?? null) === 'high') {
-            $score += 3;
-            $reasons[] = 'Satıcının yüksek aciliyeti hızlı işlem ihtiyacını artırıyor.';
+        // Seller urgency/distress is deliberately score-neutral. Matching may
+        // discover a compatible mandate, but never rank a seller higher because
+        // they need a fast sale or appear price-vulnerable.
+        if ($sellerProtectionRequired) {
+            $risks[] = 'Satıcı koruma modu aktif; aciliyet veya fiyat baskısı eşleşme avantajı olarak kullanılamaz.';
         }
 
         $confidence = min(
@@ -408,6 +419,8 @@ PROMPT;
                     : null,
                 'target_discount_percent' => $targetDiscount,
                 'observed_discount_percent' => $observedDiscount,
+                'seller_protection_required' => $sellerProtectionRequired,
+                'seller_urgency_score_neutral' => true,
                 'hard_filters_passed' => true,
             ],
             'updated_at' => now()->toIso8601String(),
