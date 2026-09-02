@@ -16,6 +16,7 @@ use App\Services\RealEstateOpportunityScoreService;
 use App\Services\RealEstateSellerMotivationService;
 use App\Services\RealEstateSellerOfferPacketService;
 use App\Services\RealEstateSellerInvestorHandoffService;
+use App\Services\RealEstateTitleOwnershipIntelligenceService;
 use App\Services\RealEstateValuationResearchOutputGuardService;
 
 class RealEstateProfileObserver
@@ -44,6 +45,14 @@ class RealEstateProfileObserver
         $profile->refresh();
         app(RealEstateSellerMotivationService::class)->sync($profile);
         $profile->refresh();
+
+        // Ownership relationship is derived only from an explicit customer
+        // statement in the isolated conversation. This is deliberately done
+        // before the seller packet so the bot/CRM can avoid asking again when
+        // the customer has already said whose name the title deed is under.
+        app(RealEstateTitleOwnershipIntelligenceService::class)->sync($profile);
+        $profile->refresh();
+
         app(RealEstateSellerOfferPacketService::class)->sync($profile);
         $profile->refresh();
         app(RealEstateSellerInvestorHandoffService::class)->sync($profile);
