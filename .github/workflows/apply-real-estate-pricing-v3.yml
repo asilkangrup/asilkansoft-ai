@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
 
       - name: Apply isolated pricing patch
-        run: python3 .github/scripts/apply_real_estate_pricing_v3.py
+        run: python3 .github/scripts/run_pricing_v3_compat.py
 
       - name: Commit product changes
         run: |
