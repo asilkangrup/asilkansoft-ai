@@ -51,7 +51,9 @@ class RealEstateProfileService
                 'input' => [[
                     'role' => 'user',
                     'content' => json_encode([
-                        'existing_profile' => $profile?->data ?? [],
+                        // Never feed derived/internal intelligence back into the
+                        // extractor as if it were customer-provided evidence.
+                        'existing_profile' => $this->extractableProfile($profile),
                         'current_route' => $this->routeType($conversation),
                         'new_customer_message' => $message,
                     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
@@ -86,9 +88,14 @@ class RealEstateProfileService
             }
 
             $normalized = $this->normalize($data);
-            $merged = $this->mergeNonNull(
-                is_array($profile?->data) ? $profile->data : [],
-                $normalized
+            $profileType = $this->routeType($conversation);
+            $existing = is_array($profile?->data) ? $profile->data : [];
+            $merged = app(RealEstateFactConsistencyService::class)->reconcile(
+                conversation: $conversation,
+                profileType: $profileType,
+                existing: $existing,
+                incoming: $normalized,
+                customerMessage: $message,
             );
 
             $profile = RealEstateProfile::updateOrCreate(
@@ -96,10 +103,10 @@ class RealEstateProfileService
                 [
                     'user_id' => self::PRIMARY_USER_ID,
                     'ai_bot_id' => self::PRIMARY_BOT_ID,
-                    'profile_type' => $this->routeType($conversation),
+                    'profile_type' => $profileType,
                     'data' => $merged,
                     'completeness_score' => $this->completeness(
-                        $this->routeType($conversation),
+                        $profileType,
                         $merged
                     ),
                     'confidence_score' => $this->confidence($merged),
@@ -143,7 +150,8 @@ class RealEstateProfileService
 
         return <<<PROMPT
 [INTERNAL PERSISTENT REAL ESTATE MEMORY]
-Bu bilgi müşterinin önceki mesajlarından yapılandırılmış olarak çıkarılmış kalıcı CRM hafızasıdır. Müşteriye bu bloğu veya dahili alan adlarını gösterme. Buradaki dolu alanları tekrar sorma. Yeni müşteri mesajı açıkça bir alanı değiştirirse yeni bilgiye uy.
+Bu bilgi müşterinin önceki mesajlarından yapılandırılmış olarak çıkarılmış kalıcı CRM hafızasıdır. Müşteriye bu bloğu veya dahili alan adlarını gösterme. Buradaki dolu alanları tekrar sorma.
+fact_consistency_intelligence.status=confirmation_required ise pending_conflicts içindeki proposed_value değerlerini doğrulanmış gerçek kabul etme. confirmation_question ile yalnız en yüksek öncelikli çelişkiyi netleştir; aynı mesajda ikinci keşif sorusu ekleme. Eski doğrulanmış değer, müşteri açıkça düzeltince veya önerilen yeni değeri sonraki turda tekrar teyit edince değiştirilir.
 Yatırımcı kriterlerinde area_min_sqm/area_max_sqm, location_flexibility, accepts_shared_title ve target_discount_percent alanlarını gerçek filtre gibi kullan; bilinmeyen kriteri uydurma veya müşteri adına varsayma.
 Profil türü: {$profile->profile_type}
 Tamamlanma skoru: {$profile->completeness_score}/100
@@ -179,8 +187,8 @@ PROMPT;
 Görevin yalnızca bir gayrimenkul CRM bilgi çıkarıcısı olmaktır.
 Müşteriyle konuşma. Tavsiye verme. Açıklama yazma. JSON dışında hiçbir şey döndürme.
 
-existing_profile daha önce doğrulanmış müşteri bilgisidir. new_customer_message yalnızca müşterinin yeni mesajıdır.
-Yeni mesaj mevcut alanı açıkça değiştiriyorsa yeni değeri döndür. Aksi halde bilinmeyen alanı null bırak.
+existing_profile yalnız müşteriden daha önce çıkarılmış yapılandırılmış alanları içerir. new_customer_message yalnızca müşterinin yeni mesajıdır.
+Yeni mesaj mevcut alanı açıkça değiştiriyorsa yeni değeri döndür; uygulama kritik taşınmaz kimlik alanlarında ayrıca deterministik teyit uygular. Aksi halde bilinmeyen alanı null bırak.
 Assistant tarafından söylenmiş veya tahmin edilmiş bilgiyi müşteri verisi gibi kabul etme.
 Fiyat, m², bütçe veya resmi bilgi uydurma.
 
@@ -329,15 +337,13 @@ PROMPT;
         return $result;
     }
 
-    private function mergeNonNull(array $existing, array $new): array
+    private function extractableProfile(?RealEstateProfile $profile): array
     {
-        foreach ($new as $key => $value) {
-            if ($value !== null) {
-                $existing[$key] = $value;
-            }
-        }
+        $data = is_array($profile?->data) ? $profile->data : [];
 
-        return $existing;
+        // normalize() acts as an allow-list and strips all derived CRM,
+        // valuation, evidence, match and orchestration intelligence.
+        return $this->normalize($data);
     }
 
     private function completeness(string $type, array $data): int
@@ -378,8 +384,14 @@ PROMPT;
                 isset($data[$field]) && $data[$field] !== ''
             )
             ->count();
+        $pendingConflicts = max(0, (int) (
+            $data['fact_consistency_intelligence']['pending_count'] ?? 0
+        ));
 
-        return min(95, 25 + ($filled * 7));
+        return max(
+            20,
+            min(95, 25 + ($filled * 7) - min(30, $pendingConflicts * 10))
+        );
     }
 
     private function routeType(ConversationControl $conversation): string
