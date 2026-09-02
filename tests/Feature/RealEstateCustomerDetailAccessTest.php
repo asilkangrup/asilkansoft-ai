@@ -9,6 +9,7 @@ use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\Organization;
 use App\Models\RealEstateProfile;
+use App\Models\RealEstatePrivateMedia;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -125,6 +126,10 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $this->assertSame('title_deed', $manual['category']);
         $this->assertTrue($manual['private']);
         Storage::disk('local')->assertExists($manual['storage_path']);
+        $this->assertDatabaseHas('real_estate_private_media', [
+            'user_id'=>40,'organization_id'=>37,'ai_bot_id'=>35,
+            'real_estate_profile_id'=>$profile->id,'media_key'=>$manual['id'],
+        ]);
         $this->assertSame('relative', data_get($profile->data, 'title_ownership.relation'));
         $this->assertSame('Babasının üzerine', data_get($profile->data, 'title_ownership.note'));
         $this->assertFalse((bool) data_get($profile->data, 'media_findings.0.legal_verification'));
@@ -153,6 +158,13 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $privatePath = 'real-estate-inbound/'.$whatsappMedia->id.'/original.jpg';
         Storage::disk('local')->put($privatePath, 'private-image');
         $whatsappMedia->forceFill(['media_url'=>'private:'.$privatePath])->saveQuietly();
+        RealEstatePrivateMedia::query()->forceCreate([
+            'user_id'=>40,'organization_id'=>37,'ai_bot_id'=>35,
+            'chat_message_id'=>$whatsappMedia->id,'real_estate_profile_id'=>null,
+            'media_key'=>null,'mime_type'=>'image/jpeg','size'=>13,
+            'content_base64'=>base64_encode('private-image'),
+        ]);
+        Storage::disk('local')->delete($privatePath);
         $profileData = $profile->data;
         $profileData['property_type'] = 'dubleks daire';
         $profileData['media_findings'][] = [
