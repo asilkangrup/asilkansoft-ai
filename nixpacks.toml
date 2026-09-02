@@ -1,0 +1,10 @@
+[variables]
+# Dedicated isolated real-estate workload model policy.
+# These variables only affect the user 40 / org 37 / bot 35 services that
+# explicitly read REAL_ESTATE_* settings. They do not replace credentials and
+# the isolated services still require bot 35's encrypted bot-level API key.
+REAL_ESTATE_OPENAI_MODEL = "gpt-5-mini"
+REAL_ESTATE_EXTRACTOR_MODEL = "gpt-5-mini"
+REAL_ESTATE_MEDIA_MODEL = "gpt-5-mini"
+REAL_ESTATE_VALUATION_MODEL = "gpt-5-mini"
+REAL_ESTATE_CHAT_REASONING_EFFORT = "low"
