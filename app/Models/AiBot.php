@@ -193,6 +193,15 @@ class AiBot extends Model
     {
         static::saving(
             function (AiBot $aiBot): void {
+                // Fresh Emlak AI is reply-only by product design. Even if a
+                // generic WAI panel/update path attempts to turn follow-ups on,
+                // model-level persistence fails closed for exactly user 40 /
+                // bot 35. Other WAI tenants retain their existing behaviour.
+                if ($aiBot->isIsolatedRealEstateBot()) {
+                    $aiBot->follow_up_enabled = false;
+                    $aiBot->second_follow_up_enabled = false;
+                }
+
                 if (
                     $aiBot->isDirty('business_sector')
                     || trim((string) $aiBot->lead_scoring_profile) === ''
