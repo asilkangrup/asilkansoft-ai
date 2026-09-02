@@ -6,6 +6,7 @@ use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\RealEstateProfile;
 use App\Services\RealEstateIsolationService;
+use App\Services\RealEstateSellerOfferPacketService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -56,15 +57,7 @@ class RegisterRealEstateMediaCrmFinding implements ShouldQueue
             ->where('conversation_control_id', $conversation->id)
             ->first();
 
-        if (! $profile) {
-            if ($this->attempts() < $this->tries) {
-                $this->release(2);
-            }
-
-            return;
-        }
-
-        if ($profile->profile_type !== 'seller') {
+        if (! $profile || $profile->profile_type !== 'seller') {
             return;
         }
 
@@ -73,32 +66,41 @@ class RegisterRealEstateMediaCrmFinding implements ShouldQueue
             ? $data['media_findings']
             : [];
         $messageId = trim((string) $message->whatsapp_message_id);
+        $alreadyRegistered = false;
 
         foreach ($findings as $finding) {
             if (
                 is_array($finding)
                 && trim((string) ($finding['message_id'] ?? '')) === $messageId
             ) {
-                return;
+                $alreadyRegistered = true;
+                break;
             }
         }
 
-        $isImage = $message->message_type === 'image';
-        $findings[] = [
-            'message_id' => $messageId,
-            'media_category' => $isImage ? 'property_photo' : 'parcel_document',
-            'summary' => $isImage
-                ? 'WhatsApp fotoğrafı — taşınmaz bilgileri yazılı teyit bekliyor.'
-                : 'WhatsApp belgesi — belge türü ve taşınmaz bilgileri yazılı teyit bekliyor.',
-            'confidence_score' => 0,
-            'operator_classified' => false,
-            'legal_verification' => false,
-            'vision_analyzed' => false,
-            'source' => 'crm_only_media_registration',
-            'registered_at' => now()->toIso8601String(),
-        ];
+        if (! $alreadyRegistered) {
+            $isImage = $message->message_type === 'image';
+            $findings[] = [
+                'message_id' => $messageId,
+                'media_category' => $isImage ? 'property_photo' : 'parcel_document',
+                'summary' => $isImage
+                    ? 'WhatsApp fotoğrafı — taşınmaz bilgileri yazılı teyit bekliyor.'
+                    : 'WhatsApp belgesi — belge türü ve taşınmaz bilgileri yazılı teyit bekliyor.',
+                'confidence_score' => 0,
+                'operator_classified' => false,
+                'legal_verification' => false,
+                'vision_analyzed' => false,
+                'source' => 'crm_only_media_registration',
+                'registered_at' => now()->toIso8601String(),
+            ];
 
-        $data['media_findings'] = array_slice($findings, -100);
-        $profile->updateQuietly(['data' => $data]);
+            $data['media_findings'] = array_slice($findings, -100);
+            $profile->updateQuietly(['data' => $data]);
+            $profile->refresh();
+        }
+
+        // Recompute only the deterministic seller dossier checklist. This
+        // performs no OpenAI/vision, valuation research, matching or outbound.
+        app(RealEstateSellerOfferPacketService::class)->sync($profile);
     }
 }
