@@ -105,6 +105,120 @@ class RealEstateOpportunityMatchingTest extends TestCase
         $this->assertNull($sellerConversation->next_follow_up_at);
     }
 
+    public function test_seller_urgency_is_score_neutral_and_protection_is_not_exposed_as_bargaining_leverage(): void
+    {
+        $bot = $this->seedRealEstateBot();
+
+        $investorConversation = $this->conversation(
+            $bot,
+            'investor-fairness-session',
+            '905552323232',
+            ['business:real_estate_investor']
+        );
+        RealEstateProfile::query()->create([
+            'conversation_control_id' => $investorConversation->id,
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'profile_type' => 'investor',
+            'data' => [
+                'property_type' => 'arsa',
+                'city' => 'Muğla',
+                'district' => 'Marmaris',
+                'budget_max' => 4000000,
+                'financing' => 'cash',
+            ],
+            'valuation' => [],
+            'completeness_score' => 90,
+            'confidence_score' => 80,
+        ]);
+
+        $lowUrgencyConversation = $this->conversation(
+            $bot,
+            'seller-low-urgency-session',
+            '905552424242',
+            ['business:real_estate_seller']
+        );
+        RealEstateProfile::query()->create([
+            'conversation_control_id' => $lowUrgencyConversation->id,
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'profile_type' => 'seller',
+            'data' => [
+                'property_type' => 'arsa',
+                'city' => 'Muğla',
+                'district' => 'Marmaris',
+                'area_sqm' => 1200,
+                'asking_price' => 4200000,
+                'urgency' => 'low',
+                'title_deed_type' => 'müstakil',
+                'zoning_status' => 'konut',
+            ],
+            'valuation' => [
+                'market_min' => 3700000,
+                'market_max' => 4300000,
+                'quick_sale_max' => 3800000,
+                'investor_buy_max' => 3600000,
+            ],
+            'completeness_score' => 100,
+            'confidence_score' => 82,
+        ]);
+
+        $highUrgencyConversation = $this->conversation(
+            $bot,
+            'seller-high-urgency-session',
+            '905552525252',
+            ['business:real_estate_seller']
+        );
+        RealEstateProfile::query()->create([
+            'conversation_control_id' => $highUrgencyConversation->id,
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'profile_type' => 'seller',
+            'data' => [
+                'property_type' => 'arsa',
+                'city' => 'Muğla',
+                'district' => 'Marmaris',
+                'area_sqm' => 1200,
+                'asking_price' => 4200000,
+                'minimum_price' => 3000000,
+                'urgency' => 'high',
+                'urgency_reason' => 'özel kişisel neden',
+                'title_deed_type' => 'müstakil',
+                'zoning_status' => 'konut',
+            ],
+            'valuation' => [
+                'market_min' => 3700000,
+                'market_max' => 4300000,
+                'quick_sale_max' => 3800000,
+                'investor_buy_max' => 3600000,
+            ],
+            'completeness_score' => 100,
+            'confidence_score' => 82,
+        ]);
+
+        $lowMatches = app(RealEstateMatchService::class)->process($lowUrgencyConversation);
+        $highMatches = app(RealEstateMatchService::class)->process($highUrgencyConversation);
+
+        $this->assertCount(1, $lowMatches);
+        $this->assertCount(1, $highMatches);
+        $this->assertSame($lowMatches[0]['match_score'], $highMatches[0]['match_score']);
+        $this->assertFalse($lowMatches[0]['criteria_checks']['seller_protection_required']);
+        $this->assertTrue($highMatches[0]['criteria_checks']['seller_protection_required']);
+        $this->assertTrue($highMatches[0]['criteria_checks']['seller_urgency_score_neutral']);
+        $this->assertNotContains(
+            'Satıcının yüksek aciliyeti hızlı işlem ihtiyacını artırıyor.',
+            $highMatches[0]['reasons']
+        );
+
+        $prompt = app(RealEstateMatchService::class)->promptFor($highUrgencyConversation);
+
+        $this->assertStringContainsString('pazarlık kozu olarak kullanılamaz', $prompt);
+        $this->assertStringContainsString('seller_protection_required', $prompt);
+        $this->assertStringNotContainsString('özel kişisel neden', $prompt);
+        $this->assertStringNotContainsString('3000000', $prompt);
+        $this->assertNull($highUrgencyConversation->fresh()->next_follow_up_at);
+    }
+
     public function test_investor_perspective_points_to_seller_as_candidate(): void
     {
         $bot = $this->seedRealEstateBot();
