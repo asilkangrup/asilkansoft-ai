@@ -62,10 +62,14 @@ class RealEstateInvestorOnboardingReliabilityTest extends TestCase
         $recovery = file_get_contents(
             app_path('Jobs/RecoverRealEstateUnansweredInbound.php')
         );
+        $recoveryService = file_get_contents(
+            app_path('Services/RealEstateInboundRecoveryService.php')
+        );
 
         $this->assertIsString($client);
         $this->assertIsString($batch);
         $this->assertIsString($recovery);
+        $this->assertIsString($recoveryService);
 
         $this->assertStringContainsString(
             "'real-estate-openai:bot:'",
@@ -83,6 +87,18 @@ class RealEstateInvestorOnboardingReliabilityTest extends TestCase
         $this->assertStringContainsString(
             "onQueue('real-estate')",
             $recovery
+        );
+        $this->assertStringContainsString(
+            "->where('status', 'ignored')",
+            $recoveryService
+        );
+        $this->assertStringContainsString(
+            'superseded_by_newer_customer_message',
+            $recoveryService
+        );
+        $this->assertStringContainsString(
+            'reply_already_exists',
+            $recoveryService
         );
     }
 
