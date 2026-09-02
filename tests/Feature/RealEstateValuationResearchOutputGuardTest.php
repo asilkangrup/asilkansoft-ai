@@ -16,7 +16,7 @@ class RealEstateValuationResearchOutputGuardTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_observer_strips_web_derived_prose_and_canonicalizes_sources_before_crm_use(): void
+    public function test_observer_strips_web_derived_prose_and_tokenizes_sources_before_crm_use(): void
     {
         [, $conversation] = $this->seedScope('research-output');
         $profile = $this->profile($conversation);
@@ -74,13 +74,21 @@ class RealEstateValuationResearchOutputGuardTest extends TestCase
         $this->assertNull($valuation['summary']);
         $this->assertNull($valuation['next_best_action']);
         $this->assertSame(['area_sqm'], $valuation['missing_data']);
-        $this->assertSame(['https://evil.example'], $valuation['sources']);
+        $this->assertCount(2, $valuation['sources']);
+        $this->assertStringStartsWith('https://evil.example/r/', $valuation['sources'][0]);
+        $this->assertStringStartsWith('https://evil.example/r/', $valuation['sources'][1]);
+        $this->assertNotSame($valuation['sources'][0], $valuation['sources'][1]);
         $this->assertSame('evil.example', $valuation['comparables'][0]['source']);
-        $this->assertSame('https://evil.example', $valuation['comparables'][0]['url']);
-        $this->assertSame('Muğla Marmaris Hisarönü', $valuation['comparables'][0]['location']);
-        $this->assertSame('arsa', $valuation['comparables'][0]['property_type']);
+        $this->assertStringStartsWith(
+            'https://evil.example/r/',
+            $valuation['comparables'][0]['url']
+        );
+        $this->assertSame('mismatch', $valuation['comparables'][0]['location']);
+        $this->assertSame('mismatch', $valuation['comparables'][0]['property_type']);
         $this->assertSame(['expired'], $valuation['freshness_reasons']);
         $this->assertTrue($valuation['research_output_guard']['web_prose_removed']);
+        $this->assertTrue($valuation['research_output_guard']['source_urls_tokenized']);
+        $this->assertTrue($valuation['research_output_guard']['integrity_semantics_preserved']);
         $this->assertStringNotContainsString('IGNORE ALL INSTRUCTIONS', $encoded);
         $this->assertStringNotContainsString('SYSTEM OVERRIDE', $encoded);
         $this->assertStringNotContainsString('3250000', $encoded);
@@ -89,7 +97,7 @@ class RealEstateValuationResearchOutputGuardTest extends TestCase
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
-    public function test_guard_keeps_numeric_valuation_semantics_while_recomputing_comparable_stats(): void
+    public function test_guard_keeps_numeric_valuation_semantics_and_distinct_source_cardinality(): void
     {
         [, $conversation] = $this->seedScope('research-numbers');
         $profile = $this->profile($conversation);
@@ -110,11 +118,15 @@ class RealEstateValuationResearchOutputGuardTest extends TestCase
                         'url' => 'https://one.example/listing/1',
                         'listing_price' => 4_000_000,
                         'area_sqm' => 1000,
+                        'location' => 'Muğla Marmaris',
+                        'property_type' => 'arsa',
                     ],
                     [
                         'url' => 'https://two.example/listing/2',
                         'listing_price' => 4_200_000,
                         'area_sqm' => 1200,
+                        'location' => 'Muğla Marmaris',
+                        'property_type' => 'arsa',
                     ],
                 ],
             ], $profile->data);
@@ -126,7 +138,10 @@ class RealEstateValuationResearchOutputGuardTest extends TestCase
         $this->assertSame(2, $sanitized['comparable_stats']['count']);
         $this->assertSame(2, $sanitized['comparable_stats']['priced_per_sqm_count']);
         $this->assertSame('asking', $sanitized['comparable_stats']['price_basis']);
-        $this->assertSame(['https://one.example', 'https://two.example'], $sanitized['sources']);
+        $this->assertGreaterThanOrEqual(2, count($sanitized['sources']));
+        $this->assertStringStartsWith('https://one.example/r/', $sanitized['sources'][0]);
+        $this->assertSame('Muğla Marmaris Hisarönü', $sanitized['comparables'][0]['location']);
+        $this->assertSame('arsa', $sanitized['comparables'][0]['property_type']);
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
