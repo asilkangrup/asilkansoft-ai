@@ -72,6 +72,29 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
         );
     }
 
+    public function test_ambiguous_first_contact_is_deterministically_asked_for_role(): void
+    {
+        $source = file_get_contents(app_path(
+            'Services/RealEstateWhatsAppInboundService.php'
+        ));
+
+        $this->assertIsString($source);
+        $this->assertStringContainsString(
+            'deterministicFirstContactRoleQuestion',
+            $source
+        );
+        $this->assertStringContainsString(
+            'Gayrimenkul satıcısı mısınız, yoksa yatırımcı mısınız?',
+            $source
+        );
+        $this->assertStringContainsString(
+            "->whereIn('sender_type', ['ai', 'human'])",
+            $source
+        );
+        $this->assertStringContainsString("'satmak istiyorum'", $source);
+        $this->assertStringContainsString("'yatirimciyim'", $source);
+    }
+
     public function test_inbound_delivery_has_stale_turn_and_runtime_disable_guards(): void
     {
         $source = file_get_contents(app_path(
