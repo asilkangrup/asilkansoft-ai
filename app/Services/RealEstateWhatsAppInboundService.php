@@ -363,10 +363,17 @@ class RealEstateWhatsAppInboundService
             limit: 20,
         );
 
-        $answer = $this->deterministicSellerPriceAnswer(
+        $answer = $this->deterministicFirstContactRoleQuestion(
             conversation: $conversation,
             message: $message,
         );
+
+        if ($answer === null) {
+            $answer = $this->deterministicSellerPriceAnswer(
+                conversation: $conversation,
+                message: $message,
+            );
+        }
 
         if ($answer === null) {
             $answer = $this->deterministicSellerPriceSteeringAnswer(
@@ -487,6 +494,47 @@ class RealEstateWhatsAppInboundService
             'message' => 'Emlak AI cevabı gönderildi.',
             'delivery_deduplicated' => ! (bool) $deliveryResult['sent_now'],
         ];
+    }
+
+    private function deterministicFirstContactRoleQuestion(
+        ConversationControl $conversation,
+        string $message,
+    ): ?string {
+        $priorOperatorReplyExists = ChatMessage::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('session_id', $conversation->session_id)
+            ->whereIn('sender_type', ['ai', 'human'])
+            ->exists();
+
+        if ($priorOperatorReplyExists) {
+            return null;
+        }
+
+        $normalized = strtolower(strtr(trim($message), [
+            'İ' => 'i', 'I' => 'i', 'ı' => 'i',
+            'Ş' => 's', 'ş' => 's', 'Ğ' => 'g', 'ğ' => 'g',
+            'Ü' => 'u', 'ü' => 'u', 'Ö' => 'o', 'ö' => 'o',
+            'Ç' => 'c', 'ç' => 'c',
+        ]));
+
+        foreach ([
+            'satmak istiyorum', 'satmak istiyoruz', 'satacagim',
+            'satisa cikarmak', 'mulk sahibiyim', 'evim var',
+            'arsam var', 'tarlam var', 'dairəm var', 'dairem var',
+            'nakite cevirmek', 'nakit ihtiyaci',
+            'yatirimciyim', 'yatirim yapmak', 'almak istiyorum',
+            'almak istiyoruz', 'aliciyim', 'firsat ariyorum',
+            'portfoy ariyorum',
+        ] as $intentSignal) {
+            if (str_contains($normalized, $intentSignal)) {
+                return null;
+            }
+        }
+
+        return 'Merhaba, size doğru yardımcı olabilmem için sorayım: '
+            .'Gayrimenkul satıcısı mısınız, yoksa yatırımcı mısınız?';
     }
 
     private function deterministicSellerPriceAnswer(
