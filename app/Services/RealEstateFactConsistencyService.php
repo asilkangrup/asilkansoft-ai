@@ -26,6 +26,30 @@ class RealEstateFactConsistencyService
         'is_shared_title',
     ];
 
+    /**
+     * Investor/buyer mandate facts directly drive matching. A one-turn model
+     * extraction error must not silently move a budget, location, area or risk
+     * constraint and immediately create/remove opportunities. Genuine changes
+     * are accepted when the customer explicitly marks the mandate as changed,
+     * or repeats the proposed value on a later turn.
+     */
+    private const STABLE_INVESTOR_FIELDS = [
+        'city',
+        'district',
+        'property_type',
+        'area_min_sqm',
+        'area_max_sqm',
+        'budget_min',
+        'budget_max',
+        'financing',
+        'investment_goal',
+        'risk_preference',
+        'timeline',
+        'location_flexibility',
+        'accepts_shared_title',
+        'target_discount_percent',
+    ];
+
     public function reconcile(
         ConversationControl $conversation,
         string $profileType,
@@ -37,7 +61,9 @@ class RealEstateFactConsistencyService
             return $existing;
         }
 
-        if ($profileType !== 'seller') {
+        $guardedFields = $this->guardedFields($profileType);
+
+        if ($guardedFields === []) {
             return $this->mergeNonNull($existing, $incoming);
         }
 
@@ -45,16 +71,21 @@ class RealEstateFactConsistencyService
         $previous = is_array($existing[self::DATA_KEY] ?? null)
             ? $existing[self::DATA_KEY]
             : [];
-        $pending = $this->pendingByField($previous['pending_conflicts'] ?? []);
+        $pending = $this->pendingByField(
+            $previous['pending_conflicts'] ?? [],
+            $guardedFields,
+        );
         $resolvedFields = [];
         $explicitCorrection = $this->hasExplicitCorrectionMarker($customerMessage);
+        $explicitMandateChange = in_array($profileType, ['investor', 'buyer'], true)
+            && $this->hasExplicitInvestorChangeMarker($customerMessage);
 
         foreach ($incoming as $field => $value) {
             if ($value === null) {
                 continue;
             }
 
-            if (! in_array($field, self::STABLE_SELLER_FIELDS, true)) {
+            if (! in_array($field, $guardedFields, true)) {
                 $result[$field] = $value;
                 continue;
             }
@@ -83,7 +114,11 @@ class RealEstateFactConsistencyService
                     $value
                 );
 
-            if ($explicitCorrection || $pendingProposalConfirmed) {
+            if (
+                $explicitCorrection
+                || $explicitMandateChange
+                || $pendingProposalConfirmed
+            ) {
                 $result[$field] = $value;
                 unset($pending[$field]);
                 $resolvedFields[] = $field;
@@ -108,20 +143,24 @@ class RealEstateFactConsistencyService
             ];
         }
 
-        $orderedPending = $this->orderedPending($pending);
+        $orderedPending = $this->orderedPending($pending, $guardedFields);
         $primary = $orderedPending[0] ?? null;
+        $isInvestor = in_array($profileType, ['investor', 'buyer'], true);
         $intelligence = [
             'status' => $primary ? 'confirmation_required' : 'consistent',
+            'profile_type' => $profileType,
             'pending_count' => count($orderedPending),
             'highest_priority_field' => $primary['field'] ?? null,
             'confirmation_question' => $primary
-                ? $this->confirmationQuestion($primary)
+                ? $this->confirmationQuestion($primary, $profileType)
                 : null,
             'pending_conflicts' => $orderedPending,
             'resolved_fields' => array_values(array_unique($resolvedFields)),
             'guardrails' => [
-                'unconfirmed_property_identity_may_be_used_for_valuation' => false,
-                'unconfirmed_property_identity_may_be_used_for_matching' => false,
+                'unconfirmed_property_identity_may_be_used_for_valuation' => $isInvestor,
+                'unconfirmed_property_identity_may_be_used_for_matching' => $isInvestor,
+                'unconfirmed_investor_mandate_may_be_used_for_matching' => ! $isInvestor,
+                'unconfirmed_investor_mandate_may_be_presented_as_current' => ! $isInvestor,
                 'seller_minimum_price_is_never_a_consistency_prompt_field' => true,
                 'follow_up_scheduling_allowed' => false,
             ],
@@ -145,6 +184,15 @@ class RealEstateFactConsistencyService
         return is_array($summary) ? $summary : [];
     }
 
+    private function guardedFields(string $profileType): array
+    {
+        return match ($profileType) {
+            'seller' => self::STABLE_SELLER_FIELDS,
+            'investor', 'buyer' => self::STABLE_INVESTOR_FIELDS,
+            default => [],
+        };
+    }
+
     private function mergeNonNull(array $existing, array $incoming): array
     {
         foreach ($incoming as $field => $value) {
@@ -156,7 +204,7 @@ class RealEstateFactConsistencyService
         return $existing;
     }
 
-    private function pendingByField(mixed $pending): array
+    private function pendingByField(mixed $pending, array $guardedFields): array
     {
         if (! is_array($pending)) {
             return [];
@@ -171,7 +219,7 @@ class RealEstateFactConsistencyService
 
             $field = trim((string) ($item['field'] ?? ''));
 
-            if (! in_array($field, self::STABLE_SELLER_FIELDS, true)) {
+            if (! in_array($field, $guardedFields, true)) {
                 continue;
             }
 
@@ -181,11 +229,11 @@ class RealEstateFactConsistencyService
         return $result;
     }
 
-    private function orderedPending(array $pending): array
+    private function orderedPending(array $pending, array $guardedFields): array
     {
         $result = [];
 
-        foreach (self::STABLE_SELLER_FIELDS as $field) {
+        foreach ($guardedFields as $field) {
             if (isset($pending[$field])) {
                 $result[] = $pending[$field];
             }
@@ -196,17 +244,32 @@ class RealEstateFactConsistencyService
 
     private function hasExplicitCorrectionMarker(string $message): bool
     {
-        $normalized = mb_strtolower(strtr($message, [
-            'İ' => 'i', 'I' => 'i', 'ı' => 'i',
-            'Ş' => 's', 'ş' => 's', 'Ğ' => 'g', 'ğ' => 'g',
-            'Ü' => 'u', 'ü' => 'u', 'Ö' => 'o', 'ö' => 'o',
-            'Ç' => 'c', 'ç' => 'c',
-        ]));
+        $normalized = $this->normalizeText($message);
 
         return preg_match(
             '/\b(hayir|yanlis|duzelt|duzeltiyorum|aslinda|pardon|degil|kastettim|dogrusu|guncelle|guncelliyorum)\b/u',
             $normalized
         ) === 1;
+    }
+
+    private function hasExplicitInvestorChangeMarker(string $message): bool
+    {
+        $normalized = $this->normalizeText($message);
+
+        return preg_match(
+            '/\b(artik|bundan sonra|degisti|degistirdim|artirdim|arttirdim|yukselttim|dusurdum|azalttim|cikardim|indirdim|genislettim|daralttim|sadece)\b/u',
+            $normalized
+        ) === 1;
+    }
+
+    private function normalizeText(string $message): string
+    {
+        return mb_strtolower(strtr($message, [
+            'İ' => 'i', 'I' => 'i', 'ı' => 'i',
+            'Ş' => 's', 'ş' => 's', 'Ğ' => 'g', 'ğ' => 'g',
+            'Ü' => 'u', 'ü' => 'u', 'Ö' => 'o', 'ö' => 'o',
+            'Ç' => 'c', 'ç' => 'c',
+        ]));
     }
 
     private function equivalent(mixed $left, mixed $right): bool
@@ -237,36 +300,63 @@ class RealEstateFactConsistencyService
         return mb_strlen($text) > 80 ? mb_substr($text, 0, 80) : $text;
     }
 
-    private function confirmationQuestion(array $conflict): string
+    private function confirmationQuestion(array $conflict, string $profileType): string
     {
         $field = (string) ($conflict['field'] ?? '');
         $current = $this->displayValue($field, $conflict['current_value'] ?? null);
         $proposed = $this->displayValue($field, $conflict['proposed_value'] ?? null);
-        $label = match ($field) {
+        $label = $this->fieldLabel($field, $profileType);
+        $subject = in_array($profileType, ['investor', 'buyer'], true)
+            ? 'yatırım kriterini'
+            : 'taşınmaz bilgisini';
+
+        return "{$label} bilgisini netleştirelim: daha önce {$current}, şimdi {$proposed} bilgisi geçti. Güncel {$subject} hangisi?";
+    }
+
+    private function fieldLabel(string $field, string $profileType): string
+    {
+        return match ($field) {
             'block_no' => 'ada numarası',
             'parcel_no' => 'parsel numarası',
-            'city' => 'il',
-            'district' => 'ilçe',
+            'city' => in_array($profileType, ['investor', 'buyer'], true) ? 'hedef il' : 'il',
+            'district' => in_array($profileType, ['investor', 'buyer'], true) ? 'hedef ilçe' : 'ilçe',
             'neighborhood' => 'mahalle',
             'property_type' => 'taşınmaz türü',
             'area_sqm' => 'taşınmaz alanı',
+            'area_min_sqm' => 'minimum alan kriteri',
+            'area_max_sqm' => 'maksimum alan kriteri',
             'title_deed_type' => 'tapu türü',
             'zoning_status' => 'imar durumu',
             'is_shared_title' => 'hisseli tapu durumu',
-            default => 'taşınmaz bilgisi',
+            'budget_min' => 'minimum bütçe',
+            'budget_max' => 'maksimum bütçe',
+            'financing' => 'finansman tercihi',
+            'investment_goal' => 'yatırım hedefi',
+            'risk_preference' => 'risk tercihi',
+            'timeline' => 'alım zamanlaması',
+            'location_flexibility' => 'lokasyon esnekliği',
+            'accepts_shared_title' => 'hisseli tapu tercihi',
+            'target_discount_percent' => 'hedef iskonto',
+            default => 'bilgi',
         };
-
-        return "{$label} bilgisini netleştirelim: daha önce {$current}, şimdi {$proposed} bilgisi geçti. Hangisi doğru?";
     }
 
     private function displayValue(string $field, mixed $value): string
     {
-        if ($field === 'area_sqm' && is_numeric($value)) {
+        if (in_array($field, ['area_sqm', 'area_min_sqm', 'area_max_sqm'], true) && is_numeric($value)) {
             return rtrim(rtrim(number_format((float) $value, 2, ',', '.'), '0'), ',').' m²';
         }
 
-        if ($field === 'is_shared_title' && is_bool($value)) {
-            return $value ? 'hisseli' : 'hisseli değil';
+        if (in_array($field, ['budget_min', 'budget_max'], true) && is_numeric($value)) {
+            return number_format((float) $value, 0, ',', '.').' TL';
+        }
+
+        if ($field === 'target_discount_percent' && is_numeric($value)) {
+            return '%'.rtrim(rtrim(number_format((float) $value, 2, ',', '.'), '0'), ',');
+        }
+
+        if (in_array($field, ['is_shared_title', 'accepts_shared_title'], true) && is_bool($value)) {
+            return $value ? 'evet' : 'hayır';
         }
 
         $text = trim((string) $value);
