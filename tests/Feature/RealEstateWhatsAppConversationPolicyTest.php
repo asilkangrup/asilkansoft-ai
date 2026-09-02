@@ -33,7 +33,15 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
             $prompt
         );
         $this->assertStringContainsString('garantili kazanç', $prompt);
-        $this->assertStringContainsString('en fazla 1-2 kritik kriter sor', $prompt);
+        $this->assertStringContainsString('hemen bütçe sorma', $prompt);
+        $this->assertStringContainsString(
+            'Taşınmaz türü/bölge/amaçtan en az ikisi netleşince',
+            $prompt
+        );
+        $this->assertStringContainsString(
+            'Müşteri kendiliğinden bütçe verirse kaydet; yeniden sorma',
+            $prompt
+        );
         $this->assertStringContainsString(
             '1200 => 1.200.000 TL',
             $prompt
