@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\RealEstateProfile;
+use App\Models\RealEstatePrivateMedia;
 use App\Services\RealEstateCommercialDealService;
 use App\Services\RealEstateIsolationService;
 use BackedEnum;
@@ -382,6 +383,20 @@ class EmlakMusteriDetay extends Page
             Notification::make()->title('Dosya güvenli alana kaydedilemedi')->danger()->send();
             return;
         }
+
+        $bytes = Storage::disk('local')->get($path);
+        RealEstatePrivateMedia::query()->updateOrCreate(
+            ['real_estate_profile_id' => $profile->id, 'media_key' => $id],
+            [
+                'user_id' => RealEstateIsolationService::USER_ID,
+                'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+                'ai_bot_id' => RealEstateIsolationService::BOT_ID,
+                'chat_message_id' => null,
+                'mime_type' => (string) $this->manualUpload->getMimeType(),
+                'size' => strlen($bytes),
+                'content_base64' => base64_encode($bytes),
+            ]
+        );
 
         $data = is_array($profile->data) ? $profile->data : [];
         $manual = is_array($data['manual_media'] ?? null) ? $data['manual_media'] : [];
