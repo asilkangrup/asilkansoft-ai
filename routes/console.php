@@ -90,6 +90,21 @@ Artisan::command(
 
 /*
 |--------------------------------------------------------------------------
+| ISOLATED EMLAK AI UNANSWERED INBOUND WATCHDOG
+|--------------------------------------------------------------------------
+|
+| This only retries a reply to a customer message that was already received
+| and persisted but later failed. It never creates a proactive/follow-up
+| message. Newer customer turns, human takeover and existing replies block it.
+|
+*/
+
+Schedule::command('real-estate:recover-inbound --limit=5 --age=90')
+    ->everyMinute()
+    ->withoutOverlapping(5);
+
+/*
+|--------------------------------------------------------------------------
 | CRM TAKİP / ÖNCELİKLİ LEAD BİLDİRİMLERİ
 |--------------------------------------------------------------------------
 */
