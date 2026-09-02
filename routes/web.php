@@ -46,3 +46,7 @@ Route::get('/admin/emlak-medya/{profile}/{media}', [RealEstatePrivateMediaContro
     ->whereNumber('profile')
     ->whereUuid('media')
     ->name('real-estate.private-media');
+
+Route::get('/admin/emlak-whatsapp-medya/{message}', [RealEstatePrivateMediaController::class, 'showInbound'])
+    ->whereNumber('message')
+    ->name('real-estate.private-inbound-media');
