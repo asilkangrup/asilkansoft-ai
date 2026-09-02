@@ -6,6 +6,7 @@ use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Services\RealEstateDecisionService;
+use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchService;
 use App\Services\RealEstateMatchValuationFreshnessFilterService;
 use App\Services\RealEstateMatchVerificationFilterService;
@@ -19,6 +20,7 @@ use Throwable;
 class ChatMessageObserver
 {
     private const REAL_ESTATE_USER_ID = 40;
+    private const REAL_ESTATE_ORGANIZATION_ID = 37;
     private const REAL_ESTATE_BOT_ID = 35;
     private const REAL_ESTATE_INSTANCE = 'emlak-ai-35';
 
@@ -26,6 +28,7 @@ class ChatMessageObserver
     {
         if (
             (int) $message->user_id !== self::REAL_ESTATE_USER_ID
+            || (int) $message->organization_id !== self::REAL_ESTATE_ORGANIZATION_ID
             || (int) $message->ai_bot_id !== self::REAL_ESTATE_BOT_ID
             || $message->role !== 'user'
             || $message->sender_type !== 'customer'
@@ -50,6 +53,7 @@ class ChatMessageObserver
         try {
             $conversation = ConversationControl::query()
                 ->where('user_id', self::REAL_ESTATE_USER_ID)
+                ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
                 ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
                 ->where('session_id', $message->session_id)
                 ->first();
@@ -60,7 +64,11 @@ class ChatMessageObserver
                 ->where('whatsapp_instance', self::REAL_ESTATE_INSTANCE)
                 ->first();
 
-            if (! $conversation || ! $aiBot) {
+            if (
+                ! $conversation
+                || ! $aiBot
+                || ! app(RealEstateIsolationService::class)->supportsConversation($conversation)
+            ) {
                 return;
             }
 
@@ -108,6 +116,7 @@ class ChatMessageObserver
         try {
             $previous = ChatMessage::query()
                 ->where('user_id', self::REAL_ESTATE_USER_ID)
+                ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
                 ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
                 ->where('session_id', $mediaMessage->session_id)
                 ->where('id', '<', $mediaMessage->id)
