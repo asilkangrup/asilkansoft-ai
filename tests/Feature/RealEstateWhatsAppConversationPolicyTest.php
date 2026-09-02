@@ -20,5 +20,19 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
         $this->assertStringContainsString('yatırımcı teklifine geçir', $prompt);
         $this->assertStringContainsString('özel minimum/taban fiyatını', $prompt);
         $this->assertStringContainsString('sahte alıcı, sahte teklif', $prompt);
+        $this->assertStringContainsString(
+            'Acil nakde dönmek isteyen mülk sahiplerinden gelen gayrimenkul dosyalarını inceliyoruz',
+            $prompt
+        );
+        $this->assertStringContainsString(
+            'kriterleri eşleşen gerçek yatırımcılara iletiyoruz',
+            $prompt
+        );
+        $this->assertStringContainsString(
+            'Bu açıklamayı konuşmanın ilerleyen mesajlarında tekrarlama',
+            $prompt
+        );
+        $this->assertStringContainsString('garantili kazanç', $prompt);
+        $this->assertStringContainsString('en fazla 1-2 kritik kriter sor', $prompt);
     }
 }
