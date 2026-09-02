@@ -8,6 +8,7 @@ use App\Services\RealEstateEvidenceLedgerService;
 use App\Services\RealEstateInvestorMandateService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
+use App\Services\RealEstateNextBestActionDecisionBridgeService;
 use App\Services\RealEstateNextBestActionService;
 use App\Services\RealEstateOperatorAlertService;
 use App\Services\RealEstateSellerMotivationService;
@@ -38,11 +39,12 @@ class RealEstateProfileObserver
         app(RealEstateMatchLedgerService::class)->sync($profile);
         app(RealEstateCaseLifecycleService::class)->sync($profile);
 
-        // Recompute after every guarded profile mutation. The service persists
-        // quietly, so it cannot recurse through this observer. This means the
-        // final valuation / verification / matching filter in a turn always
-        // gets the last word on the single next action.
+        // Recompute after every guarded profile mutation. Both services save
+        // quietly, so they cannot recurse through this observer. The final
+        // valuation / verification / matching filter in a turn therefore gets
+        // the last word on the single next action exposed to the AI context.
         app(RealEstateNextBestActionService::class)->process($conversation);
+        app(RealEstateNextBestActionDecisionBridgeService::class)->sync($conversation);
     }
 
     private function recordEvidence(
