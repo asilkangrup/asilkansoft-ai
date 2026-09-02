@@ -9,6 +9,7 @@ use App\Services\RealEstateInvestorMandateService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
 use App\Services\RealEstateOperatorAlertService;
+use App\Services\RealEstateSellerMotivationService;
 
 class RealEstateProfileObserver
 {
@@ -27,6 +28,8 @@ class RealEstateProfileObserver
         }
 
         app(RealEstateInvestorMandateService::class)->sync($profile);
+        $profile->refresh();
+        app(RealEstateSellerMotivationService::class)->sync($profile);
         $profile->refresh();
 
         $this->recordEvidence($profile, $conversation);
