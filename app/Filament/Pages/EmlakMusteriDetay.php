@@ -130,7 +130,9 @@ class EmlakMusteriDetay extends Page
                     'source' => 'WhatsApp',
                 ];
             })
-            ->filter();
+            ->filter()
+            ->values()
+            ->toBase();
 
         $manualMedia = collect(is_array($data['manual_media'] ?? null) ? $data['manual_media'] : [])
             ->filter(fn ($item): bool => is_array($item) && filled($item['id'] ?? null))
