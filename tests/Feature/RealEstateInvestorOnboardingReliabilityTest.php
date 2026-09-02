@@ -93,6 +93,22 @@ class RealEstateInvestorOnboardingReliabilityTest extends TestCase
             $recoveryService
         );
         $this->assertStringContainsString(
+            "'status' => 'failed'",
+            $recoveryService
+        );
+        $this->assertStringContainsString(
+            'no_saved_customer_message',
+            $recoveryService
+        );
+        $this->assertStringContainsString(
+            'public int $tries = 3',
+            $recovery
+        );
+        $this->assertStringNotContainsString(
+            "\$stats['failed']",
+            substr($recovery, strpos($recovery, 'public function handle'))
+        );
+        $this->assertStringContainsString(
             'superseded_by_newer_customer_message',
             $recoveryService
         );
@@ -126,6 +142,18 @@ class RealEstateInvestorOnboardingReliabilityTest extends TestCase
         $this->assertStringNotContainsString(
             'second_follow_up_enabled = true',
             $inbound.$recovery
+        );
+
+        $openAi = file_get_contents(
+            app_path('Services/RealEstateOpenAIService.php')
+        );
+        $this->assertStringContainsString(
+            "'max_output_tokens' => 500",
+            $openAi
+        );
+        $this->assertStringContainsString(
+            "'REAL_ESTATE_CHAT_REASONING_EFFORT',\n                    'low'",
+            $openAi
         );
     }
 }
