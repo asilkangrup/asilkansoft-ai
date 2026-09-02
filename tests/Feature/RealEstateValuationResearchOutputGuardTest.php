@@ -106,6 +106,8 @@ class RealEstateValuationResearchOutputGuardTest extends TestCase
             ->buildSanitizedValuation([
                 'market_min' => -10,
                 'market_max' => 4_500_000,
+                'realistic_sale_min' => 3_850_000,
+                'realistic_sale_max' => 4_150_000,
                 'quick_sale_min' => 3_200_000,
                 'quick_sale_max' => 3_700_000,
                 'investor_buy_min' => 3_000_000,
@@ -119,7 +121,7 @@ class RealEstateValuationResearchOutputGuardTest extends TestCase
                         'listing_price' => 4_000_000,
                         'area_sqm' => 1000,
                         'location' => 'Muğla Marmaris',
-                        'property_type' => 'arsa',
+                        'property_type' => 'Konut imarlı arsa',
                     ],
                     [
                         'url' => 'https://two.example/listing/2',
@@ -133,6 +135,8 @@ class RealEstateValuationResearchOutputGuardTest extends TestCase
 
         $this->assertNull($sanitized['market_min']);
         $this->assertSame(4_500_000.0, $sanitized['market_max']);
+        $this->assertSame(3_850_000.0, $sanitized['realistic_sale_min']);
+        $this->assertSame(4_150_000.0, $sanitized['realistic_sale_max']);
         $this->assertSame(100, $sanitized['confidence_score']);
         $this->assertSame(1000.0, $sanitized['market_gap_percent']);
         $this->assertSame(2, $sanitized['comparable_stats']['count']);

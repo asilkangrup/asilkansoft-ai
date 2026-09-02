@@ -34,6 +34,11 @@ class RealEstateValuationService
         $data = is_array($profile->data) ? $profile->data : [];
         $explicitIntent = $this->valuationIntent($message);
         $pendingResearchAction = $this->pendingResearchAction($profile, $conversation);
+        $repairComparableIntegrity = trim((string) data_get(
+            $data,
+            'next_best_action_intelligence.action_code',
+            ''
+        )) === 'repair_comparable_integrity';
         $sellerAutoReady = $profile->profile_type === 'seller'
             && filled($data['asking_price'] ?? null)
             && filled($data['area_sqm'] ?? null);
@@ -49,6 +54,7 @@ class RealEstateValuationService
         if (
             ($freshness['usable_for_decision'] ?? false)
             && ! $forceRefresh
+            && ! $repairComparableIntegrity
         ) {
             return is_array($profile->fresh()->valuation)
                 ? $profile->fresh()->valuation
@@ -386,6 +392,7 @@ KURALLAR
 - quick_sale bandı, gerçekçi normal satıştan daha düşük/hızlı nakde dönüş bandıdır ve gerçekçi satış bandından mantıksız biçimde yüksek olamaz.
 - sources alanına yalnızca gerçekten araştırmada kullandığın URL veya kaynak adını yaz; kaynak kullanmadıysan boş dizi.
 - comparables alanına yalnızca gerçekten web araştırmasında gördüğün emsalleri ekle. URL, fiyat veya m² uydurma.
+- Bir emsal hedef taşınmazla aynı ana kategorideyse comparable.property_type alanını property_profile.property_type ile aynı ana kategori adıyla yaz (ör. hedef 'arsa' ise konut imarlı/satılık arsa kaynağı için 'arsa'). Farklı kategoriyi hedef kategoriye çevirmeye çalışma.
 - observed_at için kaynak sayfasında tarih açıkça görünüyorsa YYYY-MM-DD yaz, görünmüyorsa null bırak.
 - Aynı ilanı/URL'yi birden fazla emsal gibi çoğaltma.
 

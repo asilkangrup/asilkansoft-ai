@@ -68,6 +68,8 @@ class RealEstateValuationResearchOutputGuardService
         $sanitized = [
             'market_min' => $this->positiveNumber($valuation['market_min'] ?? null),
             'market_max' => $this->positiveNumber($valuation['market_max'] ?? null),
+            'realistic_sale_min' => $this->positiveNumber($valuation['realistic_sale_min'] ?? null),
+            'realistic_sale_max' => $this->positiveNumber($valuation['realistic_sale_max'] ?? null),
             'quick_sale_min' => $this->positiveNumber($valuation['quick_sale_min'] ?? null),
             'quick_sale_max' => $this->positiveNumber($valuation['quick_sale_max'] ?? null),
             'investor_buy_min' => $this->positiveNumber($valuation['investor_buy_min'] ?? null),
@@ -266,17 +268,34 @@ class RealEstateValuationResearchOutputGuardService
     }
 
     private function comparablePropertyType(mixed $value, array $profileData): ?string
-    {
-        $expected = $this->safeProfileLabel($profileData['property_type'] ?? null, 48);
+{
+    $expected = $this->safeProfileLabel($profileData['property_type'] ?? null, 48);
 
-        if ($expected === null || ! is_scalar($value)) {
-            return null;
-        }
-
-        return $this->normalizeText((string) $value) === $this->normalizeText($expected)
-            ? $expected
-            : 'mismatch';
+    if ($expected === null || ! is_scalar($value)) {
+        return null;
     }
+
+    $actual = $this->normalizeText((string) $value);
+    $expectedNormalized = $this->normalizeText($expected);
+
+    if ($actual === $expectedNormalized) {
+        return $expected;
+    }
+
+    // Web sources often describe the same category with qualifiers
+    // such as "konut imarlı arsa" or "satılık arsa". Preserve only
+    // the trusted profile category when it appears as a whole token;
+    // unrelated categories still fail closed as mismatch.
+    if ($actual !== '' && $expectedNormalized !== '') {
+        $pattern = '/(^|\s)'.preg_quote($expectedNormalized, '/').'(\s|$)/u';
+
+        if (preg_match($pattern, $actual) === 1) {
+            return $expected;
+        }
+    }
+
+    return 'mismatch';
+}
 
     private function profileLocation(array $profileData): ?string
     {
