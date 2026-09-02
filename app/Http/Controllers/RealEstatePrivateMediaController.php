@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ChatMessage;
 use App\Models\RealEstateProfile;
 use App\Services\RealEstateIsolationService;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -9,18 +10,33 @@ use Illuminate\Support\Facades\Storage;
 
 class RealEstatePrivateMediaController extends Controller
 {
+    public function showInbound(int $message): BinaryFileResponse
+    {
+        $this->authorizeIsolatedOperator();
+
+        $chatMessage = ChatMessage::query()
+            ->whereKey($message)
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('sender_type', 'customer')
+            ->whereIn('message_type', ['image', 'document'])
+            ->firstOrFail();
+
+        $marker = trim((string) $chatMessage->media_url);
+        abort_unless(str_starts_with($marker, 'private:real-estate-inbound/'.$chatMessage->id.'/'), 404);
+        $path = substr($marker, strlen('private:'));
+        abort_unless(Storage::disk('local')->exists($path), 404);
+
+        return $this->privateFile(
+            path: $path,
+            mime: (string) ($chatMessage->media_mime_type ?: 'application/octet-stream'),
+        );
+    }
+
     public function show(int $profile, string $media): BinaryFileResponse
     {
-        $user = auth()->user();
-
-        abort_unless(
-            $user
-            && (int) $user->id === RealEstateIsolationService::USER_ID
-            && $user->activeOrganizations()
-                ->where('organizations.id', RealEstateIsolationService::ORGANIZATION_ID)
-                ->exists(),
-            403
-        );
+        $this->authorizeIsolatedOperator();
 
         $profileModel = RealEstateProfile::query()
             ->isolatedProduction()
@@ -44,10 +60,32 @@ class RealEstatePrivateMediaController extends Controller
             404
         );
 
+        return $this->privateFile(
+            path: $path,
+            mime: (string) ($record['mime_type'] ?? 'application/octet-stream'),
+        );
+    }
+
+    private function authorizeIsolatedOperator(): void
+    {
+        $user = auth()->user();
+
+        abort_unless(
+            $user
+            && (int) $user->id === RealEstateIsolationService::USER_ID
+            && $user->activeOrganizations()
+                ->where('organizations.id', RealEstateIsolationService::ORGANIZATION_ID)
+                ->exists(),
+            403
+        );
+    }
+
+    private function privateFile(string $path, string $mime): BinaryFileResponse
+    {
         $response = response()->file(
             Storage::disk('local')->path($path),
             [
-                'Content-Type' => (string) ($record['mime_type'] ?? 'application/octet-stream'),
+                'Content-Type' => $mime,
                 'Content-Disposition' => 'inline',
                 'X-Content-Type-Options' => 'nosniff',
             ]
