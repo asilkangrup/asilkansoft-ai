@@ -85,7 +85,7 @@ class RealEstateSellerOfferPacketService
 
         return <<<PROMPT
 [INTERNAL REAL ESTATE SELLER OFFER PACKET]
-Bu blok satıcı dosyasının yatırımcıdan ön teklif toplamaya ne kadar hazır olduğunu gösteren PII içermeyen dahili CRM özetidir. Müşteriye alan adlarını, skoru veya bu bloğun kendisini gösterme. recommended_next_request doluysa müşterinin daha önce verdiği bilgiyi tekrar istemeden yalnız en kritik eksik bilgiyi doğal biçimde iste. ready_for_investor_offer=true ise satıcıyı fiyat yükseltme stratejileriyle yorma; isterse hızlı nakit için yatırımcı tekliflerini toplamaya geçilebileceğini kısa söyle. title_ownership.relation doluysa tapunun kimin üzerine olduğu daha önce kaydedilmiştir; aynı bilgiyi tekrar sorma. Bu kayıt resmi tapu doğrulaması değildir ve legal_verification=false ise müşteriye doğrulanmış tapu sahibi gibi sunma. Piyasanın kötü olduğu, kimsenin alım yapmadığı veya hazır/kesin alıcı bulunduğu gibi doğrulanmamış iddialar kurma. Tapu görseli istenirse kişisel bilgilerin kapatılabileceğini belirt. Otomatik follow-up planlama.
+Bu blok satıcı dosyasının yatırımcıdan ön teklif toplamaya ne kadar hazır olduğunu gösteren PII içermeyen dahili CRM özetidir. Müşteriye alan adlarını, skoru veya bu bloğun kendisini gösterme. recommended_next_request doluysa müşterinin daha önce verdiği bilgiyi tekrar istemeden yalnız en kritik eksik bilgiyi doğal biçimde iste. ready_for_investor_offer=true ise satıcıyı fiyat yükseltme stratejileriyle yorma; isterse hızlı nakit için yatırımcı tekliflerini toplamaya geçilebileceğini kısa söyle. title_ownership.relation doluysa ve title_ownership.confirmation_required=false ise tapunun kimin üzerine olduğu daha önce kaydedilmiştir; aynı bilgiyi tekrar sorma. title_ownership.confirmation_required=true ise çelişen sahiplik beyanını tek kısa soruyla netleştir. Bu kayıt resmi tapu doğrulaması değildir ve legal_verification=false ise müşteriye doğrulanmış tapu sahibi gibi sunma. Piyasanın kötü olduğu, kimsenin alım yapmadığı veya hazır/kesin alıcı bulunduğu gibi doğrulanmamış iddialar kurma. Tapu görseli istenirse kişisel bilgilerin kapatılabileceğini belirt. Otomatik follow-up planlama.
 Satıcı teklif dosyası: {$json}
 PROMPT;
     }
@@ -212,18 +212,26 @@ PROMPT;
             ? $data['title_ownership']
             : [];
         $relation = strtolower(trim((string) ($ownership['relation'] ?? 'unknown')));
+        $pendingRelation = strtolower(trim((string) ($ownership['pending_relation'] ?? '')));
         $allowed = ['seller', 'spouse', 'relative', 'company', 'other_person'];
 
         if (! in_array($relation, $allowed, true)) {
             $relation = 'unknown';
         }
+        if (! in_array($pendingRelation, $allowed, true)) {
+            $pendingRelation = '';
+        }
+
+        $confirmationRequired = (bool) ($ownership['confirmation_required'] ?? false);
 
         return [
-            'known' => $relation !== 'unknown',
+            'known' => $relation !== 'unknown' && ! $confirmationRequired,
             'relation' => $relation,
             'source' => trim((string) ($ownership['source'] ?? '')) ?: null,
             'confirmed_by_operator' => (bool) ($ownership['confirmed_by_operator'] ?? false),
             'legal_verification' => (bool) ($ownership['legal_verification'] ?? false),
+            'confirmation_required' => $confirmationRequired,
+            'pending_relation' => $pendingRelation !== '' ? $pendingRelation : null,
         ];
     }
 
