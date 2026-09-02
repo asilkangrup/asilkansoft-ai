@@ -16,6 +16,7 @@ class RealEstateOperatorAlertService
         'hot_lead',
         'valuation_attention',
         'evidence_attention',
+        'seller_protection_attention',
     ];
 
     public function sync(RealEstateProfile $profile): array
@@ -120,6 +121,9 @@ class RealEstateOperatorAlertService
         $verification = is_array($data['verification_intelligence'] ?? null)
             ? $data['verification_intelligence']
             : [];
+        $sellerMotivation = is_array($data['seller_motivation_intelligence'] ?? null)
+            ? $data['seller_motivation_intelligence']
+            : [];
         $alerts = [];
 
         $verificationStatus = (string) ($verification['status'] ?? '');
@@ -178,6 +182,41 @@ class RealEstateOperatorAlertService
                     'ready_for_match' => (bool) ($decision['ready_for_match'] ?? false),
                 ],
             ];
+        }
+
+        if ($profile->profile_type === 'seller') {
+            $protection = is_array($sellerMotivation['seller_protection'] ?? null)
+                ? $sellerMotivation['seller_protection']
+                : [];
+
+            if ((bool) ($protection['required'] ?? false)) {
+                $reasons = collect($protection['reasons'] ?? [])
+                    ->filter(fn ($reason): bool => is_string($reason) && $reason !== '')
+                    ->unique()
+                    ->values()
+                    ->all();
+                $pricingAlignment = (string) ($sellerMotivation['pricing_alignment'] ?? 'unknown');
+                $motivationLevel = (string) ($sellerMotivation['motivation_level'] ?? 'unknown');
+                $belowRange = $pricingAlignment === 'materially_below_market_range';
+
+                $alerts[] = [
+                    'alert_key' => 'seller_protection_attention:'.$profile->id,
+                    'type' => 'seller_protection_attention',
+                    'severity' => $belowRange ? 'high' : 'medium',
+                    'title' => 'Satıcı değer koruma incelemesi',
+                    'message' => $belowRange
+                        ? 'Satıcının beklentisi mevcut tahmini piyasa aralığının belirgin altında görünüyor. Aciliyeti fırsata çevirmeden değerleme ve beklentiyi operatör kontrol etsin.'
+                        : 'Satıcı açık yüksek aciliyet sinyali verdi. Fiyat baskısı kurmadan değerleme, satış hızı ve beklenti dengesini operatör kontrol etsin.',
+                    'payload' => [
+                        'motivation_level' => $motivationLevel,
+                        'pricing_alignment' => $pricingAlignment,
+                        'protection_reasons' => $reasons,
+                        'readiness_score' => (int) ($sellerMotivation['readiness_score'] ?? 0),
+                        'private_floor_included' => false,
+                        'raw_urgency_reason_included' => false,
+                    ],
+                ];
+            }
         }
 
         if ($profile->profile_type === 'seller' && $leadScore >= 60) {
@@ -240,6 +279,7 @@ class RealEstateOperatorAlertService
     ): void {
         $existing = RealEstateOperatorAlert::query()
             ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
             ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
             ->where('alert_key', $alert['alert_key'])
             ->first();
@@ -251,11 +291,11 @@ class RealEstateOperatorAlertService
         RealEstateOperatorAlert::updateOrCreate(
             [
                 'user_id' => RealEstateIsolationService::USER_ID,
+                'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
                 'ai_bot_id' => RealEstateIsolationService::BOT_ID,
                 'alert_key' => $alert['alert_key'],
             ],
             [
-                'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
                 'conversation_control_id' => $conversation->id,
                 'real_estate_profile_id' => $profile->id,
                 'type' => $alert['type'],
@@ -288,14 +328,11 @@ class RealEstateOperatorAlertService
 
     private function supports(RealEstateProfile $profile): bool
     {
-        return (int) $profile->user_id === RealEstateIsolationService::USER_ID
-            && (int) $profile->ai_bot_id === RealEstateIsolationService::BOT_ID;
+        return $profile->belongsToIsolatedProductionScope();
     }
 
     private function supportsConversation(?ConversationControl $conversation): bool
     {
-        return $conversation !== null
-            && (int) $conversation->user_id === RealEstateIsolationService::USER_ID
-            && (int) $conversation->ai_bot_id === RealEstateIsolationService::BOT_ID;
+        return app(RealEstateIsolationService::class)->supportsConversation($conversation);
     }
 }
