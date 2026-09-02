@@ -60,7 +60,7 @@ class RealEstateCustomerDetailAccessTest extends TestCase
     private function seedAccount(): User
     {
         $user = User::query()->forceCreate(['id'=>40,'name'=>'Emlak AI','email'=>'detail-access@example.test','password'=>Hash::make('test')]);
-        Organization::query()->forceCreate(['id'=>37,'owner_user_id'=>40,'name'=>'Emlak AI','slug'=>'detail-access','plan'=>'start','seat_limit'=>1,'monthly_message_limit'=>1000,'status'=>'active']);
+        Organization::query()->forceCreate(['id'=>37,'owner_user_id'=>40,'name'=>'Emlak AI','slug'=>'detail-access','plan'=>'start','seat_limit'=>1,'monthly_message_limit'=>1000,'status'=>'active']);\n        $user->organizations()->syncWithoutDetaching([37 => ['role'=>'owner','status'=>'active','joined_at'=>now()]]);
         AiBot::query()->forceCreate(['id'=>35,'user_id'=>40,'name'=>'Emlak AI','company_name'=>'Asilkan Gayrimenkul','openai_model'=>'gpt-5-mini','status'=>'active','business_sector'=>'real_estate','lead_scoring_profile'=>'real_estate','whatsapp_instance'=>'emlak-ai-35','follow_up_enabled'=>false,'second_follow_up_enabled'=>false,'ai_enabled'=>true]);
         User::query()->forceCreate(['id'=>41,'name'=>'Foreign','email'=>'foreign-detail@example.test','password'=>Hash::make('test')]);
         Organization::query()->forceCreate(['id'=>38,'owner_user_id'=>41,'name'=>'Foreign','slug'=>'foreign-detail','plan'=>'start','seat_limit'=>1,'monthly_message_limit'=>1000,'status'=>'active']);
