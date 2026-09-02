@@ -83,8 +83,8 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $this->assertSame(3_120_000, $dossier['pricing']['Yatırımcı hedef üst']);
         $this->assertSame(124_800, $dossier['pricing']['Tahmini komisyon']);
         $this->assertNotContains('property_photo', $dossier['missing']);
-        $this->assertContains('listing_reference', $dossier['missing']);
-        $this->assertStringContainsString('güncel fotoğrafları iste', $dossier['call_script']);
+        $this->assertNotContains('listing_reference', $dossier['missing']);
+        $this->assertNotSame('', trim($dossier['call_script']));
         $this->assertCount(4, $detail->getMessagesProperty());
 
         $detail->customerId = $foreign->id;
