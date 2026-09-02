@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\ChatMessage;
 use Exception;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 class EvolutionMediaService
 {
@@ -63,6 +65,59 @@ class EvolutionMediaService
         throw new Exception(
             'WhatsApp medyası Evolution API üzerinden çözülemedi.'
         );
+    }
+
+    public function persistPrivateInboundMedia(
+        ChatMessage $message,
+        string $instanceName,
+        array $mediaContext
+    ): bool {
+        if (
+            (int) $message->user_id !== RealEstateIsolationService::USER_ID
+            || (int) $message->organization_id !== RealEstateIsolationService::ORGANIZATION_ID
+            || (int) $message->ai_bot_id !== RealEstateIsolationService::BOT_ID
+            || ! in_array($message->message_type, ['image', 'document'], true)
+        ) {
+            return false;
+        }
+
+        $mime = strtolower(trim((string) ($mediaContext['mime_type'] ?? $message->media_mime_type)));
+        $extensions = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'application/pdf' => 'pdf',
+        ];
+
+        if (! isset($extensions[$mime])) {
+            return false;
+        }
+
+        $base64 = $this->downloadBase64(
+            instanceName: $instanceName,
+            messageEnvelope: is_array($mediaContext['message_envelope'] ?? null)
+                ? $mediaContext['message_envelope']
+                : [],
+        );
+        $bytes = base64_decode($base64, true);
+
+        if (! is_string($bytes) || $bytes === '' || strlen($bytes) > 15 * 1024 * 1024) {
+            throw new Exception('WhatsApp medyası güvenli saklama sınırını aşıyor veya çözülemedi.');
+        }
+
+        $path = 'real-estate-inbound/'.$message->id.'/original.'.$extensions[$mime];
+
+        if (! Storage::disk('local')->put($path, $bytes)) {
+            throw new Exception('WhatsApp medyası özel depolamaya yazılamadı.');
+        }
+
+        $message->forceFill([
+            'media_url' => 'private:'.$path,
+            'media_mime_type' => $mime,
+            'media_size' => strlen($bytes),
+        ])->saveQuietly();
+
+        return true;
     }
 
     private function requestBase64(
