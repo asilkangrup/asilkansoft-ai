@@ -119,7 +119,12 @@ class EmlakMusteriDetay extends Page
                     ? route('real-estate.private-inbound-media', ['message' => $message->id], false)
                     : $storedUrl;
 
-                if (! preg_match('/^https?:\/\//i', $url)) {
+                $isAllowedPrivateRoute = str_starts_with(
+                    $url,
+                    '/admin/emlak-whatsapp-medya/'
+                );
+
+                if (! $isAllowedPrivateRoute && ! preg_match('/^https?:\\/\\//i', $url)) {
                     return null;
                 }
 
