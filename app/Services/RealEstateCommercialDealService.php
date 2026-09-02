@@ -13,7 +13,8 @@ class RealEstateCommercialDealService
         }
 
         $data = is_array($profile->data) ? $profile->data : [];
-        $valuation = is_array($profile->valuation) ? $profile->valuation : [];
+        $valuation = app(RealEstateValuationFreshnessService::class)
+            ->valuationForDecision($profile);
         $handoff = is_array($data['investor_offer_handoff_intelligence'] ?? null)
             ? $data['investor_offer_handoff_intelligence'] : [];
 
