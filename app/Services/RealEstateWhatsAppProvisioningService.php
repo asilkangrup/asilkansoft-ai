@@ -12,17 +12,25 @@ class RealEstateWhatsAppProvisioningService
     ) {
     }
 
-    public function configureWebhook(
-        string $instanceName,
-        string $webhookUrl
-    ): array {
+    public function configureWebhook(string $instanceName): array
+    {
         $instanceName = trim($instanceName);
-        $webhookUrl = trim($webhookUrl);
-        $secret = $this->authService->secret();
 
-        if ($instanceName === '' || $webhookUrl === '') {
-            throw new Exception('Emlak AI webhook bilgileri eksik.');
+        if ($instanceName !== RealEstateIsolationService::INSTANCE) {
+            throw new Exception(
+                'Emlak AI yalnızca '.RealEstateIsolationService::INSTANCE
+                .' Evolution instance üzerinde provision edilebilir.'
+            );
         }
+
+        $appUrl = rtrim((string) config('app.url'), '/');
+
+        if ($appUrl === '') {
+            throw new Exception('Emlak AI uygulama URL yapılandırması eksik.');
+        }
+
+        $webhookUrl = $appUrl.'/api/real-estate/whatsapp/webhook';
+        $secret = $this->authService->secret();
 
         if ($secret === null) {
             throw new Exception('Emlak AI webhook gizli anahtarı yapılandırılmamış.');
