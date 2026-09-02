@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ProcessWhatsAppWebhook;
+use App\Jobs\ProcessRealEstateMediaBatch;
+use App\Jobs\ProcessRealEstateWhatsAppWebhook;
 use App\Models\AiBot;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateWebhookAuthService;
 use App\Services\RealEstateWhatsAppInboundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 class RealEstateWhatsAppWebhookController extends Controller
@@ -113,7 +116,39 @@ class RealEstateWhatsAppWebhookController extends Controller
             // the generic WAI endpoint from becoming an auth bypass.
             $payload['_real_estate_authorized'] = true;
 
-            ProcessWhatsAppWebhook::dispatch($payload);
+            $remoteJid = trim((string) data_get($payload, 'data.key.remoteJid', ''));
+            $cacheKey = 'real-estate-media-batch:'.hash('sha256', $remoteJid);
+            $pendingMediaBatch = $remoteJid !== '' ? Cache::get($cacheKey) : null;
+
+            // If a customer sends several photos/documents and then a short
+            // text such as "bunları incele", keep that text in the same
+            // burst. The final job therefore sees every media analysis before
+            // producing exactly one customer-facing reply.
+            if ($this->isBurstMediaPayload($payload) || is_array($pendingMediaBatch)) {
+                $existing = $pendingMediaBatch;
+                $payloads = is_array($existing) && is_array($existing['payloads'] ?? null)
+                    ? $existing['payloads']
+                    : [];
+                $payloads[] = $payload;
+                $generation = (string) Str::uuid();
+
+                Cache::put($cacheKey, [
+                    'generation' => $generation,
+                    'payloads' => array_slice($payloads, -12),
+                ], now()->addSeconds(45));
+
+                ProcessRealEstateMediaBatch::dispatch($cacheKey, $generation)
+                    ->delay(now()->addSeconds(3));
+
+                return response()->json([
+                    'success' => true,
+                    'queued' => true,
+                    'batched_media' => true,
+                    'isolated' => true,
+                ]);
+            }
+
+            ProcessRealEstateWhatsAppWebhook::dispatch($payload);
 
             return response()->json([
                 'success' => true,
@@ -134,6 +169,23 @@ class RealEstateWhatsAppWebhookController extends Controller
                 'message' => 'Emlak AI webhook işlenemedi.',
             ], 500);
         }
+    }
+
+    private function isBurstMediaPayload(array $payload): bool
+    {
+        $message = data_get($payload, 'data.message', []);
+
+        if (! is_array($message)) {
+            return false;
+        }
+
+        $encoded = json_encode($message);
+
+        return is_string($encoded) && (
+            str_contains($encoded, '"imageMessage"')
+            || str_contains($encoded, '"documentMessage"')
+            || str_contains($encoded, '"videoMessage"')
+        );
     }
 
     private function normalizeEvent(mixed $event): string
