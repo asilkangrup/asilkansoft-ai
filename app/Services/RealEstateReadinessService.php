@@ -42,6 +42,7 @@ class RealEstateReadinessService
             && class_exists(RealEstateNegotiationMemoryService::class);
         $caseLifecycleReady = Schema::hasTable('real_estate_case_events')
             && class_exists(RealEstateCaseLifecycleService::class);
+        $sellerInvestorHandoffReady = class_exists(RealEstateSellerInvestorHandoffService::class);
         $audioTranscriptionReady = $this->audioTranscriptionReady();
         $apiKeyConfigured = $botIdentityValid && filled($bot?->openai_api_key);
         $apiKeyEncryptedAtRest = $apiKeyConfigured && $this->apiKeyEncryptedAtRest();
@@ -90,6 +91,7 @@ class RealEstateReadinessService
             'evidence_quality_guard_ready' => $evidenceQualityGuardReady,
             'negotiation_memory_ready' => $negotiationMemoryReady,
             'case_lifecycle_ready' => $caseLifecycleReady,
+            'seller_investor_handoff_ready' => $sellerInvestorHandoffReady,
             'audio_transcription_ready' => $audioTranscriptionReady,
             'openai_api_key_configured' => $apiKeyConfigured,
             'openai_api_key_encrypted_at_rest' => $apiKeyEncryptedAtRest,
