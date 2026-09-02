@@ -3,11 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\AiBot;
+use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\Organization;
 use App\Models\RealEstateOperatorAlert;
 use App\Models\RealEstateProfile;
 use App\Models\User;
+use App\Services\RealEstateOperatorAlertService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -113,6 +115,70 @@ class RealEstateOperatorAlertTest extends TestCase
         ]);
         $this->assertNull($conversation->fresh()->next_follow_up_at);
         $this->assertFalse($conversation->fresh()->human_takeover);
+    }
+
+    public function test_active_whatsapp_chat_resolves_contact_alert_until_idle_without_hiding_internal_attention(): void
+    {
+        [, $conversation] = $this->seedIsolatedAccount('operator-active-chat');
+        $conversation->update([
+            'lead_score' => 93,
+            'lead_temperature' => 'hot',
+            'lead_status' => 'qualified',
+            'next_follow_up_at' => null,
+        ]);
+
+        $profile = RealEstateProfile::query()->create([
+            'conversation_control_id' => $conversation->id,
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'profile_type' => 'seller',
+            'data' => [
+                'property_type' => 'arsa',
+                'city' => 'Muğla',
+                'district' => 'Marmaris',
+                'asking_price' => 4200000,
+                'decision_intelligence' => [
+                    'lead_score' => 93,
+                    'lead_temperature' => 'hot',
+                    'stage' => 'ready',
+                    'ready_for_match' => true,
+                ],
+            ],
+            'valuation' => [],
+            'completeness_score' => 90,
+            'confidence_score' => 80,
+        ]);
+
+        $this->assertDatabaseHas('real_estate_operator_alerts', [
+            'real_estate_profile_id'=>$profile->id,'type'=>'hot_lead','status'=>'open',
+        ]);
+
+        $message = ChatMessage::withoutEvents(fn () => ChatMessage::query()->forceCreate([
+            'user_id'=>40,'organization_id'=>37,'ai_bot_id'=>35,
+            'session_id'=>$conversation->session_id,'role'=>'assistant','sender_type'=>'ai',
+            'message'=>'Tapu görselini de gönderir misiniz?','message_type'=>'text','status'=>'sent',
+        ]));
+
+        app(RealEstateOperatorAlertService::class)->sync($profile->fresh());
+
+        $this->assertDatabaseHas('real_estate_operator_alerts', [
+            'real_estate_profile_id'=>$profile->id,'type'=>'hot_lead','status'=>'resolved',
+        ]);
+        $this->assertDatabaseHas('real_estate_operator_alerts', [
+            'real_estate_profile_id'=>$profile->id,'type'=>'valuation_attention','status'=>'open',
+        ]);
+
+        $message->forceFill([
+            'created_at'=>now()->subMinutes(31),
+            'updated_at'=>now()->subMinutes(31),
+        ])->saveQuietly();
+
+        app(RealEstateOperatorAlertService::class)->sync($profile->fresh());
+
+        $this->assertDatabaseHas('real_estate_operator_alerts', [
+            'real_estate_profile_id'=>$profile->id,'type'=>'hot_lead','status'=>'open',
+        ]);
+        $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
     public function test_alert_is_resolved_when_the_risk_condition_disappears(): void
