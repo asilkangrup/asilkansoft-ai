@@ -150,7 +150,7 @@ class EmlakCrm extends Page
                 : (string) ($handoff['recommended_operator_action'] ?? 'Satıcı dosyasındaki eksikleri tamamla.'),
             'notes' => trim((string) ($conversation?->notes ?? '')),
             'updated_at' => ($profile->last_extracted_at ?? $profile->updated_at)?->diffForHumans() ?? '—',
-            'customer_url' => $conversation ? url('/admin/musteriler?customer='.$conversation->id) : null,
+            'customer_url' => $conversation ? url('/admin/emlak-musteri-detay?customer='.$conversation->id) : null,
             'is_investor' => $isInvestor,
         ];
     }
