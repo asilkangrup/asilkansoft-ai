@@ -3,10 +3,10 @@
 .ed{--ink:#122018;--muted:#718078;--line:#e4ebe7;width:100%;max-width:1100px;margin:auto}.ed *{box-sizing:border-box}.ed-back{display:inline-flex;margin-bottom:12px;color:#087344;text-decoration:none;font-size:12px;font-weight:900}.ed-head{padding:21px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(135deg,#fff,#f3fcf7)}.ed-role{font-size:10px;font-weight:900;color:#087344}.ed-name{margin:5px 0 2px;font-size:25px;font-weight:900;color:var(--ink)}.ed-contact{font-size:13px;color:var(--muted)}.ed-call{display:inline-flex;margin-top:12px;padding:10px 13px;border-radius:11px;background:#eafaf2;color:#087344;text-decoration:none;font-size:12px;font-weight:900}
 .ed-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.ed-card{min-width:0;padding:17px;border:1px solid var(--line);border-radius:18px;background:#fff}.ed-wide{grid-column:1/-1}.ed-card h2{margin:0 0 12px;font-size:14px;color:var(--ink)}.ed-data{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.ed-data div{min-width:0;padding:10px;border-radius:11px;background:#f7faf8}.ed-data small{display:block;font-size:9px;font-weight:900;color:var(--muted)}.ed-data b{display:block;margin-top:4px;font-size:12px;line-height:1.35;color:#35463d;overflow-wrap:anywhere}.ed-action,.ed-script{padding:12px;border-left:3px solid #22c77a;border-radius:10px;background:#f4fbf7;font-size:12px;line-height:1.55;color:#405149}.ed-script{border-color:#d79a16;background:#fffaf0}
 .ed-checks{display:flex;flex-wrap:wrap;gap:7px}.ed-check{padding:8px 10px;border-radius:999px;background:#fff1ed;color:#9a4635;font-size:10px;font-weight:850}.ed-ok{padding:12px;border-radius:11px;background:#f4fbf7;color:#087344;font-size:11px}
-.ed-gallery-groups{display:grid;gap:15px}.ed-gallery-group h3{margin:0 0 8px;font-size:11px;color:#536159}.ed-gallery{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.ed-media{display:block;overflow:hidden;border:1px solid var(--line);border-radius:13px;background:#f7faf8;color:#315b9c;text-decoration:none}.ed-media img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover}.ed-media-file,.ed-media-empty{display:grid;place-items:center;aspect-ratio:4/3;padding:12px;text-align:center;font-size:11px;font-weight:900}.ed-media-empty{border:1px dashed var(--line);border-radius:13px;color:var(--muted);background:#fafcfb}.ed-media-meta{display:block;padding:7px;font-size:9px;color:var(--muted)}
+.ed-upload{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;margin-bottom:16px;padding:12px;border-radius:13px;background:#f7faf8}.ed-upload input,.ed-upload select,.ed-owner select,.ed-owner input{width:100%;min-height:44px;padding:9px 11px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);font-size:14px}.ed-upload button,.ed-owner button{min-height:44px;padding:0 14px;border:0;border-radius:11px;background:var(--ink);color:#fff;font-weight:900}.ed-owner{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end}.ed-owner-field small{display:block;margin-bottom:5px;font-size:9px;font-weight:900;color:var(--muted)}.ed-legal{margin:9px 0 0;font-size:10px;line-height:1.45;color:#8a6951}.ed-gallery-groups{display:grid;gap:15px}.ed-gallery-group h3{margin:0 0 8px;font-size:11px;color:#536159}.ed-gallery{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.ed-media{display:block;overflow:hidden;border:1px solid var(--line);border-radius:13px;background:#f7faf8;color:#315b9c;text-decoration:none}.ed-media img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover}.ed-media-file,.ed-media-empty{display:grid;place-items:center;aspect-ratio:4/3;padding:12px;text-align:center;font-size:11px;font-weight:900}.ed-media-empty{border:1px dashed var(--line);border-radius:13px;color:var(--muted);background:#fafcfb}.ed-media-meta{display:block;padding:7px;font-size:9px;color:var(--muted)}
 .ed-chat{display:grid;gap:8px;max-height:460px;overflow:auto}.ed-msg{max-width:86%;padding:10px 12px;border-radius:14px;background:#f2f5f3;color:#405149}.ed-msg.customer{justify-self:start;border-bottom-left-radius:4px}.ed-msg.ai,.ed-msg.human{justify-self:end;background:#eaf8f1;border-bottom-right-radius:4px}.ed-msg p{margin:0;white-space:pre-wrap;font-size:11px;line-height:1.5}.ed-msg small{display:block;margin-top:5px;font-size:8px;color:var(--muted)}
 .ed-notes{white-space:pre-wrap;font-size:12px;line-height:1.55;color:#4b5a52;max-height:180px;overflow:auto}.ed-noteform{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.ed-noteform textarea{min-height:70px;padding:11px;border:1px solid var(--line);border-radius:12px;resize:vertical}.ed-noteform button{padding:0 15px;border:0;border-radius:12px;background:var(--ink);color:#fff;font-weight:900}.ed-timeline{display:grid;gap:8px}.ed-event{padding:11px;border-radius:12px;background:#f7faf8}.ed-event b{font-size:11px;color:#35463d}.ed-event p{margin:4px 0;font-size:11px;line-height:1.45;color:#536159}.ed-event small{font-size:9px;color:var(--muted)}
-@media(max-width:720px){.ed-grid{grid-template-columns:minmax(0,1fr)}.ed-wide{grid-column:auto}.ed-name{font-size:22px}.ed-card{padding:14px}.ed-data{grid-template-columns:repeat(2,minmax(0,1fr))}.ed-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.ed-noteform{grid-template-columns:1fr}.ed-noteform textarea{font-size:16px}.ed-noteform button{height:44px}.ed-call{width:100%;justify-content:center}.ed-msg{max-width:92%}}
+@media(max-width:720px){.ed-upload,.ed-owner{grid-template-columns:1fr}.ed-upload input,.ed-upload select,.ed-owner select,.ed-owner input{font-size:16px}.ed-upload button,.ed-owner button{width:100%}.ed-grid{grid-template-columns:minmax(0,1fr)}.ed-wide{grid-column:auto}.ed-name{font-size:22px}.ed-card{padding:14px}.ed-data{grid-template-columns:repeat(2,minmax(0,1fr))}.ed-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.ed-noteform{grid-template-columns:1fr}.ed-noteform textarea{font-size:16px}.ed-noteform button{height:44px}.ed-call{width:100%;justify-content:center}.ed-msg{max-width:92%}}
 @media(max-width:380px){.ed-data{grid-template-columns:1fr}}
 </style>
 <div class="ed">
@@ -37,25 +37,48 @@
             @endforeach
         </div></section>
 
+        <section class="ed-card ed-wide"><h2>Tapu Kimin Üzerine?</h2>
+            <div class="ed-owner">
+                <label class="ed-owner-field"><small>SAHİPLİK İLİŞKİSİ</small><select wire:model="titleOwnerRelation">
+                    <option value="unknown">Henüz bilinmiyor</option><option value="seller">Satıcının kendisi</option>
+                    <option value="spouse">Eşi</option><option value="relative">Yakını / akrabası</option>
+                    <option value="company">Şirket</option><option value="other_person">Başka bir kişi</option>
+                </select></label>
+                <label class="ed-owner-field"><small>KISA AÇIKLAMA</small><input wire:model="titleOwnerNote" maxlength="300" placeholder="Örn. babasının üzerine"></label>
+                <button wire:click="saveTitleOwnership" wire:loading.attr="disabled">Kaydet</button>
+            </div>
+            <p class="ed-legal">Bu alan görüşme sırasında alınan operatör beyanıdır; resmi tapu doğrulaması yerine geçmez.</p>
+        </section>
+
         <section class="ed-card"><h2>Telefonda Söyle</h2><div class="ed-script">{{ $this->dossier['call_script'] }}</div></section>
         <section class="ed-card"><h2>Sıradaki Aksiyon</h2><div class="ed-action">{{ $this->details['next_action'] }}</div></section>
 
         <section class="ed-card ed-wide"><h2>Eksik Bilgi ve Belgeler</h2>
             @if(count($this->dossier['missing']))
                 <div class="ed-checks">@foreach($this->dossier['missing'] as $missing)
-                    @php $missingLabel=match($missing){'property_type'=>'Taşınmaz türü','city'=>'İl','location'=>'Konum','area_sqm'=>'Metrekare','asking_price'=>'Satıcı fiyatı','property_identity'=>'Ada/parsel veya konum','property_photo'=>'Güncel arsa fotoğrafları','zoning_context'=>'İmar bilgisi','title_deed_context'=>'Tapu bilgisi','listing_reference'=>'İlan bağlantısı',default=>$missing}; @endphp
+                    @php $missingLabel=match($missing){'property_type'=>'Taşınmaz türü','city'=>'İl','location'=>'Konum','area_sqm'=>'Metrekare','asking_price'=>'Satıcı fiyatı','property_identity'=>'Ada/parsel veya konum','property_photo'=>'Güncel arsa fotoğrafları','zoning_context'=>'İmar bilgisi','title_deed_context'=>'Tapu bilgisi','title_owner_relation'=>'Tapu kimin üzerine','listing_reference'=>'İlan bağlantısı',default=>$missing}; @endphp
                     <span class="ed-check">{{ $missingLabel }}</span>
                 @endforeach</div>
             @else<div class="ed-ok">Kayıtlı dosyada kritik eksik görünmüyor.</div>@endif
         </section>
 
-        <section class="ed-card ed-wide"><h2>Fotoğraflar ve Belgeler</h2><div class="ed-gallery-groups">
+        <section class="ed-card ed-wide"><h2>Fotoğraflar ve Belgeler</h2>
+            <div class="ed-upload">
+                <input type="file" wire:model="manualUpload" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                <select wire:model="manualMediaCategory">
+                    <option value="property_photo">Arsa / taşınmaz fotoğrafı</option><option value="title_deed">Tapu belgesi</option>
+                    <option value="parcel_document">Parsel belgesi</option><option value="listing">İlan görseli</option>
+                </select>
+                <button wire:click="uploadManualMedia" wire:loading.attr="disabled" wire:target="manualUpload,uploadManualMedia">Dosyaya ekle</button>
+            </div>
+            @error('manualUpload')<div class="ed-check" style="margin-bottom:10px">{{ $message }}</div>@enderror
+            <div class="ed-gallery-groups">
             @foreach($this->mediaGallery as $group=>$items)
                 <div class="ed-gallery-group"><h3>{{ mb_strtoupper($group) }} · {{ count($items) }}</h3>
                     @if(count($items))<div class="ed-gallery">@foreach($items as $media)
                         <a class="ed-media" href="{{ $media['url'] }}" target="_blank" rel="noopener noreferrer">
                             @if($media['is_image'])<img src="{{ $media['url'] }}" alt="{{ $group }}" loading="lazy">@else<span class="ed-media-file">📄 Belgeyi aç</span>@endif
-                            <span class="ed-media-meta">{{ $media['summary'] ?: $media['received_at'] }}</span>
+                            <span class="ed-media-meta">{{ $media['source'] }} · {{ $media['summary'] ?: $media['received_at'] }}</span>
                         </a>
                     @endforeach</div>@else<div class="ed-media-empty">Henüz {{ mb_strtolower($group) }} gelmedi.</div>@endif
                 </div>
