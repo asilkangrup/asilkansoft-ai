@@ -29,7 +29,9 @@ class RealEstateMatchVerificationFilterService
             ? $data['opportunity_matches']
             : [];
 
-        if ($profile->profile_type === 'seller' && ! $this->sellerSafe($profile)) {
+        if (! $this->profileFactConsistent($profile)) {
+            $matches = [];
+        } elseif ($profile->profile_type === 'seller' && ! $this->sellerSafe($profile)) {
             $matches = [];
         } else {
             $matches = collect($matches)
@@ -39,6 +41,7 @@ class RealEstateMatchVerificationFilterService
                     }
 
                     $sellerProfileId = $match['seller_profile_id'] ?? null;
+                    $investorProfileId = $match['investor_profile_id'] ?? null;
 
                     if (! is_numeric($sellerProfileId)) {
                         return false;
@@ -50,7 +53,30 @@ class RealEstateMatchVerificationFilterService
                         ->where('profile_type', 'seller')
                         ->first();
 
-                    return $seller !== null && $this->sellerSafe($seller);
+                    if (
+                        $seller === null
+                        || ! $this->sellerSafe($seller)
+                        || ! $this->profileFactConsistent($seller)
+                    ) {
+                        return false;
+                    }
+
+                    // Every scored pair carries the investor profile id. Fail
+                    // closed if it is absent or the mandate has an unresolved
+                    // customer-side conflict; stale confirmed criteria must not
+                    // remain matchable while a new value is awaiting confirmation.
+                    if (! is_numeric($investorProfileId)) {
+                        return false;
+                    }
+
+                    $investor = RealEstateProfile::query()
+                        ->isolatedProduction()
+                        ->whereKey((int) $investorProfileId)
+                        ->whereIn('profile_type', ['investor', 'buyer'])
+                        ->first();
+
+                    return $investor !== null
+                        && $this->profileFactConsistent($investor);
                 })
                 ->values()
                 ->all();
@@ -63,6 +89,8 @@ class RealEstateMatchVerificationFilterService
             'strongest_grade' => $matches[0]['grade'] ?? null,
             'verification_filtered' => true,
             'evidence_quality_filtered' => true,
+            'fact_consistency_filtered' => true,
+            'blocked_by_fact_consistency' => ! $this->profileFactConsistent($profile),
             'updated_at' => now()->toIso8601String(),
         ];
 
@@ -76,6 +104,19 @@ class RealEstateMatchVerificationFilterService
         ]);
 
         return $matches;
+    }
+
+    private function profileFactConsistent(RealEstateProfile $profile): bool
+    {
+        if (! $profile->belongsToIsolatedProductionScope()) {
+            return false;
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $consistency = app(RealEstateFactConsistencyService::class)
+            ->summary($data);
+
+        return ($consistency['status'] ?? 'consistent') !== 'confirmation_required';
     }
 
     private function sellerSafe(RealEstateProfile $seller): bool
