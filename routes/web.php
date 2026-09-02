@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PublicDemoController;
+use App\Http\Controllers\RealEstatePrivateMediaController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -35,3 +36,9 @@ Route::view('/', 'home')
 Route::post('/demo/chat', [PublicDemoController::class, 'chat'])
     ->middleware('throttle:20,1')
     ->name('demo.chat');
+
+Route::get('/admin/emlak-medya/{profile}/{media}', [RealEstatePrivateMediaController::class, 'show'])
+    ->whereNumber('profile')
+    ->whereUuid('media')
+    ->middleware('auth')
+    ->name('real-estate.private-media');
