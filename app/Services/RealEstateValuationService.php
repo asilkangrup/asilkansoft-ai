@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiBot;
 use App\Models\ConversationControl;
 use App\Models\RealEstateProfile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -17,34 +18,52 @@ class RealEstateValuationService
     ): ?array {
         $isolation = app(RealEstateIsolationService::class);
 
-        if (
-            ! $isolation->supportsConversation($conversation)
-            || ! $this->valuationIntent($message)
-        ) {
-            return null;
-        }
+if (! $isolation->supportsConversation($conversation)) {
+    return null;
+}
 
-        $profile = RealEstateProfile::query()
-            ->isolatedProduction()
-            ->where('conversation_control_id', $conversation->id)
-            ->first();
+$profile = RealEstateProfile::query()
+    ->isolatedProduction()
+    ->where('conversation_control_id', $conversation->id)
+    ->first();
 
-        if (! $profile || ! $this->minimumDataAvailable($profile->data ?? [])) {
-            return null;
-        }
+if (! $profile || ! $this->minimumDataAvailable($profile->data ?? [])) {
+    return null;
+}
 
-        $freshnessService = app(RealEstateValuationFreshnessService::class);
-        $freshness = $freshnessService->refreshMetadata($profile);
-        $forceRefresh = $this->forceRefreshIntent($message);
+$data = is_array($profile->data) ? $profile->data : [];
+$explicitIntent = $this->valuationIntent($message);
+$pendingResearchAction = $this->pendingResearchAction($profile, $conversation);
+$sellerAutoReady = $profile->profile_type === 'seller'
+    && filled($data['asking_price'] ?? null)
+    && filled($data['area_sqm'] ?? null);
 
-        if (
-            ($freshness['usable_for_decision'] ?? false)
-            && ! $forceRefresh
-        ) {
-            return is_array($profile->fresh()->valuation)
-                ? $profile->fresh()->valuation
-                : null;
-        }
+if (! $explicitIntent && ! $pendingResearchAction && ! $sellerAutoReady) {
+    return null;
+}
+
+$freshnessService = app(RealEstateValuationFreshnessService::class);
+$freshness = $freshnessService->refreshMetadata($profile);
+$forceRefresh = $explicitIntent && $this->forceRefreshIntent($message);
+
+if (
+    ($freshness['usable_for_decision'] ?? false)
+    && ! $forceRefresh
+) {
+    return is_array($profile->fresh()->valuation)
+        ? $profile->fresh()->valuation
+        : null;
+}
+
+$automaticResearch = ! $explicitIntent
+    && ($pendingResearchAction || $sellerAutoReady);
+
+if (
+    $automaticResearch
+    && ! $this->reserveAutomaticResearchAttempt($profile, $freshnessService)
+) {
+    return null;
+}
 
         $aiBot = AiBot::query()
             ->whereKey(RealEstateIsolationService::BOT_ID)
@@ -84,7 +103,7 @@ class RealEstateValuationService
                         JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
                     ),
                 ]],
-                'max_output_tokens' => 1500,
+                'max_output_tokens' => 4000,
                 'tools' => [[
                     'type' => 'web_search_preview',
                 ]],
@@ -92,7 +111,7 @@ class RealEstateValuationService
             ];
 
             if (str_starts_with($model, 'gpt-5')) {
-                $request['reasoning'] = ['effort' => 'medium'];
+                $request['reasoning'] = ['effort' => 'low'];
             }
 
             $response = app(RealEstateOpenAIClient::class)
@@ -111,14 +130,33 @@ class RealEstateValuationService
                 ],
             );
 
-            $result = json_decode(
-                $this->cleanJson(trim((string) ($response->outputText ?? ''))),
-                true
-            );
+            $outputText = trim((string) ($response->outputText ?? ''));
 
-            if (! is_array($result)) {
-                return null;
-            }
+if ($outputText === '') {
+    Log::warning('REAL ESTATE VALUATION RESPONSE EMPTY OR INCOMPLETE', [
+        'conversation_control_id' => $conversation->id,
+        'user_id' => RealEstateIsolationService::USER_ID,
+        'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+        'ai_bot_id' => RealEstateIsolationService::BOT_ID,
+        'response_status' => is_scalar($response->status ?? null) ? (string) $response->status : null,
+        'automatic_research' => $automaticResearch,
+    ]);
+    return null;
+}
+
+$result = json_decode($this->cleanJson($outputText), true);
+
+if (! is_array($result)) {
+    Log::warning('REAL ESTATE VALUATION RESPONSE INVALID JSON', [
+        'conversation_control_id' => $conversation->id,
+        'user_id' => RealEstateIsolationService::USER_ID,
+        'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+        'ai_bot_id' => RealEstateIsolationService::BOT_ID,
+        'response_status' => is_scalar($response->status ?? null) ? (string) $response->status : null,
+        'automatic_research' => $automaticResearch,
+    ]);
+    return null;
+}
 
             $valuation = $freshnessService->stamp(
                 profile: $profile,
@@ -210,6 +248,58 @@ PROMPT;
             );
     }
 
+    private function pendingResearchAction(
+    RealEstateProfile $profile,
+    ConversationControl $conversation
+): bool {
+    $data = is_array($profile->data) ? $profile->data : [];
+    $plan = is_array($data['next_best_action_intelligence'] ?? null)
+        ? $data['next_best_action_intelligence']
+        : [];
+    $actionCode = trim((string) ($plan['action_code'] ?? ''));
+
+    if (in_array($actionCode, ['refresh_valuation_research', 'repair_comparable_integrity'], true)) {
+        return true;
+    }
+
+    $action = Str::lower($this->turkishNormalize(trim((string) $conversation->next_best_action)));
+
+    return $action !== '' && (
+        str_contains($action, 'guncel emsal arastirmasini yenile')
+        || str_contains($action, 'emsal arastirmasini yenile')
+        || str_contains($action, 'degerlemeyi yenile')
+    );
+}
+
+private function reserveAutomaticResearchAttempt(
+    RealEstateProfile $profile,
+    RealEstateValuationFreshnessService $freshnessService
+): bool {
+    $data = is_array($profile->data) ? $profile->data : [];
+    $fingerprint = $freshnessService->fingerprint($data);
+    $valuation = is_array($profile->valuation) ? $profile->valuation : [];
+    $storedFingerprint = trim((string) ($valuation['profile_fingerprint'] ?? ''));
+    $researchedAt = trim((string) ($valuation['researched_at'] ?? ''));
+
+    if ($storedFingerprint !== '' && hash_equals($storedFingerprint, $fingerprint) && $researchedAt !== '') {
+        try {
+            if (\Carbon\CarbonImmutable::parse($researchedAt)->greaterThan(now()->subMinutes(10))) {
+                return false;
+            }
+        } catch (Throwable) {
+            // Invalid legacy timestamp must not disable a safe new attempt.
+        }
+    }
+
+    $key = 'real-estate:auto-valuation:'
+        .RealEstateIsolationService::ORGANIZATION_ID.':'
+        .RealEstateIsolationService::BOT_ID.':'
+        .$profile->id.':'
+        .$fingerprint;
+
+    return Cache::add($key, true, now()->addMinutes(10));
+}
+
     private function valuationIntent(string $message): bool
     {
         $normalized = Str::lower($this->turkishNormalize($message));
@@ -261,10 +351,12 @@ KURALLAR
 - Yetersiz veri varsa sayı uydurma; ilgili fiyat alanlarını null bırak.
 - Web araştırması yapmadan güncel piyasa fiyatı üretme.
 - İlan fiyatını gerçekleşmiş satış fiyatı gibi sunma. comparables içindeki listing_price yalnızca ilan/istenen fiyatıdır.
-- Tek ilana dayanma. Mümkün olduğunda en az 2, tercihen 3+ güncel ve benzer emsal karşılaştır.
+- Tek ilana dayanma. En az 3 güçlü yakın emsal bulmaya çalış; 3-5 yeterince benzer ve güncel kaynak bulunduğunda gereksiz ek web araması yapma. Nihai JSON'a en fazla 5 emsal koy.
 - Taşınmazın imar/tapu/hukuki durumunu doğrulanmadıysa varsayma.
 - Çok geniş lokasyon, az emsal veya yetersiz özellik varsa confidence_score düşük olsun.
-- Hızlı satış aralığı piyasa aralığından mantıksız biçimde yüksek olamaz.
+- realistic_sale_min/realistic_sale_max, birden fazla yakın emsal, m² fiyatları, normal pazarlık payı ve taşınmaz özellikleriyle tahmin edilen gerçekçi satar fiyat bandıdır; tek ilana dayanma.
+- Hızlı satış aralığı gerçekçi normal satış bandından mantıksız biçimde yüksek olamaz.
+- Yatırımcı alım aralığını satıcının istediği fiyattan değil realistic_sale bandından türet. Ticari model gereği investor_buy_max gerçekçi satar fiyatın en az %20 altında olmalıdır; normal hedef %20-30 iskontodur. Emsal veya sayı uydurarak bu oranı sağlama.
 - Yatırımcı alım aralığı piyasa aralığından mantıksız biçimde yüksek olamaz.
 - Tüm fiyatlar TL ve sayısal değer olsun.
 - sources alanına yalnızca gerçekten araştırmada kullandığın URL veya kaynak adını yaz; kaynak kullanmadıysan boş dizi.
@@ -276,6 +368,8 @@ SADECE şu JSON yapısını döndür:
 {
   "market_min": null,
   "market_max": null,
+  "realistic_sale_min": null,
+  "realistic_sale_max": null,
   "quick_sale_min": null,
   "quick_sale_max": null,
   "investor_buy_min": null,
@@ -309,7 +403,8 @@ PROMPT;
     private function normalize(array $data): array
     {
         $numericFields = [
-            'market_min', 'market_max', 'quick_sale_min', 'quick_sale_max',
+            'market_min', 'market_max', 'realistic_sale_min', 'realistic_sale_max',
+            'quick_sale_min', 'quick_sale_max',
             'investor_buy_min', 'investor_buy_max', 'market_gap_percent',
         ];
 
