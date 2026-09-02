@@ -143,6 +143,7 @@ class MemoryService
                     if (
                         $mediaContext !== []
                         && filled($mediaContext['instance_name'] ?? null)
+                        && ! (bool) ($mediaContext['skip_analysis'] ?? false)
                     ) {
                         app(RealEstateMediaAnalysisService::class)->process(
                             conversation: $conversation,
