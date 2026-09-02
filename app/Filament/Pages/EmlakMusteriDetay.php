@@ -360,6 +360,38 @@ class EmlakMusteriDetay extends Page
         ];
     }
 
+    public function getLegacyCrmProperty(): array
+    {
+        $customer = $this->customer;
+
+        if (! $customer) {
+            return [];
+        }
+
+        $money = static fn ($value): string => is_numeric($value)
+            ? number_format((float) $value, 0, ',', '.').' TL'
+            : 'Belirtilmedi';
+
+        return [
+            'Lead durumu' => (string) ($customer->lead_status ?: 'Belirtilmedi'),
+            'Fırsat puanı' => (int) $customer->lead_score.'/100',
+            'Lead sıcaklığı' => (string) ($customer->lead_temperature ?: 'Belirtilmedi'),
+            'Sorumlu personel' => (string) ($customer->assignedUser?->name ?: 'Atanmadı'),
+            'Son temas' => $customer->last_contact_at?->format('d.m.Y H:i') ?: 'Belirtilmedi',
+            'Planlı takip' => $customer->next_follow_up_at?->format('d.m.Y H:i') ?: 'Yok',
+            'Okunmamış mesaj' => (string) ((int) $customer->unread_count),
+            'Etiketler' => collect($customer->tags ?? [])->filter()->implode(', ') ?: 'Yok',
+            'AI CRM özeti' => (string) ($customer->ai_summary ?: 'Henüz oluşturulmadı'),
+            'Sonraki en iyi aksiyon' => (string) ($customer->next_best_action ?: 'Belirtilmedi'),
+            'Tahmini portföy değeri' => $money($customer->estimated_value),
+            'Gerçekleşen işlem değeri' => $money($customer->actual_value),
+            'Kontrol' => $customer->human_takeover ? 'Operatörde' : 'Emlak AI’da',
+            'Kazanılma tarihi' => $customer->won_at?->format('d.m.Y H:i') ?: 'Yok',
+            'Kaybedilme tarihi' => $customer->lost_at?->format('d.m.Y H:i') ?: 'Yok',
+            'Kaybedilme nedeni' => (string) ($customer->lost_reason ?: 'Yok'),
+        ];
+    }
+
     public function uploadManualMedia(): void
     {
         abort_unless(static::canAccess() && $this->profile?->profile_type === 'seller', 403);
