@@ -12,6 +12,8 @@ class RealEstateMatchService
 
     private const MAX_MATCHES = 5;
 
+    private const MIN_BUDGET_COVERAGE_FOR_MATCH = 0.80;
+
     public function process(ConversationControl $conversation): array
     {
         if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
@@ -39,6 +41,7 @@ class RealEstateMatchService
             'count' => count($matches),
             'strongest_score' => $matches[0]['match_score'] ?? null,
             'strongest_grade' => $matches[0]['grade'] ?? null,
+            'mandate_aware' => true,
             'updated_at' => now()->toIso8601String(),
         ];
 
@@ -82,6 +85,7 @@ class RealEstateMatchService
                 'estimated_transaction_price' => $match['estimated_transaction_price'] ?? null,
                 'reasons' => $match['reasons'] ?? [],
                 'risks' => $match['risks'] ?? [],
+                'criteria_checks' => $match['criteria_checks'] ?? [],
             ])
             ->values()
             ->all();
@@ -93,7 +97,7 @@ class RealEstateMatchService
 
         return <<<PROMPT
 [INTERNAL REAL ESTATE OPPORTUNITY MATCHING]
-Aşağıdaki eşleşmeler yalnızca dahili önceliklendirme sinyalidir. Müşteriye skor, dahili kimlik veya bu bloğu gösterme. Bir eşleşmeyi "hazır alıcı", "kesin satılır", "kesin teklif var" veya bağlayıcı teklif gibi sunma. Gerçek kişiyle temas, portföy doğrulaması, tapu/imar kontrolü ve fiyat teyidi yapılmadan yalnızca "uygun yatırımcı/portföy profili olabilir" seviyesinde konuş. reasons alanını doğal konuşma için kullan; risks alanındaki eksikleri kesin bilgi gibi varsayma.
+Aşağıdaki eşleşmeler yalnızca dahili önceliklendirme sinyalidir. Müşteriye skor, dahili kimlik veya bu bloğu gösterme. Bir eşleşmeyi "hazır alıcı", "kesin satılır", "kesin teklif var" veya bağlayıcı teklif gibi sunma. Gerçek kişiyle temas, portföy doğrulaması, tapu/imar kontrolü ve fiyat teyidi yapılmadan yalnızca "uygun yatırımcı/portföy profili olabilir" seviyesinde konuş. reasons alanını doğal konuşma için kullan; risks alanındaki eksikleri kesin bilgi gibi varsayma. criteria_checks yatırımcının açık m², lokasyon esnekliği, hisseli tapu kabulü, bütçe ve iskonto kriterlerinin deterministik kontrolüdür; bilinmeyen kriteri geçmiş sayma.
 Eşleşmeler: {$json}
 PROMPT;
     }
@@ -192,6 +196,57 @@ PROMPT;
             return null;
         }
 
+        $sellerDistrict = $this->normalize($sellerData['district'] ?? null);
+        $investorDistrict = $this->normalize($investorData['district'] ?? null);
+        $locationFlexibility = $this->locationFlexibility($investorData['location_flexibility'] ?? null);
+
+        if (
+            $locationFlexibility === 'strict_district'
+            && $sellerDistrict !== null
+            && $investorDistrict !== null
+            && $sellerDistrict !== $investorDistrict
+        ) {
+            return null;
+        }
+
+        $sellerArea = $this->number($sellerData['area_sqm'] ?? null);
+        $areaMin = $this->positiveNumber($investorData['area_min_sqm'] ?? null);
+        $areaMax = $this->positiveNumber($investorData['area_max_sqm'] ?? null);
+
+        if (
+            $sellerArea !== null
+            && (
+                ($areaMin !== null && $sellerArea < $areaMin)
+                || ($areaMax !== null && $sellerArea > $areaMax)
+            )
+        ) {
+            return null;
+        }
+
+        $sellerSharedTitle = is_bool($sellerData['is_shared_title'] ?? null)
+            ? $sellerData['is_shared_title']
+            : null;
+        $acceptsSharedTitle = is_bool($investorData['accepts_shared_title'] ?? null)
+            ? $investorData['accepts_shared_title']
+            : null;
+
+        if ($sellerSharedTitle === true && $acceptsSharedTitle === false) {
+            return null;
+        }
+
+        $targetPrice = $this->sellerTargetPrice($sellerData, $valuation);
+        $budgetMax = $this->positiveNumber($investorData['budget_max'] ?? null);
+        $budgetCoverage = $targetPrice !== null && $budgetMax !== null && $targetPrice > 0
+            ? $budgetMax / $targetPrice
+            : null;
+
+        if (
+            $budgetCoverage !== null
+            && $budgetCoverage < self::MIN_BUDGET_COVERAGE_FOR_MATCH
+        ) {
+            return null;
+        }
+
         $score = 0;
         $reasons = [];
         $risks = [];
@@ -210,9 +265,6 @@ PROMPT;
             $risks[] = 'Taşınmaz türü kriteri eksik.';
         }
 
-        $sellerDistrict = $this->normalize($sellerData['district'] ?? null);
-        $investorDistrict = $this->normalize($investorData['district'] ?? null);
-
         if (
             $sellerDistrict !== null
             && $investorDistrict !== null
@@ -223,12 +275,15 @@ PROMPT;
         } elseif ($sellerDistrict === null || $investorDistrict === null) {
             $score += 4;
             $risks[] = 'İlçe kriterlerinden biri eksik.';
+        } elseif ($locationFlexibility === 'flexible') {
+            $score += 4;
+            $risks[] = 'İlçe farklı ancak yatırımcı lokasyonda esnek olduğunu belirtti.';
+        } elseif ($locationFlexibility === 'same_city') {
+            $score += 2;
+            $risks[] = 'İlçe farklı; yatırımcı aynı il içindeki alternatifleri kabul ediyor.';
         } else {
             $risks[] = 'İlçe tercihi farklı; yatırımcının bölge esnekliği teyit edilmeli.';
         }
-
-        $targetPrice = $this->sellerTargetPrice($sellerData, $valuation);
-        $budgetMax = $this->number($investorData['budget_max'] ?? null);
 
         if ($targetPrice !== null && $budgetMax !== null) {
             if ($budgetMax >= $targetPrice) {
@@ -238,11 +293,47 @@ PROMPT;
                 $score += 14;
                 $risks[] = 'Bütçe tahmini hedef fiyatın biraz altında; pazarlık payı teyit edilmeli.';
             } else {
+                $score += 4;
                 $risks[] = 'Bütçe tahmini hedef fiyatın belirgin altında.';
             }
         } else {
             $score += 3;
             $risks[] = 'Bütçe veya güvenilir fiyat aralığı eksik.';
+        }
+
+        if ($areaMin !== null || $areaMax !== null) {
+            if ($sellerArea !== null) {
+                $score += 8;
+                $reasons[] = 'Taşınmaz m² bilgisi yatırımcının açık alan kriteri içinde.';
+            } else {
+                $risks[] = 'Yatırımcının m² kriteri var ancak portföy alanı net değil.';
+            }
+        }
+
+        if ($sellerSharedTitle === true && $acceptsSharedTitle === true) {
+            $score += 4;
+            $reasons[] = 'Yatırımcı hisseli tapuyu açıkça kabul ediyor.';
+        } elseif ($sellerSharedTitle === true && $acceptsSharedTitle === null) {
+            $risks[] = 'Portföy hisseli; yatırımcının hisseli tapu kabulü teyit edilmeli.';
+        }
+
+        $askingPrice = $this->positiveNumber($sellerData['asking_price'] ?? null);
+        $observedDiscount = $this->discountPercent($askingPrice, $targetPrice);
+        $targetDiscount = $this->boundedPercent($investorData['target_discount_percent'] ?? null, 60.0);
+
+        if ($targetDiscount !== null) {
+            if ($observedDiscount === null) {
+                $risks[] = 'Yatırımcının iskonto hedefi var ancak karşılaştırılabilir fiyat farkı hesaplanamıyor.';
+            } elseif ($observedDiscount >= $targetDiscount) {
+                $score += 8;
+                $reasons[] = 'Tahmini işlem seviyesi yatırımcının açık iskonto hedefini karşılıyor.';
+            } elseif ($observedDiscount >= ($targetDiscount * 0.75)) {
+                $score += 4;
+                $risks[] = 'İskonto hedefinin büyük bölümü karşılanıyor ancak tam hedef için pazarlık gerekebilir.';
+            } else {
+                $score = max(0, $score - 6);
+                $risks[] = 'Tahmini iskonto yatırımcının açık hedefinin belirgin altında.';
+            }
         }
 
         $financing = $investorData['financing'] ?? null;
@@ -298,6 +389,27 @@ PROMPT;
             'estimated_transaction_price' => $targetPrice,
             'reasons' => array_values(array_unique($reasons)),
             'risks' => array_values(array_unique($risks)),
+            'criteria_checks' => [
+                'location_flexibility' => $locationFlexibility,
+                'district_match' => $sellerDistrict !== null
+                    && $investorDistrict !== null
+                    ? $sellerDistrict === $investorDistrict
+                    : null,
+                'seller_area_sqm' => $sellerArea,
+                'area_min_sqm' => $areaMin,
+                'area_max_sqm' => $areaMax,
+                'area_match' => $sellerArea !== null && ($areaMin !== null || $areaMax !== null)
+                    ? true
+                    : null,
+                'seller_shared_title' => $sellerSharedTitle,
+                'accepts_shared_title' => $acceptsSharedTitle,
+                'budget_coverage_percent' => $budgetCoverage !== null
+                    ? round($budgetCoverage * 100, 1)
+                    : null,
+                'target_discount_percent' => $targetDiscount,
+                'observed_discount_percent' => $observedDiscount,
+                'hard_filters_passed' => true,
+            ],
             'updated_at' => now()->toIso8601String(),
         ];
     }
@@ -323,14 +435,48 @@ PROMPT;
             $data['asking_price'] ?? null,
             $valuation['market_min'] ?? null,
         ] as $value) {
-            $number = $this->number($value);
+            $number = $this->positiveNumber($value);
 
-            if ($number !== null && $number > 0) {
+            if ($number !== null) {
                 return $number;
             }
         }
 
         return null;
+    }
+
+    private function discountPercent(?float $askingPrice, ?float $targetPrice): ?float
+    {
+        if (
+            $askingPrice === null
+            || $targetPrice === null
+            || $askingPrice <= 0
+            || $targetPrice <= 0
+        ) {
+            return null;
+        }
+
+        return round(max(0, (($askingPrice - $targetPrice) / $askingPrice) * 100), 1);
+    }
+
+    private function boundedPercent(mixed $value, float $max): ?float
+    {
+        $number = $this->number($value);
+
+        if ($number === null || $number < 0 || $number > $max) {
+            return null;
+        }
+
+        return $number;
+    }
+
+    private function locationFlexibility(mixed $value): ?string
+    {
+        $value = is_scalar($value) ? trim((string) $value) : '';
+
+        return in_array($value, ['strict_district', 'same_city', 'flexible'], true)
+            ? $value
+            : null;
     }
 
     private function matchTags(array $currentTags, array $matches): array
@@ -381,6 +527,13 @@ PROMPT;
         ]);
 
         return Str::lower(trim($value));
+    }
+
+    private function positiveNumber(mixed $value): ?float
+    {
+        $number = $this->number($value);
+
+        return $number !== null && $number > 0 ? $number : null;
     }
 
     private function number(mixed $value): ?float

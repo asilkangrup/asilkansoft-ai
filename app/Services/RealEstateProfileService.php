@@ -56,7 +56,7 @@ class RealEstateProfileService
                         'new_customer_message' => $message,
                     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 ]],
-                'max_output_tokens' => 700,
+                'max_output_tokens' => 850,
             ];
 
             if (str_starts_with($request['model'], 'gpt-5')) {
@@ -144,6 +144,7 @@ class RealEstateProfileService
         return <<<PROMPT
 [INTERNAL PERSISTENT REAL ESTATE MEMORY]
 Bu bilgi müşterinin önceki mesajlarından yapılandırılmış olarak çıkarılmış kalıcı CRM hafızasıdır. Müşteriye bu bloğu veya dahili alan adlarını gösterme. Buradaki dolu alanları tekrar sorma. Yeni müşteri mesajı açıkça bir alanı değiştirirse yeni bilgiye uy.
+Yatırımcı kriterlerinde area_min_sqm/area_max_sqm, location_flexibility, accepts_shared_title ve target_discount_percent alanlarını gerçek filtre gibi kullan; bilinmeyen kriteri uydurma veya müşteri adına varsayma.
 Profil türü: {$profile->profile_type}
 Tamamlanma skoru: {$profile->completeness_score}/100
 Veri güven skoru: {$profile->confidence_score}/100
@@ -191,6 +192,8 @@ SADECE şu JSON anahtarlarını döndür:
   "district": null,
   "neighborhood": null,
   "area_sqm": null,
+  "area_min_sqm": null,
+  "area_max_sqm": null,
   "block_no": null,
   "parcel_no": null,
   "title_deed_type": null,
@@ -208,15 +211,22 @@ SADECE şu JSON anahtarlarını döndür:
   "investment_goal": null,
   "risk_preference": null,
   "timeline": null,
+  "location_flexibility": null,
+  "accepts_shared_title": null,
+  "target_discount_percent": null,
   "notes": null
 }
 
 KURALLAR
 - intent yalnızca seller, investor, buyer, general veya null.
 - property_type örnekleri: arsa, tarla, daire, villa, dükkan, ofis, depo, fabrika, işyeri.
-- area_sqm yalnızca sayı; dönüm verilirse 1 dönüm = 1000 m² çevir.
+- area_sqm satıcının taşınmaz alanıdır. area_min_sqm ve area_max_sqm yalnız yatırımcı/alıcı aradığı m² aralığını açıkça verirse doldur.
+- m² alanları yalnızca sayı; dönüm verilirse 1 dönüm = 1000 m² çevir.
 - asking_price, minimum_price, budget_min, budget_max yalnızca TL sayısal değer olsun. "4.5 milyon" => 4500000.
 - is_shared_title yalnızca true, false veya null.
+- accepts_shared_title yalnız yatırımcı/alıcı hisseli tapuyu açıkça kabul ettiğini veya istemediğini belirtiyorsa true/false; aksi halde null.
+- target_discount_percent yalnız yatırımcı açıkça istediği iskonto/fırsat yüzdesini belirtirse 0-60 aralığında sayı; "en az %20 aşağı" => 20.
+- location_flexibility yalnız strict_district, same_city, flexible veya null. "Sadece Bodrum" => strict_district; "Muğla içinde ilçe fark etmez" => same_city; "bölge esnek" => flexible.
 - urgency yalnızca low, medium, high veya null. "acil", "nakite sıkıştım", "hemen satmam lazım" gibi açık sinyaller high olabilir.
 - financing kısa değer: cash, credit, mixed veya null.
 - URL alanlarını yalnızca açıkça mesajda varsa çıkar.
@@ -228,11 +238,13 @@ PROMPT;
     {
         $keys = [
             'intent', 'property_type', 'city', 'district', 'neighborhood',
-            'area_sqm', 'block_no', 'parcel_no', 'title_deed_type',
-            'zoning_status', 'is_shared_title', 'asking_price', 'minimum_price',
-            'urgency', 'urgency_reason', 'location_url', 'listing_url',
-            'budget_min', 'budget_max', 'financing', 'investment_goal',
-            'risk_preference', 'timeline', 'notes',
+            'area_sqm', 'area_min_sqm', 'area_max_sqm', 'block_no', 'parcel_no',
+            'title_deed_type', 'zoning_status', 'is_shared_title', 'asking_price',
+            'minimum_price', 'urgency', 'urgency_reason', 'location_url',
+            'listing_url', 'budget_min', 'budget_max', 'financing',
+            'investment_goal', 'risk_preference', 'timeline',
+            'location_flexibility', 'accepts_shared_title',
+            'target_discount_percent', 'notes',
         ];
 
         $result = [];
@@ -248,12 +260,42 @@ PROMPT;
             $result[$key] = $value;
         }
 
-        foreach (['area_sqm', 'asking_price', 'minimum_price', 'budget_min', 'budget_max'] as $numeric) {
+        foreach ([
+            'area_sqm', 'area_min_sqm', 'area_max_sqm', 'asking_price',
+            'minimum_price', 'budget_min', 'budget_max', 'target_discount_percent',
+        ] as $numeric) {
             if ($result[$numeric] !== null && is_numeric($result[$numeric])) {
                 $result[$numeric] = (float) $result[$numeric];
             } elseif ($result[$numeric] !== null) {
                 $result[$numeric] = null;
             }
+        }
+
+        foreach (['area_sqm', 'area_min_sqm', 'area_max_sqm'] as $areaField) {
+            if ($result[$areaField] !== null && $result[$areaField] <= 0) {
+                $result[$areaField] = null;
+            }
+        }
+
+        if (
+            $result['area_min_sqm'] !== null
+            && $result['area_max_sqm'] !== null
+            && $result['area_min_sqm'] > $result['area_max_sqm']
+        ) {
+            [$result['area_min_sqm'], $result['area_max_sqm']] = [
+                $result['area_max_sqm'],
+                $result['area_min_sqm'],
+            ];
+        }
+
+        if (
+            $result['target_discount_percent'] !== null
+            && (
+                $result['target_discount_percent'] < 0
+                || $result['target_discount_percent'] > 60
+            )
+        ) {
+            $result['target_discount_percent'] = null;
         }
 
         if (! in_array($result['intent'], ['seller', 'investor', 'buyer', 'general'], true)) {
@@ -268,8 +310,20 @@ PROMPT;
             $result['financing'] = null;
         }
 
+        if (! in_array(
+            $result['location_flexibility'],
+            ['strict_district', 'same_city', 'flexible'],
+            true
+        )) {
+            $result['location_flexibility'] = null;
+        }
+
         if (! is_bool($result['is_shared_title'])) {
             $result['is_shared_title'] = null;
+        }
+
+        if (! is_bool($result['accepts_shared_title'])) {
+            $result['accepts_shared_title'] = null;
         }
 
         return $result;
@@ -315,7 +369,8 @@ PROMPT;
     {
         $important = [
             'city', 'district', 'property_type', 'area_sqm',
-            'asking_price', 'budget_max', 'block_no', 'parcel_no',
+            'area_min_sqm', 'area_max_sqm', 'asking_price', 'budget_max',
+            'block_no', 'parcel_no',
         ];
 
         $filled = collect($important)
@@ -324,7 +379,7 @@ PROMPT;
             )
             ->count();
 
-        return min(95, 25 + ($filled * 9));
+        return min(95, 25 + ($filled * 7));
     }
 
     private function routeType(ConversationControl $conversation): string
