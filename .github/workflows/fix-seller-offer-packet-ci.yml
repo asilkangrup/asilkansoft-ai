@@ -1,0 +1,33 @@
+name: Fix Seller Offer Packet CI
+
+on:
+  push:
+    branches:
+      - feature/seller-offer-packet-intelligence
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/seller-offer-packet-intelligence
+          fetch-depth: 0
+      - name: Apply fixes
+        run: python3 .github/scripts/fix_seller_offer_packet_ci.py
+      - name: Validate focused tests
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          cp .env.example .env
+          php artisan key:generate
+          php artisan test tests/Feature/RealEstateSellerOfferPacketIntelligenceTest.php tests/Feature/RealEstateNextBestActionOrchestratorTest.php
+      - name: Commit fixes
+        run: |
+          git config user.name "asilkangrup"
+          git config user.email "asilkangrup@gmail.com"
+          git add -A
+          git commit -m "Fix seller offer packet isolation and match priority"
+          git push origin feature/seller-offer-packet-intelligence
