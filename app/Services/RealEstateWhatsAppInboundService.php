@@ -506,29 +506,17 @@ class RealEstateWhatsAppInboundService
             return null;
         }
 
-        $data = is_array($profile->data) ? $profile->data : [];
-        $missing = [];
-
-        if (empty($data['area_sqm'])) {
-            $missing[] = 'm²';
-        }
-        if (empty($data['block_no']) || empty($data['parcel_no'])) {
-            $missing[] = 'ada/parsel';
-        }
-        if (empty($data['location_url']) && (empty($data['neighborhood']) || empty($data['district']))) {
-            $missing[] = 'konum';
-        }
-        if (empty($data['zoning_status'])) {
-            $missing[] = 'imar bilgisi';
-        }
+        $packet = app(RealEstateSellerOfferPacketService::class)
+            ->summaryForProfile($profile);
+        $nextRequest = trim((string) ($packet['recommended_next_request'] ?? ''));
 
         $answer = 'Fiyatı daha yüksek yazmak mümkün; ancak yatırımcı tarafında yüksek fiyatlar dönüşü zorlaştırabiliyor. '
             .'Hızlı nakit düşünüyorsanız yatırımcılarımızdan teklif toplayalım.';
 
-        if ($missing !== []) {
-            $answer .= "\nBunun için ".implode(', ', $missing).' ile varsa tapu/ilan görsellerini ve arsanın fotoğraflarını gönderin.';
-        } else {
-            $answer .= "\nVarsa tapu/ilan görsellerini ve arsanın fotoğraflarını da gönderin; dosyayı yatırımcıya hazır hale getireyim.";
+        if ($nextRequest !== '') {
+            $answer .= "\n".$nextRequest;
+        } elseif ((bool) ($packet['ready_for_investor_offer'] ?? false)) {
+            $answer .= "\nDosya ön teklif toplamak için yeterli görünüyor; hızlı nakit tekliflerini değerlendirmeye geçebiliriz.";
         }
 
         return $answer;
