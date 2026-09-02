@@ -110,6 +110,18 @@ class RealEstateMediaFactPromotionTest extends TestCase
             'Mesajınızı tekrar gönderirseniz',
             $openAi
         );
+        $this->assertStringContainsString(
+            '$this->schedulePendingBatch($scheduledKey);',
+            $source
+        );
+        $this->assertStringContainsString(
+            'self::dispatch($this->cacheKey, $generation)',
+            $source
+        );
+        $this->assertGreaterThan(
+            strpos($source, 'foreach ($payloads as $index => $payload)'),
+            strpos($source, '$this->schedulePendingBatch($scheduledKey);')
+        );
     }
 
     public function test_seller_auto_research_no_longer_requires_asking_price(): void
