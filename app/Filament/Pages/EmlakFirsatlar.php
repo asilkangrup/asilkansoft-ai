@@ -18,7 +18,7 @@ class EmlakFirsatlar extends Page
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBolt;
     protected static ?int $navigationSort = 30;
 
-    public string $filter = 'actionable';
+    public string $filter = 'priority';
     public string $search = '';
 
     public static function canAccess(): bool
@@ -37,7 +37,7 @@ class EmlakFirsatlar extends Page
 
     public function setFilter(string $filter): void
     {
-        if (in_array($filter, ['actionable', 'preparation', 'blocked', 'all'], true)) {
+        if (in_array($filter, ['priority', 'actionable', 'preparation', 'blocked', 'all'], true)) {
             $this->filter = $filter;
         }
     }
@@ -104,6 +104,7 @@ class EmlakFirsatlar extends Page
     private function matchesFilter(array $item): bool
     {
         return match ($this->filter) {
+            'priority' => $item['state'] !== 'blocked',
             'actionable' => $item['state'] === 'actionable',
             'preparation' => in_array($item['state'], ['research_required', 'preparation_required'], true),
             'blocked' => $item['state'] === 'blocked',
