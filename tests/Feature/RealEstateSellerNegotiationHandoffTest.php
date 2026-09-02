@@ -101,4 +101,45 @@ class RealEstateSellerNegotiationHandoffTest extends TestCase
             mb_strtolower($inbound)
         );
     }
+
+    public function test_company_information_is_exact_and_isolated_in_inbound_flow(): void
+    {
+        $service = app(\App\Services\RealEstateWhatsAppInboundService::class);
+        $method = (new ReflectionClass($service))
+            ->getMethod('deterministicCompanyInformationAnswer');
+        $method->setAccessible(true);
+
+        $answer = $method->invoke(
+            $service,
+            'Komisyonunuz nedir, yeriniz nerede ve tüm Türkiye çalışıyor musunuz?'
+        );
+
+        $this->assertSame(
+            'Alıcıdan %2, satıcıdan da %2 hizmet komisyonu alıyoruz. '
+            .'Merkezimiz İstanbul Bahçeşehir’de. '
+            .'Tüm Türkiye genelinde hizmet veriyoruz.',
+            $answer
+        );
+    }
+
+    public function test_parcel_identity_message_connects_fresh_research_to_negotiation(): void
+    {
+        $inbound = file_get_contents(
+            app_path('Services/RealEstateWhatsAppInboundService.php')
+        );
+
+        $this->assertIsString($inbound);
+        $this->assertStringContainsString(
+            "str_contains(\$normalized, 'ada')",
+            $inbound
+        );
+        $this->assertStringContainsString(
+            "str_contains(\$normalized, 'parsel')",
+            $inbound
+        );
+        $this->assertStringContainsString(
+            'deterministicCompanyInformationAnswer',
+            $inbound
+        );
+    }
 }
