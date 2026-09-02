@@ -55,14 +55,33 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
     public function handle(RealEstateWhatsAppInboundService $inbound): void
     {
         $batch = Cache::get($this->cacheKey);
+        $scheduledKey = $this->cacheKey.':scheduled';
 
-        if (! is_array($batch) || ($batch['generation'] ?? null) !== $this->generation) {
+        if (! is_array($batch)) {
+            Cache::forget($scheduledKey);
+
+            return;
+        }
+
+        $quietUntil = (int) ($batch['quiet_until'] ?? 0);
+
+        if ($quietUntil > now()->timestamp) {
+            $this->release(max(1, $quietUntil - now()->timestamp));
+
+            return;
+        }
+
+        // Pull first so a message arriving during slow media/valuation work
+        // creates a fresh batch and its own scheduled job instead of being
+        // deleted when this batch completes.
+        $batch = Cache::pull($this->cacheKey);
+        Cache::forget($scheduledKey);
+
+        if (! is_array($batch)) {
             return;
         }
 
         $payloads = is_array($batch['payloads'] ?? null) ? $batch['payloads'] : [];
-        Cache::forget($this->cacheKey);
-
         $payloads = array_values(array_filter($payloads, 'is_array'));
         $last = count($payloads) - 1;
 
