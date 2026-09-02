@@ -237,6 +237,7 @@ KURALLAR
 - area_sqm satıcının taşınmaz alanıdır. area_min_sqm ve area_max_sqm yalnız yatırımcı/alıcı aradığı m² aralığını açıkça verirse doldur.
 - m² alanları yalnızca sayı; dönüm verilirse 1 dönüm = 1000 m² çevir.
 - asking_price, minimum_price, budget_min, budget_max yalnızca TL sayısal değer olsun. "4.5 milyon" => 4500000.
+- Satıcı fiyat sorusuna "1 500", "1.500" veya "1500" diye cevap veriyorsa ve taşınmaz m²'si zaten mevcutsa bunu toplam 1.500.000 TL satış beklentisi olarak yorumla; alan/m² olarak yeniden yazma. Satıcı sonraki mesajda "evet", "doğru" veya "aynen" diyerek botun TL teyidini onayladıysa mevcut asking_price değerini koru.
 - is_shared_title yalnızca true, false veya null.
 - accepts_shared_title yalnız yatırımcı/alıcı hisseli tapuyu açıkça kabul ettiğini veya istemediğini belirtiyorsa true/false; aksi halde null.
 - target_discount_percent yalnız yatırımcı açıkça istediği iskonto/fırsat yüzdesini belirtirse 0-60 aralığında sayı; "en az %20 aşağı" => 20.
