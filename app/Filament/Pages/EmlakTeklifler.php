@@ -83,8 +83,8 @@ class EmlakTeklifler extends Page
                     'amount' => is_numeric($latestAmount) ? (int) $latestAmount : null,
                     'next_action' => $this->nextAction($stage),
                     'updated_at' => $latest->created_at?->diffForHumans() ?? '—',
-                    'seller_url' => $seller->conversation ? url('/admin/musteriler?customer='.$seller->conversation->id) : null,
-                    'investor_url' => $investor->conversation ? url('/admin/musteriler?customer='.$investor->conversation->id) : null,
+                    'seller_url' => $seller->conversation ? url('/admin/emlak-musteri-detay?customer='.$seller->conversation->id) : null,
+                    'investor_url' => $investor->conversation ? url('/admin/emlak-musteri-detay?customer='.$investor->conversation->id) : null,
                     'timeline' => $events->take(-8)->reverse()->map(fn (CrmActivity $event): array => [
                         'title' => $this->eventTitle((string) $event->meta['task_kind']),
                         'outcome' => (string) $event->meta['outcome'],
