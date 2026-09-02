@@ -328,6 +328,7 @@ class RealEstateMediaAnalysisService
 
         $findings[] = $analysis;
         $data['media_findings'] = array_slice($findings, -8);
+        $data = $this->promoteObservedFacts($data, $analysis);
 
         $profile->update([
             'data' => $data,
@@ -433,6 +434,56 @@ PROMPT;
             'confidence_score' => max(0, min(100, (int) ($data['confidence_score'] ?? 0))),
             'analyzed_at' => now()->toIso8601String(),
         ];
+    }
+
+    private function promoteObservedFacts(array $data, array $analysis): array
+    {
+        $confidence = (int) ($analysis['confidence_score'] ?? 0);
+        $category = (string) ($analysis['media_category'] ?? '');
+
+        if (
+            $confidence < 70
+            || ! in_array($category, ['title_deed', 'parcel_document', 'listing'], true)
+        ) {
+            return $data;
+        }
+
+        $fields = [
+            'property_type', 'city', 'district', 'neighborhood', 'area_sqm',
+            'block_no', 'parcel_no', 'title_deed_type', 'zoning_status',
+        ];
+        $promoted = [];
+
+        foreach ($fields as $field) {
+            $existing = $data[$field] ?? null;
+            $observed = $analysis[$field] ?? null;
+
+            if (
+                ($existing === null || (is_string($existing) && trim($existing) === ''))
+                && $observed !== null
+                && (! is_string($observed) || trim($observed) !== '')
+            ) {
+                $data[$field] = $observed;
+                $promoted[] = $field;
+            }
+        }
+
+        if ($promoted !== []) {
+            $sources = is_array($data['media_fact_sources'] ?? null)
+                ? $data['media_fact_sources']
+                : [];
+            $sources[] = [
+                'message_id' => $analysis['message_id'] ?? null,
+                'media_category' => $category,
+                'confidence_score' => $confidence,
+                'fields' => $promoted,
+                'observed_not_legally_verified' => true,
+                'recorded_at' => now()->toIso8601String(),
+            ];
+            $data['media_fact_sources'] = array_slice($sources, -8);
+        }
+
+        return $data;
     }
 
     private function normalizeMediaCategory(mixed $value): ?string
