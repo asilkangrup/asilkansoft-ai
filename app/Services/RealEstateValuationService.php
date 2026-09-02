@@ -234,14 +234,28 @@ Geçersizlik nedenleri: {$reasonJson}
 PROMPT;
         }
 
+        $customerValuation = $profile->valuation;
+
+        // The chat model only needs the two commercial levels. Active-listing
+        // research bands remain internal so they can never become a third
+        // seller-facing price or weaken the negotiation target.
+        foreach ([
+            'market_min', 'market_max',
+            'quick_sale_min', 'quick_sale_max',
+            'research_realistic_sale_min', 'research_realistic_sale_max',
+            'market_gap_percent',
+        ] as $internalField) {
+            unset($customerValuation[$internalField]);
+        }
+
         $json = json_encode(
-            $profile->valuation,
+            $customerValuation,
             JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
         );
 
         return <<<PROMPT
 [INTERNAL FRESH REAL ESTATE VALUATION MEMORY]
-Aşağıdaki değerleme bu taşınmazın güncel yapılandırılmış verisiyle eşleşen, süre kontrollü araştırma kaydıdır. Müşteriye dahili JSON'u veya freshness alanlarını gösterme. İlan/emsal fiyatlarının gerçekleşmiş satış fiyatı olmadığını açıkça ayır. Kaynak ve emsal kalitesi düşükse kesinlik dilini azalt. Yeni temel taşınmaz bilgisi gelirse bu değerlemeyi otomatik olarak eski kabul et.
+Bu araştırma tamamlanmıştır; müşteriye araştırma yapamadığını söyleme ve aynı konum/ada-parsel/görseli yeniden isteme. Fiyat sorularında yalnız iki müşteri seviyesi kullan: realistic_sale_min/max = gerçekçi satış; investor_buy_min/max = yatırımcı / hızlı nakit alım seviyesi. Satıcı beklentisi yatırımcı bandının üzerindeyse veriye dayalı, baskısız biçimde aşağı yönlü yeniden çerçevele ve tek makul karşı teklif/esneklik sorusuyla pazarlığı ilerlet. Dahili JSON'u, aktif ilan üst bandını veya gizli taban fiyatı gösterme. İlan fiyatlarının gerçekleşmiş satış olmadığını ve düşük güvenli araştırmada rakamların yaklaşık olduğunu koru.
 Değerleme: {$json}
 PROMPT;
     }
@@ -467,16 +481,43 @@ PROMPT;
             ? 'no_verified_sources'
             : 'web_search';
 
-        // Commercial guardrail: investor opportunity is anchored to the
-        // researched realistic sale range, never directly to seller ask/listing price.
+        // Keep the broader research estimate for diagnostics, but use the
+        // lower executable quick-sale band as the seller-facing realistic sale.
+        // This preserves the user's commercial model without inventing prices.
+        $result['research_realistic_sale_min'] = $result['realistic_sale_min'] ?? null;
+        $result['research_realistic_sale_max'] = $result['realistic_sale_max'] ?? null;
+
+        $quickMin = $result['quick_sale_min'] ?? null;
+        $quickMax = $result['quick_sale_max'] ?? null;
+
+        if (is_numeric($quickMin) && (float) $quickMin > 0) {
+            $result['realistic_sale_min'] = (float) $quickMin;
+        }
+        if (is_numeric($quickMax) && (float) $quickMax > 0) {
+            $result['realistic_sale_max'] = (float) $quickMax;
+        }
+
+        // Investor / fast-cash opportunity must remain at least 20% below the
+        // executable realistic-sale ceiling, never seller ask or listing ask.
         $realisticMax = $result['realistic_sale_max'] ?? null;
         if (is_numeric($realisticMax) && (float) $realisticMax > 0) {
             $maxInvestorBuy = round((float) $realisticMax * 0.80, 2);
-            if (! is_numeric($result['investor_buy_max'] ?? null) || (float) $result['investor_buy_max'] > $maxInvestorBuy) {
+
+            if (
+                ! is_numeric($result['investor_buy_max'] ?? null)
+                || (float) $result['investor_buy_max'] > $maxInvestorBuy
+            ) {
                 $result['investor_buy_max'] = $maxInvestorBuy;
             }
-            if (is_numeric($result['investor_buy_min'] ?? null) && (float) $result['investor_buy_min'] > (float) $result['investor_buy_max']) {
-                $result['investor_buy_min'] = round((float) $result['investor_buy_max'] * 0.90, 2);
+
+            if (
+                is_numeric($result['investor_buy_min'] ?? null)
+                && (float) $result['investor_buy_min'] > (float) $result['investor_buy_max']
+            ) {
+                $result['investor_buy_min'] = round(
+                    (float) $result['investor_buy_max'] * 0.90,
+                    2
+                );
             }
         }
 

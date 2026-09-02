@@ -68,6 +68,10 @@ class RealEstateValuationResearchOutputGuardService
         $sanitized = [
             'market_min' => $this->positiveNumber($valuation['market_min'] ?? null),
             'market_max' => $this->positiveNumber($valuation['market_max'] ?? null),
+            'realistic_sale_min' => $this->positiveNumber($valuation['realistic_sale_min'] ?? null),
+            'realistic_sale_max' => $this->positiveNumber($valuation['realistic_sale_max'] ?? null),
+            'research_realistic_sale_min' => $this->positiveNumber($valuation['research_realistic_sale_min'] ?? null),
+            'research_realistic_sale_max' => $this->positiveNumber($valuation['research_realistic_sale_max'] ?? null),
             'quick_sale_min' => $this->positiveNumber($valuation['quick_sale_min'] ?? null),
             'quick_sale_max' => $this->positiveNumber($valuation['quick_sale_max'] ?? null),
             'investor_buy_min' => $this->positiveNumber($valuation['investor_buy_min'] ?? null),
