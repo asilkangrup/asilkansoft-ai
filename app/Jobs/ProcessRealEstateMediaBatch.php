@@ -5,13 +5,15 @@ namespace App\Jobs;
 use App\Services\RealEstateWhatsAppInboundService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Cache;
 
 class ProcessRealEstateMediaBatch implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 1;
+    public int $tries = 120;
+
     public int $timeout = 240;
 
     public function __construct(
@@ -20,6 +22,34 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
     ) {
         $this->onConnection('database');
         $this->onQueue('real-estate');
+    }
+
+    public function middleware(): array
+    {
+        return [
+            (new WithoutOverlapping($this->overlapKey()))
+                ->releaseAfter(1)
+                ->expireAfter(300)
+                ->shared(),
+        ];
+    }
+
+    public function overlapKey(): string
+    {
+        $hash = '';
+
+        foreach (['real-estate-inbound-burst:', 'real-estate-media-batch:'] as $prefix) {
+            if (str_starts_with($this->cacheKey, $prefix)) {
+                $hash = substr($this->cacheKey, strlen($prefix));
+                break;
+            }
+        }
+
+        if (! is_string($hash) || ! preg_match('/^[a-f0-9]{64}$/', $hash)) {
+            $hash = hash('sha256', $this->cacheKey);
+        }
+
+        return 'real-estate-chat:'.$hash;
     }
 
     public function handle(RealEstateWhatsAppInboundService $inbound): void
