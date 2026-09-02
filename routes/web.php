@@ -37,8 +37,12 @@ Route::post('/demo/chat', [PublicDemoController::class, 'chat'])
     ->middleware('throttle:20,1')
     ->name('demo.chat');
 
+// Do not use the generic `auth` redirect middleware here. This application
+// has a Filament-specific admin login route rather than a global `login`
+// route, so an unauthenticated asset request would otherwise become a 500.
+// The controller performs the stricter exact 40/37 authorization check and
+// intentionally returns 403 before any profile or file lookup.
 Route::get('/admin/emlak-medya/{profile}/{media}', [RealEstatePrivateMediaController::class, 'show'])
     ->whereNumber('profile')
     ->whereUuid('media')
-    ->middleware('auth')
     ->name('real-estate.private-media');
