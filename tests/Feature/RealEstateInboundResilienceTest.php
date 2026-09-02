@@ -8,10 +8,12 @@ use App\Models\RealEstateWebhookReceipt;
 use App\Models\User;
 use App\Services\RealEstateWebhookAuthService;
 use App\Services\RealEstateWebhookReceiptService;
+use App\Services\RealEstateWhatsAppInboundService;
 use App\Services\RealEstateWhatsAppMessageParser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
+use ReflectionMethod;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -81,6 +83,70 @@ class RealEstateInboundResilienceTest extends TestCase
         $this->assertSame(2, $retry['receipt']->attempts);
         $this->assertSame('processing', $retry['receipt']->status);
         $this->assertSame(1, RealEstateWebhookReceipt::query()->count());
+    }
+
+    public function test_lid_remote_jid_uses_phone_number_alternative_for_reply(): void
+    {
+        $method = new ReflectionMethod(
+            RealEstateWhatsAppInboundService::class,
+            'resolvePhoneNumber'
+        );
+
+        $resolved = $method->invoke(
+            app(RealEstateWhatsAppInboundService::class),
+            [
+                'data' => [
+                    'key' => [
+                        'remoteJid' => '126817583255713@lid',
+                        'remoteJidAlt' => '905550001122@s.whatsapp.net',
+                    ],
+                ],
+            ]
+        );
+
+        $this->assertSame('905550001122', $resolved);
+    }
+
+    public function test_unmapped_lid_is_not_treated_as_a_phone_number(): void
+    {
+        $method = new ReflectionMethod(
+            RealEstateWhatsAppInboundService::class,
+            'resolvePhoneNumber'
+        );
+
+        $resolved = $method->invoke(
+            app(RealEstateWhatsAppInboundService::class),
+            [
+                'data' => [
+                    'key' => [
+                        'remoteJid' => '126817583255713@lid',
+                    ],
+                ],
+            ]
+        );
+
+        $this->assertNull($resolved);
+    }
+
+    public function test_standard_phone_jid_remains_supported(): void
+    {
+        $method = new ReflectionMethod(
+            RealEstateWhatsAppInboundService::class,
+            'resolvePhoneNumber'
+        );
+
+        $resolved = $method->invoke(
+            app(RealEstateWhatsAppInboundService::class),
+            [
+                'data' => [
+                    'key' => [
+                        'remoteJid' => '905550009988@s.whatsapp.net',
+                    ],
+                ],
+            ]
+        );
+
+        $this->assertSame('905550009988', $resolved);
     }
 
     public function test_parser_turns_whatsapp_location_into_persistent_map_context(): void
