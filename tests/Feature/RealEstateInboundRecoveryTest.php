@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
+use App\Models\Organization;
 use App\Models\RealEstateOutboundDelivery;
 use App\Models\RealEstateWebhookReceipt;
+use App\Models\User;
 use App\Services\MemoryService;
 use App\Services\RealEstateInboundRecoveryService;
 use App\Services\RealEstateIsolationService;
@@ -14,6 +16,7 @@ use App\Services\RealEstateOpenAIService;
 use App\Services\RealEstateOutboundDeliveryService;
 use App\Services\RealEstateWebhookReceiptService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Mockery;
 use Tests\TestCase;
 
@@ -114,13 +117,13 @@ class RealEstateInboundRecoveryTest extends TestCase
         $this->assertSame('superseded_by_newer_customer_message', $receipt->fresh()->last_error);
     }
 
-    public function test_foreign_receipts_never_enter_isolated_recovery(): void
+    public function test_foreign_instance_receipts_never_enter_isolated_recovery(): void
     {
         $this->seedBot();
 
         RealEstateWebhookReceipt::query()->forceCreate([
-            'user_id'=>1,'organization_id'=>1,'ai_bot_id'=>1,
-            'instance'=>'gulten-sirketi-1','event'=>'messages.upsert',
+            'user_id'=>40,'organization_id'=>37,'ai_bot_id'=>35,
+            'instance'=>'foreign-test-instance','event'=>'messages.upsert',
             'receipt_key'=>hash('sha256', 'foreign-receipt'),
             'whatsapp_message_id'=>'foreign-message','phone_number'=>'905550000099',
             'status'=>'failed','attempts'=>1,
@@ -173,6 +176,32 @@ class RealEstateInboundRecoveryTest extends TestCase
 
     private function seedBot(): AiBot
     {
+        $user = User::query()->forceCreate([
+            'id'=>40,
+            'name'=>'Emlak AI Test',
+            'email'=>'emlak-recovery@example.test',
+            'password'=>Hash::make('test'),
+        ]);
+
+        Organization::query()->forceCreate([
+            'id'=>37,
+            'owner_user_id'=>40,
+            'name'=>'Emlak AI Test',
+            'slug'=>'emlak-ai-recovery-test',
+            'plan'=>'start',
+            'seat_limit'=>1,
+            'monthly_message_limit'=>1000,
+            'status'=>'active',
+        ]);
+
+        $user->organizations()->syncWithoutDetaching([
+            37 => [
+                'role'=>'owner',
+                'status'=>'active',
+                'joined_at'=>now(),
+            ],
+        ]);
+
         return AiBot::query()->forceCreate([
             'id'=>35,
             'user_id'=>40,
