@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\RealEstateProfile;
 use App\Services\RealEstateCaseLifecycleService;
 use App\Services\RealEstateEvidenceLedgerService;
+use App\Services\RealEstateFactConsistencyActionService;
 use App\Services\RealEstateInvestorMandateService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
@@ -44,6 +45,14 @@ class RealEstateProfileObserver
         // valuation / verification / matching filter in a turn therefore gets
         // the last word on the single next action exposed to the AI context.
         app(RealEstateNextBestActionService::class)->process($conversation);
+
+        // A customer-side conflict in stable property identity is even more
+        // fundamental than valuation or matching readiness. Keep the last
+        // confirmed fact in memory and require one deterministic confirmation
+        // question before any unconfirmed replacement can influence pricing or
+        // investor matching.
+        app(RealEstateFactConsistencyActionService::class)->sync($conversation);
+
         app(RealEstateNextBestActionDecisionBridgeService::class)->sync($conversation);
     }
 
