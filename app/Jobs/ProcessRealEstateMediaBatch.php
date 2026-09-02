@@ -54,6 +54,19 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
         return 'real-estate-chat:'.$hash;
     }
 
+    private function isImagePayload(array $payload): bool
+    {
+        $message = data_get($payload, 'data.message', []);
+
+        if (! is_array($message)) {
+            return false;
+        }
+
+        $encoded = json_encode($message);
+
+        return is_string($encoded) && str_contains($encoded, '"imageMessage"');
+    }
+
     public function handle(RealEstateWhatsAppInboundService $inbound): void
     {
         $batch = Cache::get($this->cacheKey);
@@ -86,12 +99,30 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
         $payloads = is_array($batch['payloads'] ?? null) ? $batch['payloads'] : [];
         $payloads = array_values(array_filter($payloads, 'is_array'));
         $last = count($payloads) - 1;
+        $imageIndexes = array_keys(array_filter(
+            $payloads,
+            fn (array $payload): bool => $this->isImagePayload($payload)
+        ));
+        $representativeImageIndexes = count($imageIndexes) <= 3
+            ? $imageIndexes
+            : array_values(array_unique([
+                $imageIndexes[0],
+                $imageIndexes[(int) floor((count($imageIndexes) - 1) / 2)],
+                $imageIndexes[count($imageIndexes) - 1],
+            ]));
 
         foreach ($payloads as $index => $payload) {
             unset($payload['_real_estate_authorized']);
 
             try {
-                $inbound->process($payload, suppressReply: $index < $last);
+                $analyzeMedia = ! in_array($index, $imageIndexes, true)
+                    || in_array($index, $representativeImageIndexes, true);
+
+                $inbound->process(
+                    $payload,
+                    suppressReply: $index < $last,
+                    analyzeMedia: $analyzeMedia,
+                );
             } catch (\Throwable $exception) {
                 // Preserve the failed turn and all following fragments. The
                 // queue will retry internally with backoff; customers never
