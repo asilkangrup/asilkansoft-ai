@@ -43,6 +43,14 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
             $prompt
         );
         $this->assertStringContainsString(
+            'Daire/dubleks/villa/konut için ada/parseli veya konum linkini varsayılan soru olarak isteme',
+            $prompt
+        );
+        $this->assertStringContainsString(
+            'Arsa/tarla/arazi için konum, m², ada/parsel',
+            $prompt
+        );
+        $this->assertStringContainsString(
             '1200 => 1.200.000 TL',
             $prompt
         );
@@ -77,6 +85,14 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
         );
         $this->assertStringContainsString(
             '$bot->refresh();',
+            $source
+        );
+        $this->assertStringContainsString(
+            "'real-estate-latest-inbound:'",
+            $source
+        );
+        $this->assertStringContainsString(
+            '$supersededAtWebhook',
             $source
         );
     }
