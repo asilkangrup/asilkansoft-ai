@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiBot;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Exceptions\RateLimitException;
+use RuntimeException;
 use Throwable;
 
 class RealEstateOpenAIService extends OpenAIService
@@ -169,7 +170,7 @@ class RealEstateOpenAIService extends OpenAIService
                     : $answer;
             }
 
-            return 'Bu konuda sağlıklı bir cevap verebilmem için taşınmazın konumunu ve temel özelliklerini biraz daha netleştirelim.';
+            throw new RuntimeException('Emlak AI boş cevap üretti; müşteri mesajı dahili olarak yeniden denenecek.');
         } catch (RateLimitException $exception) {
             Log::warning('REAL ESTATE AI RATE LIMIT', [
                 'ai_bot_id' => $aiBot->id,
@@ -177,7 +178,10 @@ class RealEstateOpenAIService extends OpenAIService
                 'message' => $exception->getMessage(),
             ]);
 
-            return 'Şu anda kısa süreli bir yoğunluk var. Mesajınızı tekrar gönderirseniz kaldığımız yerden devam edeceğim.';
+            throw new RuntimeException(
+                'Emlak AI geçici yoğunluk nedeniyle yeniden denenecek.',
+                previous: $exception,
+            );
         } catch (Throwable $exception) {
             Log::error('REAL ESTATE AI ERROR', [
                 'ai_bot_id' => $aiBot->id,
@@ -187,7 +191,10 @@ class RealEstateOpenAIService extends OpenAIService
 
             report($exception);
 
-            return 'Şu anda emlak danışmanlığı bağlantısında kısa süreli bir sorun var. Lütfen biraz sonra tekrar deneyin.';
+            throw new RuntimeException(
+                'Emlak AI geçici bağlantı hatası nedeniyle yeniden denenecek.',
+                previous: $exception,
+            );
         }
     }
 
