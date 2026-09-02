@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RealEstateProfile;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use Throwable;
 
 class RealEstateValuationResearchOutputGuardService
@@ -109,10 +110,11 @@ class RealEstateValuationResearchOutputGuardService
             $valuation['freshness_reasons'] ?? []
         );
         $sanitized['research_output_guard'] = [
-            'version' => 1,
+            'version' => 2,
             'web_prose_removed' => true,
-            'source_urls_canonicalized_to_hosts' => true,
-            'comparable_labels_rebuilt_from_profile' => true,
+            'source_urls_tokenized' => true,
+            'comparable_labels_rebuilt_deterministically' => true,
+            'integrity_semantics_preserved' => true,
         ];
 
         return $sanitized;
@@ -124,8 +126,6 @@ class RealEstateValuationResearchOutputGuardService
             return [];
         }
 
-        $location = $this->profileLocation($profileData);
-        $propertyType = $this->safeProfileLabel($profileData['property_type'] ?? null, 48);
         $result = [];
 
         foreach (array_slice($value, 0, 8) as $item) {
@@ -153,8 +153,16 @@ class RealEstateValuationResearchOutputGuardService
                 'listing_price' => $price,
                 'area_sqm' => $area,
                 'unit_price_sqm' => $unitPrice,
-                'location' => $location,
-                'property_type' => $propertyType,
+                // Keep match/mismatch semantics without retaining arbitrary
+                // web prose that could become trusted internal instructions.
+                'location' => $this->comparableLocation(
+                    $item['location'] ?? null,
+                    $profileData,
+                ),
+                'property_type' => $this->comparablePropertyType(
+                    $item['property_type'] ?? null,
+                    $profileData,
+                ),
                 'observed_at' => $this->safeDate($item['observed_at'] ?? null),
                 'retrieved_at' => $this->safeDateTime($item['retrieved_at'] ?? null),
                 'price_basis' => 'asking',
@@ -214,7 +222,48 @@ class RealEstateValuationResearchOutputGuardService
             return null;
         }
 
-        return $scheme.'://'.$host;
+        // Preserve distinct-listing/source cardinality for freshness and
+        // comparable integrity while removing attacker-controlled path/query
+        // text from the value promoted into trusted internal context.
+        $token = substr(hash('sha256', $url), 0, 24);
+
+        return $scheme.'://'.$host.'/r/'.$token;
+    }
+
+    private function comparableLocation(mixed $value, array $profileData): ?string
+    {
+        $expected = $this->profileLocation($profileData);
+
+        if ($expected === null || ! is_scalar($value)) {
+            return null;
+        }
+
+        $actual = $this->normalizeText((string) $value);
+        $city = $this->normalizeText((string) ($profileData['city'] ?? ''));
+        $district = $this->normalizeText((string) ($profileData['district'] ?? ''));
+
+        if ($actual === '' || $city === '' || ! str_contains($actual, $city)) {
+            return 'mismatch';
+        }
+
+        if ($district !== '' && ! str_contains($actual, $district)) {
+            return 'mismatch';
+        }
+
+        return $expected;
+    }
+
+    private function comparablePropertyType(mixed $value, array $profileData): ?string
+    {
+        $expected = $this->safeProfileLabel($profileData['property_type'] ?? null, 48);
+
+        if ($expected === null || ! is_scalar($value)) {
+            return null;
+        }
+
+        return $this->normalizeText((string) $value) === $this->normalizeText($expected)
+            ? $expected
+            : 'mismatch';
     }
 
     private function profileLocation(array $profileData): ?string
@@ -248,6 +297,19 @@ class RealEstateValuationResearchOutputGuardService
         }
 
         return mb_substr($text, 0, $maxLength);
+    }
+
+    private function normalizeText(string $value): string
+    {
+        $value = Str::lower(strtr(trim($value), [
+            'İ' => 'i', 'I' => 'i', 'ı' => 'i',
+            'Ş' => 's', 'ş' => 's', 'Ğ' => 'g', 'ğ' => 'g',
+            'Ü' => 'u', 'ü' => 'u', 'Ö' => 'o', 'ö' => 'o',
+            'Ç' => 'c', 'ç' => 'c',
+        ]));
+        $value = preg_replace('/[^a-z0-9\s]+/u', ' ', $value) ?? $value;
+
+        return trim(preg_replace('/\s+/', ' ', $value) ?? $value);
     }
 
     private function missingFields(mixed $value): array
