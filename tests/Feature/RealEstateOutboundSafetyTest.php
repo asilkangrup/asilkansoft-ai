@@ -8,9 +8,11 @@ use App\Models\Organization;
 use App\Models\RealEstateOutboundSafetyEvent;
 use App\Models\RealEstateProfile;
 use App\Models\User;
+use App\Services\RealEstateOutboundDeliveryService;
 use App\Services\RealEstateOutboundSafetyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -210,6 +212,42 @@ class RealEstateOutboundSafetyTest extends TestCase
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
+    public function test_delivery_reserves_and_sends_replacement_instead_of_unsafe_generated_answer(): void
+    {
+        [$conversation] = $this->seedProfile('seller', [
+            'property_type' => 'arsa',
+            'city' => 'Muğla',
+            'district' => 'Marmaris',
+        ]);
+        $bot = AiBot::query()->findOrFail(35);
+
+        Http::fake([
+            '*' => Http::response(['key' => ['id' => 'safe-outbound-wa-1']], 200),
+        ]);
+
+        $unsafe = 'Kesin alıcı var ve bu portföy garanti satılır.';
+        $result = app(RealEstateOutboundDeliveryService::class)->deliver(
+            bot: $bot,
+            instance: 'emlak-ai-35',
+            inboundMessageId: 'wamid-safety-delivery-1',
+            sessionId: (string) $conversation->session_id,
+            phoneNumber: (string) $conversation->whatsapp_number,
+            answer: $unsafe,
+        );
+
+        $this->assertTrue($result['sent_now']);
+        $this->assertSame('sent', $result['state']);
+        $this->assertNotSame($unsafe, $result['answer']);
+        $this->assertStringNotContainsString('Kesin alıcı', $result['answer']);
+        $this->assertStringNotContainsString('garanti satılır', $result['answer']);
+        $this->assertSame($result['answer'], $result['delivery']->fresh()->answer);
+        $this->assertSame(hash('sha256', $result['answer']), $result['delivery']->fresh()->answer_hash);
+        $this->assertDatabaseCount('real_estate_outbound_safety_events', 1);
+        $this->assertNull($conversation->fresh()->next_follow_up_at);
+        $this->assertFalse((bool) $conversation->fresh()->human_takeover);
+        Http::assertSentCount(1);
+    }
+
     public function test_cross_organization_conversation_fails_closed(): void
     {
         $this->seedScope();
@@ -224,9 +262,14 @@ class RealEstateOutboundSafetyTest extends TestCase
             'status' => 'active',
         ]);
 
+        // ConversationControl intentionally normalizes the production bot to
+        // organization 37. Create a legitimate isolated row first and then use
+        // the same saveQuietly fixture pattern as the organization-boundary
+        // regression suite to model persisted scope drift without observers
+        // silently repairing the test fixture.
         $foreignConversation = ConversationControl::query()->create([
             'user_id' => 40,
-            'organization_id' => 38,
+            'organization_id' => 37,
             'ai_bot_id' => 35,
             'session_id' => 'foreign-outbound-safety',
             'whatsapp_number' => '905559998877',
@@ -234,6 +277,11 @@ class RealEstateOutboundSafetyTest extends TestCase
             'next_follow_up_at' => null,
             'human_takeover' => false,
         ]);
+        $foreignConversation->forceFill(['organization_id' => 38])->saveQuietly();
+        $foreignConversation->refresh();
+
+        $this->assertSame(38, (int) $foreignConversation->organization_id);
+        $this->assertDatabaseCount('real_estate_outbound_safety_events', 0);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('outbound güvenlik kapsamı ihlali');
