@@ -11,13 +11,13 @@ class RecoverRealEstateUnansweredInbound implements ShouldQueue, ShouldBeUnique
 {
     use Queueable;
 
-    public int $tries = 20;
+    public int $tries = 3;
 
     public int $timeout = 240;
 
     public int $uniqueFor = 300;
 
-    public array $backoff = [60, 90, 120, 180, 300];
+    public array $backoff = [300, 900, 1800];
 
     public function __construct()
     {
@@ -40,11 +40,12 @@ class RecoverRealEstateUnansweredInbound implements ShouldQueue, ShouldBeUnique
         // Provider rate limits are transient. Keep the recovery job alive
         // until the saved inbound messages receive a reply; this never starts
         // a new conversation or creates a follow-up.
-        if (
-            (int) ($stats['failed'] ?? 0) > 0
-            || (int) ($stats['busy'] ?? 0) > 0
-        ) {
-            $this->release(60);
+        // A failed provider call can mean exhausted credit. Never loop
+        // automatically and spend the same request repeatedly; failed receipts
+        // remain recoverable after the operator restores capacity. Only a busy
+        // receipt is retried because no model request was made for it.
+        if ((int) ($stats['busy'] ?? 0) > 0) {
+            $this->release(300);
         }
     }
 }
