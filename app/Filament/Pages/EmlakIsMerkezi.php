@@ -5,7 +5,6 @@ namespace App\Filament\Pages;
 use App\Models\CrmActivity;
 use App\Models\RealEstateProfile;
 use App\Services\CrmActivityService;
-use App\Services\OrganizationAccessService;
 use App\Services\RealEstateIsolationService;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -16,31 +15,38 @@ use Illuminate\Support\Collection;
 class EmlakIsMerkezi extends Page
 {
     protected string $view = 'filament.pages.emlak-is-merkezi';
-
     protected static ?string $title = 'Emlak İş Merkezi';
-
     protected static ?string $navigationLabel = 'Emlak İş Merkezi';
-
-    protected static string|BackedEnum|null $navigationIcon =
-        Heroicon::OutlinedBuildingOffice2;
-
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
     protected static ?int $navigationSort = 31;
 
     public array $callNotes = [];
-
     public array $callResults = [];
-
     public array $offerAmounts = [];
 
     public static function canAccess(): bool
     {
-        return (int) auth()->id() === RealEstateIsolationService::USER_ID
-            && app(OrganizationAccessService::class)->can('tasks');
+        $user = auth()->user();
+
+        return $user
+            && (int) $user->id === RealEstateIsolationService::USER_ID
+            && $user->activeOrganizations()
+                ->where('organizations.id', RealEstateIsolationService::ORGANIZATION_ID)
+                ->exists();
     }
 
     public static function shouldRegisterNavigation(): bool
     {
         return static::canAccess();
+    }
+
+    private function canWrite(): bool
+    {
+        $user = auth()->user();
+
+        return static::canAccess()
+            && $user
+            && $user->canManageOrganization(RealEstateIsolationService::ORGANIZATION_ID);
     }
 
     public function getTasksProperty(): Collection
@@ -52,11 +58,8 @@ class EmlakIsMerkezi extends Page
             ->get();
 
         $investors = $profiles
-            ->filter(fn (RealEstateProfile $profile): bool =>
-                in_array($profile->profile_type, ['investor', 'buyer'], true)
-            )
+            ->filter(fn (RealEstateProfile $profile): bool => in_array($profile->profile_type, ['investor', 'buyer'], true))
             ->keyBy('id');
-
         $history = $this->latestOperatorHistory();
 
         return $profiles
@@ -74,26 +77,16 @@ class EmlakIsMerkezi extends Page
 
                 $candidateRefs = collect($handoff['candidate_refs'] ?? [])
                     ->filter(fn (mixed $candidate): bool => is_array($candidate))
-                    ->sortByDesc(fn (array $candidate): int =>
-                        (int) ($candidate['match_score'] ?? 0)
-                    );
+                    ->sortByDesc(fn (array $candidate): int => (int) ($candidate['match_score'] ?? 0));
 
                 foreach ($candidateRefs as $candidate) {
-                    $investor = $investors->get(
-                        (int) ($candidate['investor_profile_id'] ?? 0)
-                    );
+                    $investor = $investors->get((int) ($candidate['investor_profile_id'] ?? 0));
 
                     if (! $investor || ! $investor->conversation) {
                         continue;
                     }
 
-                    $task = $this->taskForPair(
-                        seller: $seller,
-                        investor: $investor,
-                        candidate: $candidate,
-                        property: $property,
-                        history: $history,
-                    );
+                    $task = $this->taskForPair($seller, $investor, $candidate, $property, $history);
 
                     if ($task !== null) {
                         return $task;
@@ -105,7 +98,6 @@ class EmlakIsMerkezi extends Page
                     'seller_profile_id' => $seller->id,
                     'investor_profile_id' => null,
                     'contact_profile_id' => $seller->id,
-                    'target_conversation_id' => $seller->conversation?->id,
                     'target_name' => 'Yeni yatırımcı adayı bul',
                     'phone' => null,
                     'property' => $property,
@@ -126,47 +118,18 @@ class EmlakIsMerkezi extends Page
     public function outcomesFor(string $kind): array
     {
         return match ($kind) {
-            'investor' => [
-                'Ulaşılmadı',
-                'İlgileniyor',
-                'Teklif verdi',
-                'Tekrar ara',
-                'Uygun değil',
-            ],
-            'seller_offer' => [
-                'Ulaşılmadı',
-                'Kabul etti',
-                'Karşı teklif',
-                'Reddetti',
-                'Tekrar ara',
-            ],
-            'investor_counter' => [
-                'Ulaşılmadı',
-                'Kabul etti',
-                'Yeni teklif',
-                'Reddetti',
-                'Tekrar ara',
-            ],
-            'seller_final' => [
-                'Ulaşılmadı',
-                'Kabul etti',
-                'Reddetti',
-                'Tekrar ara',
-            ],
-            'seller' => [
-                'Ulaşılmadı',
-                'Bilgi tamamlandı',
-                'Belge/fotoğraf bekleniyor',
-                'Tekrar ara',
-            ],
+            'investor' => ['Ulaşılmadı', 'İlgileniyor', 'Teklif verdi', 'Tekrar ara', 'Uygun değil'],
+            'seller_offer' => ['Ulaşılmadı', 'Kabul etti', 'Karşı teklif', 'Reddetti', 'Tekrar ara'],
+            'investor_counter' => ['Ulaşılmadı', 'Kabul etti', 'Yeni teklif', 'Reddetti', 'Tekrar ara'],
+            'seller_final' => ['Ulaşılmadı', 'Kabul etti', 'Reddetti', 'Tekrar ara'],
+            'seller' => ['Ulaşılmadı', 'Bilgi tamamlandı', 'Belge/fotoğraf bekleniyor', 'Tekrar ara'],
             default => ['Not alındı'],
         };
     }
 
     public function saveCall(string $key): void
     {
-        abort_unless(static::canAccess(), 403);
-        abort_unless(app(OrganizationAccessService::class)->canWriteCrm(), 403);
+        abort_unless($this->canWrite(), 403);
 
         $task = $this->tasks->firstWhere('key', $key);
 
@@ -177,17 +140,15 @@ class EmlakIsMerkezi extends Page
 
         $result = trim((string) ($this->callResults[$key] ?? ''));
         $note = trim((string) ($this->callNotes[$key] ?? ''));
-        $allowed = $this->outcomesFor((string) $task['kind']);
 
-        if ($result === '' || ! in_array($result, $allowed, true)) {
+        if ($result === '' || ! in_array($result, $this->outcomesFor((string) $task['kind']), true)) {
             Notification::make()->title('Görüşme sonucunu seçin')->warning()->send();
             return;
         }
 
         $amount = $this->parseMoney($this->offerAmounts[$key] ?? null);
-        $needsAmount = in_array($result, ['Teklif verdi', 'Karşı teklif', 'Yeni teklif'], true);
 
-        if ($needsAmount && $amount === null) {
+        if (in_array($result, ['Teklif verdi', 'Karşı teklif', 'Yeni teklif'], true) && $amount === null) {
             Notification::make()->title('Teklif tutarını girin')->warning()->send();
             return;
         }
@@ -209,22 +170,13 @@ class EmlakIsMerkezi extends Page
             return;
         }
 
-        $entry = now()->format('d.m.Y H:i')
-            .' — ['.$task['property'].'] '
-            .$result;
-
-        if ($amount !== null) {
-            $entry .= ' — '.$this->moneyLabel($amount);
-        }
-
-        if ($note !== '') {
-            $entry .= ': '.$note;
-        }
+        $entry = now()->format('d.m.Y H:i').' — ['.$task['property'].'] '.$result;
+        $entry .= $amount !== null ? ' — '.$this->moneyLabel($amount) : '';
+        $entry .= $note !== '' ? ': '.$note : '';
 
         $conversation->forceFill([
             'notes' => trim(($conversation->notes ? $conversation->notes."\n\n" : '').$entry),
             'last_contact_at' => now(),
-            // The isolated real-estate product never schedules automatic follow-ups.
             'next_follow_up_at' => null,
         ])->save();
 
@@ -233,7 +185,6 @@ class EmlakIsMerkezi extends Page
             type: 'real_estate_operator_call',
             title: $this->activityTitle((string) $task['kind']),
             description: $entry,
-            oldValue: null,
             newValue: $result,
             performedBy: auth()->user(),
             meta: [
@@ -246,9 +197,7 @@ class EmlakIsMerkezi extends Page
                 'task_kind' => (string) $task['kind'],
                 'outcome' => $result,
                 'offer_amount' => $amount,
-                'match_score' => is_numeric($task['match_score'] ?? null)
-                    ? (int) $task['match_score']
-                    : null,
+                'match_score' => is_numeric($task['match_score'] ?? null) ? (int) $task['match_score'] : null,
                 'property_label' => (string) $task['property'],
                 'follow_up_scheduling_allowed' => false,
                 'automatic_outbound_allowed' => false,
@@ -256,12 +205,7 @@ class EmlakIsMerkezi extends Page
             ],
         );
 
-        $this->appendOperatorMemory(
-            seller: $seller,
-            task: $task,
-            result: $result,
-            amount: $amount,
-        );
+        $this->appendOperatorMemory($seller, $task, $result, $amount);
 
         $this->callNotes[$key] = '';
         $this->callResults[$key] = '';
@@ -270,19 +214,13 @@ class EmlakIsMerkezi extends Page
         Notification::make()->title('Görüşme ve sonraki aksiyon CRM’e kaydedildi')->success()->send();
     }
 
-    private function taskForPair(
-        RealEstateProfile $seller,
-        RealEstateProfile $investor,
-        array $candidate,
-        string $property,
-        Collection $history,
-    ): ?array {
+    private function taskForPair(RealEstateProfile $seller, RealEstateProfile $investor, array $candidate, string $property, Collection $history): ?array
+    {
         $pair = $seller->id.':'.$investor->id;
         $investorCall = $history->get($pair.':investor');
         $sellerOffer = $history->get($pair.':seller_offer');
         $investorCounter = $history->get($pair.':investor_counter');
         $sellerFinal = $history->get($pair.':seller_final');
-
         $investorOutcome = $this->activityOutcome($investorCall);
 
         if ($investorOutcome === 'Uygun değil') {
@@ -290,108 +228,56 @@ class EmlakIsMerkezi extends Page
         }
 
         if ($investorOutcome !== 'Teklif verdi') {
-            return $this->investorCallTask(
-                seller: $seller,
-                investor: $investor,
-                candidate: $candidate,
-                property: $property,
-                priorOutcome: $investorOutcome,
-            );
+            return $this->investorCallTask($seller, $investor, $candidate, $property, $investorOutcome);
         }
 
         $offerAmount = $this->activityAmount($investorCall);
         $sellerOutcome = $this->activityOutcome($sellerOffer);
 
-        if (
-            ! $sellerOffer
-            || $sellerOffer->id < $investorCall->id
-            || in_array($sellerOutcome, ['Ulaşılmadı', 'Tekrar ara'], true)
-        ) {
-            return $this->sellerOfferTask(
-                seller: $seller,
-                investor: $investor,
-                property: $property,
-                amount: $offerAmount,
-                matchScore: (int) ($candidate['match_score'] ?? 0),
-                sourceActivityId: $investorCall->id,
-            );
+        if (! $sellerOffer || $sellerOffer->id < $investorCall->id || in_array($sellerOutcome, ['Ulaşılmadı', 'Tekrar ara'], true)) {
+            return $this->sellerOfferTask($seller, $investor, $property, $offerAmount, (int) ($candidate['match_score'] ?? 0), $investorCall->id);
         }
 
-        if (in_array($sellerOutcome, ['Kabul etti', 'Reddetti'], true)) {
-            return null;
-        }
-
-        if ($sellerOutcome !== 'Karşı teklif') {
+        if (in_array($sellerOutcome, ['Kabul etti', 'Reddetti'], true) || $sellerOutcome !== 'Karşı teklif') {
             return null;
         }
 
         $counterAmount = $this->activityAmount($sellerOffer);
         $counterOutcome = $this->activityOutcome($investorCounter);
 
-        if (
-            ! $investorCounter
-            || $investorCounter->id < $sellerOffer->id
-            || in_array($counterOutcome, ['Ulaşılmadı', 'Tekrar ara'], true)
-        ) {
-            return $this->investorCounterTask(
-                seller: $seller,
-                investor: $investor,
-                property: $property,
-                amount: $counterAmount,
-                matchScore: (int) ($candidate['match_score'] ?? 0),
-                sourceActivityId: $sellerOffer->id,
-            );
+        if (! $investorCounter || $investorCounter->id < $sellerOffer->id || in_array($counterOutcome, ['Ulaşılmadı', 'Tekrar ara'], true)) {
+            return $this->investorCounterTask($seller, $investor, $property, $counterAmount, (int) ($candidate['match_score'] ?? 0), $sellerOffer->id);
         }
 
-        if ($counterOutcome === 'Reddetti') {
+        if ($counterOutcome === 'Reddetti' || ! in_array($counterOutcome, ['Kabul etti', 'Yeni teklif'], true)) {
             return null;
         }
 
-        if (! in_array($counterOutcome, ['Kabul etti', 'Yeni teklif'], true)) {
-            return null;
-        }
-
-        $finalAmount = $counterOutcome === 'Yeni teklif'
-            ? $this->activityAmount($investorCounter)
-            : $counterAmount;
+        $finalAmount = $counterOutcome === 'Yeni teklif' ? $this->activityAmount($investorCounter) : $counterAmount;
         $finalOutcome = $this->activityOutcome($sellerFinal);
 
-        if (
-            ! $sellerFinal
-            || $sellerFinal->id < $investorCounter->id
-            || in_array($finalOutcome, ['Ulaşılmadı', 'Tekrar ara'], true)
-        ) {
+        if (! $sellerFinal || $sellerFinal->id < $investorCounter->id || in_array($finalOutcome, ['Ulaşılmadı', 'Tekrar ara'], true)) {
             return $this->sellerFinalTask(
-                seller: $seller,
-                investor: $investor,
-                property: $property,
-                amount: $finalAmount,
-                matchScore: (int) ($candidate['match_score'] ?? 0),
-                sourceActivityId: $investorCounter->id,
-                acceptedCounter: $counterOutcome === 'Kabul etti',
+                $seller,
+                $investor,
+                $property,
+                $finalAmount,
+                (int) ($candidate['match_score'] ?? 0),
+                $investorCounter->id,
+                $counterOutcome === 'Kabul etti'
             );
         }
 
         return null;
     }
 
-    private function investorCallTask(
-        RealEstateProfile $seller,
-        RealEstateProfile $investor,
-        array $candidate,
-        string $property,
-        ?string $priorOutcome,
-    ): array {
+    private function investorCallTask(RealEstateProfile $seller, RealEstateProfile $investor, array $candidate, string $property, ?string $priorOutcome): array
+    {
         $conversation = $investor->conversation;
         $name = $conversation?->customer_name ?: 'Yatırımcı';
         $score = (int) ($candidate['match_score'] ?? 0);
-        $sellerData = is_array($seller->data) ? $seller->data : [];
-        $area = $this->firstValue($sellerData, [
-            'area_sqm',
-            'square_meters',
-            'property.area_sqm',
-            'size_sqm',
-        ]);
+        $data = is_array($seller->data) ? $seller->data : [];
+        $area = $this->firstValue($data, ['area_sqm', 'square_meters', 'property.area_sqm', 'size_sqm']);
         $interested = $priorOutcome === 'İlgileniyor';
 
         return [
@@ -399,7 +285,6 @@ class EmlakIsMerkezi extends Page
             'seller_profile_id' => $seller->id,
             'investor_profile_id' => $investor->id,
             'contact_profile_id' => $investor->id,
-            'target_conversation_id' => $conversation?->id,
             'target_name' => $name,
             'phone' => $conversation?->whatsapp_number,
             'property' => $property,
@@ -421,14 +306,8 @@ class EmlakIsMerkezi extends Page
         ];
     }
 
-    private function sellerOfferTask(
-        RealEstateProfile $seller,
-        RealEstateProfile $investor,
-        string $property,
-        ?int $amount,
-        int $matchScore,
-        int $sourceActivityId,
-    ): array {
+    private function sellerOfferTask(RealEstateProfile $seller, RealEstateProfile $investor, string $property, ?int $amount, int $matchScore, int $sourceActivityId): array
+    {
         $conversation = $seller->conversation;
         $investorName = $investor->conversation?->customer_name ?: 'yatırımcı';
         $amountLabel = $amount ? $this->moneyLabel($amount) : 'netleştirilmiş teklif';
@@ -438,7 +317,6 @@ class EmlakIsMerkezi extends Page
             'seller_profile_id' => $seller->id,
             'investor_profile_id' => $investor->id,
             'contact_profile_id' => $seller->id,
-            'target_conversation_id' => $conversation?->id,
             'target_name' => $conversation?->customer_name ?: 'Satıcı',
             'phone' => $conversation?->whatsapp_number,
             'property' => $property,
@@ -452,14 +330,8 @@ class EmlakIsMerkezi extends Page
         ];
     }
 
-    private function investorCounterTask(
-        RealEstateProfile $seller,
-        RealEstateProfile $investor,
-        string $property,
-        ?int $amount,
-        int $matchScore,
-        int $sourceActivityId,
-    ): array {
+    private function investorCounterTask(RealEstateProfile $seller, RealEstateProfile $investor, string $property, ?int $amount, int $matchScore, int $sourceActivityId): array
+    {
         $conversation = $investor->conversation;
         $amountLabel = $amount ? $this->moneyLabel($amount) : 'karşı teklif';
 
@@ -468,7 +340,6 @@ class EmlakIsMerkezi extends Page
             'seller_profile_id' => $seller->id,
             'investor_profile_id' => $investor->id,
             'contact_profile_id' => $investor->id,
-            'target_conversation_id' => $conversation?->id,
             'target_name' => $conversation?->customer_name ?: 'Yatırımcı',
             'phone' => $conversation?->whatsapp_number,
             'property' => $property,
@@ -482,15 +353,8 @@ class EmlakIsMerkezi extends Page
         ];
     }
 
-    private function sellerFinalTask(
-        RealEstateProfile $seller,
-        RealEstateProfile $investor,
-        string $property,
-        ?int $amount,
-        int $matchScore,
-        int $sourceActivityId,
-        bool $acceptedCounter,
-    ): array {
+    private function sellerFinalTask(RealEstateProfile $seller, RealEstateProfile $investor, string $property, ?int $amount, int $matchScore, int $sourceActivityId, bool $acceptedCounter): array
+    {
         $conversation = $seller->conversation;
         $amountLabel = $amount ? $this->moneyLabel($amount) : 'son teklif';
 
@@ -499,7 +363,6 @@ class EmlakIsMerkezi extends Page
             'seller_profile_id' => $seller->id,
             'investor_profile_id' => $investor->id,
             'contact_profile_id' => $seller->id,
-            'target_conversation_id' => $conversation?->id,
             'target_name' => $conversation?->customer_name ?: 'Satıcı',
             'phone' => $conversation?->whatsapp_number,
             'property' => $property,
@@ -507,9 +370,7 @@ class EmlakIsMerkezi extends Page
             'priority' => 400 + $matchScore,
             'match_score' => $matchScore,
             'offer_amount' => $amount,
-            'reason' => $acceptedCounter
-                ? 'Yatırımcı satıcının karşı teklifini kabul etti.'
-                : 'Yatırımcı '.$amountLabel.' seviyesinde yeni teklif verdi.',
+            'reason' => $acceptedCounter ? 'Yatırımcı satıcının karşı teklifini kabul etti.' : 'Yatırımcı '.$amountLabel.' seviyesinde yeni teklif verdi.',
             'action' => 'Satıcıyı ara ve son teyidi al. Onay olmadan işlemi kesinleşmiş sayma.',
             'script' => $acceptedCounter
                 ? 'Merhaba, '.$property.' için ilettiğiniz karşı teklif yatırımcı tarafından kabul edildi. İşleme devam etmek istediğinizi son kez teyit edebilir miyiz?'
@@ -517,11 +378,8 @@ class EmlakIsMerkezi extends Page
         ];
     }
 
-    private function sellerCompletionTask(
-        RealEstateProfile $seller,
-        string $property,
-        array $handoff,
-    ): array {
+    private function sellerCompletionTask(RealEstateProfile $seller, string $property, array $handoff): array
+    {
         $conversation = $seller->conversation;
 
         return [
@@ -529,7 +387,6 @@ class EmlakIsMerkezi extends Page
             'seller_profile_id' => $seller->id,
             'investor_profile_id' => null,
             'contact_profile_id' => $seller->id,
-            'target_conversation_id' => $conversation?->id,
             'target_name' => $conversation?->customer_name ?: 'Satıcı',
             'phone' => $conversation?->whatsapp_number,
             'property' => $property,
@@ -538,8 +395,7 @@ class EmlakIsMerkezi extends Page
             'match_score' => null,
             'offer_amount' => null,
             'reason' => 'Dosya henüz yatırımcı aramasına hazır değil.',
-            'action' => (string) ($handoff['recommended_operator_action']
-                ?? 'Satıcı dosyasındaki eksik bilgiyi tamamla.'),
+            'action' => (string) ($handoff['recommended_operator_action'] ?? 'Satıcı dosyasındaki eksik bilgiyi tamamla.'),
             'script' => 'Merhaba, taşınmaz dosyanızı yatırımcılarımıza doğru şekilde sunabilmemiz için eksik olan bilgiyi tamamlamak istiyoruz.',
         ];
     }
@@ -550,80 +406,49 @@ class EmlakIsMerkezi extends Page
             ->where('user_id', RealEstateIsolationService::USER_ID)
             ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
             ->where('type', 'real_estate_operator_call')
-            ->whereHas('conversationControl', function ($query): void {
-                $query
-                    ->where('user_id', RealEstateIsolationService::USER_ID)
-                    ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
-                    ->where('ai_bot_id', RealEstateIsolationService::BOT_ID);
-            })
+            ->whereHas('conversationControl', fn ($query) => $query
+                ->where('user_id', RealEstateIsolationService::USER_ID)
+                ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+                ->where('ai_bot_id', RealEstateIsolationService::BOT_ID))
             ->latest('id')
             ->limit(1000)
             ->get()
-            ->filter(fn (CrmActivity $activity): bool =>
-                is_array($activity->meta)
+            ->filter(fn (CrmActivity $activity): bool => is_array($activity->meta)
                 && is_numeric($activity->meta['seller_profile_id'] ?? null)
                 && is_numeric($activity->meta['investor_profile_id'] ?? null)
-                && is_string($activity->meta['task_kind'] ?? null)
-            )
-            ->unique(fn (CrmActivity $activity): string =>
-                (int) $activity->meta['seller_profile_id']
+                && is_string($activity->meta['task_kind'] ?? null))
+            ->unique(fn (CrmActivity $activity): string => (int) $activity->meta['seller_profile_id']
                 .':'.(int) $activity->meta['investor_profile_id']
-                .':'.$activity->meta['task_kind']
-            )
-            ->keyBy(fn (CrmActivity $activity): string =>
-                (int) $activity->meta['seller_profile_id']
+                .':'.$activity->meta['task_kind'])
+            ->keyBy(fn (CrmActivity $activity): string => (int) $activity->meta['seller_profile_id']
                 .':'.(int) $activity->meta['investor_profile_id']
-                .':'.$activity->meta['task_kind']
-            );
+                .':'.$activity->meta['task_kind']);
     }
 
-    private function appendOperatorMemory(
-        RealEstateProfile $seller,
-        array $task,
-        string $result,
-        ?int $amount,
-    ): void {
+    private function appendOperatorMemory(RealEstateProfile $seller, array $task, string $result, ?int $amount): void
+    {
         $data = is_array($seller->data) ? $seller->data : [];
-        $history = is_array($data['operator_negotiation_history'] ?? null)
-            ? $data['operator_negotiation_history']
-            : [];
-
+        $history = is_array($data['operator_negotiation_history'] ?? null) ? $data['operator_negotiation_history'] : [];
         $history[] = [
-            'investor_profile_id' => is_numeric($task['investor_profile_id'] ?? null)
-                ? (int) $task['investor_profile_id']
-                : null,
+            'investor_profile_id' => is_numeric($task['investor_profile_id'] ?? null) ? (int) $task['investor_profile_id'] : null,
             'contact_profile_id' => (int) $task['contact_profile_id'],
             'task_kind' => (string) $task['kind'],
             'outcome' => $result,
             'offer_amount' => $amount,
-            'match_score' => is_numeric($task['match_score'] ?? null)
-                ? (int) $task['match_score']
-                : null,
+            'match_score' => is_numeric($task['match_score'] ?? null) ? (int) $task['match_score'] : null,
             'recorded_at' => now()->toIso8601String(),
             'source' => 'operator_crm',
             'follow_up_scheduling_allowed' => false,
             'automatic_outbound_allowed' => false,
         ];
-
         $data['operator_negotiation_history'] = array_slice($history, -50);
         $seller->forceFill(['data' => $data])->saveQuietly();
     }
 
     private function propertySummary(array $data): string
     {
-        $location = $this->firstValue($data, [
-            'location',
-            'property.location',
-            'property_location',
-            'district',
-            'city',
-        ]);
-        $type = $this->firstValue($data, [
-            'property_type',
-            'property.type',
-            'asset_type',
-        ]) ?: 'taşınmaz';
-
+        $location = $this->firstValue($data, ['location', 'property.location', 'property_location', 'district', 'city']);
+        $type = $this->firstValue($data, ['property_type', 'property.type', 'asset_type']) ?: 'taşınmaz';
         return trim(($location ? $location.' ' : '').$type);
     }
 
@@ -631,31 +456,23 @@ class EmlakIsMerkezi extends Page
     {
         foreach ($keys as $key) {
             $value = data_get($data, $key);
-
             if (is_scalar($value) && trim((string) $value) !== '') {
                 return trim((string) $value);
             }
         }
-
         return null;
     }
 
     private function activityOutcome(?CrmActivity $activity): ?string
     {
         $outcome = $activity?->meta['outcome'] ?? null;
-
-        return is_string($outcome) && trim($outcome) !== ''
-            ? trim($outcome)
-            : null;
+        return is_string($outcome) && trim($outcome) !== '' ? trim($outcome) : null;
     }
 
     private function activityAmount(?CrmActivity $activity): ?int
     {
         $amount = $activity?->meta['offer_amount'] ?? null;
-
-        return is_numeric($amount) && (int) $amount > 0
-            ? (int) $amount
-            : null;
+        return is_numeric($amount) && (int) $amount > 0 ? (int) $amount : null;
     }
 
     private function parseMoney(mixed $value): ?int
@@ -663,14 +480,8 @@ class EmlakIsMerkezi extends Page
         if ($value === null || trim((string) $value) === '') {
             return null;
         }
-
         $digits = preg_replace('/[^0-9]/', '', (string) $value);
-
-        if (! is_string($digits) || $digits === '' || (int) $digits <= 0) {
-            return null;
-        }
-
-        return (int) $digits;
+        return is_string($digits) && $digits !== '' && (int) $digits > 0 ? (int) $digits : null;
     }
 
     private function moneyLabel(int $amount): string
