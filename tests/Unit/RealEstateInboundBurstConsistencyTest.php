@@ -40,6 +40,23 @@ class RealEstateInboundBurstConsistencyTest extends TestCase
         );
     }
 
+    public function test_webhook_marks_latest_arrival_before_queued_processing(): void
+    {
+        $source = file_get_contents(app_path(
+            'Http/Controllers/RealEstateWhatsAppWebhookController.php'
+        ));
+
+        $this->assertIsString($source);
+        $this->assertStringContainsString(
+            "'real-estate-latest-inbound:'",
+            $source
+        );
+        $this->assertStringContainsString(
+            "Cache::put(",
+            $source
+        );
+    }
+
     public function test_media_analysis_requires_full_image_location_scan(): void
     {
         $method = new ReflectionMethod(
