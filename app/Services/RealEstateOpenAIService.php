@@ -118,7 +118,55 @@ class RealEstateOpenAIService extends OpenAIService
             $answer = trim((string) ($response->outputText ?? ''));
 
             if ($answer !== '') {
-                return $answer;
+                $quality = app(RealEstateWhatsAppReplyQualityService::class);
+                $assessment = $quality->inspect($answer);
+
+                if ((bool) ($assessment['passed'] ?? false)) {
+                    return $answer;
+                }
+
+                try {
+                    $repairRequest = $request;
+                    $repairRequest['instructions'] .= "\n\n".$quality->repairInstructions($assessment);
+                    $repairResponse = app(RealEstateOpenAIClient::class)
+                        ->createResponse($aiBot, $repairRequest);
+
+                    app(AiUsageService::class)->record(
+                        response: $repairResponse,
+                        operation: 'real_estate_chat_reply_quality_repair',
+                        aiBot: $aiBot,
+                        meta: [
+                            'quality_reasons' => array_values(array_unique(array_merge(
+                                $assessment['blocking'] ?? [],
+                                $assessment['repair'] ?? [],
+                            ))),
+                            'single_repair_attempt' => true,
+                            'external_tools_allowed' => false,
+                            'dedicated_api_key' => true,
+                        ],
+                    );
+
+                    $repaired = trim((string) ($repairResponse->outputText ?? ''));
+                    $repairedAssessment = $quality->inspect($repaired);
+
+                    if ($repaired !== '' && ($repairedAssessment['blocking'] ?? []) === []) {
+                        return $repaired;
+                    }
+                } catch (Throwable $repairException) {
+                    Log::warning('REAL ESTATE AI QUALITY REPAIR FAILED', [
+                        'ai_bot_id' => $aiBot->id,
+                        'model' => $model,
+                        'quality_reasons' => array_values(array_unique(array_merge(
+                            $assessment['blocking'] ?? [],
+                            $assessment['repair'] ?? [],
+                        ))),
+                        'error_class' => $repairException::class,
+                    ]);
+                }
+
+                return ($assessment['blocking'] ?? []) !== []
+                    ? $quality->safeFallback()
+                    : $answer;
             }
 
             return 'Bu konuda sağlıklı bir cevap verebilmem için taşınmazın konumunu ve temel özelliklerini biraz daha netleştirelim.';
