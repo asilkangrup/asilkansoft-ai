@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ChatMessage;
+use App\Models\RealEstatePrivateMedia;
 use Exception;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
@@ -107,9 +108,24 @@ class EvolutionMediaService
 
         $path = 'real-estate-inbound/'.$message->id.'/original.'.$extensions[$mime];
 
-        if (! Storage::disk('local')->put($path, $bytes)) {
-            throw new Exception('WhatsApp medyası özel depolamaya yazılamadı.');
-        }
+        RealEstatePrivateMedia::query()->updateOrCreate(
+            ['chat_message_id' => $message->id],
+            [
+                'user_id' => RealEstateIsolationService::USER_ID,
+                'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+                'ai_bot_id' => RealEstateIsolationService::BOT_ID,
+                'real_estate_profile_id' => null,
+                'media_key' => null,
+                'mime_type' => $mime,
+                'size' => strlen($bytes),
+                'content_base64' => base64_encode($bytes),
+            ]
+        );
+
+        // The local file is only a disposable serving cache. The database
+        // copy above is the durable source so a Coolify redeploy cannot
+        // silently break the CRM gallery.
+        Storage::disk('local')->put($path, $bytes);
 
         $message->forceFill([
             'media_url' => 'private:'.$path,
