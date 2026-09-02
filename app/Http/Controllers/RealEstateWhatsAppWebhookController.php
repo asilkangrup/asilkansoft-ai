@@ -154,7 +154,7 @@ class RealEstateWhatsAppWebhookController extends Controller
             ], now()->addSeconds(45));
 
             ProcessRealEstateMediaBatch::dispatch($cacheKey, $generation)
-                ->delay(now()->addSeconds(7));
+                ->delay(now()->addSeconds(10));
 
             return response()->json([
                 'success' => true,
