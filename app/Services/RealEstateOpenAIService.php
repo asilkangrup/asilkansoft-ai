@@ -79,7 +79,7 @@ class RealEstateOpenAIService extends OpenAIService
             'model' => $model,
             'instructions' => $instructions,
             'input' => $input,
-            'max_output_tokens' => 1200,
+            'max_output_tokens' => 700,
         ];
 
         // The customer-facing chat call deliberately has no external tools.
@@ -93,7 +93,12 @@ class RealEstateOpenAIService extends OpenAIService
             || preg_match('/^o\d/i', $model)
         ) {
             $request['reasoning'] = [
-                'effort' => 'high',
+                // WhatsApp lead intake needs low latency and predictable token
+                // use. Deep valuation research runs in its dedicated service.
+                'effort' => trim((string) env(
+                    'REAL_ESTATE_CHAT_REASONING_EFFORT',
+                    'medium'
+                )),
             ];
         }
 
