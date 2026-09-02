@@ -8,6 +8,7 @@ use App\Models\ConversationControl;
 use App\Models\Organization;
 use App\Models\RealEstateProfile;
 use App\Models\User;
+use App\Services\RealEstateCommercialDealService;
 use App\Services\RealEstateOpportunityScoreService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -24,6 +25,7 @@ class RealEstateOpportunityScoreTest extends TestCase
         $profile = $this->profile($conversation, [
             'property_type'=>'arsa','location'=>'Marmaris','asking_price'=>2_700_000,
             'minimum_price'=>2_400_000,'urgency'=>'high',
+            'commercial_terms'=>['commission_rate_percent'=>3],
             'seller_motivation_intelligence'=>[
                 'motivation_level'=>'high_explicit',
                 'confidential_price_flexibility'=>['band'=>'moderate','confidential'=>true],
@@ -41,18 +43,27 @@ class RealEstateOpportunityScoreTest extends TestCase
         ], 95, 90);
 
         $summary = app(RealEstateOpportunityScoreService::class)->sync($profile);
+        $commercial = app(RealEstateCommercialDealService::class)->summaryForProfile($profile);
 
         $this->assertSame('actionable', $summary['state']);
         $this->assertContains($summary['grade'], ['exceptional','strong']);
         $this->assertGreaterThanOrEqual(65, $summary['score']);
         $this->assertSame(10, $summary['components']['urgency_priority']);
         $this->assertTrue($summary['metrics']['asking_within_investor_band']);
+        $this->assertSame('investor_ready', $commercial['state']);
+        $this->assertSame(2_600_000, $commercial['negotiation_target_min']);
+        $this->assertSame(2_800_000, $commercial['negotiation_target_max']);
+        $this->assertSame(81_000, $commercial['expected_commission_amount']);
+        $this->assertSame(0, $commercial['gap_to_investor_band_amount']);
+        $this->assertFalse($commercial['guardrails']['urgency_changes_target_price']);
+        $this->assertFalse($commercial['guardrails']['private_seller_floor_included']);
         $this->assertTrue($summary['guardrails']['urgency_may_increase_contact_priority']);
         $this->assertFalse($summary['guardrails']['urgency_may_change_valuation_or_offer']);
         $this->assertFalse($summary['guardrails']['seller_distress_may_be_used_for_pressure']);
         $this->assertFalse($summary['guardrails']['private_seller_floor_included']);
         $json = json_encode($summary);
         $this->assertStringNotContainsString('2400000', $json);
+        $this->assertStringNotContainsString('2400000', json_encode($commercial));
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
