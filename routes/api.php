@@ -4,6 +4,7 @@ use App\Http\Controllers\RealEstateWhatsAppWebhookController;
 use App\Http\Controllers\WhatsAppWebhookController;
 use App\Models\RealEstateNextBestActionEvent;
 use App\Models\RealEstateOutboundSafetyEvent;
+use App\Services\RealEstateChatBoundaryGuardService;
 use App\Services\RealEstateEvidenceLedgerService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
@@ -68,6 +69,8 @@ Route::prefix('real-estate')->group(function (): void {
         $mediaSafetyReady = Schema::hasTable('real_estate_media_processing_events')
             && class_exists(RealEstateMediaSafetyService::class)
             && class_exists(RealEstateMediaProcessingLedgerService::class);
+        $chatBoundary = app(RealEstateChatBoundaryGuardService::class)->snapshot();
+        $chatBoundaryReady = (bool) ($chatBoundary['ready'] ?? false);
 
         $snapshot['checks']['match_ledger_ready'] = $matchLedgerReady;
         $snapshot['match_ledger_telemetry_24h'] = $matchLedgerReady
@@ -214,6 +217,9 @@ Route::prefix('real-estate')->group(function (): void {
             ? app(RealEstateMediaProcessingLedgerService::class)->telemetry24h()
             : app(RealEstateMediaProcessingLedgerService::class)->emptyTelemetry();
 
+        $snapshot['checks']['chat_research_boundary_ready'] = $chatBoundaryReady;
+        $snapshot['chat_research_boundary'] = $chatBoundary;
+
         foreach ([
             'match_ledger_ready' => $matchLedgerReady,
             'evidence_ledger_ready' => $evidenceLedgerReady,
@@ -221,6 +227,7 @@ Route::prefix('real-estate')->group(function (): void {
             'next_best_action_orchestrator_ready' => $nextBestActionReady,
             'valuation_research_ledger_ready' => $valuationResearchLedgerReady,
             'media_analysis_firewall_ready' => $mediaSafetyReady,
+            'chat_research_boundary_ready' => $chatBoundaryReady,
         ] as $check => $ready) {
             if ($ready) {
                 continue;
