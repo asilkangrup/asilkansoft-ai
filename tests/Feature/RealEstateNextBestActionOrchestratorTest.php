@@ -68,7 +68,7 @@ class RealEstateNextBestActionOrchestratorTest extends TestCase
     {
         $bot = $this->seedIsolatedAccount();
         $conversation = $this->conversation($bot, 37, 'nba-seller-valuation');
-        $profile = $this->profileQuietly($conversation, 'seller', [
+        $this->profileQuietly($conversation, 'seller', [
             'property_type' => 'arsa',
             'city' => 'Muğla',
             'district' => 'Marmaris',
@@ -135,7 +135,11 @@ class RealEstateNextBestActionOrchestratorTest extends TestCase
         $this->assertSame('high', $plan['priority']);
         $this->assertTrue($plan['blocking']);
         $this->assertNotNull($plan['single_question']);
-        $this->assertStringContainsString('ilçe', mb_strtolower($plan['single_question']));
+        $this->assertStringContainsString(
+            'yatırım hedefini',
+            mb_strtolower($plan['single_question'])
+        );
+        $this->assertContains('missing_investment_goal', $plan['reason_codes']);
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
@@ -143,7 +147,7 @@ class RealEstateNextBestActionOrchestratorTest extends TestCase
     {
         $bot = $this->seedIsolatedAccount();
         $conversation = $this->conversation($bot, 37, 'nba-seller-match');
-        $profile = $this->profileQuietly($conversation, 'seller', [
+        $this->profileQuietly($conversation, 'seller', [
             'property_type' => 'arsa',
             'city' => 'Muğla',
             'district' => 'Marmaris',
