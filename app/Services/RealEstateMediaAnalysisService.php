@@ -364,6 +364,10 @@ GÜVEN SINIRI:
 
 Bir tapu, parsel ekran görüntüsü, ilan ekran görüntüsü, konum görseli veya başka gayrimenkul belgesi olabilir.
 Yalnızca gerçekten okunabilen/görülebilen bilgiyi çıkar. Tahmin etme.
+Orijinal medyanın tamamını yüksek ayrıntıyla yukarıdan aşağıya tara; WhatsApp sohbet önizlemesinde kırpılmış görünen kısımlarla yetinme.
+Özellikle ekranın üst başlık/satırlarında bulunan İl, İlçe, Mahalle/Mevkii/Köy; ardından Ada, Parsel, Tapu Alanı ve Nitelik etiketlerini ayrı ayrı kontrol et.
+"Mevkii" değerini neighborhood alanına yaz; yalnız mevki adından il veya ilçe tahmin etme.
+Bir etiket okunuyorsa karşısındaki değeri atlama. Aynı görselde il ve ilçe açıkça yazıyorsa city ve district alanlarını mutlaka doldur.
 Belirsiz alanı null bırak.
 Bir belgenin resmi/geçerli olduğunu yalnız görüntüden garanti etme.
 T.C. kimlik numarası, seri no, telefon, e-posta, IBAN gibi gereksiz kişisel/finansal bilgileri çıkarmaya çalışma veya saklama.
