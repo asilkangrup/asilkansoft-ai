@@ -9,6 +9,7 @@ use App\Services\CrmConversationSummaryService;
 use App\Services\CrmDailySalesService;
 use App\Services\CrmForecastService;
 use App\Services\CrmRevenueService;
+use App\Services\RealEstateIsolationService;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -28,6 +29,8 @@ class Musteriler extends Page
 
     protected static ?int $navigationSort = 31;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'CRM';
+
     /*
     |--------------------------------------------------------------------------
     | SADECE ANA YÖNETİCİ
@@ -36,7 +39,8 @@ class Musteriler extends Page
 
     public static function canAccess(): bool
     {
-        return (bool) auth()->user()?->is_admin;
+        return (bool) auth()->user()?->is_admin
+            || app(RealEstateIsolationService::class)->currentOperatorHasAccess();
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -225,15 +229,17 @@ class Musteriler extends Page
 
     protected function customerQuery(): Builder
     {
-        return ConversationControl::query()
-            ->with([
-                'aiBot',
-                'assignedUser',
-            ])
-            ->where(
-                'user_id',
-                auth()->id()
-            );
+        $query = ConversationControl::query()
+            ->with(['aiBot', 'assignedUser']);
+
+        if (app(RealEstateIsolationService::class)->currentOperatorHasAccess()) {
+            return $query
+                ->where('user_id', RealEstateIsolationService::USER_ID)
+                ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+                ->where('ai_bot_id', RealEstateIsolationService::BOT_ID);
+        }
+
+        return $query->where('user_id', auth()->id());
     }
 
     /*
