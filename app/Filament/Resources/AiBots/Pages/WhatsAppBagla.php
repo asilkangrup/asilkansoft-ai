@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\AiBots\Pages;
 
 use App\Filament\Resources\AiBots\AiBotResource;
+use App\Services\RealEstateIsolationService;
+use App\Services\RealEstateWhatsAppProvisioningService;
 use App\Services\WhatsAppService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
@@ -78,24 +80,15 @@ class WhatsAppBagla extends Page
                     'whatsapp_qr' => is_string($qrCode) ? $qrCode : null,
                 ]);
 
-                $webhookUrl = rtrim((string) config('app.url'), '/')
-                    . '/api/whatsapp/webhook';
-
-                $whatsAppService->setWebhook(
-                    $instanceName,
-                    $webhookUrl
-                );
+                $this->configureWebhook($whatsAppService, $instanceName);
 
                 $this->record->refresh();
             }
 
             if (filled($this->record->whatsapp_instance)) {
-                $webhookUrl = rtrim((string) config('app.url'), '/')
-                    . '/api/whatsapp/webhook';
-
-                $whatsAppService->setWebhook(
-                    $this->record->whatsapp_instance,
-                    $webhookUrl
+                $this->configureWebhook(
+                    $whatsAppService,
+                    $this->record->whatsapp_instance
                 );
             }
 
@@ -134,5 +127,30 @@ class WhatsAppBagla extends Page
                 ->persistent()
                 ->send();
         }
+    }
+
+    private function configureWebhook(
+        WhatsAppService $whatsAppService,
+        string $instanceName
+    ): void {
+        $baseUrl = rtrim((string) config('app.url'), '/');
+        $isIsolatedRealEstateBot =
+            (int) $this->record->id === RealEstateIsolationService::BOT_ID
+            && (int) $this->record->user_id === RealEstateIsolationService::USER_ID
+            && trim($instanceName) === RealEstateIsolationService::INSTANCE;
+
+        if ($isIsolatedRealEstateBot) {
+            app(RealEstateWhatsAppProvisioningService::class)->configureWebhook(
+                $instanceName,
+                $baseUrl.'/api/real-estate/whatsapp/webhook'
+            );
+
+            return;
+        }
+
+        $whatsAppService->setWebhook(
+            $instanceName,
+            $baseUrl.'/api/whatsapp/webhook'
+        );
     }
 }
