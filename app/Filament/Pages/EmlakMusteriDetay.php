@@ -91,6 +91,7 @@ class EmlakMusteriDetay extends Page
         }
 
         $data = is_array($profile->data) ? $profile->data : [];
+        $propertyPhotoGroup = $this->propertyPhotoGroupLabel($data);
         $findings = collect(is_array($data['media_findings'] ?? null) ? $data['media_findings'] : [])
             ->filter(fn ($finding): bool => is_array($finding) && filled($finding['message_id'] ?? null))
             ->keyBy(fn (array $finding): string => trim((string) $finding['message_id']));
@@ -105,7 +106,7 @@ class EmlakMusteriDetay extends Page
             ->whereIn('message_type', ['image', 'document'])
             ->latest('id')
             ->get()
-            ->map(function (ChatMessage $message) use ($findings): ?array {
+            ->map(function (ChatMessage $message) use ($findings, $propertyPhotoGroup): ?array {
                 $finding = $findings->get(trim((string) $message->whatsapp_message_id), []);
                 $category = (string) ($finding['media_category'] ?? '');
 
@@ -115,7 +116,7 @@ class EmlakMusteriDetay extends Page
 
                 $storedUrl = trim((string) $message->media_url);
                 $url = str_starts_with($storedUrl, 'private:real-estate-inbound/'.$message->id.'/')
-                    ? route('real-estate.private-inbound-media', ['message' => $message->id])
+                    ? route('real-estate.private-inbound-media', ['message' => $message->id], false)
                     : $storedUrl;
 
                 if (! preg_match('/^https?:\/\//i', $url)) {
@@ -127,7 +128,7 @@ class EmlakMusteriDetay extends Page
                     'url' => $url,
                     'category' => $category,
                     'group' => match ($category) {
-                        'property_photo' => 'Arsa Fotoğrafları',
+                        'property_photo' => $propertyPhotoGroup,
                         'listing' => 'İlan Görselleri',
                         default => 'Tapu / Parsel Belgeleri',
                     },
@@ -143,15 +144,15 @@ class EmlakMusteriDetay extends Page
 
         $manualMedia = collect(is_array($data['manual_media'] ?? null) ? $data['manual_media'] : [])
             ->filter(fn ($item): bool => is_array($item) && filled($item['id'] ?? null))
-            ->map(function (array $item) use ($profile): array {
+            ->map(function (array $item) use ($profile, $propertyPhotoGroup): array {
                 $category = (string) ($item['category'] ?? 'other');
 
                 return [
                     'id' => (string) $item['id'],
-                    'url' => route('real-estate.private-media', ['profile'=>$profile->id, 'media'=>$item['id']]),
+                    'url' => route('real-estate.private-media', ['profile'=>$profile->id, 'media'=>$item['id']], false),
                     'category' => $category,
                     'group' => match ($category) {
-                        'property_photo' => 'Arsa Fotoğrafları',
+                        'property_photo' => $propertyPhotoGroup,
                         'listing' => 'İlan Görselleri',
                         default => 'Tapu / Parsel Belgeleri',
                     },
@@ -166,7 +167,7 @@ class EmlakMusteriDetay extends Page
         $grouped = $whatsappMedia->merge($manualMedia)->groupBy('group')->all();
 
         return [
-            'Arsa Fotoğrafları' => $grouped['Arsa Fotoğrafları'] ?? collect(),
+            $propertyPhotoGroup => $grouped[$propertyPhotoGroup] ?? collect(),
             'Tapu / Parsel Belgeleri' => $grouped['Tapu / Parsel Belgeleri'] ?? collect(),
             'İlan Görselleri' => $grouped['İlan Görselleri'] ?? collect(),
         ];
@@ -573,6 +574,22 @@ class EmlakMusteriDetay extends Page
             'accepted_real_offer' => 'Gerçek yatırımcı teklifini kabul etti',
             'rejected_real_offer' => 'Gerçek yatırımcı teklifini reddetti',
             default => 'Görüşme sonucu',
+        };
+    }
+
+    private function propertyPhotoGroupLabel(array $data): string
+    {
+        $type = Str::lower(trim((string) ($data['property_type'] ?? data_get($data, 'property.type', ''))));
+
+        return match (true) {
+            str_contains($type, 'daire') => 'Daire Fotoğrafları',
+            str_contains($type, 'villa') => 'Villa Fotoğrafları',
+            str_contains($type, 'konut'), str_contains($type, 'ev') => 'Konut Fotoğrafları',
+            str_contains($type, 'dükkan'), str_contains($type, 'işyeri'),
+            str_contains($type, 'ticari') => 'İşyeri Fotoğrafları',
+            str_contains($type, 'arsa'), str_contains($type, 'tarla'),
+            str_contains($type, 'arazi') => 'Arsa Fotoğrafları',
+            default => 'Taşınmaz Fotoğrafları',
         };
     }
 
