@@ -376,6 +376,13 @@ class RealEstateWhatsAppInboundService
         }
 
         if ($answer === null) {
+            $answer = $this->deterministicSellerValuationNegotiationAnswer(
+                conversation: $conversation,
+                message: $message,
+            );
+        }
+
+        if ($answer === null) {
             $answer = $this->deterministicSellerPriceSteeringAnswer(
                 conversation: $conversation,
                 message: $message,
@@ -596,6 +603,163 @@ class RealEstateWhatsAppInboundService
             .' TL.'
             ."\n"
             .'Acil nakde çevirmek isterseniz yatırımcılardan teklifleri toplayıp size iletebilirim.';
+    }
+
+    private function deterministicSellerValuationNegotiationAnswer(
+        ConversationControl $conversation,
+        string $message,
+    ): ?string {
+        $normalized = $this->normalizeTurkishText($message);
+        $valuationIntent = false;
+
+        foreach ([
+            'emsal', 'fiyat sizce', 'uygun mu', 'uygunmu', 'pahali mi',
+            'siz bakin', 'siz arastirin', 'ada parselden bakin',
+            'kaca gider', 'kaca satilir', 'ne kadar eder', 'fiyat belirleyin',
+            'siz soyleyin', 'ona gore konusalim',
+        ] as $signal) {
+            if (str_contains($normalized, $signal)) {
+                $valuationIntent = true;
+                break;
+            }
+        }
+
+        if (! $valuationIntent) {
+            return null;
+        }
+
+        $profile = RealEstateProfile::query()
+            ->isolatedProduction()
+            ->where('conversation_control_id', $conversation->id)
+            ->first();
+
+        if (! $profile || $profile->profile_type !== 'seller') {
+            return null;
+        }
+
+        $valuation = app(RealEstateValuationFreshnessService::class)
+            ->valuationForDecision($profile);
+
+        $realisticMin = $this->positivePrice($valuation['realistic_sale_min'] ?? null)
+            ?? $this->positivePrice($valuation['quick_sale_min'] ?? null);
+        $realisticMax = $this->positivePrice($valuation['realistic_sale_max'] ?? null)
+            ?? $this->positivePrice($valuation['quick_sale_max'] ?? null);
+        $investorMin = $this->positivePrice($valuation['investor_buy_min'] ?? null);
+        $investorMax = $this->positivePrice($valuation['investor_buy_max'] ?? null);
+
+        if ($realisticMin === null || $realisticMax === null) {
+            return null;
+        }
+
+        if ($realisticMin > $realisticMax) {
+            [$realisticMin, $realisticMax] = [$realisticMax, $realisticMin];
+        }
+
+        $commercialCap = round($realisticMax * 0.80 / 1000) * 1000;
+        $investorMax = $investorMax === null
+            ? $commercialCap
+            : min($investorMax, $commercialCap);
+        $investorMin ??= round($investorMax * 0.90 / 1000) * 1000;
+
+        if ($investorMin > $investorMax) {
+            $investorMin = round($investorMax * 0.90 / 1000) * 1000;
+        }
+
+        $asking = $this->confirmedSellerAskingPrice($conversation, $profile);
+        $confidence = (int) ($valuation['confidence_score'] ?? 0);
+        $prefix = $confidence < 65 ? 'Yaklaşık emsal çalışmasına göre ' : '';
+
+        $answer = $prefix.'gerçekçi satış seviyesi '
+            .$this->formatTl($realisticMin).'–'.$this->formatTl($realisticMax)
+            .' TL; hızlı nakit yatırımcı seviyesi '
+            .$this->formatTl($investorMin).'–'.$this->formatTl($investorMax)
+            .' TL civarında görünüyor.';
+
+        if ($asking !== null && $asking > $realisticMax) {
+            $answer .= "\n".$this->formatTl($asking)
+                .' TL beklentiniz bu emsallere göre yüksek kalıyor ve yatırımcı dönüşünü zorlaştırır.';
+        }
+
+        $negotiationTarget = round(
+            (($investorMin + $investorMax) / 2) / 50000
+        ) * 50000;
+
+        return $answer."\nHızlı ve gerçek bir yatırımcı teklifi için "
+            .$this->formatTl($negotiationTarget)
+            .' TL civarına yaklaşma payınız var mı?';
+    }
+
+    private function confirmedSellerAskingPrice(
+        ConversationControl $conversation,
+        RealEstateProfile $profile,
+    ): ?float {
+        $data = is_array($profile->data) ? $profile->data : [];
+        $stored = $this->positivePrice($data['asking_price'] ?? null);
+
+        if ($stored !== null) {
+            return $stored;
+        }
+
+        $messages = ChatMessage::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('session_id', $conversation->session_id)
+            ->latest('id')
+            ->limit(20)
+            ->get()
+            ->reverse()
+            ->values();
+
+        foreach ($messages as $index => $chatMessage) {
+            if ($chatMessage->sender_type !== 'ai') {
+                continue;
+            }
+
+            $text = trim((string) $chatMessage->message);
+            $normalized = $this->normalizeTurkishText($text);
+
+            if (
+                ! str_contains($normalized, 'tl mi')
+                && ! str_contains($normalized, 'rakam')
+            ) {
+                continue;
+            }
+
+            if (! preg_match('/(\\d{1,3}(?:\\.\\d{3})+)\\s*TL/iu', $text, $match)) {
+                continue;
+            }
+
+            $next = $messages->get($index + 1);
+            if (! $next || $next->sender_type !== 'customer') {
+                continue;
+            }
+
+            $confirmation = $this->normalizeTurkishText(
+                trim((string) $next->message)
+            );
+
+            if (
+                $confirmation === 'evet'
+                || str_starts_with($confirmation, 'evet ')
+                || $confirmation === 'dogru'
+                || $confirmation === 'aynen'
+            ) {
+                return (float) str_replace('.', '', $match[1]);
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeTurkishText(string $value): string
+    {
+        return strtolower(strtr(trim($value), [
+            'İ' => 'i', 'I' => 'i', 'ı' => 'i',
+            'Ş' => 's', 'ş' => 's', 'Ğ' => 'g', 'ğ' => 'g',
+            'Ü' => 'u', 'ü' => 'u', 'Ö' => 'o', 'ö' => 'o',
+            'Ç' => 'c', 'ç' => 'c',
+        ]));
     }
 
     private function deterministicSellerPriceSteeringAnswer(
