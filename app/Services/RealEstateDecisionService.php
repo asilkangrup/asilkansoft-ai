@@ -272,14 +272,14 @@ PROMPT;
         if ($asking !== null && $marketMax !== null && $asking > ($marketMax * 1.12)) {
             return [
                 'reframe_high_ask',
-                'Fiyat beklentisini tek bir ilana değil güncel emsal aralığına dayandırarak yeniden çerçevele; satıcının esnekliğini doğal biçimde ölç.',
+                'Satıcıya fiyat yükseltme veya maksimum kapanış stratejisi verme. Güncel emsaller destekliyorsa yüksek fiyatlarda yatırımcıların daha seçici olabileceğini kısa ve ölçülü anlat; hızlı nakit istiyorsa dosyayı yatırımcı teklifine hazırla ve pazarlık esnekliğini doğal biçimde ölç.',
             ];
         }
 
         if ($asking !== null && $investorMax !== null && $asking > $investorMax) {
             return [
                 'negotiate_to_investor_range',
-                'Satıcıya piyasa, hızlı satış ve yatırımcı alım aralığını şeffaf biçimde ayır. Yatırımcıya sunulabilir gerçek bir fırsat oluşturmak için fiyatın yatırımcı alım bandına yaklaşması gerektiğini emsal ve hız/fiyat dengesiyle anlat; makul bir karşı teklif aralığı öner ve pazarlık esnekliğini ölç. Aciliyet üzerinden baskı kurma, sahte alıcı/teklif kullanma.',
+                'Satıcıya uzun fiyat/kapanış danışmanlığı verme. Yatırımcı alım seviyesinin hızlı nakit karşılığı olduğunu kısa ve şeffaf anlat; yüksek fiyatlarda yatırımcı dönüşünün zorlaşabileceğini yalnız veri destekliyorsa belirt. Hızlı nakit istiyorsa gerekli taşınmaz bilgileri ve fotoğrafları tamamlayıp gerçek yatırımcı tekliflerini topla. Aciliyet üzerinden baskı kurma, sahte alıcı/teklif veya uydurma piyasa kötülüğü kullanma.',
             ];
         }
 
@@ -293,7 +293,7 @@ PROMPT;
         if ($this->hasValuation($valuation)) {
             return [
                 'protect_value',
-                'Piyasa, hızlı satış ve yatırımcı alım aralıklarını birbirinden ayır; satıcıya hangi hız/fiyat dengesini tercih ettiğini netleştir.',
+                'Gerçekçi satış seviyesi ile hızlı nakit yatırımcı seviyesini kısa biçimde ayır. Satıcı hızlı nakit istiyorsa dosyayı yatırımcı teklifine hazırla; gereksiz ilan fiyatı veya maksimum kapanış stratejisi verme.',
             ];
         }
 

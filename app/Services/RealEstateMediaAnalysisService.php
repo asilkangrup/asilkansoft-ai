@@ -370,6 +370,7 @@ T.C. kimlik numarası, seri no, telefon, e-posta, IBAN gibi gereksiz kişisel/fi
 
 SADECE şu JSON yapısını döndür:
 {
+  "media_category": null,
   "document_type": null,
   "summary": null,
   "property_type": null,
@@ -388,6 +389,7 @@ SADECE şu JSON yapısını döndür:
   "confidence_score": 0
 }
 
+media_category yalnızca title_deed, parcel_document, listing, property_photo, location_map veya other olsun. property_photo yalnız görselin ana konusu gerçek taşınmaz/arsa/arazi fotoğrafıysa kullan; ilan/tapu/parsel ekran görüntüsünü property_photo sayma.
 confidence_score 0-100 arası olsun.
 summary en fazla 3 kısa cümle olsun ve kişi adı/iletişim/kimlik/hesap bilgisi içerme.
 warnings yalnızca gerçekten önemli belirsizlik/riskleri içersin ve kişisel veri tekrar etme.
@@ -406,6 +408,9 @@ PROMPT;
             'mime_type' => app(RealEstateMediaSafetyService::class)->normalizeMime(
                 (string) ($mediaContext['mime_type'] ?? '')
             ) ?: null,
+            'media_category' => $this->normalizeMediaCategory(
+                $data['media_category'] ?? null
+            ),
             'document_type' => $this->nullable($data['document_type'] ?? null),
             'summary' => $this->nullable($data['summary'] ?? null),
             'property_type' => $this->nullable($data['property_type'] ?? null),
@@ -424,6 +429,20 @@ PROMPT;
             'confidence_score' => max(0, min(100, (int) ($data['confidence_score'] ?? 0))),
             'analyzed_at' => now()->toIso8601String(),
         ];
+    }
+
+    private function normalizeMediaCategory(mixed $value): ?string
+    {
+        $value = strtolower(trim((string) ($value ?? '')));
+
+        return in_array($value, [
+            'title_deed',
+            'parcel_document',
+            'listing',
+            'property_photo',
+            'location_map',
+            'other',
+        ], true) ? $value : null;
     }
 
     private function nullable(mixed $value): ?string

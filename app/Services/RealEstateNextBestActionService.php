@@ -154,6 +154,14 @@ PROMPT;
         $missing = $this->stringList(
             $decision['missing_critical_data'] ?? []
         );
+        $offerPacket = app(RealEstateSellerOfferPacketService::class)
+            ->summaryForProfile($profile);
+        $offerMissing = $this->stringList(
+            $offerPacket['missing_critical_for_offer'] ?? []
+        );
+        $offerQuestion = $this->cleanQuestion(
+            $offerPacket['recommended_next_request'] ?? null
+        );
 
         // A material verification conflict is the strongest safety signal in
         // the pipeline. It must never be overwritten by a softer discovery
@@ -182,6 +190,20 @@ PROMPT;
                         $missing
                     ),
                 ])),
+                matchCount: $matchCount,
+                stage: $stage,
+            );
+        }
+
+        if (in_array('property_identity', $offerMissing, true)) {
+            return $this->payload(
+                actionCode: 'complete_seller_offer_packet',
+                priority: 'high',
+                actionText: $offerQuestion
+                    ?? 'Yatırımcı ön teklifi için taşınmaz kimliğini konum linki veya ada/parsel ile tamamla.',
+                singleQuestion: $offerQuestion,
+                blocking: true,
+                reasonCodes: ['seller_offer_packet_incomplete', 'missing_property_identity'],
                 matchCount: $matchCount,
                 stage: $stage,
             );
@@ -232,8 +254,28 @@ PROMPT;
             );
         }
 
+        if ($offerMissing !== []) {
+            return $this->payload(
+                actionCode: 'complete_seller_offer_packet',
+                priority: 'medium',
+                actionText: $offerQuestion
+                    ?? 'Satıcı dosyasını yatırımcı ön teklifine hazırlamak için kalan en kritik taşınmaz bilgisini veya gerçek mülk fotoğrafını iste.',
+                singleQuestion: $offerQuestion,
+                blocking: false,
+                reasonCodes: array_values(array_unique([
+                    'seller_offer_packet_incomplete',
+                    ...array_map(
+                        fn (string $field): string => 'offer_missing_'.$this->code($field),
+                        $offerMissing
+                    ),
+                ])),
+                matchCount: $matchCount,
+                stage: $stage,
+            );
+        }
+
         // Optional conversation-completeness questions are allowed only after
-        // hard valuation and verification guards are clear.
+        // hard valuation, verification and investor-offer-packet guards are clear.
         if ($sellerQuestion !== null) {
             return $this->payload(
                 actionCode: 'complete_seller_discovery',
