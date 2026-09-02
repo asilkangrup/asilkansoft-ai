@@ -90,6 +90,22 @@ Artisan::command(
 
 /*
 |--------------------------------------------------------------------------
+| ISOLATED EMLAK AI OUTBOUND RECONCILIATION WATCHDOG
+|--------------------------------------------------------------------------
+|
+| Network-boundary rows older than two minutes are checked read-only against
+| the fresh Evolution instance. An exact provider record is confirmed as sent;
+| otherwise `sending` is quarantined as uncertain. This command never calls
+| sendText and therefore cannot create a duplicate customer reply.
+|
+*/
+
+Schedule::command('real-estate:reconcile-outbound --limit=10 --age=120')
+    ->everyMinute()
+    ->withoutOverlapping(5);
+
+/*
+|--------------------------------------------------------------------------
 | ISOLATED EMLAK AI UNANSWERED INBOUND WATCHDOG
 |--------------------------------------------------------------------------
 |
