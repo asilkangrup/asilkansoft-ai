@@ -12,7 +12,7 @@
     <section class="fo-hero">
         <small>DOĞRULANMIŞ AVANTAJ · DOSYA KALİTESİ · GERÇEK YATIRIMCI</small>
         <h1>Fırsat Motoru</h1>
-        <p>Satıcının aciliyetine değil, doğrulanmış fiyat avantajına, güvenli dosyaya ve gerçek yatırımcı eşleşmesine göre hangi portföyle önce ilgilenmen gerektiğini gösterir.</p>
+        <p>Acil satıcıları iletişim önceliğinde yükseltir; fiyat avantajı, dosya güvenliği ve gerçek yatırımcı eşleşmesiyle birlikte sıradaki doğru aksiyonu gösterir.</p>
     </section>
 
     <div class="fo-stats">
@@ -24,7 +24,7 @@
 
     <div class="fo-tools">
         <div class="fo-filters">
-            @foreach(['actionable'=>'Hazır fırsatlar','preparation'=>'Hazırlanacak','blocked'=>'Blokeli','all'=>'Tümü'] as $key=>$label)
+            @foreach(['priority'=>'Öncelik listesi','actionable'=>'Hazır fırsatlar','preparation'=>'Eksik belge / hazırlık','blocked'=>'Blokeli','all'=>'Tümü'] as $key=>$label)
                 <button class="fo-filter {{ $filter===$key?'active':'' }}" wire:click="setFilter('{{ $key }}')">{{ $label }}</button>
             @endforeach
         </div>

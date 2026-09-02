@@ -3,8 +3,8 @@
 .ed{--ink:#122018;--muted:#718078;--line:#e4ebe7;max-width:1000px;margin:auto}.ed-back{display:inline-flex;margin-bottom:12px;color:#087344;text-decoration:none;font-size:12px;font-weight:900}.ed-head{padding:21px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(135deg,#fff,#f3fcf7)}.ed-role{font-size:10px;font-weight:900;color:#087344}.ed-name{margin:5px 0 2px;font-size:25px;font-weight:900;color:var(--ink)}.ed-contact{font-size:13px;color:var(--muted)}.ed-call{display:inline-flex;margin-top:12px;padding:10px 13px;border-radius:11px;background:#eafaf2;color:#087344;text-decoration:none;font-size:12px;font-weight:900}
 .ed-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.ed-card{padding:17px;border:1px solid var(--line);border-radius:18px;background:#fff}.ed-card h2{margin:0 0 12px;font-size:14px;color:var(--ink)}.ed-data{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ed-data div{padding:10px;border-radius:11px;background:#f7faf8}.ed-data small{display:block;font-size:9px;font-weight:900;color:var(--muted)}.ed-data b{display:block;margin-top:4px;font-size:12px;color:#35463d}.ed-action{padding:12px;border-left:3px solid #22c77a;border-radius:10px;background:#f4fbf7;font-size:12px;line-height:1.5;color:#405149}
 .ed-notes{white-space:pre-wrap;font-size:12px;line-height:1.55;color:#4b5a52;max-height:180px;overflow:auto}.ed-noteform{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.ed-noteform textarea{min-height:70px;padding:11px;border:1px solid var(--line);border-radius:12px;resize:vertical}.ed-noteform button{padding:0 15px;border:0;border-radius:12px;background:var(--ink);color:#fff;font-weight:900}
-.ed-timeline{display:grid;gap:8px}.ed-event{padding:11px;border-radius:12px;background:#f7faf8}.ed-event b{font-size:11px;color:#35463d}.ed-event p{margin:4px 0;font-size:11px;line-height:1.45;color:#536159}.ed-event small{font-size:9px;color:var(--muted)}
-@media(max-width:720px){.ed-grid{grid-template-columns:1fr}.ed-name{font-size:22px}.ed-card{padding:15px}.ed-noteform{grid-template-columns:1fr}.ed-noteform textarea{font-size:16px}.ed-noteform button{height:44px}.ed-call{width:100%;justify-content:center}}
+.ed-gallery-card{grid-column:1/-1}.ed-gallery-groups{display:grid;gap:15px}.ed-gallery-group h3{margin:0 0 8px;font-size:11px;color:#536159}.ed-gallery{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.ed-media{display:block;overflow:hidden;border:1px solid var(--line);border-radius:13px;background:#f7faf8;color:#315b9c;text-decoration:none}.ed-media img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover}.ed-media-file{display:grid;place-items:center;aspect-ratio:4/3;padding:12px;text-align:center;font-size:11px;font-weight:900}.ed-media-meta{display:block;padding:7px;font-size:9px;color:var(--muted)}.ed-timeline{display:grid;gap:8px}.ed-event{padding:11px;border-radius:12px;background:#f7faf8}.ed-event b{font-size:11px;color:#35463d}.ed-event p{margin:4px 0;font-size:11px;line-height:1.45;color:#536159}.ed-event small{font-size:9px;color:var(--muted)}
+@media(max-width:720px){.ed-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.ed-grid{grid-template-columns:1fr}.ed-name{font-size:22px}.ed-card{padding:15px}.ed-noteform{grid-template-columns:1fr}.ed-noteform textarea{font-size:16px}.ed-noteform button{height:44px}.ed-call{width:100%;justify-content:center}}
 </style>
 <div class="ed">
     <a class="ed-back" href="{{ $this->backUrl() }}">← Emlak CRM’e dön</a>
@@ -35,6 +35,31 @@
             <h2>Sıradaki Aksiyon</h2>
             <div class="ed-action">{{ $this->details['next_action'] }}</div>
         </section>
+
+        @if(count($this->mediaGallery))
+        <section class="ed-card ed-gallery-card">
+            <h2>Taşınmaz Görselleri ve Belgeleri</h2>
+            <div class="ed-gallery-groups">
+                @foreach($this->mediaGallery as $group => $items)
+                    <div class="ed-gallery-group">
+                        <h3>{{ mb_strtoupper($group) }} · {{ count($items) }}</h3>
+                        <div class="ed-gallery">
+                            @foreach($items as $media)
+                                <a class="ed-media" href="{{ $media['url'] }}" target="_blank" rel="noopener noreferrer">
+                                    @if($media['is_image'])
+                                        <img src="{{ $media['url'] }}" alt="{{ $group }}" loading="lazy">
+                                    @else
+                                        <span class="ed-media-file">📄 Belgeyi aç</span>
+                                    @endif
+                                    <span class="ed-media-meta">{{ $media['summary'] ?: $media['received_at'] }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+        @endif
 
         <section class="ed-card">
             <h2>CRM Notları</h2>
