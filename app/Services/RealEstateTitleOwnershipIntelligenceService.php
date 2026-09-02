@@ -26,13 +26,13 @@ class RealEstateTitleOwnershipIntelligenceService
 
         $data = is_array($profile->data) ? $profile->data : [];
         $existing = is_array($data[self::DATA_KEY] ?? null)
-            ? $data[self::DATA_KEY]
+            ? $this->normalizedStored($data[self::DATA_KEY])
             : [];
 
         // An operator-confirmed relation is authoritative for CRM purposes.
         // Customer-message extraction must never silently overwrite it.
         if ((bool) ($existing['confirmed_by_operator'] ?? false)) {
-            return $this->normalizedStored($existing);
+            return $existing;
         }
 
         $conversation = $profile->conversation()->first();
@@ -52,33 +52,71 @@ class RealEstateTitleOwnershipIntelligenceService
             ->first();
 
         if (! $message) {
-            return $existing !== [] ? $this->normalizedStored($existing) : [];
+            return $existing;
         }
 
-        $relation = $this->relationFromMessage((string) $message->message);
+        $rawMessage = (string) $message->message;
+        $relation = $this->relationFromMessage($rawMessage);
 
         if ($relation === null) {
-            return $existing !== [] ? $this->normalizedStored($existing) : [];
+            return $existing;
         }
 
-        $stored = [
-            'relation' => $relation,
-            'note' => null,
-            'source' => 'explicit_customer_statement',
-            'source_chat_message_id' => $message->id,
-            'confirmed_by_operator' => false,
-            'legal_verification' => false,
-            'updated_at' => now()->toIso8601String(),
-        ];
+        $currentRelation = (string) ($existing['relation'] ?? 'unknown');
+        $pendingRelation = (string) ($existing['pending_relation'] ?? '');
+        $sameAsCurrent = $currentRelation !== 'unknown' && $currentRelation === $relation;
+        $explicitCorrection = $this->hasCorrectionMarker($rawMessage);
+        $pendingConfirmed = $pendingRelation !== '' && $pendingRelation === $relation;
+
+        if ($sameAsCurrent) {
+            $stored = [
+                ...$existing,
+                'relation' => $relation,
+                'source' => 'explicit_customer_statement',
+                'source_chat_message_id' => $message->id,
+                'confirmation_required' => false,
+                'pending_relation' => null,
+                'legal_verification' => false,
+                'updated_at' => now()->toIso8601String(),
+            ];
+        } elseif (
+            $currentRelation !== 'unknown'
+            && ! $explicitCorrection
+            && ! $pendingConfirmed
+        ) {
+            // Ownership is a stable seller fact. A single contradictory turn
+            // is held for confirmation instead of silently replacing it.
+            $stored = [
+                ...$existing,
+                'confirmation_required' => true,
+                'pending_relation' => $relation,
+                'pending_source_chat_message_id' => $message->id,
+                'legal_verification' => false,
+                'updated_at' => now()->toIso8601String(),
+            ];
+        } else {
+            $stored = [
+                'relation' => $relation,
+                'note' => null,
+                'source' => 'explicit_customer_statement',
+                'source_chat_message_id' => $message->id,
+                'confirmed_by_operator' => false,
+                'legal_verification' => false,
+                'confirmation_required' => false,
+                'pending_relation' => null,
+                'pending_source_chat_message_id' => null,
+                'updated_at' => now()->toIso8601String(),
+            ];
+        }
 
         if ($this->comparable($existing) === $this->comparable($stored)) {
-            return $this->normalizedStored($existing ?: $stored);
+            return $existing ?: $this->normalizedStored($stored);
         }
 
         $data[self::DATA_KEY] = $stored;
         $profile->forceFill(['data' => $data])->saveQuietly();
 
-        return $stored;
+        return $this->normalizedStored($stored);
     }
 
     public function summaryForProfile(RealEstateProfile $profile): array
@@ -131,7 +169,7 @@ class RealEstateTitleOwnershipIntelligenceService
         }
 
         if (preg_match(
-            '/\b(babam|babamin|annem|annemin|kardesim|kardesimin|abim|abimin|ablam|ablamin|oglum|oglumun|kizim|kizimin|amcam|amcamin|dayim|dayimin|halam|halamin|teyzem|teyzemin|dedem|dedemin|ninem|ninemin|akrabam|akrabamin|yakınım|yakınımın|yakinim|yakinimin)\b/u',
+            '/\b(babam|babamin|annem|annemin|kardesim|kardesimin|abim|abimin|ablam|ablamin|oglum|oglumun|kizim|kizimin|amcam|amcamin|dayim|dayimin|halam|halamin|teyzem|teyzemin|dedem|dedemin|ninem|ninemin|akrabam|akrabamin|yakinim|yakinimin)\b/u',
             $text
         ) === 1) {
             return 'relative';
@@ -151,12 +189,26 @@ class RealEstateTitleOwnershipIntelligenceService
         return null;
     }
 
+    private function hasCorrectionMarker(string $message): bool
+    {
+        $text = $this->normalizeText($message);
+
+        return preg_match(
+            '/\b(hayir|yanlis|aslinda|pardon|duzeltiyorum|dogrusu|artik|simdi|devredildi|devrettik|guncellendi)\b/u',
+            $text
+        ) === 1;
+    }
+
     private function normalizedStored(array $stored): array
     {
         $relation = strtolower(trim((string) ($stored['relation'] ?? 'unknown')));
+        $pendingRelation = strtolower(trim((string) ($stored['pending_relation'] ?? '')));
 
         if (! in_array($relation, self::ALLOWED_RELATIONS, true)) {
             $relation = 'unknown';
+        }
+        if (! in_array($pendingRelation, self::ALLOWED_RELATIONS, true) || $pendingRelation === 'unknown') {
+            $pendingRelation = '';
         }
 
         return [
@@ -170,6 +222,11 @@ class RealEstateTitleOwnershipIntelligenceService
                 : null,
             'confirmed_by_operator' => (bool) ($stored['confirmed_by_operator'] ?? false),
             'legal_verification' => (bool) ($stored['legal_verification'] ?? false),
+            'confirmation_required' => (bool) ($stored['confirmation_required'] ?? false),
+            'pending_relation' => $pendingRelation !== '' ? $pendingRelation : null,
+            'pending_source_chat_message_id' => is_numeric($stored['pending_source_chat_message_id'] ?? null)
+                ? (int) $stored['pending_source_chat_message_id']
+                : null,
             'updated_at' => $stored['updated_at'] ?? null,
         ];
     }
