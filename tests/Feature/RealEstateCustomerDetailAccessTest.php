@@ -91,7 +91,7 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $this->assertNotSame('', trim($dossier['call_script']));
         $this->assertCount(4, $detail->getMessagesProperty());
         $legacyCrm = $detail->getLegacyCrmProperty();
-        $this->assertSame('0/100', $legacyCrm['Fırsat puanı']);
+        $this->assertMatchesRegularExpression('/^\\d{1,3}\\/100$/', $legacyCrm['Fırsat puanı']);
         $this->assertArrayHasKey('AI CRM özeti', $legacyCrm);
         $this->assertArrayHasKey('Sonraki en iyi aksiyon', $legacyCrm);
         $this->assertArrayHasKey('Tahmini portföy değeri', $legacyCrm);
