@@ -8,10 +8,6 @@ use Illuminate\Support\Str;
 
 class RealEstateVerificationService
 {
-    private const REAL_ESTATE_USER_ID = 40;
-
-    private const REAL_ESTATE_BOT_ID = 35;
-
     private const TAG_PREFIX = 'real_estate:verification:';
 
     public function process(ConversationControl $conversation): ?array
@@ -179,17 +175,15 @@ PROMPT;
 
     private function inScope(ConversationControl $conversation): bool
     {
-        return (int) $conversation->user_id === self::REAL_ESTATE_USER_ID
-            && (int) $conversation->ai_bot_id === self::REAL_ESTATE_BOT_ID;
+        return app(RealEstateIsolationService::class)->supportsConversation($conversation);
     }
 
     private function profileFor(
         ConversationControl $conversation
     ): ?RealEstateProfile {
         return RealEstateProfile::query()
+            ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
-            ->where('user_id', self::REAL_ESTATE_USER_ID)
-            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
             ->first();
     }
 
@@ -269,9 +263,6 @@ PROMPT;
         $score += min(24, count($missing) * 8);
         $score -= min(20, $corroboratedCount * 5);
 
-        // Hard floors make the numeric risk score consistent with the status.
-        // Corroborated fields may reduce uncertainty but must never numerically
-        // hide a critical or high-severity contradiction.
         if ($severities->contains('critical')) {
             $score = max($score, 85);
         } elseif ($severities->contains('high')) {
