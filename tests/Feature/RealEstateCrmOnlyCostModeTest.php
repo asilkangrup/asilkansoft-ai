@@ -34,11 +34,13 @@ class RealEstateCrmOnlyCostModeTest extends TestCase
         );
     }
 
-    public function test_media_is_saved_without_vision_and_chat_context_is_bounded(): void
+    public function test_media_is_saved_without_hidden_vision_and_chat_context_remembers_50_messages(): void
     {
         $batch = file_get_contents(app_path('Jobs/ProcessRealEstateMediaBatch.php'));
         $inbound = file_get_contents(app_path('Services/RealEstateWhatsAppInboundService.php'));
         $prompt = file_get_contents(app_path('Services/RealEstateOpenAIService.php'));
+        $observer = file_get_contents(app_path('Observers/ChatMessageObserver.php'));
+        $registrationJob = file_get_contents(app_path('Jobs/RegisterRealEstateMediaCrmFinding.php'));
 
         $this->assertStringContainsString('public int $tries = 2', $batch);
         $this->assertStringContainsString('analyzeMedia: false', $batch);
@@ -55,6 +57,11 @@ class RealEstateCrmOnlyCostModeTest extends TestCase
         $this->assertStringContainsString('Yatırımcılardan hızlı nakit fiyatı almak ister misiniz?', $inbound);
         $this->assertStringContainsString('Yatırımcı tekliflerini topluyoruz', $inbound);
         $this->assertStringContainsString('görüşmeyi yeni sorularla uzatma', $prompt);
+
+        $this->assertStringNotContainsString('RealEstateMediaAnalysisService', $observer);
+        $this->assertStringContainsString('RegisterRealEstateMediaCrmFinding::dispatch', $observer);
+        $this->assertStringContainsString("'vision_analyzed' => false", $registrationJob);
+        $this->assertStringContainsString("'legal_verification' => false", $registrationJob);
     }
 
     public function test_followups_and_cross_tenant_behavior_are_not_enabled(): void
