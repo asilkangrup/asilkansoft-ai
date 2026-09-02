@@ -88,8 +88,12 @@ class RealEstateProfileService
             }
 
             $normalized = $this->normalize($data);
-            $profileType = $this->routeType($conversation);
             $existing = is_array($profile?->data) ? $profile->data : [];
+            $profileType = $this->resolvedProfileType(
+                conversation: $conversation,
+                incomingIntent: $normalized['intent'] ?? null,
+                existingIntent: $existing['intent'] ?? null,
+            );
             $merged = app(RealEstateFactConsistencyService::class)->reconcile(
                 conversation: $conversation,
                 profileType: $profileType,
@@ -154,6 +158,7 @@ Bu bilgi müşterinin önceki mesajlarından yapılandırılmış olarak çıkar
 Serbest müşteri notları, aciliyet gerekçesinin ham metni, ilan/konum URL'leri ve satıcının gizli minimum fiyat tutarı bu genel profil bloğuna kopyalanmaz. Bu özel bilgiler yalnız onları yöneten daha dar kapsamlı servislerde kullanılabilir.
 fact_consistency.status=confirmation_required ise unconfirmed replacement değerleri doğrulanmış gerçek kabul etme. Yalnız en yüksek öncelikli çelişkiyi netleştir; aynı mesajda ikinci keşif sorusu ekleme. Eski doğrulanmış değer, müşteri açıkça düzeltince veya önerilen yeni değeri sonraki turda tekrar teyit edince değiştirilir.
 Yatırımcı kriterlerinde area_min_sqm/area_max_sqm, location_flexibility, accepts_shared_title ve target_discount_percent alanlarını gerçek filtre gibi kullan; bilinmeyen kriteri uydurma veya müşteri adına varsayma.
+recent_media_analysis doluysa ilgili görsel/belge uygulama tarafından gerçekten analiz edilmiştir. Bu durumda "fotoğrafın içeriği bana görünmüyor" veya eşdeğer bir ifade kullanma; yalnız analiz sonucunda görülen/görülmeyen bilgileri dürüstçe belirt. Medya analizinde taşınmaz bilgisi yoksa "görsel incelendi ancak taşınmaza ait okunabilir bilgi bulunamadı" de.
 Profil türü: {$profile->profile_type}
 Tamamlanma skoru: {$profile->completeness_score}/100
 Veri güven skoru: {$profile->confidence_score}/100
@@ -374,6 +379,38 @@ PROMPT;
             ->reject(fn (mixed $value): bool => $value === null || $value === '')
             ->all();
 
+        $mediaFindings = is_array($data['media_findings'] ?? null)
+            ? array_slice($data['media_findings'], -3)
+            : [];
+
+        $recentMedia = collect($mediaFindings)
+            ->filter(fn (mixed $finding): bool => is_array($finding))
+            ->map(function (array $finding): array {
+                return collect($finding)->only([
+                    'document_type',
+                    'summary',
+                    'property_type',
+                    'city',
+                    'district',
+                    'neighborhood',
+                    'area_sqm',
+                    'block_no',
+                    'parcel_no',
+                    'title_deed_type',
+                    'zoning_status',
+                    'visible_asking_price',
+                    'warnings',
+                    'confidence_score',
+                    'analyzed_at',
+                ])->all();
+            })
+            ->values()
+            ->all();
+
+        if ($recentMedia !== []) {
+            $safe['recent_media_analysis'] = $recentMedia;
+        }
+
         $consistency = app(RealEstateFactConsistencyService::class)->summary($data);
 
         if ($consistency !== []) {
@@ -439,6 +476,45 @@ PROMPT;
             20,
             min(95, 25 + ($filled * 7) - min(30, $pendingConflicts * 10))
         );
+    }
+
+    private function resolvedProfileType(
+        ConversationControl $conversation,
+        mixed $incomingIntent,
+        mixed $existingIntent,
+    ): string {
+        $routeType = $this->routeType($conversation);
+
+        if ($routeType !== 'general') {
+            return $routeType;
+        }
+
+        $intent = is_string($incomingIntent) && $incomingIntent !== ''
+            ? $incomingIntent
+            : (is_string($existingIntent) ? $existingIntent : null);
+
+        $resolved = match ($intent) {
+            'seller' => 'seller',
+            'investor', 'buyer' => 'investor',
+            default => 'general',
+        };
+
+        if ($resolved === 'general') {
+            return $resolved;
+        }
+
+        $tags = collect($conversation->etiketler())
+            ->filter(fn ($tag): bool => is_string($tag) && ! str_starts_with($tag, 'business:real_estate_'))
+            ->values()
+            ->all();
+        $tags[] = 'business:real_estate_'.$resolved;
+
+        $conversation->update([
+            'tags' => array_values(array_unique($tags)),
+        ]);
+        $conversation->refresh();
+
+        return $resolved;
     }
 
     private function routeType(ConversationControl $conversation): string
