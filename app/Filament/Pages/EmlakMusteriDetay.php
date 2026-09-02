@@ -110,7 +110,11 @@ class EmlakMusteriDetay extends Page
                     return null;
                 }
 
-                $url = trim((string) $message->media_url);
+                $storedUrl = trim((string) $message->media_url);
+                $url = str_starts_with($storedUrl, 'private:real-estate-inbound/'.$message->id.'/')
+                    ? route('real-estate.private-inbound-media', ['message' => $message->id])
+                    : $storedUrl;
+
                 if (! preg_match('/^https?:\/\//i', $url)) {
                     return null;
                 }
