@@ -72,6 +72,7 @@ class RealEstateOpportunityScoreService
             ['moderate', 'high'],
             true
         ) ? 5 : 0;
+        $urgencyScore = $this->urgencyScore($data, $motivation);
 
         $factBlocked = ($fact['status'] ?? null) === 'confirmation_required';
         $verificationStatus = (string) ($verification['status'] ?? 'unverified');
@@ -79,7 +80,7 @@ class RealEstateOpportunityScoreService
             || (int) ($verification['risk_score'] ?? 0) >= 70;
         $riskPenalty = ($factBlocked ? 30 : 0) + ($verificationBlocked ? 35 : 0);
 
-        $raw = $priceScore + $readinessScore + $valuationScore + $matchComponent + $handoffScore + $flexibilityScore;
+        $raw = $priceScore + $readinessScore + $valuationScore + $matchComponent + $handoffScore + $flexibilityScore + $urgencyScore;
         $score = max(0, min(100, $raw - $riskPenalty));
         $state = match (true) {
             $factBlocked || $verificationBlocked => 'blocked',
@@ -107,7 +108,7 @@ class RealEstateOpportunityScoreService
                 'operator_handoff' => $handoffScore,
                 'price_flexibility_signal' => $flexibilityScore,
                 'risk_penalty' => $riskPenalty,
-                'urgency_score_contribution' => 0,
+                'urgency_priority' => $urgencyScore,
             ],
             'metrics' => [
                 'asking_to_realistic_discount_percent' => $this->discountPercent($asking, $realisticMax),
@@ -123,12 +124,14 @@ class RealEstateOpportunityScoreService
                 $matchComponent >= 10 ? 'strong_investor_match' : null,
                 $handoffScore === 15 ? 'file_ready_for_operator_handoff' : null,
                 $flexibilityScore > 0 ? 'confidential_flexibility_signal_present' : null,
+                $urgencyScore > 0 ? 'seller_requests_fast_contact' : null,
                 $factBlocked ? 'fact_confirmation_required' : null,
                 $verificationBlocked ? 'verification_risk_blocks_action' : null,
                 $realisticMax === null ? 'valuation_missing' : null,
             ])),
             'guardrails' => [
-                'urgency_increases_score' => false,
+                'urgency_may_increase_contact_priority' => true,
+                'urgency_may_change_valuation_or_offer' => false,
                 'seller_distress_may_be_used_for_pressure' => false,
                 'private_seller_floor_included' => false,
                 'automatic_investor_outreach_allowed' => false,
@@ -136,6 +139,17 @@ class RealEstateOpportunityScoreService
                 'human_review_required' => true,
             ],
         ];
+    }
+
+    private function urgencyScore(array $data, array $motivation): int
+    {
+        $level = mb_strtolower(trim((string) ($motivation['motivation_level'] ?? $data['urgency'] ?? '')));
+
+        return match ($level) {
+            'high', 'high_explicit', 'urgent', 'acil', 'çok_acil', 'cok_acil' => 10,
+            'medium', 'medium_explicit', 'moderate', 'orta' => 5,
+            default => 0,
+        };
     }
 
     private function priceScore(?float $asking, ?float $realisticMax, ?float $investorMax): int
