@@ -1,0 +1,42 @@
+name: Apply Seller Offer Packet Intelligence
+
+on:
+  push:
+    branches:
+      - feature/seller-offer-packet-intelligence
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/seller-offer-packet-intelligence
+          fetch-depth: 0
+      - name: Apply patch
+        run: python3 .github/scripts/apply_seller_offer_packet_intelligence.py
+      - name: Validate PHP syntax
+        run: |
+          php -l app/Services/RealEstateSellerOfferPacketService.php
+          php -l app/Console/Commands/InspectRealEstateSellerOfferPackets.php
+          php -l app/Observers/RealEstateProfileObserver.php
+          php -l app/Services/MemoryService.php
+          php -l app/Services/RealEstateMediaAnalysisService.php
+          php -l app/Services/RealEstateNextBestActionService.php
+          php -l app/Services/RealEstateDecisionService.php
+          php -l app/Services/RealEstateWhatsAppInboundService.php
+          php -l tests/Feature/RealEstateSellerOfferPacketIntelligenceTest.php
+      - name: Commit feature
+        run: |
+          git config user.name "asilkangrup"
+          git config user.email "asilkangrup@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Build seller investor-offer packet intelligence"
+          git push origin feature/seller-offer-packet-intelligence
