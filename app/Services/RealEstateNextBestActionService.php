@@ -108,51 +108,66 @@ PROMPT;
         array $data,
         array $decision,
     ): array {
-        $profileType = (string) $profile->profile_type;
         $matches = is_array($data['opportunity_matches'] ?? null)
             ? $data['opportunity_matches']
             : [];
         $matchCount = count($matches);
-        $stage = (string) ($decision['stage'] ?? 'new');
+        $stage = trim((string) ($decision['stage'] ?? 'new')) ?: 'new';
 
-        if ($profileType === 'seller') {
-            return $this->sellerPlan($profile, $data, $decision, $matchCount, $stage);
-        }
-
-        if (in_array($profileType, ['investor', 'buyer'], true)) {
-            return $this->investorPlan($profile, $data, $decision, $matchCount, $stage);
-        }
-
-        return $this->payload(
-            actionCode: 'clarify_customer_role',
-            priority: 'high',
-            actionText: 'Müşterinin taşınmaz satmak mı yoksa yatırım/alım yapmak mı istediğini tek kısa soruyla netleştir.',
-            singleQuestion: 'Taşınmaz satmak mı istiyorsunuz, yoksa yatırım için mülk mü arıyorsunuz?',
-            blocking: true,
-            reasonCodes: ['profile_role_unresolved'],
-            matchCount: $matchCount,
-            stage: $stage,
-        );
+        return match ((string) $profile->profile_type) {
+            'seller' => $this->sellerPlan(
+                $profile,
+                $decision,
+                $matchCount,
+                $stage,
+            ),
+            'investor', 'buyer' => $this->investorPlan(
+                $profile,
+                $decision,
+                $matchCount,
+                $stage,
+            ),
+            default => $this->payload(
+                actionCode: 'clarify_customer_role',
+                priority: 'high',
+                actionText: 'Müşterinin taşınmaz satmak mı yoksa yatırım/alım yapmak mı istediğini tek kısa soruyla netleştir.',
+                singleQuestion: 'Taşınmaz satmak mı istiyorsunuz, yoksa yatırım için mülk mü arıyorsunuz?',
+                blocking: true,
+                reasonCodes: ['profile_role_unresolved'],
+                matchCount: $matchCount,
+                stage: $stage,
+            ),
+        };
     }
 
     private function sellerPlan(
         RealEstateProfile $profile,
-        array $data,
         array $decision,
         int $matchCount,
         string $stage,
     ): array {
         $motivation = app(RealEstateSellerMotivationService::class)
             ->summaryForProfile($profile);
-        $missing = array_values(array_filter(
-            $decision['missing_critical_data'] ?? [],
-            fn (mixed $value): bool => is_string($value) && $value !== ''
-        ));
         $sellerQuestion = $this->cleanQuestion(
             $motivation['recommended_next_question'] ?? null
         );
+        $missing = $this->stringList(
+            $decision['missing_critical_data'] ?? []
+        );
 
-        if ($missing !== [] || $sellerQuestion !== null) {
+        // A material verification conflict is the strongest safety signal in
+        // the pipeline. It must never be overwritten by a softer discovery
+        // question (for example urgency or timeline collection).
+        if ($this->hardVerificationConflict($decision)) {
+            return $this->verificationPlan(
+                $decision,
+                $matchCount,
+                $stage,
+                ['hard_verification_conflict'],
+            );
+        }
+
+        if ($missing !== []) {
             return $this->payload(
                 actionCode: 'complete_seller_core_data',
                 priority: 'high',
@@ -163,7 +178,7 @@ PROMPT;
                 reasonCodes: array_values(array_unique([
                     'seller_core_data_incomplete',
                     ...array_map(
-                        fn (string $field): string => 'missing_'.$field,
+                        fn (string $field): string => 'missing_'.$this->code($field),
                         $missing
                     ),
                 ])),
@@ -172,6 +187,8 @@ PROMPT;
             );
         }
 
+        // Pricing research blockers outrank optional seller-discovery prompts:
+        // stale or structurally weak valuation data must not become an anchor.
         if ((bool) ($decision['valuation_research_needed'] ?? false)) {
             return $this->payload(
                 actionCode: 'refresh_valuation_research',
@@ -195,8 +212,10 @@ PROMPT;
                 reasonCodes: array_values(array_unique([
                     'comparable_integrity_insufficient',
                     ...array_map(
-                        fn (mixed $reason): string => 'integrity_'.preg_replace('/[^a-z0-9_\-]/i', '_', (string) $reason),
-                        $decision['valuation_integrity_reasons'] ?? []
+                        fn (string $reason): string => 'integrity_'.$this->code($reason),
+                        $this->stringList(
+                            $decision['valuation_integrity_reasons'] ?? []
+                        )
                     ),
                 ])),
                 matchCount: $matchCount,
@@ -204,26 +223,25 @@ PROMPT;
             );
         }
 
-        $verificationSafe = (bool) ($decision['ready_for_match'] ?? false)
-            || (
-                in_array((string) ($decision['verification_status'] ?? ''), ['verified', 'safe'], true)
-                && (bool) ($decision['evidence_sufficient_for_matching'] ?? false)
+        if (! $this->verificationSafe($decision)) {
+            return $this->verificationPlan(
+                $decision,
+                $matchCount,
+                $stage,
+                ['property_verification_or_evidence_incomplete'],
             );
+        }
 
-        if (! $verificationSafe) {
+        // Optional conversation-completeness questions are allowed only after
+        // hard valuation and verification guards are clear.
+        if ($sellerQuestion !== null) {
             return $this->payload(
-                actionCode: 'complete_property_verification',
-                priority: 'high',
-                actionText: (string) (
-                    $decision['next_best_action']
-                    ?? 'Taşınmaz doğrulamasını ve yeterli belge desteğini tamamla; doğrulanmadan yatırımcı eşleşmesini hazır fırsat gibi sunma.'
-                ),
-                singleQuestion: null,
-                blocking: true,
-                reasonCodes: [
-                    'property_verification_or_evidence_incomplete',
-                    'verification_'.((string) ($decision['verification_status'] ?? 'unknown')),
-                ],
+                actionCode: 'complete_seller_discovery',
+                priority: 'medium',
+                actionText: $sellerQuestion,
+                singleQuestion: $sellerQuestion,
+                blocking: false,
+                reasonCodes: ['seller_discovery_context_incomplete'],
                 matchCount: $matchCount,
                 stage: $stage,
             );
@@ -269,14 +287,15 @@ PROMPT;
 
     private function investorPlan(
         RealEstateProfile $profile,
-        array $data,
         array $decision,
         int $matchCount,
         string $stage,
     ): array {
         $mandate = app(RealEstateInvestorMandateService::class)
             ->summaryForProfile($profile);
-        $question = $this->cleanQuestion($mandate['recommended_next_question'] ?? null);
+        $question = $this->cleanQuestion(
+            $mandate['recommended_next_question'] ?? null
+        );
 
         if ($question !== null) {
             return $this->payload(
@@ -288,8 +307,10 @@ PROMPT;
                 reasonCodes: array_values(array_unique([
                     'investor_mandate_incomplete',
                     ...array_map(
-                        fn (mixed $criterion): string => 'missing_'.preg_replace('/[^a-z0-9_\-]/i', '_', (string) $criterion),
-                        $mandate['missing_high_value_criteria'] ?? []
+                        fn (string $criterion): string => 'missing_'.$this->code($criterion),
+                        $this->stringList(
+                            $mandate['missing_high_value_criteria'] ?? []
+                        )
                     ),
                 ])),
                 matchCount: $matchCount,
@@ -335,6 +356,63 @@ PROMPT;
         );
     }
 
+    private function verificationPlan(
+        array $decision,
+        int $matchCount,
+        string $stage,
+        array $reasonCodes,
+    ): array {
+        $status = trim((string) ($decision['verification_status'] ?? 'unknown'))
+            ?: 'unknown';
+
+        return $this->payload(
+            actionCode: 'complete_property_verification',
+            priority: 'high',
+            actionText: $this->fixedFallback(
+                $decision['next_best_action']
+                ?? 'Taşınmaz doğrulamasını ve yeterli belge desteğini tamamla; doğrulanmadan yatırımcı eşleşmesini hazır fırsat gibi sunma.'
+            ),
+            singleQuestion: null,
+            blocking: true,
+            reasonCodes: array_values(array_unique([
+                ...$reasonCodes,
+                'verification_'.$this->code($status),
+            ])),
+            matchCount: $matchCount,
+            stage: $stage,
+        );
+    }
+
+    private function hardVerificationConflict(array $decision): bool
+    {
+        $status = mb_strtolower(trim((string) (
+            $decision['verification_status'] ?? ''
+        )));
+        $riskScore = max(0, min(100, (int) (
+            $decision['verification_risk_score'] ?? 0
+        )));
+
+        return in_array(
+            $status,
+            ['blocked', 'unsafe', 'critical', 'conflict'],
+            true
+        ) || $riskScore >= 85;
+    }
+
+    private function verificationSafe(array $decision): bool
+    {
+        if ((bool) ($decision['ready_for_match'] ?? false)) {
+            return true;
+        }
+
+        $status = mb_strtolower(trim((string) (
+            $decision['verification_status'] ?? ''
+        )));
+
+        return in_array($status, ['verified', 'safe'], true)
+            && (bool) ($decision['evidence_sufficient_for_matching'] ?? false);
+    }
+
     private function payload(
         string $actionCode,
         string $priority,
@@ -353,10 +431,11 @@ PROMPT;
             'blocking' => $blocking,
             'reason_codes' => array_values(array_unique(array_filter(
                 $reasonCodes,
-                fn (mixed $reason): bool => is_string($reason) && $reason !== ''
+                fn (mixed $reason): bool => is_string($reason)
+                    && trim($reason) !== ''
             ))),
             'match_count' => max(0, $matchCount),
-            'stage' => $stage !== '' ? $stage : 'new',
+            'stage' => $stage,
             'deterministic' => true,
             'guardrails' => [
                 'one_primary_action_per_turn' => true,
@@ -392,7 +471,10 @@ PROMPT;
         ];
         $stateKey = hash(
             'sha256',
-            json_encode($state, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            (string) json_encode(
+                $state,
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            )
         );
 
         RealEstateNextBestActionEvent::query()->firstOrCreate(
@@ -431,6 +513,19 @@ PROMPT;
         return $value;
     }
 
+    private function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $value,
+            fn (mixed $item): bool => is_string($item)
+                && trim($item) !== ''
+        ));
+    }
+
     private function cleanQuestion(mixed $value): ?string
     {
         if (! is_string($value)) {
@@ -439,7 +534,7 @@ PROMPT;
 
         $value = trim($value);
 
-        if ($value === '') {
+        if ($value === '' || str_starts_with($value, 'Yeni soru sormadan')) {
             return null;
         }
 
@@ -453,5 +548,16 @@ PROMPT;
         }
 
         return 'Dosyadaki en yüksek değerli eksik veya riskli adımı tamamla; doğrulanmamış bilgi, kesin teklif veya otomatik takip üretme.';
+    }
+
+    private function code(string $value): string
+    {
+        $normalized = preg_replace(
+            '/[^a-z0-9_\-]+/i',
+            '_',
+            mb_strtolower(trim($value))
+        );
+
+        return trim((string) $normalized, '_-') ?: 'unknown';
     }
 }
