@@ -13,7 +13,9 @@ use App\Services\OpenAIService;
 use App\Services\RealEstateAwareCrmConversationSummaryService;
 use App\Services\RealEstateAwareCrmManagerSummaryService;
 use App\Services\RealEstateAwareFinanceLeadExtractorService;
+use App\Services\RealEstateGuardedMediaAnalysisService;
 use App\Services\RealEstateLiveReadinessService;
+use App\Services\RealEstateMediaAnalysisService;
 use App\Services\RealEstateOpenAIService;
 use App\Services\RealEstateReadinessService;
 use Illuminate\Support\ServiceProvider;
@@ -43,6 +45,15 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             FinanceLeadExtractorService::class,
             RealEstateAwareFinanceLeadExtractorService::class
+        );
+
+        // The parser includes media_context metadata on every inbound turn.
+        // Ignore non-image/document contexts before the strict media firewall so
+        // ordinary text/location/audio/video traffic cannot inflate rejection
+        // telemetry. Actual media still uses the same fail-closed analyzer.
+        $this->app->bind(
+            RealEstateMediaAnalysisService::class,
+            RealEstateGuardedMediaAnalysisService::class
         );
 
         // Health/readiness must use Evolution's live state for the isolated
