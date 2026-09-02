@@ -6,6 +6,7 @@ use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Services\RealEstateDecisionService;
+use App\Services\RealEstateEvidenceReconciliationService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchService;
 use App\Services\RealEstateMatchValuationFreshnessFilterService;
@@ -92,9 +93,9 @@ class ChatMessageObserver
                 return;
             }
 
-            // The shared webhook's initial text-memory pass finishes before the
-            // media row is created. Recompute downstream state immediately so
-            // document conflicts and valuation safety affect this same turn.
+            // Canonical CRM memory and field provenance must be reconciled
+            // before verification and match decisions on the same media turn.
+            app(RealEstateEvidenceReconciliationService::class)->process($conversation);
             app(RealEstateVerificationService::class)->process($conversation);
             app(RealEstateDecisionService::class)->process($conversation);
             app(RealEstateValuationDecisionGuardService::class)->process($conversation);
