@@ -77,7 +77,7 @@ class RealEstateInvestorOnboardingReliabilityTest extends TestCase
             $batch
         );
         $this->assertStringContainsString(
-            'automatic follow-up',
+            'never starts a new conversation',
             strtolower($recovery)
         );
         $this->assertStringContainsString(
