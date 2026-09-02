@@ -3,9 +3,11 @@
 namespace App\Filament\Pages;
 
 use App\Models\RealEstateProfile;
+use App\Services\RealEstateCommercialDealService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateOpportunityScoreService;
 use BackedEnum;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
@@ -20,6 +22,7 @@ class EmlakFirsatlar extends Page
 
     public string $filter = 'priority';
     public string $search = '';
+    public array $commissionRates = [];
 
     public static function canAccess(): bool
     {
@@ -52,6 +55,7 @@ class EmlakFirsatlar extends Page
             ->map(function (RealEstateProfile $profile): array {
                 $data = is_array($profile->data) ? $profile->data : [];
                 $score = app(RealEstateOpportunityScoreService::class)->summaryForProfile($profile);
+                $deal = app(RealEstateCommercialDealService::class)->summaryForProfile($profile);
                 $location = $this->first($data, ['location', 'property.location', 'district', 'city']) ?: 'Konum belirtilmedi';
                 $type = $this->first($data, ['property_type', 'property.type']) ?: 'taşınmaz';
 
@@ -69,6 +73,16 @@ class EmlakFirsatlar extends Page
                     'match_score' => data_get($score, 'metrics.strongest_match_score'),
                     'completeness' => (int) data_get($score, 'metrics.file_completeness', 0),
                     'valuation_confidence' => (int) data_get($score, 'metrics.valuation_confidence', 0),
+                    'asking_price' => $deal['asking_price'] ?? null,
+                    'realistic_sale_min' => $deal['realistic_sale_min'] ?? null,
+                    'realistic_sale_max' => $deal['realistic_sale_max'] ?? null,
+                    'negotiation_target_min' => $deal['negotiation_target_min'] ?? null,
+                    'negotiation_target_max' => $deal['negotiation_target_max'] ?? null,
+                    'gap_amount' => $deal['gap_to_investor_band_amount'] ?? null,
+                    'gap_percent' => $deal['gap_to_investor_band_percent'] ?? null,
+                    'commission_rate' => $deal['commission_rate_percent'] ?? null,
+                    'expected_commission' => $deal['expected_commission_amount'] ?? null,
+                    'commercial_action' => $deal['recommended_operator_action'] ?? null,
                     'customer_url' => $profile->conversation
                         ? url('/admin/emlak-musteri-detay?customer='.$profile->conversation->id)
                         : null,
@@ -99,6 +113,33 @@ class EmlakFirsatlar extends Page
             'preparation' => $all->whereIn('state', ['research_required', 'preparation_required'])->count(),
             'blocked' => $all->where('state', 'blocked')->count(),
         ];
+    }
+
+    public function saveCommission(int $profileId): void
+    {
+        abort_unless(static::canAccess() && auth()->user()?->canManageOrganization(RealEstateIsolationService::ORGANIZATION_ID), 403);
+
+        $profile = RealEstateProfile::query()
+            ->isolatedProduction()
+            ->where('profile_type', 'seller')
+            ->whereKey($profileId)
+            ->firstOrFail();
+        $rate = $this->commissionRates[$profileId] ?? null;
+
+        if (! is_numeric($rate) || (float) $rate <= 0 || (float) $rate > 20) {
+            Notification::make()->title('Komisyon oranı 0–20 arasında olmalı')->warning()->send();
+            return;
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $terms = is_array($data['commercial_terms'] ?? null) ? $data['commercial_terms'] : [];
+        $terms['commission_rate_percent'] = round((float) $rate, 2);
+        $terms['commission_estimate_only'] = true;
+        $terms['updated_at'] = now()->toIso8601String();
+        $data['commercial_terms'] = $terms;
+
+        $profile->forceFill(['data' => $data])->save();
+        Notification::make()->title('Komisyon oranı CRM’e kaydedildi')->success()->send();
     }
 
     private function matchesFilter(array $item): bool
