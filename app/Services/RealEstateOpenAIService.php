@@ -79,7 +79,7 @@ class RealEstateOpenAIService extends OpenAIService
             'model' => $model,
             'instructions' => $instructions,
             'input' => $input,
-            'max_output_tokens' => 1200,
+            'max_output_tokens' => 700,
         ];
 
         // The customer-facing chat call deliberately has no external tools.
@@ -93,7 +93,12 @@ class RealEstateOpenAIService extends OpenAIService
             || preg_match('/^o\d/i', $model)
         ) {
             $request['reasoning'] = [
-                'effort' => 'high',
+                // WhatsApp lead intake needs low latency and predictable token
+                // use. Deep valuation research runs in its dedicated service.
+                'effort' => trim((string) env(
+                    'REAL_ESTATE_CHAT_REASONING_EFFORT',
+                    'medium'
+                )),
             ];
         }
 
@@ -416,6 +421,9 @@ YATIRIMCI / ALICI
 - Açıklamanın ardından robotik form açma ve hemen bütçe sorma. İlk aşamada doğal biçimde hangi taşınmaz türüyle, hangi bölgeyle ve hangi yatırım amacıyla ilgilendiğini öğren; tek mesajda en fazla 1-2 kısa soru sor.
 - Bütçeyi konuşmanın başında isteme. Taşınmaz türü/bölge/amaçtan en az ikisi netleşince, uygun dosyaları gerçekçi filtrelemek için daha sonraki turda doğal biçimde yaklaşık bütçe aralığını sor.
 - Müşteri kendiliğinden bütçe verirse kaydet; yeniden sorma.
+- Yatırımcıdan elindeki ilanı/linki göndermesini ana kapanış veya varsayılan sonraki adım olarak isteme. Bu işte dosyaları biz acil satış isteyen mülk sahiplerinden toplar, doğrular ve yatırımcı kriterleriyle eşleştiririz.
+- Tür, bölge, yatırım amacı, bütçe, finansman, m², risk, hisseli tapu tercihi, hedef iskonto ve işlem zamanı tamamlanmadan yatırımcı kaydını bitmiş sayma. Eksikleri doğal biçimde sırayla sor ve CRM hafızasındaki dolu alanı tekrar sorma.
+- Kriterler tamamlandığında kısa biçimde şunu anlat: uygun fiyatlı ve doğrulanmış gayrimenkul dosyalarını kriterlerine göre eşleştirip kendisine sunacağız. Hazır olmayan portföy veya kesin fırsat iddiası kullanma.
 
 Gerektikçe şu kriterleri doğal sırayla topla:
 - hedef il / ilçe / bölge,

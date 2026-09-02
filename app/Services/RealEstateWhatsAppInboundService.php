@@ -373,6 +373,13 @@ class RealEstateWhatsAppInboundService
         }
 
         if ($answer === null) {
+            $answer = $this->deterministicInvestorOnboardingAnswer(
+                conversation: $conversation,
+                message: $message,
+            );
+        }
+
+        if ($answer === null) {
             $answer = $this->deterministicSellerPriceAnswer(
                 conversation: $conversation,
                 message: $message,
@@ -576,6 +583,138 @@ class RealEstateWhatsAppInboundService
         }
 
         return $parts === [] ? null : implode(' ', $parts);
+    }
+
+    private function deterministicInvestorOnboardingAnswer(
+        ConversationControl $conversation,
+        string $message,
+    ): ?string {
+        $profile = RealEstateProfile::query()
+            ->isolatedProduction()
+            ->where('conversation_control_id', $conversation->id)
+            ->first();
+
+        if (! $profile || $profile->profile_type !== 'investor') {
+            return null;
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $state = is_array($data['investor_onboarding_intelligence'] ?? null)
+            ? $data['investor_onboarding_intelligence']
+            : [];
+
+        if (filled($state['completed_at'] ?? null)) {
+            return null;
+        }
+
+        $completed = array_values(array_filter(
+            is_array($state['completed_criteria'] ?? null)
+                ? $state['completed_criteria']
+                : [],
+            'is_string'
+        ));
+        $awaiting = trim((string) ($state['awaiting_criterion'] ?? ''));
+
+        if ($awaiting !== '') {
+            $completed[] = $awaiting;
+            $completed = array_values(array_unique($completed));
+            $state['awaiting_criterion'] = null;
+        }
+
+        $hasLocation = filled($data['city'] ?? null)
+            || filled($data['district'] ?? null)
+            || filled($data['location_flexibility'] ?? null);
+        $hasBudget = $this->positivePrice($data['budget_min'] ?? null) !== null
+            || $this->positivePrice($data['budget_max'] ?? null) !== null;
+
+        $criteria = [
+            'property_type' => [
+                'complete' => filled($data['property_type'] ?? null),
+                'question' => 'En çok hangi tür gayrimenkullerle ilgileniyorsunuz: arsa, tarla, konut, ticari veya başka bir tür mü?',
+            ],
+            'location' => [
+                'complete' => $hasLocation,
+                'question' => 'Öncelikli baktığınız il, ilçe veya bölgeler hangileri? Bölge fark etmiyorsa onu da not edebilirim.',
+            ],
+            'investment_goal' => [
+                'complete' => filled($data['investment_goal'] ?? null),
+                'question' => 'Yatırım hedefiniz kısa vadeli al-sat mı, kira getirisi mi, yoksa uzun vadeli değer artışı mı?',
+            ],
+            'budget' => [
+                'complete' => $hasBudget,
+                'question' => 'Uygun dosyaları doğru filtreleyebilmem için yaklaşık minimum–maksimum bütçe aralığınız nedir?',
+            ],
+            'financing' => [
+                'complete' => filled($data['financing'] ?? null),
+                'question' => 'Alımı nakit mi, krediyle mi, yoksa ikisini birlikte mi düşünüyorsunuz?',
+            ],
+            'area_range' => [
+                'complete' => filled($data['area_min_sqm'] ?? null)
+                    || filled($data['area_max_sqm'] ?? null),
+                'question' => 'Tercih ettiğiniz yaklaşık minimum–maksimum m² aralığı var mı, yoksa m² konusunda esnek misiniz?',
+            ],
+            'risk_preference' => [
+                'complete' => filled($data['risk_preference'] ?? null),
+                'question' => 'Risk tercihiniz nasıl: yalnız temiz ve hazır dosyalar mı, yoksa imar/hisse gibi ek inceleme isteyen fırsatlara da açık mısınız?',
+            ],
+            'accepts_shared_title' => [
+                'complete' => is_bool($data['accepts_shared_title'] ?? null),
+                'question' => 'Hisseli tapulu taşınmazları değerlendirir misiniz, yoksa yalnız müstakil tapu mu arıyorsunuz?',
+            ],
+            'target_discount' => [
+                'complete' => is_numeric($data['target_discount_percent'] ?? null),
+                'question' => 'Bir dosyayı fırsat saymanız için yaklaşık hangi iskonto seviyesi sizi ilgilendirir? Yüzde belirtmek istemezseniz “fiyata göre” diyebilirsiniz.',
+            ],
+            'timeline' => [
+                'complete' => filled($data['timeline'] ?? null),
+                'question' => 'Uygun gayrimenkul çıktığında işlem için ne kadar sürede hazır olabilirsiniz?',
+            ],
+        ];
+
+        $explainedBefore = ChatMessage::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('session_id', $conversation->session_id)
+            ->where('sender_type', 'ai')
+            ->where(function ($query): void {
+                $query
+                    ->where('message', 'ilike', '%acil nak%')
+                    ->orWhere('message', 'ilike', '%mülk sahip%')
+                    ->orWhere('message', 'ilike', '%uygun fiyatlı gayrimenkul%');
+            })
+            ->exists();
+
+        foreach ($criteria as $criterion => $definition) {
+            if (
+                (bool) $definition['complete']
+                || in_array($criterion, $completed, true)
+            ) {
+                continue;
+            }
+
+            $state['completed_criteria'] = $completed;
+            $state['awaiting_criterion'] = $criterion;
+            $state['updated_at'] = now()->toIso8601String();
+            $data['investor_onboarding_intelligence'] = $state;
+            $profile->forceFill(['data' => $data])->save();
+
+            $prefix = $explainedBefore
+                ? ''
+                : 'Acil nakde dönmek isteyen mülk sahiplerinden gelen gayrimenkul dosyalarını inceliyoruz. Bilgisi, belgesi ve fiyatı uygun olan dosyaları kriterleri eşleşen gerçek yatırımcılara iletiyoruz.'
+                    ."\n";
+
+            return $prefix.$definition['question'];
+        }
+
+        $state['completed_criteria'] = $completed;
+        $state['awaiting_criterion'] = null;
+        $state['completed_at'] = now()->toIso8601String();
+        $state['updated_at'] = $state['completed_at'];
+        $data['investor_onboarding_intelligence'] = $state;
+        $profile->forceFill(['data' => $data])->save();
+
+        return 'Kriterlerinizi CRM’e kaydettim. Acil satış için gelen dosyaları bilgi, belge ve fiyat açısından inceleyip size uygun fiyatlı gayrimenkulleri kriterlerinize göre eşleştirerek sunacağız.';
     }
 
     private function deterministicSellerPriceAnswer(

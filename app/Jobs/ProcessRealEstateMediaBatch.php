@@ -138,6 +138,12 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
                     now()->addMinutes(10)
                 );
 
+                // The container does not depend on an external scheduler for
+                // correctness. A provider/rate-limit failure schedules one
+                // unique delayed recovery for already-received messages.
+                RecoverRealEstateUnansweredInbound::dispatch()
+                    ->delay(now()->addSeconds(65));
+
                 throw $exception;
             }
         }

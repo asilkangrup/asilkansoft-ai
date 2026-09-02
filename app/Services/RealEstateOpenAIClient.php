@@ -3,15 +3,26 @@
 namespace App\Services;
 
 use App\Models\AiBot;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
 class RealEstateOpenAIClient
 {
     public function createResponse(AiBot $aiBot, array $request): mixed
     {
-        return $this->client($aiBot)
-            ->responses()
-            ->create($request);
+        // Bot 35 can receive many simultaneous advertisement leads. The
+        // dedicated OpenAI project rate-limits concurrent bursts, so serialize
+        // only its model boundary while leaving webhook intake and CRM writes
+        // parallel. Waiting jobs remain safely queued instead of failing and
+        // leaving a customer's first message unanswered.
+        return Cache::lock(
+            'real-estate-openai:bot:'.RealEstateIsolationService::BOT_ID,
+            300,
+        )->block(180, function () use ($aiBot, $request): mixed {
+            return $this->client($aiBot)
+                ->responses()
+                ->create($request);
+        });
     }
 
     public function transcribeAudio(
