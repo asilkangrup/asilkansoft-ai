@@ -16,8 +16,8 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
         $this->assertStringContainsString('ilk cümlesinde doğrudan bu ihtiyaca cevap ver', $prompt);
         $this->assertStringContainsString('sadece alanları listeleme', $prompt);
         $this->assertStringContainsString('Yeterli veri varsa soru sorarak kaçma', $prompt);
-        $this->assertStringContainsString('tek kritik soru', $prompt);
-        $this->assertStringContainsString('yatırımcı teklifine geçir', $prompt);
+        $this->assertStringContainsString('otomatik piyasa/emsal araştırması yapmaz', $prompt);
+        $this->assertStringContainsString('Hızlı nakit satışta değerlendirebileceğiniz son fiyat nedir?', $prompt);
         $this->assertStringContainsString('özel minimum/taban fiyatını', $prompt);
         $this->assertStringContainsString('sahte alıcı, sahte teklif', $prompt);
         $this->assertStringContainsString(
@@ -51,11 +51,11 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
             $prompt
         );
         $this->assertStringContainsString(
-            'recent_media_analysis içinde m²',
+            'Fotoğraf ve belgeler özel CRM galerisine kaydedilir',
             $prompt
         );
         $this->assertStringContainsString(
-            'Satıcı "siz fiyat belirleyin"',
+            'Müşteri “siz söyleyin” veya “siz araştırın” derse fiyat uydurma',
             $prompt
         );
         $this->assertStringContainsString(
@@ -67,7 +67,7 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
             $prompt
         );
         $this->assertStringContainsString(
-            'tekrar satıcı fiyatını zorlamayı bırak',
+            'hızlı nakitte değerlendireceği son fiyatı ve yatırımcıya sunma onayını sor',
             $prompt
         );
     }

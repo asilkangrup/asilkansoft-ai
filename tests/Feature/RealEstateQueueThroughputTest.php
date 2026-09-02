@@ -36,7 +36,7 @@ class RealEstateQueueThroughputTest extends TestCase
         $this->assertSame('real-estate-chat:'.$hash, $textJob->overlapKey());
         $this->assertSame($textJob->overlapKey(), $batchJob->overlapKey());
         $this->assertSame(120, $textJob->tries);
-        $this->assertSame(120, $batchJob->tries);
+        $this->assertSame(2, $batchJob->tries);
         $this->assertInstanceOf(WithoutOverlapping::class, $textJob->middleware()[0]);
         $this->assertInstanceOf(WithoutOverlapping::class, $batchJob->middleware()[0]);
     }

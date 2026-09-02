@@ -76,8 +76,12 @@ class RealEstateInvestorOnboardingReliabilityTest extends TestCase
             $client
         );
         $this->assertStringContainsString('->block(180', $client);
-        $this->assertStringContainsString(
+        $this->assertStringNotContainsString(
             'RecoverRealEstateUnansweredInbound::dispatch()',
+            $batch
+        );
+        $this->assertStringContainsString(
+            'public int $tries = 2',
             $batch
         );
         $this->assertStringContainsString(

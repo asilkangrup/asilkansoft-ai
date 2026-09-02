@@ -240,7 +240,13 @@ class RealEstateWhatsAppInboundService
             messageId: $messageId,
         );
 
-        if (! $analyzeMedia && ($mediaContext['type'] ?? null) === 'image') {
+        if (
+            ! $analyzeMedia
+            && in_array($mediaContext['type'] ?? null, ['image', 'document'], true)
+        ) {
+            // Keep the original file in the private CRM gallery without
+            // spending tokens on automatic vision/OCR. The operator reviews
+            // photos and documents manually.
             $mediaContext['skip_analysis'] = true;
         }
 
@@ -360,7 +366,7 @@ class RealEstateWhatsAppInboundService
         $history = $this->memoryService->openAIMesajlariHazirla(
             userId: RealEstateIsolationService::USER_ID,
             sessionId: $sessionId,
-            limit: 20,
+            limit: 8,
         );
 
         $answer = $this->deterministicFirstContactRoleQuestion(
@@ -380,21 +386,7 @@ class RealEstateWhatsAppInboundService
         }
 
         if ($answer === null) {
-            $answer = $this->deterministicSellerPriceAnswer(
-                conversation: $conversation,
-                message: $message,
-            );
-        }
-
-        if ($answer === null) {
-            $answer = $this->deterministicSellerValuationNegotiationAnswer(
-                conversation: $conversation,
-                message: $message,
-            );
-        }
-
-        if ($answer === null) {
-            $answer = $this->deterministicSellerPriceSteeringAnswer(
+            $answer = $this->deterministicSellerFastCashHandoffAnswer(
                 conversation: $conversation,
                 message: $message,
             );
@@ -715,6 +707,58 @@ class RealEstateWhatsAppInboundService
         $profile->forceFill(['data' => $data])->save();
 
         return 'Kriterlerinizi CRM’e kaydettim. Acil satış için gelen dosyaları bilgi, belge ve fiyat açısından inceleyip size uygun fiyatlı gayrimenkulleri kriterlerinize göre eşleştirerek sunacağız.';
+    }
+
+    private function deterministicSellerFastCashHandoffAnswer(
+        ConversationControl $conversation,
+        string $message,
+    ): ?string {
+        $profile = RealEstateProfile::query()
+            ->isolatedProduction()
+            ->where('conversation_control_id', $conversation->id)
+            ->first();
+
+        if (! $profile || $profile->profile_type !== 'seller') {
+            return null;
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $state = is_array($data['seller_fast_cash_handoff'] ?? null)
+            ? $data['seller_fast_cash_handoff']
+            : [];
+
+        if (filled($state['asked_at'] ?? null)) {
+            return null;
+        }
+
+        $normalized = $this->normalizeTurkishText($message);
+        $priceIntent = collect([
+            'ne kadar eder', 'kac para eder', 'kaca satilir', 'kaca gider',
+            'emsal', 'fiyat', 'siz bakin', 'siz soyleyin', 'son fiyat',
+            'acil', 'nakit', 'yatirimciya sun',
+        ])->contains(fn (string $signal): bool => str_contains($normalized, $signal));
+
+        $hasLocation = filled($data['city'] ?? null)
+            || filled($data['district'] ?? null)
+            || filled($data['neighborhood'] ?? null);
+        $fileReadyForPriceQuestion = filled($data['property_type'] ?? null)
+            && $hasLocation
+            && filled($data['area_sqm'] ?? null)
+            && $this->positivePrice($data['asking_price'] ?? null) !== null;
+
+        if (! $priceIntent && ! $fileReadyForPriceQuestion) {
+            return null;
+        }
+
+        $state['asked_at'] = now()->toIso8601String();
+        $state['market_research_mode'] = 'manual_operator';
+        $state['automatic_price_generated'] = false;
+        $data['seller_fast_cash_handoff'] = $state;
+        $profile->forceFill(['data' => $data])->save();
+
+        return 'Taşınmazınızı yatırımcı ağımıza sunabiliriz. Yatırımcı teklifi normal satış beklentinizden biraz daha düşük olabilir; uygun yatırımcıyla anlaşılırsa nakit ve işlem süreci daha hızlı ilerler.'
+            ."\n"
+            .'Hızlı nakit satışta değerlendirebileceğiniz son fiyat nedir? Bu fiyatla yatırımcılarımıza sunalım mı?';
     }
 
     private function deterministicSellerPriceAnswer(
