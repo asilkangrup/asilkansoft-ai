@@ -61,14 +61,27 @@ class RealEstateWhatsAppWebhookController extends Controller
         $event = $this->normalizeEvent(data_get($payload, 'event'));
         $payload['event'] = $event;
 
+        if ($instance !== RealEstateIsolationService::INSTANCE) {
+            Log::warning('REAL ESTATE WEBHOOK INSTANCE REJECTED', [
+                'instance' => $instance,
+                'expected_instance' => RealEstateIsolationService::INSTANCE,
+                'event' => $event,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Geçersiz Emlak AI instance.',
+            ], 403);
+        }
+
         $bot = AiBot::query()
             ->whereKey(RealEstateIsolationService::BOT_ID)
             ->where('user_id', RealEstateIsolationService::USER_ID)
             ->where('business_sector', 'real_estate')
-            ->where('whatsapp_instance', $instance)
+            ->where('whatsapp_instance', RealEstateIsolationService::INSTANCE)
             ->first();
 
-        if (! $isolation->supportsBotIdentity($bot) || ! $isolation->organizationValid()) {
+        if (! $isolation->supportsProductionBot($bot) || ! $isolation->organizationValid()) {
             Log::warning('REAL ESTATE WEBHOOK SCOPE REJECTED', [
                 'instance' => $instance,
                 'event' => $event,
