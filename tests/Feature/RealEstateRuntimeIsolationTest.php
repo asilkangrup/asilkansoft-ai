@@ -12,8 +12,10 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateWhatsAppInboundService;
+use App\Services\WhatsAppService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -33,6 +35,61 @@ class RealEstateRuntimeIsolationTest extends TestCase
             'last_customer_message_at' => now(),
             'is_active' => true,
         ]);
+
+        $this->assertFalse($followUp->fresh()->is_active);
+    }
+
+    public function test_real_estate_bot_follow_up_flags_can_never_be_enabled_through_model_writes(): void
+    {
+        $bot = $this->seedScope();
+
+        $bot->forceFill([
+            'follow_up_enabled' => true,
+            'second_follow_up_enabled' => true,
+        ])->save();
+
+        $bot->refresh();
+
+        $this->assertFalse($bot->follow_up_enabled);
+        $this->assertFalse($bot->second_follow_up_enabled);
+    }
+
+    public function test_shared_follow_up_sender_hard_blocks_real_estate_even_after_direct_database_drift(): void
+    {
+        $this->seedScope();
+
+        $followUp = ConversationFollowUp::query()->create([
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'session_id' => 'whatsapp:35:905550000009',
+            'whatsapp_number' => '905550000009',
+            'last_customer_message_at' => now()->subDays(2),
+            'is_active' => false,
+        ]);
+
+        // Simulate an unsafe shared-WAI/admin/direct-SQL drift that bypasses
+        // both Eloquent model guards. The command itself must still fail closed.
+        DB::table('ai_bots')
+            ->where('id', 35)
+            ->where('user_id', 40)
+            ->update([
+                'follow_up_enabled' => true,
+                'second_follow_up_enabled' => true,
+                'whatsapp_status' => 'open',
+            ]);
+
+        DB::table('conversation_follow_ups')
+            ->where('id', $followUp->id)
+            ->update([
+                'is_active' => true,
+            ]);
+
+        $this->mock(WhatsAppService::class, function ($mock): void {
+            $mock->shouldNotReceive('sendText');
+        });
+
+        $this->artisan('app:send-conversation-follow-ups')
+            ->assertSuccessful();
 
         $this->assertFalse($followUp->fresh()->is_active);
     }

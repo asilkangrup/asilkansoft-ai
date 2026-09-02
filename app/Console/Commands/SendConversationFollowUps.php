@@ -8,7 +8,6 @@ use App\Services\WhatsAppService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -21,17 +20,6 @@ class SendConversationFollowUps extends Command
         MemoryService $memoryService
     ): int {
         $this->info('Otomatik takip mesajları kontrol ediliyor...');
-
-        /*
-        |--------------------------------------------------------------------------
-        | SADECE AKTİF VE GEÇERLİ KAYITLARI GETİR
-        |--------------------------------------------------------------------------
-        |
-        | Not:
-        | Zaman filtresi bot bazında değiştiği için burada tamamen SQL'e
-        | taşımıyoruz. Ancak gereksiz ilişkileri ve bozuk kayıtları erken eliyoruz.
-        |
-        */
 
         $followUps = ConversationFollowUp::query()
             ->with('aiBot')
@@ -52,12 +40,6 @@ class SendConversationFollowUps extends Command
             try {
                 $aiBot = $followUp->aiBot;
 
-                /*
-                |--------------------------------------------------------------------------
-                | BOT VAR MI?
-                |--------------------------------------------------------------------------
-                */
-
                 if (! $aiBot) {
                     $followUp->update([
                         'is_active' => false,
@@ -70,11 +52,26 @@ class SendConversationFollowUps extends Command
                     continue;
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | TAKİP SİSTEMİ AÇIK MI?
-                |--------------------------------------------------------------------------
-                */
+                // Fresh Emlak AI (user 40 / bot 35) is intentionally reply-only.
+                // This guard is independent from both the AiBot settings and the
+                // ConversationFollowUp model hook so even direct database drift
+                // cannot make the shared WAI follow-up sender contact its clients.
+                if (
+                    (int) $aiBot->id === 35
+                    && (int) $aiBot->user_id === 40
+                ) {
+                    $followUp->update([
+                        'is_active' => false,
+                    ]);
+
+                    Log::warning('ISOLATED REAL ESTATE FOLLOW-UP HARD BLOCKED', [
+                        'follow_up_id' => $followUp->id,
+                        'user_id' => (int) $aiBot->user_id,
+                        'ai_bot_id' => (int) $aiBot->id,
+                    ]);
+
+                    continue;
+                }
 
                 if (! $aiBot->follow_up_enabled) {
                     $followUp->update([
@@ -83,12 +80,6 @@ class SendConversationFollowUps extends Command
 
                     continue;
                 }
-
-                /*
-                |--------------------------------------------------------------------------
-                | WHATSAPP INSTANCE / NUMARA VAR MI?
-                |--------------------------------------------------------------------------
-                */
 
                 if (
                     blank($aiBot->whatsapp_instance)
@@ -100,16 +91,6 @@ class SendConversationFollowUps extends Command
 
                     continue;
                 }
-
-                /*
-                |--------------------------------------------------------------------------
-                | WHATSAPP GERÇEKTEN BAĞLI MI?
-                |--------------------------------------------------------------------------
-                |
-                | DB'deki status alanı connection closed olan botlara gereksiz
-                | HTTP isteği atılmasını engeller.
-                |
-                */
 
                 $whatsappStatus = strtolower(
                     trim((string) $aiBot->whatsapp_status)
@@ -140,12 +121,6 @@ class SendConversationFollowUps extends Command
                     continue;
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | 1. TAKİP
-                |--------------------------------------------------------------------------
-                */
-
                 $firstFollowUpMinutes = max(
                     1,
                     (int) (
@@ -162,12 +137,6 @@ class SendConversationFollowUps extends Command
                         );
 
                 if (! $followUp->first_follow_up_sent_at) {
-                    /*
-                    |--------------------------------------------------------------------------
-                    | HENÜZ ZAMANI GELMEDİYSE HİÇBİR ŞEY YAPMA
-                    |--------------------------------------------------------------------------
-                    */
-
                     if (now()->lessThan($firstFollowUpTime)) {
                         continue;
                     }
@@ -212,12 +181,6 @@ class SendConversationFollowUps extends Command
                     continue;
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | İKİNCİ TAKİP KAPALIYSA TAMAMLA
-                |--------------------------------------------------------------------------
-                */
-
                 if (! $aiBot->second_follow_up_enabled) {
                     $followUp->update([
                         'is_active' => false,
@@ -225,12 +188,6 @@ class SendConversationFollowUps extends Command
 
                     continue;
                 }
-
-                /*
-                |--------------------------------------------------------------------------
-                | İKİNCİ TAKİP ZATEN GÖNDERİLDİYSE PASİF YAP
-                |--------------------------------------------------------------------------
-                */
 
                 if ($followUp->second_follow_up_sent_at) {
                     $followUp->update([
@@ -254,12 +211,6 @@ class SendConversationFollowUps extends Command
                         ->addMinutes(
                             $secondFollowUpMinutes
                         );
-
-                /*
-                |--------------------------------------------------------------------------
-                | 2. TAKİP ZAMANI GELMEDİYSE GEÇ
-                |--------------------------------------------------------------------------
-                */
 
                 if (now()->lessThan($secondFollowUpTime)) {
                     continue;
@@ -319,16 +270,6 @@ class SendConversationFollowUps extends Command
                             $exception->getMessage(),
                     ]
                 );
-
-                /*
-                |--------------------------------------------------------------------------
-                | BAĞLANTI / INSTANCE HATASINDA SONSUZ TEKRAR YAPMA
-                |--------------------------------------------------------------------------
-                |
-                | Mesaj içeriği veya geçici OpenAI hatası nedeniyle takip
-                | tamamen kapatılmıyor.
-                |
-                */
 
                 $errorMessage = strtolower(
                     $exception->getMessage()
