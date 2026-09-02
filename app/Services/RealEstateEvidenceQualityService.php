@@ -127,8 +127,7 @@ class RealEstateEvidenceQualityService
 
     private function supports(RealEstateProfile $profile): bool
     {
-        return (int) $profile->user_id === RealEstateIsolationService::USER_ID
-            && (int) $profile->ai_bot_id === RealEstateIsolationService::BOT_ID;
+        return $profile->belongsToIsolatedProductionScope();
     }
 
     private function classify(array $finding): string
