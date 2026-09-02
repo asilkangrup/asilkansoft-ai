@@ -44,14 +44,18 @@ class RealEstatePrivateMediaController extends Controller
             404
         );
 
-        return response()->file(
+        $response = response()->file(
             Storage::disk('local')->path($path),
             [
                 'Content-Type' => (string) ($record['mime_type'] ?? 'application/octet-stream'),
                 'Content-Disposition' => 'inline',
-                'Cache-Control' => 'private, no-store, max-age=0',
                 'X-Content-Type-Options' => 'nosniff',
             ]
         );
+        $response->setPrivate();
+        $response->setMaxAge(0);
+        $response->headers->addCacheControlDirective('no-store');
+
+        return $response;
     }
 }
