@@ -12,9 +12,10 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Livewire\Features\SupportFileUploads\WithFileUploads;
+use Livewire\WithFileUploads;
 
 class EmlakMusteriDetay extends Page
 {
@@ -148,7 +149,7 @@ class EmlakMusteriDetay extends Page
                     'is_image' => str_starts_with(strtolower((string) ($item['mime_type'] ?? '')), 'image/'),
                     'summary' => (string) ($item['label'] ?? 'Manuel yükleme'),
                     'received_at' => filled($item['uploaded_at'] ?? null)
-                        ? now()->parse($item['uploaded_at'])->format('d.m.Y H:i') : null,
+                        ? Carbon::parse($item['uploaded_at'])->format('d.m.Y H:i') : null,
                     'source' => 'Manuel',
                 ];
             });
@@ -306,8 +307,8 @@ class EmlakMusteriDetay extends Page
         $findings[] = [
             'message_id'=>'manual:'.$id,'media_category'=>$this->manualMediaCategory,
             'summary'=>$this->mediaCategoryLabel($this->manualMediaCategory),
-            'confidence_score'=>100,'analyzed_at'=>now()->toIso8601String(),
-            'source'=>'operator_manual_upload',
+            'confidence_score'=>80,'operator_classified'=>true,'legal_verification'=>false,
+            'analyzed_at'=>now()->toIso8601String(),'source'=>'operator_manual_upload',
         ];
         $data['manual_media'] = array_slice($manual, -30);
         $data['media_findings'] = array_slice($findings, -40);
