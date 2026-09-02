@@ -14,6 +14,10 @@ class RealEstateChatBoundaryGuardService
         $clientSource = $this->sourceFor(RealEstateOpenAIClient::class);
         $memorySource = $this->sourceFor(MemoryService::class);
         $profileSource = $this->sourceFor(RealEstateProfileService::class);
+        $matchSource = $this->sourceFor(RealEstateMatchService::class);
+        $sellerMotivationSource = $this->sourceFor(
+            RealEstateSellerMotivationService::class
+        );
         $valuationOutputGuardSource = $this->sourceFor(
             RealEstateValuationResearchOutputGuardService::class
         );
@@ -72,6 +76,40 @@ class RealEstateChatBoundaryGuardService
                 && str_contains($profileSource, "'minimum_price_present'")
                 && str_contains($profileSource, "'urgency_reason_present'")
                 && str_contains($profileSource, "\$safe['notes']"),
+            'seller_match_source_readable' => $matchSource !== null,
+            'seller_motivation_source_readable' => $sellerMotivationSource !== null,
+            'seller_urgency_score_neutral' => $matchSource !== null
+                && str_contains(
+                    $matchSource,
+                    "'seller_urgency_score_neutral' => true"
+                )
+                && ! str_contains(
+                    $matchSource,
+                    'Satıcının yüksek aciliyeti hızlı işlem ihtiyacını artırıyor.'
+                ),
+            'seller_protection_signal_wired_to_matching' => $matchSource !== null
+                && str_contains(
+                    $matchSource,
+                    'RealEstateSellerMotivationService::class'
+                )
+                && str_contains(
+                    $matchSource,
+                    "'seller_protection_required' => \$sellerProtectionRequired"
+                ),
+            'seller_protection_not_bargaining_leverage' =>
+                $matchSource !== null
+                && $sellerMotivationSource !== null
+                && str_contains(
+                    $matchSource,
+                    'pazarlık kozu olarak kullanılamaz'
+                )
+                && str_contains(
+                    $sellerMotivationSource,
+                    "'urgency_must_not_be_used_for_pressure' => true"
+                ),
+            'seller_private_floor_absent_from_match_scoring' =>
+                $matchSource !== null
+                && ! str_contains($matchSource, "\$sellerData['minimum_price']"),
             'valuation_research_output_guard_source_readable' =>
                 $valuationOutputGuardSource !== null,
             'valuation_research_output_guard_wired_before_crm' =>
@@ -102,6 +140,7 @@ class RealEstateChatBoundaryGuardService
             'application_data_boundary' => 'lower_privilege_envelope',
             'valuation_research_output_boundary' => 'deterministic_redaction_before_crm',
             'next_best_action_delivery' => 'deterministic_orchestrator_in_chat_memory',
+            'seller_match_protection' => 'urgency_neutral_protected_signal',
             'dedicated_openai_key_only' => true,
             'follow_up_capability' => 'disabled',
             'checks' => $checks,
