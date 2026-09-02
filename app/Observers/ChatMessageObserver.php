@@ -2,19 +2,8 @@
 
 namespace App\Observers;
 
-use App\Models\AiBot;
+use App\Jobs\RegisterRealEstateMediaCrmFinding;
 use App\Models\ChatMessage;
-use App\Models\ConversationControl;
-use App\Services\RealEstateDecisionService;
-use App\Services\RealEstateEvidenceReconciliationService;
-use App\Services\RealEstateIsolationService;
-use App\Services\RealEstateMatchService;
-use App\Services\RealEstateMatchValuationFreshnessFilterService;
-use App\Services\RealEstateMatchVerificationFilterService;
-use App\Services\RealEstateMediaAnalysisService;
-use App\Services\RealEstateValuationDecisionGuardService;
-use App\Services\RealEstateVerificationDecisionGuardService;
-use App\Services\RealEstateVerificationService;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -23,7 +12,6 @@ class ChatMessageObserver
     private const REAL_ESTATE_USER_ID = 40;
     private const REAL_ESTATE_ORGANIZATION_ID = 37;
     private const REAL_ESTATE_BOT_ID = 35;
-    private const REAL_ESTATE_INSTANCE = 'emlak-ai-35';
 
     public function created(ChatMessage $message): void
     {
@@ -51,65 +39,14 @@ class ChatMessageObserver
             return;
         }
 
-        try {
-            $conversation = ConversationControl::query()
-                ->where('user_id', self::REAL_ESTATE_USER_ID)
-                ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
-                ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
-                ->where('session_id', $message->session_id)
-                ->first();
-
-            $aiBot = AiBot::query()
-                ->whereKey(self::REAL_ESTATE_BOT_ID)
-                ->where('user_id', self::REAL_ESTATE_USER_ID)
-                ->where('whatsapp_instance', self::REAL_ESTATE_INSTANCE)
-                ->first();
-
-            if (
-                ! $conversation
-                || ! $aiBot
-                || ! app(RealEstateIsolationService::class)->supportsConversation($conversation)
-            ) {
-                return;
-            }
-
-            $analysis = app(RealEstateMediaAnalysisService::class)->process(
-                conversation: $conversation,
-                instanceName: self::REAL_ESTATE_INSTANCE,
-                mediaContext: [
-                    'type' => $type,
-                    'url' => $message->media_url,
-                    'mime_type' => $message->media_mime_type,
-                    'filename' => $message->media_filename,
-                    'caption' => $message->media_caption,
-                    'message_id' => $message->whatsapp_message_id,
-                    'message_envelope' => [
-                        'key' => ['id' => $message->whatsapp_message_id],
-                    ],
-                ],
-            );
-
-            if (! is_array($analysis)) {
-                return;
-            }
-
-            // Canonical CRM memory and field provenance must be reconciled
-            // before verification and match decisions on the same media turn.
-            app(RealEstateEvidenceReconciliationService::class)->process($conversation);
-            app(RealEstateVerificationService::class)->process($conversation);
-            app(RealEstateDecisionService::class)->process($conversation);
-            app(RealEstateValuationDecisionGuardService::class)->process($conversation);
-            app(RealEstateVerificationDecisionGuardService::class)->process($conversation);
-            app(RealEstateMatchService::class)->process($conversation);
-            app(RealEstateMatchValuationFreshnessFilterService::class)->process($conversation);
-            app(RealEstateMatchVerificationFilterService::class)->process($conversation);
-        } catch (Throwable $exception) {
-            Log::warning('REAL ESTATE MEDIA OBSERVER FAILED', [
-                'chat_message_id' => $message->id,
-                'message' => $exception->getMessage(),
-            ]);
-            report($exception);
-        }
+        // Production is intentionally CRM-only for inbound media. The
+        // full-resolution file is already persisted by the isolated inbound
+        // service. Never invoke vision/OCR from a model observer: it creates
+        // hidden token spend and can promote unverified image text into CRM
+        // facts. This delayed job only makes the saved file visible in the
+        // seller gallery and marks it as awaiting written confirmation.
+        RegisterRealEstateMediaCrmFinding::dispatch($message->id)
+            ->delay(now()->addSeconds(2));
     }
 
     private function removeLegacyPlaceholderDuplicate(ChatMessage $mediaMessage): void
