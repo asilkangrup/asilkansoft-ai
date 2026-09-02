@@ -1,0 +1,132 @@
+name: Apply Seller Investor Handoff
+
+on:
+  push:
+    branches:
+      - feat/seller-investor-handoff
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/seller-investor-handoff
+          fetch-depth: 0
+      - name: Integrate isolated seller handoff
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'needle not found in {path}: {old[:100]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          observer = 'app/Observers/RealEstateProfileObserver.php'
+          replace_once(
+              observer,
+              'use App\\Services\\RealEstateSellerOfferPacketService;\n',
+              'use App\\Services\\RealEstateSellerOfferPacketService;\nuse App\\Services\\RealEstateSellerInvestorHandoffService;\n',
+          )
+          replace_once(
+              observer,
+              '        app(RealEstateSellerOfferPacketService::class)->sync($profile);\n        $profile->refresh();\n\n        $this->recordEvidence($profile, $conversation);',
+              '        app(RealEstateSellerOfferPacketService::class)->sync($profile);\n        $profile->refresh();\n        app(RealEstateSellerInvestorHandoffService::class)->sync($profile);\n        $profile->refresh();\n\n        $this->recordEvidence($profile, $conversation);',
+          )
+
+          alert = 'app/Services/RealEstateOperatorAlertService.php'
+          replace_once(
+              alert,
+              "        'seller_protection_attention',\n",
+              "        'seller_protection_attention',\n        'investor_offer_handoff',\n",
+          )
+          replace_once(
+              alert,
+              "        $sellerMotivation = is_array($data['seller_motivation_intelligence'] ?? null)\n            ? $data['seller_motivation_intelligence']\n            : [];\n        $alerts = [];",
+              "        $sellerMotivation = is_array($data['seller_motivation_intelligence'] ?? null)\n            ? $data['seller_motivation_intelligence']\n            : [];\n        $handoff = is_array($data['investor_offer_handoff_intelligence'] ?? null)\n            ? $data['investor_offer_handoff_intelligence']\n            : [];\n        $alerts = [];",
+          )
+          marker = "\n        return $alerts;\n    }\n\n    private function upsert("
+          block = """
+
+        if (
+            $profile->profile_type === 'seller'
+            && (bool) ($handoff['ready_for_operator_handoff'] ?? false)
+            && (string) ($handoff['status'] ?? '') === 'ready'
+        ) {
+            $candidateCount = max(0, (int) ($handoff['candidate_count'] ?? 0));
+            $strongestGrade = (string) ($handoff['strongest_match_grade'] ?? '');
+            $alerts[] = [
+                'alert_key' => 'investor_offer_handoff:'.$profile->id,
+                'type' => 'investor_offer_handoff',
+                'severity' => $strongestGrade === 'strong' ? 'high' : 'medium',
+                'title' => 'Yatırımcı teklif toplama dosyası hazır',
+                'message' => (string) ($handoff['recommended_operator_action']
+                    ?? 'Uygun yatırımcı adaylarını operatör inceleyip gerçek teklif toplama sürecini manuel başlatsın.'),
+                'payload' => [
+                    'candidate_count' => $candidateCount,
+                    'strongest_match_score' => is_numeric($handoff['strongest_match_score'] ?? null)
+                        ? (int) $handoff['strongest_match_score']
+                        : null,
+                    'strongest_match_grade' => in_array($strongestGrade, ['possible', 'good', 'strong'], true)
+                        ? $strongestGrade
+                        : null,
+                    'candidate_refs' => collect($handoff['candidate_refs'] ?? [])
+                        ->filter(fn ($candidate): bool => is_array($candidate))
+                        ->take(3)
+                        ->values()
+                        ->all(),
+                    'automatic_investor_outreach_allowed' => false,
+                    'automatic_customer_follow_up_allowed' => false,
+                    'private_seller_floor_included' => false,
+                    'customer_pii_included' => false,
+                    'human_review_required_before_investor_contact' => true,
+                ],
+            ];
+        }
+"""
+          p = Path(alert)
+          text = p.read_text()
+          if "'investor_offer_handoff:'.$profile->id" not in text:
+              if marker not in text:
+                  raise SystemExit('operator alert return marker not found')
+              p.write_text(text.replace(marker, block + marker, 1))
+
+          readiness = 'app/Services/RealEstateReadinessService.php'
+          replace_once(
+              readiness,
+              '        $caseLifecycleReady = Schema::hasTable(\'real_estate_case_events\')\n            && class_exists(RealEstateCaseLifecycleService::class);\n        $audioTranscriptionReady = $this->audioTranscriptionReady();',
+              '        $caseLifecycleReady = Schema::hasTable(\'real_estate_case_events\')\n            && class_exists(RealEstateCaseLifecycleService::class);\n        $sellerInvestorHandoffReady = class_exists(RealEstateSellerInvestorHandoffService::class);\n        $audioTranscriptionReady = $this->audioTranscriptionReady();',
+          )
+          replace_once(
+              readiness,
+              "            'case_lifecycle_ready' => $caseLifecycleReady,\n            'audio_transcription_ready' => $audioTranscriptionReady,",
+              "            'case_lifecycle_ready' => $caseLifecycleReady,\n            'seller_investor_handoff_ready' => $sellerInvestorHandoffReady,\n            'audio_transcription_ready' => $audioTranscriptionReady,",
+          )
+          PY
+      - name: Syntax check changed PHP
+        run: |
+          php -l app/Services/RealEstateSellerInvestorHandoffService.php
+          php -l app/Services/RealEstateOperatorAlertService.php
+          php -l app/Observers/RealEstateProfileObserver.php
+          php -l app/Services/RealEstateReadinessService.php
+          php -l app/Console/Commands/InspectRealEstateInvestorHandoffs.php
+          php -l tests/Feature/RealEstateSellerInvestorHandoffTest.php
+      - name: Commit integration
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/Observers/RealEstateProfileObserver.php app/Services/RealEstateOperatorAlertService.php app/Services/RealEstateReadinessService.php
+          git commit -m "Integrate seller investor handoff runtime"
+          git push origin HEAD:feat/seller-investor-handoff
