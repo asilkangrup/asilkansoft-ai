@@ -7,8 +7,8 @@
 .re-top{display:flex;justify-content:space-between;gap:12px}.re-name{font-weight:900;font-size:17px;color:var(--ink)}.re-property{font-size:13px;color:var(--muted);margin-top:3px}
 .re-badge{height:30px;padding:0 10px;display:flex;align-items:center;border-radius:999px;background:#eafaf2;color:#087344;font-size:11px;font-weight:900;white-space:nowrap}.re-badge.seller{background:#fff5df;color:#8a5a00}.re-badge.offer{background:#eef4ff;color:#2956a3}.re-badge.final{background:#f2ecff;color:#6f3fb3}
 .re-box{padding:13px;border-radius:14px;background:#f7faf8;margin-top:12px}.re-box b{font-size:12px;color:var(--ink)}.re-box p{font-size:13px;line-height:1.55;color:#3c4c44;margin:5px 0 0}.re-script{border-left:3px solid var(--g)}
-.re-offer{display:inline-flex;margin-top:10px;padding:7px 10px;border-radius:10px;background:#eef4ff;color:#2956a3;font-size:12px;font-weight:900}
-.re-actions{display:grid;grid-template-columns:180px 180px minmax(220px,1fr) auto;gap:9px;margin-top:12px}.re-actions select,.re-actions textarea,.re-actions input{border:1px solid #dce5e0;border-radius:12px;background:#fff;font-size:13px}.re-actions select,.re-actions input{height:44px;padding:0 10px}.re-actions textarea{min-height:44px;padding:11px;resize:vertical}
+.re-offer{display:inline-flex;margin-top:10px;padding:7px 10px;border-radius:10px;background:#eef4ff;color:#2956a3;font-size:12px;font-weight:900}.re-reminder{display:inline-flex;margin:10px 0 0 6px;padding:7px 10px;border-radius:10px;background:#fff4dd;color:#875900;font-size:12px;font-weight:900}
+.re-actions{display:grid;grid-template-columns:170px 170px 190px minmax(220px,1fr) auto;gap:9px;margin-top:12px}.re-actions select,.re-actions textarea,.re-actions input{border:1px solid #dce5e0;border-radius:12px;background:#fff;font-size:13px}.re-actions select,.re-actions input{height:44px;padding:0 10px}.re-actions textarea{min-height:44px;padding:11px;resize:vertical}
 .re-save,.re-call{border:0;border-radius:12px;font-weight:850;cursor:pointer}.re-save{padding:0 16px;background:var(--ink);color:#fff}.re-call{display:inline-flex;margin-top:12px;padding:10px 13px;background:#eafaf2;color:#087344;text-decoration:none}.re-empty{text-align:center;padding:45px;border:1px dashed var(--line);border-radius:20px;color:var(--muted)}
 @media(max-width:850px){.re-actions{grid-template-columns:1fr 1fr}.re-actions textarea{grid-column:1/-1}.re-save{height:46px}}
 @media(max-width:700px){.re-hero{padding:19px}.re-hero h1{font-size:23px}.re-card{padding:15px}.re-top{align-items:flex-start}.re-actions{grid-template-columns:1fr}.re-actions textarea{grid-column:auto}.re-actions select,.re-actions input{font-size:16px}.re-save{height:46px}.re-call{width:100%;justify-content:center}}
@@ -51,6 +51,10 @@
                     <div class="re-offer">Mevcut rakam: {{ number_format((int) $task['offer_amount'], 0, ',', '.') }} TL</div>
                 @endif
 
+                @if(!empty($task['reminder_at']))
+                    <div class="re-reminder">⏰ Tekrar ara: {{ $task['reminder_at']->format('d.m.Y H:i') }}</div>
+                @endif
+
                 @if($task['phone'])
                     <a class="re-call" href="tel:{{ preg_replace('/[^0-9+]/', '', $task['phone']) }}">📞 {{ $task['phone'] }} numarasını ara</a>
                 @endif
@@ -72,6 +76,13 @@
                     @else
                         <div></div>
                     @endif
+
+                    <input
+                        type="datetime-local"
+                        wire:model="reminderDates.{{ $task['key'] }}"
+                        title="Tekrar arama zamanı"
+                        aria-label="Tekrar arama zamanı"
+                    >
 
                     <textarea wire:model="callNotes.{{ $task['key'] }}" placeholder="Görüşme notunu yaz…"></textarea>
                     <button class="re-save" wire:click="saveCall('{{ $task['key'] }}')">Kaydet</button>
