@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Pages\EmlakCrm;
 use App\Filament\Pages\EmlakMusteriDetay;
 use App\Models\AiBot;
+use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\Organization;
 use App\Models\RealEstateProfile;
@@ -28,9 +29,31 @@ class RealEstateCustomerDetailAccessTest extends TestCase
             'user_id' => 40,
             'ai_bot_id' => 35,
             'profile_type' => 'seller',
-            'data' => ['location' => 'Marmaris', 'property_type' => 'arsa'],
+            'data' => [
+                'location' => 'Marmaris', 'property_type' => 'arsa',
+                'media_findings' => [
+                    ['message_id'=>'photo-1','media_category'=>'property_photo','summary'=>'Arsanın güncel görünümü'],
+                    ['message_id'=>'deed-1','media_category'=>'title_deed','summary'=>'Tapu görseli'],
+                    ['message_id'=>'listing-1','media_category'=>'listing','summary'=>'İlan ekran görüntüsü'],
+                    ['message_id'=>'map-1','media_category'=>'location_map','summary'=>'Konum görseli'],
+                ],
+            ],
             'valuation' => [],
         ]));
+
+        foreach ([
+            ['photo-1','image','https://media.example.test/arsa.jpg','image/jpeg'],
+            ['deed-1','image','https://media.example.test/tapu.jpg','image/jpeg'],
+            ['listing-1','image','https://media.example.test/ilan.jpg','image/jpeg'],
+            ['map-1','image','https://media.example.test/konum.jpg','image/jpeg'],
+        ] as [$messageId, $type, $url, $mime]) {
+            ChatMessage::query()->forceCreate([
+                'user_id'=>40,'organization_id'=>37,'ai_bot_id'=>35,
+                'session_id'=>$customer->session_id,'role'=>'user','sender_type'=>'customer',
+                'message'=>'[Görsel]','message_type'=>$type,'media_url'=>$url,
+                'media_mime_type'=>$mime,'whatsapp_message_id'=>$messageId,'status'=>'received',
+            ]);
+        }
 
         $this->actingAs($user);
         $this->assertTrue(EmlakMusteriDetay::canAccess());
@@ -38,6 +61,11 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $detail = new EmlakMusteriDetay;
         $detail->customerId = $customer->id;
         $this->assertSame($customer->id, $detail->getCustomerProperty()?->id);
+        $gallery = $detail->getMediaGalleryProperty();
+        $this->assertCount(1, $gallery['Arsa Fotoğrafları']);
+        $this->assertCount(1, $gallery['Tapu / Parsel Belgeleri']);
+        $this->assertCount(1, $gallery['İlan Görselleri']);
+        $this->assertArrayNotHasKey('Konum Görselleri', $gallery);
 
         $detail->customerId = $foreign->id;
         $this->assertNull($detail->getCustomerProperty());
