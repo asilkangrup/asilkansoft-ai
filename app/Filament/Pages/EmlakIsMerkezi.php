@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\ChatMessage;
+use App\Models\ConversationControl;
 use App\Models\CrmActivity;
 use App\Models\RealEstateProfile;
 use App\Services\CrmActivityService;
@@ -14,6 +16,8 @@ use Illuminate\Support\Collection;
 
 class EmlakIsMerkezi extends Page
 {
+    private const WHATSAPP_IDLE_MINUTES = 30;
+
     protected string $view = 'filament.pages.emlak-is-merkezi';
     protected static ?string $title = 'Emlak İş Merkezi';
     protected static ?string $navigationLabel = 'Emlak İş Merkezi';
@@ -112,9 +116,36 @@ class EmlakIsMerkezi extends Page
                 ];
             })
             ->filter()
+            ->filter(function (array $task) use ($profiles): bool {
+                if (($task['kind'] ?? null) === 'sourcing') {
+                    return true;
+                }
+
+                $contact = $profiles->firstWhere('id', (int) ($task['contact_profile_id'] ?? 0));
+
+                return $this->whatsappConversationIsIdle($contact?->conversation);
+            })
             ->map(fn (array $task): array => $this->attachReminder($task, $history))
             ->sortByDesc(fn (array $task): int => $this->taskRank($task))
             ->values();
+    }
+
+    private function whatsappConversationIsIdle(?ConversationControl $conversation): bool
+    {
+        if (! $conversation) {
+            return true;
+        }
+
+        $latestMessage = ChatMessage::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('session_id', $conversation->session_id)
+            ->latest('created_at')
+            ->first(['created_at']);
+
+        return ! $latestMessage
+            || $latestMessage->created_at->lte(now()->subMinutes(self::WHATSAPP_IDLE_MINUTES));
     }
 
     public function outcomesFor(string $kind): array
