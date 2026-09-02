@@ -97,9 +97,9 @@ class RealEstateInvestorMandateIntelligenceTest extends TestCase
 
         $this->assertSame(35, $summary['strength_score']);
         $this->assertSame('building', $summary['status']);
-        $this->assertTrue($summary['core_ready']);
+        $this->assertFalse($summary['core_ready']);
         $this->assertSame(
-            'Yatırım hedefini: al-sat, kira getirisi veya değer artışı olarak netleştir.',
+            'Yatırım hedefini kısa biçimde netleştir: al-sat, kira getirisi veya değer artışı.',
             $summary['recommended_next_question']
         );
         $this->assertNull($summary['explicit_match_constraints']['area_min_sqm']);

@@ -151,13 +151,18 @@ PROMPT;
 
     private function investorDecision(array $data, array $valuation): array
     {
+        $nationwide = ($data['location_flexibility'] ?? null) === 'flexible';
+        $geographyReady = $this->has($data, 'city') || $nationwide;
         $missing = $this->missing($data, [
-            'city', 'property_type', 'budget_max', 'investment_goal', 'timeline',
+            'property_type', 'budget_max', 'investment_goal',
         ]);
+        if (! $geographyReady) {
+            $missing[] = 'geography';
+        }
 
         $score = 10;
         $score += $this->has($data, 'budget_max') ? 18 : 0;
-        $score += $this->has($data, 'city') ? 10 : 0;
+        $score += $geographyReady ? 10 : 0;
         $score += ($this->has($data, 'district') || $this->has($data, 'neighborhood')) ? 8 : 0;
         $score += $this->has($data, 'property_type') ? 12 : 0;
         $score += $this->has($data, 'investment_goal') ? 14 : 0;
@@ -171,23 +176,23 @@ PROMPT;
         };
         $score = min(100, $score);
 
-        $readyForMatch = $score >= 68
+        $readyForMatch = $score >= 58
             && $this->has($data, 'budget_max')
-            && $this->has($data, 'city')
-            && $this->has($data, 'property_type');
+            && $geographyReady
+            && $this->has($data, 'property_type')
+            && $this->has($data, 'investment_goal');
 
         $posture = $readyForMatch ? 'qualified_buyer' : 'qualify_before_offer';
         $strategy = $readyForMatch
             ? 'Bütçe, lokasyon ve yatırım hedefiyle uyumlu fırsatları filtrele; gerçek iskonto varsa veriye dayanarak açıkla.'
-            : 'Teklif konuşmadan önce bütçe, hedef bölge, taşınmaz türü ve zamanlamayı tamamla.';
+            : 'Temel kriterleri tamamla; somut fırsat kararını etkilemeyen ayrıntılarla müşteriyi yorma.';
 
         $next = match (true) {
-            ! $this->has($data, 'budget_max') => 'Yatırımcının gerçekçi maksimum bütçesini netleştir.',
-            ! $this->has($data, 'city') => 'Hedef il/bölgeyi netleştir.',
-            ! $this->has($data, 'property_type') => 'Aradığı taşınmaz türünü netleştir.',
+            ! $this->has($data, 'budget_max') => 'Yatırımcının yaklaşık maksimum bütçesini netleştir.',
+            ! $geographyReady => 'Belirli bir bölge mi aradığını, yoksa Türkiye genelinde fırsata açık mı olduğunu sor.',
+            ! $this->has($data, 'property_type') => 'Öncelikli taşınmaz türünü netleştir.',
             ! $this->has($data, 'investment_goal') => 'Kısa vadeli al-sat, kira getirisi veya değer artışı hedefini sor.',
-            ! $this->has($data, 'timeline') => 'Alım zamanlamasını netleştir.',
-            ! $readyForMatch => 'Finansman ve risk tercihindeki eksikleri tamamla.',
+            ! $readyForMatch => 'Mevcut temel kriterlerle fırsat taramasına geç; yalnız somut bir portföy kararını etkiliyorsa ek kriter sor.',
             default => 'Kriterlere uyan portföyleri iskonto, risk ve veri güveniyle sıralayıp en güçlü fırsatı sun.',
         };
 
@@ -268,6 +273,13 @@ PROMPT;
             return [
                 'reframe_high_ask',
                 'Fiyat beklentisini tek bir ilana değil güncel emsal aralığına dayandırarak yeniden çerçevele; satıcının esnekliğini doğal biçimde ölç.',
+            ];
+        }
+
+        if ($asking !== null && $investorMax !== null && $asking > $investorMax) {
+            return [
+                'negotiate_to_investor_range',
+                'Satıcıya piyasa, hızlı satış ve yatırımcı alım aralığını şeffaf biçimde ayır. Yatırımcıya sunulabilir gerçek bir fırsat oluşturmak için fiyatın yatırımcı alım bandına yaklaşması gerektiğini emsal ve hız/fiyat dengesiyle anlat; makul bir karşı teklif aralığı öner ve pazarlık esnekliğini ölç. Aciliyet üzerinden baskı kurma, sahte alıcı/teklif kullanma.',
             ];
         }
 
