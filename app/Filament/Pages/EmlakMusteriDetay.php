@@ -12,9 +12,14 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\WithFileUploads;
 
 class EmlakMusteriDetay extends Page
 {
+    use WithFileUploads;
+
     protected string $view = 'filament.pages.emlak-musteri-detay';
     protected static ?string $title = 'Müşteri Detayı';
     protected static ?string $navigationLabel = 'Müşteri Detayı';
@@ -23,6 +28,10 @@ class EmlakMusteriDetay extends Page
 
     public ?int $customerId = null;
     public string $note = '';
+    public mixed $manualUpload = null;
+    public string $manualMediaCategory = 'property_photo';
+    public string $titleOwnerRelation = 'unknown';
+    public string $titleOwnerNote = '';
 
     public static function canAccess(): bool
     {
@@ -40,6 +49,11 @@ class EmlakMusteriDetay extends Page
         $id = request()->integer('customer');
         $this->customerId = $id > 0 ? $id : null;
         abort_unless($this->customer !== null, 404);
+
+        $ownership = is_array(data_get($this->profile?->data, 'title_ownership'))
+            ? data_get($this->profile?->data, 'title_ownership') : [];
+        $this->titleOwnerRelation = (string) ($ownership['relation'] ?? 'unknown');
+        $this->titleOwnerNote = (string) ($ownership['note'] ?? '');
     }
 
     public function getCustomerProperty(): ?ConversationControl
@@ -77,7 +91,7 @@ class EmlakMusteriDetay extends Page
             ->filter(fn ($finding): bool => is_array($finding) && filled($finding['message_id'] ?? null))
             ->keyBy(fn (array $finding): string => trim((string) $finding['message_id']));
 
-        $grouped = ChatMessage::query()
+        $whatsappMedia = ChatMessage::query()
             ->where('user_id', RealEstateIsolationService::USER_ID)
             ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
             ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
@@ -112,11 +126,34 @@ class EmlakMusteriDetay extends Page
                     'is_image' => str_starts_with(strtolower((string) $message->media_mime_type), 'image/'),
                     'summary' => trim((string) ($finding['summary'] ?? '')),
                     'received_at' => $message->created_at?->format('d.m.Y H:i'),
+                    'source' => 'WhatsApp',
                 ];
             })
-            ->filter()
-            ->groupBy('group')
-            ->all();
+            ->filter();
+
+        $manualMedia = collect(is_array($data['manual_media'] ?? null) ? $data['manual_media'] : [])
+            ->filter(fn ($item): bool => is_array($item) && filled($item['id'] ?? null))
+            ->map(function (array $item) use ($profile): array {
+                $category = (string) ($item['category'] ?? 'other');
+
+                return [
+                    'id' => (string) $item['id'],
+                    'url' => route('real-estate.private-media', ['profile'=>$profile->id, 'media'=>$item['id']]),
+                    'category' => $category,
+                    'group' => match ($category) {
+                        'property_photo' => 'Arsa Fotoğrafları',
+                        'listing' => 'İlan Görselleri',
+                        default => 'Tapu / Parsel Belgeleri',
+                    },
+                    'is_image' => str_starts_with(strtolower((string) ($item['mime_type'] ?? '')), 'image/'),
+                    'summary' => (string) ($item['label'] ?? 'Manuel yükleme'),
+                    'received_at' => filled($item['uploaded_at'] ?? null)
+                        ? now()->parse($item['uploaded_at'])->format('d.m.Y H:i') : null,
+                    'source' => 'Manuel',
+                ];
+            });
+
+        $grouped = $whatsappMedia->merge($manualMedia)->groupBy('group')->all();
 
         return [
             'Arsa Fotoğrafları' => $grouped['Arsa Fotoğrafları'] ?? collect(),
@@ -169,6 +206,7 @@ class EmlakMusteriDetay extends Page
                 'Ada' => $this->first($data, ['block_no', 'ada_no']),
                 'Parsel' => $this->first($data, ['parcel_no', 'parsel_no']),
                 'Tapu niteliği' => $this->first($data, ['title_deed_type']),
+                'Tapu kimin üzerine' => $this->titleOwnerLabel($data),
                 'İmar durumu' => $this->first($data, ['zoning_status']),
                 'Hisse durumu' => $this->first($data, ['owner_share', 'share_status']),
                 'Konum bağlantısı' => $this->first($data, ['location_url']),
@@ -191,10 +229,11 @@ class EmlakMusteriDetay extends Page
                 'Uygun yatırımcı' => (int) ($handoff['candidate_count'] ?? 0),
                 'Değerleme güveni' => (int) ($valuation['confidence_score'] ?? $profile?->confidence_score ?? 0).'% ',
             ],
-            'missing' => array_values(array_unique(array_merge(
+            'missing' => array_values(array_unique(array_filter(array_merge(
                 is_array($packet['missing_critical_for_offer'] ?? null) ? $packet['missing_critical_for_offer'] : [],
                 is_array($packet['missing_supporting_context'] ?? null) ? $packet['missing_supporting_context'] : [],
-            ))),
+                [$this->titleOwnerRelation === 'unknown' ? 'title_owner_relation' : null],
+            )))),
             'call_script' => $this->callScript($commercial, $handoff),
         ];
     }
@@ -228,6 +267,96 @@ class EmlakMusteriDetay extends Page
                 ? 'Yatırımcının kriterlerine uygun gerçek portföyleri kontrol et.'
                 : (string) data_get($data, 'investor_offer_handoff_intelligence.recommended_operator_action', 'Satıcı dosyasındaki eksikleri tamamla.'),
         ];
+    }
+
+    public function uploadManualMedia(): void
+    {
+        abort_unless(static::canAccess() && $this->profile?->profile_type === 'seller', 403);
+
+        $this->validate([
+            'manualUpload' => ['required','file','mimes:jpg,jpeg,png,webp,pdf','max:10240'],
+            'manualMediaCategory' => ['required','in:property_photo,title_deed,parcel_document,listing'],
+        ]);
+
+        $profile = $this->profile;
+        $id = (string) Str::uuid();
+        $extension = strtolower((string) $this->manualUpload->getClientOriginalExtension());
+        $path = 'real-estate-private/'.$profile->id.'/'.$id.'.'.$extension;
+        $stored = $this->manualUpload->storeAs(
+            'real-estate-private/'.$profile->id,
+            $id.'.'.$extension,
+            'local'
+        );
+
+        if (! is_string($stored) || ! Storage::disk('local')->exists($path)) {
+            Notification::make()->title('Dosya güvenli alana kaydedilemedi')->danger()->send();
+            return;
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $manual = is_array($data['manual_media'] ?? null) ? $data['manual_media'] : [];
+        $manual[] = [
+            'id'=>$id,'storage_path'=>$path,'category'=>$this->manualMediaCategory,
+            'mime_type'=>(string) $this->manualUpload->getMimeType(),
+            'label'=>$this->mediaCategoryLabel($this->manualMediaCategory),
+            'uploaded_by_user_id'=>auth()->id(),'uploaded_at'=>now()->toIso8601String(),
+            'private'=>true,
+        ];
+        $findings = is_array($data['media_findings'] ?? null) ? $data['media_findings'] : [];
+        $findings[] = [
+            'message_id'=>'manual:'.$id,'media_category'=>$this->manualMediaCategory,
+            'summary'=>$this->mediaCategoryLabel($this->manualMediaCategory),
+            'confidence_score'=>100,'analyzed_at'=>now()->toIso8601String(),
+            'source'=>'operator_manual_upload',
+        ];
+        $data['manual_media'] = array_slice($manual, -30);
+        $data['media_findings'] = array_slice($findings, -40);
+        $profile->forceFill(['data'=>$data])->save();
+
+        $this->customer?->activities()->create([
+            'user_id'=>RealEstateIsolationService::USER_ID,
+            'ai_bot_id'=>RealEstateIsolationService::BOT_ID,
+            'performed_by_user_id'=>auth()->id(),
+            'type'=>'real_estate_manual_media',
+            'title'=>'Dosyaya manuel medya eklendi',
+            'description'=>$this->mediaCategoryLabel($this->manualMediaCategory),
+            'meta'=>['scope'=>'isolated_real_estate','profile_id'=>$profile->id,'media_id'=>$id,'private'=>true,'automatic_outbound_allowed'=>false],
+        ]);
+
+        $this->manualUpload = null;
+        Notification::make()->title('Fotoğraf/belge özel dosyaya eklendi')->success()->send();
+    }
+
+    public function saveTitleOwnership(): void
+    {
+        abort_unless(static::canAccess() && $this->profile?->profile_type === 'seller', 403);
+
+        $this->validate([
+            'titleOwnerRelation'=>['required','in:unknown,seller,spouse,relative,company,other_person'],
+            'titleOwnerNote'=>['nullable','string','max:300'],
+        ]);
+
+        $profile = $this->profile;
+        $data = is_array($profile->data) ? $profile->data : [];
+        $data['title_ownership'] = [
+            'relation'=>$this->titleOwnerRelation,
+            'note'=>trim($this->titleOwnerNote) ?: null,
+            'confirmed_by_operator'=>true,
+            'updated_at'=>now()->toIso8601String(),
+        ];
+        $profile->forceFill(['data'=>$data])->save();
+
+        $this->customer?->activities()->create([
+            'user_id'=>RealEstateIsolationService::USER_ID,
+            'ai_bot_id'=>RealEstateIsolationService::BOT_ID,
+            'performed_by_user_id'=>auth()->id(),
+            'type'=>'real_estate_title_ownership',
+            'title'=>'Tapu sahipliği ilişkisi güncellendi',
+            'description'=>$this->titleOwnerLabel($data),
+            'meta'=>['scope'=>'isolated_real_estate','profile_id'=>$profile->id,'relation'=>$this->titleOwnerRelation,'automatic_outbound_allowed'=>false],
+        ]);
+
+        Notification::make()->title('Tapu sahipliği CRM’e kaydedildi')->success()->send();
     }
 
     public function saveNote(): void
@@ -269,6 +398,30 @@ class EmlakMusteriDetay extends Page
     public function backUrl(): string
     {
         return url('/admin/emlak-crm');
+    }
+
+    private function titleOwnerLabel(array $data): string
+    {
+        $ownership = is_array($data['title_ownership'] ?? null) ? $data['title_ownership'] : [];
+        $relation = (string) ($ownership['relation'] ?? 'unknown');
+        $label = match ($relation) {
+            'seller'=>'Satıcının kendisi','spouse'=>'Eşi','relative'=>'Yakını / akrabası',
+            'company'=>'Şirket','other_person'=>'Başka bir kişi',default=>'Henüz bilinmiyor',
+        };
+        $note = trim((string) ($ownership['note'] ?? ''));
+
+        return $note !== '' ? $label.' — '.$note : $label;
+    }
+
+    private function mediaCategoryLabel(string $category): string
+    {
+        return match ($category) {
+            'property_photo'=>'Arsa / taşınmaz fotoğrafı',
+            'title_deed'=>'Tapu belgesi',
+            'parcel_document'=>'Parsel belgesi',
+            'listing'=>'İlan görseli',
+            default=>'Gayrimenkul belgesi',
+        };
     }
 
     private function callScript(array $commercial, array $handoff): string
