@@ -146,9 +146,12 @@ class RealEstateValuationResearchProvenanceTest extends TestCase
             'status' => 'active',
         ]);
 
+        // ConversationControl intentionally normalizes the isolated bot back
+        // to organization 37 on normal save. Force a persisted drift after
+        // creation so this is a genuine cross-organization boundary test.
         $conversation = ConversationControl::query()->create([
             'user_id' => 40,
-            'organization_id' => 38,
+            'organization_id' => 37,
             'ai_bot_id' => $bot->id,
             'session_id' => 'foreign-org-valuation',
             'whatsapp_number' => '905550000099',
@@ -156,6 +159,10 @@ class RealEstateValuationResearchProvenanceTest extends TestCase
             'lead_status' => 'new',
             'next_follow_up_at' => null,
         ]);
+        $conversation->forceFill(['organization_id' => 38])->saveQuietly();
+        $conversation->refresh();
+        $this->assertSame(38, (int) $conversation->organization_id);
+
         $profile = RealEstateProfile::query()->create([
             'conversation_control_id' => $conversation->id,
             'user_id' => 40,
