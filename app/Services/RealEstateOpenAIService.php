@@ -79,7 +79,7 @@ class RealEstateOpenAIService extends OpenAIService
             'model' => $model,
             'instructions' => $instructions,
             'input' => $input,
-            'max_output_tokens' => 700,
+            'max_output_tokens' => 500,
         ];
 
         // The customer-facing chat call deliberately has no external tools.
@@ -97,7 +97,7 @@ class RealEstateOpenAIService extends OpenAIService
                 // use. Deep valuation research runs in its dedicated service.
                 'effort' => trim((string) env(
                     'REAL_ESTATE_CHAT_REASONING_EFFORT',
-                    'medium'
+                    'low'
                 )),
             ];
         }
