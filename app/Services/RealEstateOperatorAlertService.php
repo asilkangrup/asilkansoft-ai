@@ -129,6 +129,8 @@ class RealEstateOperatorAlertService
             ? $data['investor_offer_handoff_intelligence']
             : [];
         $alerts = [];
+        $operatorContactEligible = app(RealEstateConversationHandoffService::class)
+            ->operatorContactEligible($conversation);
 
         $verificationStatus = (string) ($verification['status'] ?? '');
         $riskScore = (int) ($verification['risk_score'] ?? 0);
@@ -167,7 +169,8 @@ class RealEstateOperatorAlertService
         $stage = (string) ($decision['stage'] ?? '');
 
         if (
-            $leadScore >= 70
+            $operatorContactEligible
+            && $leadScore >= 70
             && $temperature === 'hot'
             && ! in_array((string) $conversation->lead_status, ['won', 'lost'], true)
         ) {
@@ -187,6 +190,8 @@ class RealEstateOperatorAlertService
                     'lead_temperature' => $temperature,
                     'stage' => $stage,
                     'ready_for_match' => (bool) ($decision['ready_for_match'] ?? false),
+                    'operator_contact_eligible' => true,
+                    'whatsapp_idle_threshold_minutes' => RealEstateConversationHandoffService::IDLE_MINUTES,
                 ],
             ];
         }
@@ -276,9 +281,9 @@ class RealEstateOperatorAlertService
             }
         }
 
-
         if (
-            $profile->profile_type === 'seller'
+            $operatorContactEligible
+            && $profile->profile_type === 'seller'
             && (bool) ($handoff['ready_for_operator_handoff'] ?? false)
             && (string) ($handoff['status'] ?? '') === 'ready'
         ) {
@@ -304,6 +309,8 @@ class RealEstateOperatorAlertService
                         ->take(3)
                         ->values()
                         ->all(),
+                    'operator_contact_eligible' => true,
+                    'whatsapp_idle_threshold_minutes' => RealEstateConversationHandoffService::IDLE_MINUTES,
                     'automatic_investor_outreach_allowed' => false,
                     'automatic_customer_follow_up_allowed' => false,
                     'private_seller_floor_included' => false,
