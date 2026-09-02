@@ -213,6 +213,9 @@ class RealEstateValuationResearchOutputGuardService
         $url = trim((string) $value);
         $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
         $host = strtolower(trim((string) parse_url($url, PHP_URL_HOST)));
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        $query = parse_url($url, PHP_URL_QUERY);
+        $fragment = parse_url($url, PHP_URL_FRAGMENT);
 
         if (! in_array($scheme, ['http', 'https'], true) || $host === '') {
             return null;
@@ -220,6 +223,15 @@ class RealEstateValuationResearchOutputGuardService
 
         if (! preg_match('/^[a-z0-9.-]+$/', $host)) {
             return null;
+        }
+
+        // Already-redacted values are stable across subsequent observer runs.
+        if (
+            preg_match('#^/r/[a-f0-9]{24}$#', $path)
+            && ($query === null || $query === '')
+            && ($fragment === null || $fragment === '')
+        ) {
+            return $scheme.'://'.$host.$path;
         }
 
         // Preserve distinct-listing/source cardinality for freshness and
