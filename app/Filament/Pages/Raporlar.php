@@ -10,6 +10,7 @@ use App\Services\CrmManagerSummaryService;
 use App\Services\CrmSalesGoalService;
 use App\Services\CrmStaffSalesGoalService;
 use App\Services\OrganizationAccessService;
+use App\Services\RealEstateIsolationService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Pages\Page;
@@ -25,6 +26,8 @@ class Raporlar extends Page
     protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedChartBar;
     protected static ?int $navigationSort = 34;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'CRM';
+
 
     /*
     |--------------------------------------------------------------------------
@@ -34,11 +37,8 @@ class Raporlar extends Page
 
     public static function canAccess(): bool
     {
-        return app(
-            OrganizationAccessService::class
-        )->can(
-            'reports'
-        );
+        return app(RealEstateIsolationService::class)->currentOperatorHasAccess()
+            || app(OrganizationAccessService::class)->can('reports');
     }
 
     public static function shouldRegisterNavigation(): bool
