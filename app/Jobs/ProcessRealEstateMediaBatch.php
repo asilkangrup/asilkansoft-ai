@@ -12,7 +12,7 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 12;
+    public int $tries = 120;
 
     public int $timeout = 240;
 
