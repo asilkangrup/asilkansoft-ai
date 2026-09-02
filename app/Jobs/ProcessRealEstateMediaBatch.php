@@ -12,11 +12,11 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 120;
+    public int $tries = 2;
 
     public int $timeout = 240;
 
-    public array $backoff = [2, 5, 10, 20, 30, 60];
+    public array $backoff = [60];
 
     public function __construct(
         public string $cacheKey,
@@ -98,29 +98,16 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
         $payloads = is_array($batch['payloads'] ?? null) ? $batch['payloads'] : [];
         $payloads = array_values(array_filter($payloads, 'is_array'));
         $last = count($payloads) - 1;
-        $imageIndexes = array_keys(array_filter(
-            $payloads,
-            fn (array $payload): bool => $this->isImagePayload($payload)
-        ));
-        // A property-photo burst gets one representative vision pass.
-        // Every file is still persisted in the private CRM gallery, while
-        // avoiding several serial model calls before the customer receives a
-        // reply. Documents remain fully analyzed below.
-        $representativeImageIndexes = $imageIndexes === []
-            ? []
-            : [$imageIndexes[0]];
-
         foreach ($payloads as $index => $payload) {
             unset($payload['_real_estate_authorized']);
 
             try {
-                $analyzeMedia = ! in_array($index, $imageIndexes, true)
-                    || in_array($index, $representativeImageIndexes, true);
-
                 $inbound->process(
                     $payload,
                     suppressReply: $index < $last,
-                    analyzeMedia: $analyzeMedia,
+                    // Photos and documents are stored in the CRM gallery. No
+                    // automatic vision/OCR call is made in the low-cost mode.
+                    analyzeMedia: false,
                 );
             } catch (\Throwable $exception) {
                 // Preserve the failed turn and all following fragments. The
@@ -138,11 +125,6 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
                     now()->addMinutes(10)
                 );
 
-                // The container does not depend on an external scheduler for
-                // correctness. A provider/rate-limit failure schedules one
-                // unique delayed recovery for already-received messages.
-                RecoverRealEstateUnansweredInbound::dispatch()
-                    ->delay(now()->addSeconds(65));
 
                 throw $exception;
             }
