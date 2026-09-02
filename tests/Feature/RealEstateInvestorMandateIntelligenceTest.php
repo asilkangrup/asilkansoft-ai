@@ -9,6 +9,7 @@ use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\RealEstateInvestorMandateService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -55,11 +56,11 @@ class RealEstateInvestorMandateIntelligenceTest extends TestCase
         $this->assertTrue($summary['core_ready']);
         $this->assertSame([], $summary['missing_high_value_criteria']);
         $this->assertNull($summary['recommended_next_question']);
-        $this->assertSame(900.0, $summary['explicit_match_constraints']['area_min_sqm']);
-        $this->assertSame(1500.0, $summary['explicit_match_constraints']['area_max_sqm']);
+        $this->assertSame(900.0, (float) $summary['explicit_match_constraints']['area_min_sqm']);
+        $this->assertSame(1500.0, (float) $summary['explicit_match_constraints']['area_max_sqm']);
         $this->assertSame('strict_district', $summary['explicit_match_constraints']['location_flexibility']);
         $this->assertFalse($summary['explicit_match_constraints']['accepts_shared_title']);
-        $this->assertSame(20.0, $summary['explicit_match_constraints']['target_discount_percent']);
+        $this->assertSame(20.0, (float) $summary['explicit_match_constraints']['target_discount_percent']);
         $this->assertTrue($summary['guardrails']['unknown_preferences_are_not_hard_rejections']);
         $this->assertFalse($summary['guardrails']['seller_private_floor_exposed']);
         $this->assertFalse($summary['guardrails']['follow_up_scheduling_allowed']);
@@ -153,7 +154,12 @@ class RealEstateInvestorMandateIntelligenceTest extends TestCase
             'monthly_message_limit' => 1000,
             'status' => 'active',
         ]);
-        $conversation = $this->conversation($bot, 38, 'mandate-foreign');
+        $conversation = $this->conversation($bot, 37, 'mandate-foreign');
+        DB::table('conversation_controls')
+            ->where('id', $conversation->id)
+            ->update(['organization_id' => 38]);
+        $conversation->refresh();
+
         $profile = RealEstateProfile::query()->create([
             'conversation_control_id' => $conversation->id,
             'user_id' => 40,
