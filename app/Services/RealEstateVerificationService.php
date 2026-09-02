@@ -24,6 +24,16 @@ class RealEstateVerificationService
             return null;
         }
 
+        // Documentary/property-identity verification is seller-side only.
+        // Investor/buyer preferences can legitimately differ from a listing or
+        // screenshot they share; treating that as a property-identity conflict
+        // can incorrectly block matching and ask seller-specific questions.
+        if ($profile->profile_type !== 'seller') {
+            $this->clearNonSellerVerification($profile, $conversation);
+
+            return null;
+        }
+
         $data = is_array($profile->data) ? $profile->data : [];
         $provenance = is_array($data['field_provenance'] ?? null)
             ? $data['field_provenance']
@@ -165,7 +175,12 @@ class RealEstateVerificationService
         }
 
         $profile = $this->profileFor($conversation);
-        $verification = is_array($profile?->data)
+
+        if (! $profile || $profile->profile_type !== 'seller') {
+            return '';
+        }
+
+        $verification = is_array($profile->data)
             ? ($profile->data['verification_intelligence'] ?? null)
             : null;
 
@@ -201,6 +216,28 @@ class RealEstateVerificationService
 Bu blok müşteri beyanı ile WhatsApp üzerinden analiz edilen belge/görseller arasındaki dahili tutarlılık kontrolüdür. Bu kontrol resmi tapu, belediye, TAKBİS veya hukuki doğrulama değildir. Müşteriye dahili risk skorunu veya alan adlarını gösterme. media_only_fields yalnızca görsel/belgeden CRM'e alınmış, bağımsız müşteri teyidi olmayan alanlardır; bunları kendi kaynaklarıyla eşleşiyor diye doğrulanmış sayma. Düşük güvenli medya bulguları çatışma, doğrulama veya eşleştirme kararında kullanılmaz; gerekirse daha net belge/görsel iste. Çelişki varsa kesin fiyat/imar/tapu iddiasında bulunma ve eşleştirmeyi aceleye getirme. status blocked/high_risk ise önce çelişkiyi açık, kısa ve profesyonel bir soruyla netleştir. status corroborated olsa bile resmi geçerlilik garantisi verme. legal_verification_complete hiçbir zaman yalnız görsel analizinden true kabul edilmez.
 Doğrulama desteği: {$json}
 PROMPT;
+    }
+
+    private function clearNonSellerVerification(
+        RealEstateProfile $profile,
+        ConversationControl $conversation
+    ): void {
+        $data = is_array($profile->data) ? $profile->data : [];
+
+        if (array_key_exists('verification_intelligence', $data)) {
+            unset($data['verification_intelligence']);
+            $profile->update(['data' => $data]);
+        }
+
+        $conversation->update([
+            'tags' => collect($conversation->etiketler())
+                ->filter(fn ($tag): bool =>
+                    is_string($tag)
+                    && ! str_starts_with($tag, self::TAG_PREFIX)
+                )
+                ->values()
+                ->all(),
+        ]);
     }
 
     private function inScope(ConversationControl $conversation): bool

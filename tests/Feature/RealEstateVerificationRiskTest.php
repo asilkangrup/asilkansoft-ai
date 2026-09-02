@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\RealEstateMatchVerificationFilterService;
+use App\Services\RealEstateOperatorAlertService;
 use App\Services\RealEstateVerificationDecisionGuardService;
 use App\Services\RealEstateVerificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -205,6 +206,93 @@ class RealEstateVerificationRiskTest extends TestCase
             $investorConversation->etiketler()
         );
         $this->assertNull($investorConversation->next_follow_up_at);
+    }
+
+    public function test_investor_media_mismatch_does_not_create_seller_verification_risk(): void
+    {
+        $bot = $this->seedRealEstateBot();
+        $conversation = $this->conversation(
+            $bot,
+            'investor-media-preference',
+            [
+                'business:real_estate_investor',
+                'real_estate:verification:high_risk',
+            ]
+        );
+
+        $profile = RealEstateProfile::query()->create([
+            'conversation_control_id' => $conversation->id,
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'profile_type' => 'investor',
+            'data' => [
+                'property_type' => 'arsa',
+                'city' => 'Muğla',
+                'budget_max' => 5000000,
+                'media_findings' => [[
+                    'document_type' => 'listing_screenshot',
+                    'property_type' => 'daire',
+                    'city' => 'İstanbul',
+                    'confidence_score' => 95,
+                ]],
+                'verification_intelligence' => [
+                    'status' => 'high_risk',
+                    'risk_score' => 65,
+                    'safe_to_match' => false,
+                    'conflicts' => [[
+                        'field' => 'property_type',
+                        'severity' => 'high',
+                    ]],
+                ],
+                'decision_intelligence' => [
+                    'lead_score' => 80,
+                    'lead_temperature' => 'hot',
+                    'stage' => 'ready',
+                    'ready_for_match' => true,
+                    'next_best_action' => 'Yatırım hedefini netleştir.',
+                ],
+            ],
+            'valuation' => [],
+            'completeness_score' => 80,
+            'confidence_score' => 80,
+        ]);
+
+        $this->assertNull(
+            app(RealEstateVerificationService::class)->process($conversation)
+        );
+        $this->assertSame(
+            '',
+            app(RealEstateVerificationService::class)->promptFor($conversation)
+        );
+
+        $profile->refresh();
+        $conversation->refresh();
+
+        $this->assertArrayNotHasKey(
+            'verification_intelligence',
+            $profile->data
+        );
+        $this->assertFalse(
+            collect($conversation->etiketler())
+                ->contains(fn ($tag): bool =>
+                    is_string($tag)
+                    && str_starts_with($tag, 'real_estate:verification:')
+                )
+        );
+
+        $alerts = app(RealEstateOperatorAlertService::class)->sync($profile);
+
+        $this->assertFalse(
+            collect($alerts)->contains(
+                fn (array $alert): bool => ($alert['type'] ?? null) === 'verification_risk'
+            )
+        );
+        $this->assertTrue(
+            collect($alerts)->contains(
+                fn (array $alert): bool => ($alert['type'] ?? null) === 'hot_lead'
+            )
+        );
+        $this->assertNull($conversation->next_follow_up_at);
     }
 
     public function test_verification_services_are_hard_scoped_to_fresh_account(): void

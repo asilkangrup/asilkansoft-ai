@@ -129,7 +129,10 @@ class RealEstateOperatorAlertService
         $verificationStatus = (string) ($verification['status'] ?? '');
         $riskScore = (int) ($verification['risk_score'] ?? 0);
 
-        if (in_array($verificationStatus, ['blocked', 'high_risk'], true)) {
+        if (
+            $profile->profile_type === 'seller'
+            && in_array($verificationStatus, ['blocked', 'high_risk'], true)
+        ) {
             $critical = $verificationStatus === 'blocked' || $riskScore >= 85;
             $alerts[] = [
                 'alert_key' => 'verification_risk:'.$profile->id,
