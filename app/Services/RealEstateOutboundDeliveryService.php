@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AiBot;
 use App\Models\ChatMessage;
+use App\Models\ConversationControl;
 use App\Models\RealEstateOutboundDelivery;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,7 @@ class RealEstateOutboundDeliveryService
 {
     public function __construct(
         private readonly RealEstateIsolationService $isolation,
+        private readonly RealEstateOutboundSafetyService $outboundSafetyService,
         private readonly WhatsAppService $whatsAppService,
     ) {
     }
@@ -54,6 +56,28 @@ class RealEstateOutboundDeliveryService
 
         if ($sessionId === '' || $phoneNumber === '' || $answer === '') {
             throw new RuntimeException('İzole Emlak AI outbound teslimat bilgileri eksik.');
+        }
+
+        $conversation = ConversationControl::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('session_id', $sessionId)
+            ->first();
+
+        if (! $conversation || ! $this->isolation->supportsConversation($conversation)) {
+            throw new RuntimeException('İzole Emlak AI outbound konuşma kapsamı bulunamadı.');
+        }
+
+        $safety = $this->outboundSafetyService->protect(
+            conversation: $conversation,
+            answer: $answer,
+            inboundMessageId: $inboundMessageId,
+        );
+        $answer = trim((string) $safety['answer']);
+
+        if ($answer === '') {
+            throw new RuntimeException('İzole Emlak AI outbound güvenlik filtresi boş cevap üretti.');
         }
 
         $deliveryKey = hash('sha256', $instance.'|'.$inboundMessageId);
