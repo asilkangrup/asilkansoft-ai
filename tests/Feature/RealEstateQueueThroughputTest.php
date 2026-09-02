@@ -14,7 +14,7 @@ class RealEstateQueueThroughputTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_text_and_media_jobs_for_same_chat_share_one_overlap_key(): void
+    public function test_text_and_batched_jobs_for_same_chat_share_one_overlap_key(): void
     {
         $remoteJid = '126817583255713@lid';
         $hash = hash('sha256', strtolower($remoteJid));
@@ -28,17 +28,17 @@ class RealEstateQueueThroughputTest extends TestCase
                 ],
             ],
         ]);
-        $mediaJob = new ProcessRealEstateMediaBatch(
-            'real-estate-media-batch:'.$hash,
+        $batchJob = new ProcessRealEstateMediaBatch(
+            'real-estate-inbound-burst:'.$hash,
             'generation-1',
         );
 
         $this->assertSame('real-estate-chat:'.$hash, $textJob->overlapKey());
-        $this->assertSame($textJob->overlapKey(), $mediaJob->overlapKey());
+        $this->assertSame($textJob->overlapKey(), $batchJob->overlapKey());
         $this->assertSame(120, $textJob->tries);
-        $this->assertSame(120, $mediaJob->tries);
+        $this->assertSame(120, $batchJob->tries);
         $this->assertInstanceOf(WithoutOverlapping::class, $textJob->middleware()[0]);
-        $this->assertInstanceOf(WithoutOverlapping::class, $mediaJob->middleware()[0]);
+        $this->assertInstanceOf(WithoutOverlapping::class, $batchJob->middleware()[0]);
     }
 
     public function test_different_whatsapp_chats_can_run_in_parallel(): void
