@@ -13,6 +13,7 @@ use App\Services\RealEstateNextBestActionDecisionBridgeService;
 use App\Services\RealEstateNextBestActionService;
 use App\Services\RealEstateOperatorAlertService;
 use App\Services\RealEstateSellerMotivationService;
+use App\Services\RealEstateValuationResearchOutputGuardService;
 
 class RealEstateProfileObserver
 {
@@ -29,6 +30,12 @@ class RealEstateProfileObserver
         if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return;
         }
+
+        // Valuation data may contain prose/labels originating from web search.
+        // Remove that untrusted research text before any deterministic CRM,
+        // negotiation or prompt-building service can consume the saved profile.
+        app(RealEstateValuationResearchOutputGuardService::class)->sanitize($profile);
+        $profile->refresh();
 
         app(RealEstateInvestorMandateService::class)->sync($profile);
         $profile->refresh();
