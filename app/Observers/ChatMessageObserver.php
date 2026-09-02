@@ -4,6 +4,8 @@ namespace App\Observers;
 
 use App\Jobs\RegisterRealEstateMediaCrmFinding;
 use App\Models\ChatMessage;
+use App\Models\ConversationControl;
+use App\Models\RealEstateProfile;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -40,11 +42,32 @@ class ChatMessageObserver
         }
 
         // Production is intentionally CRM-only for inbound media. The
-        // full-resolution file is already persisted by the isolated inbound
-        // service. Never invoke vision/OCR from a model observer: it creates
-        // hidden token spend and can promote unverified image text into CRM
-        // facts. This delayed job only makes the saved file visible in the
-        // seller gallery and marks it as awaiting written confirmation.
+        // full-resolution file is persisted by the isolated inbound service.
+        // Never invoke vision/OCR from a model observer: it creates hidden
+        // token spend and can promote unverified image text into CRM facts.
+        // If the seller profile already exists, update its deterministic
+        // gallery/checklist immediately. On a first-ever media turn the profile
+        // is created just after this observer returns, so use the delayed job.
+        $conversationId = ConversationControl::query()
+            ->where('user_id', self::REAL_ESTATE_USER_ID)
+            ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
+            ->where('ai_bot_id', self::REAL_ESTATE_BOT_ID)
+            ->where('session_id', $message->session_id)
+            ->value('id');
+
+        $sellerProfileExists = $conversationId !== null
+            && RealEstateProfile::query()
+                ->isolatedProduction()
+                ->where('conversation_control_id', $conversationId)
+                ->where('profile_type', 'seller')
+                ->exists();
+
+        if ($sellerProfileExists) {
+            RegisterRealEstateMediaCrmFinding::dispatchSync($message->id);
+
+            return;
+        }
+
         RegisterRealEstateMediaCrmFinding::dispatch($message->id)
             ->delay(now()->addSeconds(2));
     }
