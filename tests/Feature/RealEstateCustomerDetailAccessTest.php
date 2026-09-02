@@ -90,6 +90,11 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $this->assertNotContains('listing_reference', $dossier['missing']);
         $this->assertNotSame('', trim($dossier['call_script']));
         $this->assertCount(4, $detail->getMessagesProperty());
+        $legacyCrm = $detail->getLegacyCrmProperty();
+        $this->assertSame('0/100', $legacyCrm['Fırsat puanı']);
+        $this->assertArrayHasKey('AI CRM özeti', $legacyCrm);
+        $this->assertArrayHasKey('Sonraki en iyi aksiyon', $legacyCrm);
+        $this->assertArrayHasKey('Tahmini portföy değeri', $legacyCrm);
 
         $detail->customerId = $foreign->id;
         $this->assertNull($detail->getCustomerProperty());
