@@ -11,7 +11,10 @@ use App\Models\Organization;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class RealEstateCustomerDetailAccessTest extends TestCase
@@ -93,6 +96,59 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $record = (new EmlakCrm)->getRecordsProperty()->first();
         $this->assertStringContainsString('/admin/emlak-musteri-detay?customer='.$customer->id, $record['customer_url']);
         $this->assertStringNotContainsString('/admin/musteriler?', $record['customer_url']);
+    }
+
+    public function test_operator_can_upload_private_media_and_record_title_owner_relation(): void
+    {
+        Storage::fake('local');
+        $user = $this->seedAccount();
+        $customer = $this->conversation(40, 37, 35, 'manual-media-customer');
+        $profile = RealEstateProfile::withoutEvents(fn () => RealEstateProfile::query()->forceCreate([
+            'conversation_control_id'=>$customer->id,'user_id'=>40,'ai_bot_id'=>35,
+            'profile_type'=>'seller','data'=>[],'valuation'=>[],
+        ]));
+
+        $this->actingAs($user);
+        Livewire::withQueryParams(['customer'=>$customer->id])
+            ->test(EmlakMusteriDetay::class)
+            ->set('manualMediaCategory', 'title_deed')
+            ->set('manualUpload', UploadedFile::fake()->image('tapu.jpg'))
+            ->call('uploadManualMedia')
+            ->assertHasNoErrors()
+            ->set('titleOwnerRelation', 'relative')
+            ->set('titleOwnerNote', 'Babasının üzerine')
+            ->call('saveTitleOwnership')
+            ->assertHasNoErrors();
+
+        $profile->refresh();
+        $manual = data_get($profile->data, 'manual_media.0');
+        $this->assertSame('title_deed', $manual['category']);
+        $this->assertTrue($manual['private']);
+        Storage::disk('local')->assertExists($manual['storage_path']);
+        $this->assertSame('relative', data_get($profile->data, 'title_ownership.relation'));
+        $this->assertSame('Babasının üzerine', data_get($profile->data, 'title_ownership.note'));
+        $this->assertFalse((bool) data_get($profile->data, 'media_findings.0.legal_verification'));
+
+        $detail = new EmlakMusteriDetay;
+        $detail->customerId = $customer->id;
+        $detail->titleOwnerRelation = 'relative';
+        $this->assertSame(
+            'Yakını / akrabası — Babasının üzerine',
+            $detail->getDossierProperty()['property']['Tapu kimin üzerine']
+        );
+        $this->assertSame('Manuel', $detail->getMediaGalleryProperty()['Tapu / Parsel Belgeleri']->first()['source']);
+
+        $this->get(route('real-estate.private-media', [
+            'profile'=>$profile->id,'media'=>$manual['id'],
+        ]))->assertOk()
+            ->assertHeader('cache-control', 'private, no-store')
+            ->assertHeader('x-content-type-options', 'nosniff');
+
+        $foreign = User::query()->findOrFail(41);
+        $this->actingAs($foreign)
+            ->get(route('real-estate.private-media', [
+                'profile'=>$profile->id,'media'=>$manual['id'],
+            ]))->assertForbidden();
     }
 
     private function conversation(int $user, int $organization, int $bot, string $session): ConversationControl
