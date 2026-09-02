@@ -366,16 +366,30 @@ class RealEstateWhatsAppInboundService
         $history = $this->memoryService->openAIMesajlariHazirla(
             userId: RealEstateIsolationService::USER_ID,
             sessionId: $sessionId,
-            limit: 8,
+            limit: 50,
         );
+
+        $isPhotoOrDocument = in_array($mediaContext['type'] ?? null, ['image', 'document'], true);
 
         $answer = $this->deterministicFirstContactRoleQuestion(
             conversation: $conversation,
             message: $message,
+            isPhotoOrDocument: $isPhotoOrDocument,
         );
 
         if ($answer === null) {
             $answer = $this->deterministicCompanyInformationAnswer($message);
+        }
+
+        if ($answer === null) {
+            $answer = $this->deterministicSellerPresentationConsentAnswer(
+                conversation: $conversation,
+                message: $message,
+            );
+        }
+
+        if ($answer === null && $isPhotoOrDocument) {
+            $answer = $this->deterministicMediaWrittenDetailsAnswer($conversation);
         }
 
         if ($answer === null) {
@@ -509,6 +523,7 @@ class RealEstateWhatsAppInboundService
     private function deterministicFirstContactRoleQuestion(
         ConversationControl $conversation,
         string $message,
+        bool $isPhotoOrDocument = false,
     ): ?string {
         $priorOperatorReplyExists = ChatMessage::query()
             ->where('user_id', RealEstateIsolationService::USER_ID)
@@ -543,8 +558,83 @@ class RealEstateWhatsAppInboundService
             }
         }
 
-        return 'Merhaba, size doğru yardımcı olabilmem için sorayım: '
+        $prefix = $isPhotoOrDocument
+            ? 'Fotoğrafı/belgeyi dosyanıza kaydettim. Bilgileri doğru kaydedebilmemiz için görseldeki taşınmaz bilgilerini yazılı olarak da göndermeniz gerekiyor.'."\n"
+            : '';
+
+        return $prefix.'Merhaba, size doğru yardımcı olabilmem için sorayım: '
             .'Gayrimenkul satıcısı mısınız, yoksa yatırımcı mısınız?';
+    }
+
+    private function deterministicSellerPresentationConsentAnswer(
+        ConversationControl $conversation,
+        string $message,
+    ): ?string {
+        $profile = RealEstateProfile::query()->isolatedProduction()
+            ->where('conversation_control_id', $conversation->id)->first();
+
+        if (! $profile || $profile->profile_type !== 'seller') {
+            return null;
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $state = is_array($data['seller_fast_cash_handoff'] ?? null) ? $data['seller_fast_cash_handoff'] : [];
+
+        if (blank($state['asked_at'] ?? null) || filled($state['completed_at'] ?? null)) {
+            return null;
+        }
+
+        $normalized = $this->normalizeTurkishText($message);
+        $consent = collect([
+            'yatirimci aginiza sunabilirsiniz', 'yatirimcilara sunabilirsiniz',
+            'yatirimciya sunabilirsiniz', 'yatirimcilara sunun',
+            'yatirimciya sunun', 'evet sunun', 'olur sunun',
+        ])->contains(fn (string $signal): bool => str_contains($normalized, $signal));
+
+        if (! $consent) {
+            return null;
+        }
+
+        $state['completed_at'] = now()->toIso8601String();
+        $state['seller_consented_to_presentation'] = true;
+        $state['conversation_closed_cleanly'] = true;
+        $data['seller_fast_cash_handoff'] = $state;
+        $data['investor_presentation_status'] = 'operator_review_ready';
+        $profile->forceFill(['data' => $data])->save();
+
+        return 'Teşekkür ederim. Dosyanızı yatırımcı değerlendirmesine sunulmak üzere CRM’e kaydettim. '
+            .'Yatırımcı tekliflerini topluyoruz; kriteri uyan gerçek bir yatırımcıdan uygun teklif oluşursa süreci sizinle ilerleteceğiz. '
+            .'Şimdilik sizden başka bilgi istemiyorum.';
+    }
+
+    private function deterministicMediaWrittenDetailsAnswer(ConversationControl $conversation): string
+    {
+        $profile = RealEstateProfile::query()->isolatedProduction()
+            ->where('conversation_control_id', $conversation->id)->first();
+
+        $answer = 'Fotoğrafı/belgeyi dosyanıza kaydettim. Bilgileri doğru kaydedebilmemiz için görseldeki taşınmaz bilgilerini yazılı olarak da göndermeniz gerekiyor. '
+            .'Lütfen taşınmaz türü, il/ilçe/mahalle, m², satış fiyatı ve varsa ada/parsel bilgisini yazılı olarak atar mısınız?';
+
+        if (! $profile || $profile->profile_type !== 'seller') {
+            return $answer;
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $state = is_array($data['seller_fast_cash_handoff'] ?? null) ? $data['seller_fast_cash_handoff'] : [];
+
+        if (filled($state['asked_at'] ?? null)) {
+            return $answer;
+        }
+
+        $state['asked_at'] = now()->toIso8601String();
+        $state['market_research_mode'] = 'manual_operator';
+        $state['automatic_price_generated'] = false;
+        $data['seller_fast_cash_handoff'] = $state;
+        $profile->forceFill(['data' => $data])->save();
+
+        return $answer."\n"
+            .'Taşınmazınızı yatırımcılara hızlı nakit fiyatıyla sunuyoruz. Bu fiyat normal satış beklentinizden daha düşük olabilir; uygun yatırımcıyla anlaşılırsa ödeme ve işlem süreci daha hızlı ilerler.'."\n"
+            .'Hızlı nakitte son fiyatınız nedir? Yatırımcılardan hızlı nakit fiyatı almak ister misiniz?';
     }
 
     private function deterministicCompanyInformationAnswer(
@@ -731,34 +821,15 @@ class RealEstateWhatsAppInboundService
             return null;
         }
 
-        $normalized = $this->normalizeTurkishText($message);
-        $priceIntent = collect([
-            'ne kadar eder', 'kac para eder', 'kaca satilir', 'kaca gider',
-            'emsal', 'fiyat', 'siz bakin', 'siz soyleyin', 'son fiyat',
-            'acil', 'nakit', 'yatirimciya sun',
-        ])->contains(fn (string $signal): bool => str_contains($normalized, $signal));
-
-        $hasLocation = filled($data['city'] ?? null)
-            || filled($data['district'] ?? null)
-            || filled($data['neighborhood'] ?? null);
-        $fileReadyForPriceQuestion = filled($data['property_type'] ?? null)
-            && $hasLocation
-            && filled($data['area_sqm'] ?? null)
-            && $this->positivePrice($data['asking_price'] ?? null) !== null;
-
-        if (! $priceIntent && ! $fileReadyForPriceQuestion) {
-            return null;
-        }
-
         $state['asked_at'] = now()->toIso8601String();
         $state['market_research_mode'] = 'manual_operator';
         $state['automatic_price_generated'] = false;
         $data['seller_fast_cash_handoff'] = $state;
         $profile->forceFill(['data' => $data])->save();
 
-        return 'Taşınmazınızı yatırımcı ağımıza sunabiliriz. Yatırımcı teklifi normal satış beklentinizden biraz daha düşük olabilir; uygun yatırımcıyla anlaşılırsa nakit ve işlem süreci daha hızlı ilerler.'
+        return 'Taşınmazınızı yatırımcılara hızlı nakit fiyatıyla sunuyoruz. Bu fiyat normal satış beklentinizden daha düşük olabilir; uygun yatırımcıyla anlaşılırsa ödeme ve işlem süreci daha hızlı ilerler.'
             ."\n"
-            .'Hızlı nakit satışta değerlendirebileceğiniz son fiyat nedir? Bu fiyatla yatırımcılarımıza sunalım mı?';
+            .'Hızlı nakitte son fiyatınız nedir? Yatırımcılardan hızlı nakit fiyatı almak ister misiniz?';
     }
 
     private function deterministicSellerPriceAnswer(

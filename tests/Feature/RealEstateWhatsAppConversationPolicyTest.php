@@ -17,7 +17,7 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
         $this->assertStringContainsString('sadece alanları listeleme', $prompt);
         $this->assertStringContainsString('Yeterli veri varsa soru sorarak kaçma', $prompt);
         $this->assertStringContainsString('otomatik piyasa/emsal araştırması yapmaz', $prompt);
-        $this->assertStringContainsString('Hızlı nakit satışta değerlendirebileceğiniz son fiyat nedir?', $prompt);
+        $this->assertStringContainsString('Hızlı nakitte son fiyatınız nedir?', $prompt);
         $this->assertStringContainsString('özel minimum/taban fiyatını', $prompt);
         $this->assertStringContainsString('sahte alıcı, sahte teklif', $prompt);
         $this->assertStringContainsString(

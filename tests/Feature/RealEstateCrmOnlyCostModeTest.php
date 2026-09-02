@@ -25,7 +25,7 @@ class RealEstateCrmOnlyCostModeTest extends TestCase
             $inbound
         );
         $this->assertStringContainsString(
-            'Hızlı nakit satışta değerlendirebileceğiniz son fiyat nedir?',
+            'Hızlı nakitte son fiyatınız nedir?',
             $inbound
         );
         $this->assertStringContainsString(
@@ -38,6 +38,7 @@ class RealEstateCrmOnlyCostModeTest extends TestCase
     {
         $batch = file_get_contents(app_path('Jobs/ProcessRealEstateMediaBatch.php'));
         $inbound = file_get_contents(app_path('Services/RealEstateWhatsAppInboundService.php'));
+        $prompt = file_get_contents(app_path('Services/RealEstateOpenAIService.php'));
 
         $this->assertStringContainsString('public int $tries = 2', $batch);
         $this->assertStringContainsString('analyzeMedia: false', $batch);
@@ -49,7 +50,11 @@ class RealEstateCrmOnlyCostModeTest extends TestCase
             "in_array(\$mediaContext['type'] ?? null, ['image', 'document'], true)",
             $inbound
         );
-        $this->assertStringContainsString('limit: 8', $inbound);
+        $this->assertStringContainsString('limit: 50', $inbound);
+        $this->assertStringContainsString('görseldeki taşınmaz bilgilerini yazılı olarak da göndermeniz gerekiyor', $inbound);
+        $this->assertStringContainsString('Yatırımcılardan hızlı nakit fiyatı almak ister misiniz?', $inbound);
+        $this->assertStringContainsString('Yatırımcı tekliflerini topluyoruz', $inbound);
+        $this->assertStringContainsString('görüşmeyi yeni sorularla uzatma', $prompt);
     }
 
     public function test_followups_and_cross_tenant_behavior_are_not_enabled(): void

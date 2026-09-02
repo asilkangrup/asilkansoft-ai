@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\RealEstateProfile;
+use App\Models\RealEstatePrivateMedia;
 use App\Services\RealEstateCommercialDealService;
 use App\Services\RealEstateIsolationService;
 use BackedEnum;
@@ -359,6 +360,38 @@ class EmlakMusteriDetay extends Page
         ];
     }
 
+    public function getLegacyCrmProperty(): array
+    {
+        $customer = $this->customer;
+
+        if (! $customer) {
+            return [];
+        }
+
+        $money = static fn ($value): string => is_numeric($value)
+            ? number_format((float) $value, 0, ',', '.').' TL'
+            : 'Belirtilmedi';
+
+        return [
+            'Lead durumu' => (string) ($customer->lead_status ?: 'Belirtilmedi'),
+            'Fırsat puanı' => (int) $customer->lead_score.'/100',
+            'Lead sıcaklığı' => (string) ($customer->lead_temperature ?: 'Belirtilmedi'),
+            'Sorumlu personel' => (string) ($customer->assignedUser?->name ?: 'Atanmadı'),
+            'Son temas' => $customer->last_contact_at?->format('d.m.Y H:i') ?: 'Belirtilmedi',
+            'Planlı takip' => $customer->next_follow_up_at?->format('d.m.Y H:i') ?: 'Yok',
+            'Okunmamış mesaj' => (string) ((int) $customer->unread_count),
+            'Etiketler' => collect($customer->tags ?? [])->filter()->implode(', ') ?: 'Yok',
+            'AI CRM özeti' => (string) ($customer->ai_summary ?: 'Henüz oluşturulmadı'),
+            'Sonraki en iyi aksiyon' => (string) ($customer->next_best_action ?: 'Belirtilmedi'),
+            'Tahmini portföy değeri' => $money($customer->estimated_value),
+            'Gerçekleşen işlem değeri' => $money($customer->actual_value),
+            'Kontrol' => $customer->human_takeover ? 'Operatörde' : 'Emlak AI’da',
+            'Kazanılma tarihi' => $customer->won_at?->format('d.m.Y H:i') ?: 'Yok',
+            'Kaybedilme tarihi' => $customer->lost_at?->format('d.m.Y H:i') ?: 'Yok',
+            'Kaybedilme nedeni' => (string) ($customer->lost_reason ?: 'Yok'),
+        ];
+    }
+
     public function uploadManualMedia(): void
     {
         abort_unless(static::canAccess() && $this->profile?->profile_type === 'seller', 403);
@@ -382,6 +415,20 @@ class EmlakMusteriDetay extends Page
             Notification::make()->title('Dosya güvenli alana kaydedilemedi')->danger()->send();
             return;
         }
+
+        $bytes = Storage::disk('local')->get($path);
+        RealEstatePrivateMedia::query()->updateOrCreate(
+            ['real_estate_profile_id' => $profile->id, 'media_key' => $id],
+            [
+                'user_id' => RealEstateIsolationService::USER_ID,
+                'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+                'ai_bot_id' => RealEstateIsolationService::BOT_ID,
+                'chat_message_id' => null,
+                'mime_type' => (string) $this->manualUpload->getMimeType(),
+                'size' => strlen($bytes),
+                'content_base64' => base64_encode($bytes),
+            ]
+        );
 
         $data = is_array($profile->data) ? $profile->data : [];
         $manual = is_array($data['manual_media'] ?? null) ? $data['manual_media'] : [];

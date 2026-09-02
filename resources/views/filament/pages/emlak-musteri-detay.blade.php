@@ -135,6 +135,14 @@
             @empty<div class="ed-event"><small>Henüz kayıtlı WhatsApp konuşması yok.</small></div>@endforelse
         </div></section>
 
+        <section class="ed-card">
+            <h2>WAI CRM Özeti</h2>
+            <div class="ed-data">
+                @foreach($this->legacyCrm as $label => $value)
+                    <div><small>{{ $label }}</small><b>{{ $value }}</b></div>
+                @endforeach
+            </div>
+        </section>
         <section class="ed-card"><h2>CRM Notları</h2><div class="ed-notes">{{ $this->customer->notes ?: 'Henüz not eklenmedi.' }}</div><div class="ed-noteform"><textarea wire:model="note" placeholder="Görüşme notunu yaz…"></textarea><button wire:click="saveNote">Notu kaydet</button></div></section>
         <section class="ed-card"><h2>Müşteri Geçmişi</h2><div class="ed-timeline">@forelse($this->activities as $activity)<div class="ed-event"><b>{{ $activity->title }}</b>@if($activity->description)<p>{{ $activity->description }}</p>@endif<small>{{ $activity->created_at?->format('d.m.Y H:i') }} · {{ $activity->actorName() }}</small></div>@empty<div class="ed-event"><small>Henüz CRM aktivitesi yok.</small></div>@endforelse</div></section>
     </div>
