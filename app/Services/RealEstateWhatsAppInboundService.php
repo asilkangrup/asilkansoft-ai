@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
+use App\Models\RealEstateProfile;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -327,10 +328,17 @@ class RealEstateWhatsAppInboundService
             limit: 20,
         );
 
-        $answer = trim($this->openAIService->cevapVer(
-            mesajlar: $history,
-            aiBot: $bot,
-        ));
+        $answer = $this->deterministicSellerPriceAnswer(
+            conversation: $conversation,
+            message: $message,
+        );
+
+        if ($answer === null) {
+            $answer = trim($this->openAIService->cevapVer(
+                mesajlar: $history,
+                aiBot: $bot,
+            ));
+        }
 
         if ($answer === '') {
             throw new RuntimeException('Emlak AI boş cevap üretti.');
@@ -394,6 +402,78 @@ class RealEstateWhatsAppInboundService
             'message' => 'Emlak AI cevabı gönderildi.',
             'delivery_deduplicated' => ! (bool) $deliveryResult['sent_now'],
         ];
+    }
+
+    private function deterministicSellerPriceAnswer(
+        ConversationControl $conversation,
+        string $message,
+    ): ?string {
+        $normalized = strtolower(strtr(trim($message), [
+            'İ' => 'i', 'I' => 'i', 'ı' => 'i',
+            'Ş' => 's', 'ş' => 's', 'Ğ' => 'g', 'ğ' => 'g',
+            'Ü' => 'u', 'ü' => 'u', 'Ö' => 'o', 'ö' => 'o',
+            'Ç' => 'c', 'ç' => 'c',
+        ]));
+
+        $priceIntent = false;
+        foreach ([
+            'ne kadara satabilirim', 'kaca satabilirim', 'kaca satilir',
+            'kaca gider', 'ne kadar eder', 'kac para eder',
+            'satis fiyati', 'gercekci satis',
+        ] as $signal) {
+            if (str_contains($normalized, $signal)) {
+                $priceIntent = true;
+                break;
+            }
+        }
+
+        if (! $priceIntent) {
+            return null;
+        }
+
+        $profile = RealEstateProfile::query()
+            ->isolatedProduction()
+            ->where('conversation_control_id', $conversation->id)
+            ->first();
+
+        if (! $profile || $profile->profile_type !== 'seller') {
+            return null;
+        }
+
+        $valuation = is_array($profile->valuation) ? $profile->valuation : [];
+        $realistic = $this->positivePrice($valuation['quick_sale_min'] ?? null)
+            ?? $this->positivePrice($valuation['realistic_sale_min'] ?? null)
+            ?? $this->positivePrice($valuation['market_min'] ?? null);
+
+        if ($realistic === null) {
+            return null;
+        }
+
+        $fastCashMin = round($realistic * 0.75 / 1000) * 1000;
+        $fastCashMax = round($realistic * 0.80 / 1000) * 1000;
+
+        return 'Gerçekçi satış fiyatı: yaklaşık '
+            .$this->formatTl($realistic)
+            .' TL — bu seviyede satış mümkün ama biraz bekleyebilir.'
+            ."\n"
+            .'Hızlı nakit alım bandı: yaklaşık '
+            .$this->formatTl($fastCashMin)
+            .'–'.$this->formatTl($fastCashMax)
+            .' TL.'
+            ."\n"
+            .'Acil nakde çevirmek isterseniz yatırımcılardan teklifleri toplayıp size iletebilirim.';
+    }
+
+    private function positivePrice(mixed $value): ?float
+    {
+        return is_numeric($value) && (float) $value > 0
+            ? (float) $value
+            : null;
+    }
+
+    private function formatTl(float $value): string
+    {
+        return number_format((int) round($value), 0, ',', '.');
     }
 
     private function botForInstance(string $instance): ?AiBot
