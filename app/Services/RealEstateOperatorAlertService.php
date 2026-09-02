@@ -17,6 +17,7 @@ class RealEstateOperatorAlertService
         'valuation_attention',
         'evidence_attention',
         'seller_protection_attention',
+        'investor_offer_handoff',
     ];
 
     public function sync(RealEstateProfile $profile): array
@@ -123,6 +124,9 @@ class RealEstateOperatorAlertService
             : [];
         $sellerMotivation = is_array($data['seller_motivation_intelligence'] ?? null)
             ? $data['seller_motivation_intelligence']
+            : [];
+        $handoff = is_array($data['investor_offer_handoff_intelligence'] ?? null)
+            ? $data['investor_offer_handoff_intelligence']
             : [];
         $alerts = [];
 
@@ -270,6 +274,43 @@ class RealEstateOperatorAlertService
                     ],
                 ];
             }
+        }
+
+
+        if (
+            $profile->profile_type === 'seller'
+            && (bool) ($handoff['ready_for_operator_handoff'] ?? false)
+            && (string) ($handoff['status'] ?? '') === 'ready'
+        ) {
+            $candidateCount = max(0, (int) ($handoff['candidate_count'] ?? 0));
+            $strongestGrade = (string) ($handoff['strongest_match_grade'] ?? '');
+            $alerts[] = [
+                'alert_key' => 'investor_offer_handoff:'.$profile->id,
+                'type' => 'investor_offer_handoff',
+                'severity' => $strongestGrade === 'strong' ? 'high' : 'medium',
+                'title' => 'Yatırımcı teklif toplama dosyası hazır',
+                'message' => (string) ($handoff['recommended_operator_action']
+                    ?? 'Uygun yatırımcı adaylarını operatör inceleyip gerçek teklif toplama sürecini manuel başlatsın.'),
+                'payload' => [
+                    'candidate_count' => $candidateCount,
+                    'strongest_match_score' => is_numeric($handoff['strongest_match_score'] ?? null)
+                        ? (int) $handoff['strongest_match_score']
+                        : null,
+                    'strongest_match_grade' => in_array($strongestGrade, ['possible', 'good', 'strong'], true)
+                        ? $strongestGrade
+                        : null,
+                    'candidate_refs' => collect($handoff['candidate_refs'] ?? [])
+                        ->filter(fn ($candidate): bool => is_array($candidate))
+                        ->take(3)
+                        ->values()
+                        ->all(),
+                    'automatic_investor_outreach_allowed' => false,
+                    'automatic_customer_follow_up_allowed' => false,
+                    'private_seller_floor_included' => false,
+                    'customer_pii_included' => false,
+                    'human_review_required_before_investor_contact' => true,
+                ],
+            ];
         }
 
         return $alerts;
