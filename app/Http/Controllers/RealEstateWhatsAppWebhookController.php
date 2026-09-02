@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\ProcessRealEstateMediaBatch;
-use App\Jobs\ProcessRealEstateWhatsAppWebhook;
 use App\Models\AiBot;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateWebhookAuthService;
@@ -116,43 +115,32 @@ class RealEstateWhatsAppWebhookController extends Controller
             // the generic WAI endpoint from becoming an auth bypass.
             $payload['_real_estate_authorized'] = true;
 
-            $remoteJid = trim((string) data_get($payload, 'data.key.remoteJid', ''));
-            $cacheKey = 'real-estate-media-batch:'.hash('sha256', $remoteJid);
-            $pendingMediaBatch = $remoteJid !== '' ? Cache::get($cacheKey) : null;
+            // Debounce every inbound burst, not only media. Ads frequently
+            // produce a photo followed by several short text messages. Keeping
+            // them in one ordered batch ensures the full-resolution image is
+            // analyzed before the single final reply and prevents duplicate
+            // discovery questions from concurrent jobs.
+            $contactKey = $this->canonicalContactKey($payload);
+            $cacheKey = 'real-estate-inbound-burst:'.hash('sha256', $contactKey);
+            $existing = Cache::get($cacheKey);
+            $payloads = is_array($existing) && is_array($existing['payloads'] ?? null)
+                ? $existing['payloads']
+                : [];
+            $payloads[] = $payload;
+            $generation = (string) Str::uuid();
 
-            // If a customer sends several photos/documents and then a short
-            // text such as "bunları incele", keep that text in the same
-            // burst. The final job therefore sees every media analysis before
-            // producing exactly one customer-facing reply.
-            if ($this->isBurstMediaPayload($payload) || is_array($pendingMediaBatch)) {
-                $existing = $pendingMediaBatch;
-                $payloads = is_array($existing) && is_array($existing['payloads'] ?? null)
-                    ? $existing['payloads']
-                    : [];
-                $payloads[] = $payload;
-                $generation = (string) Str::uuid();
+            Cache::put($cacheKey, [
+                'generation' => $generation,
+                'payloads' => array_slice($payloads, -12),
+            ], now()->addSeconds(45));
 
-                Cache::put($cacheKey, [
-                    'generation' => $generation,
-                    'payloads' => array_slice($payloads, -12),
-                ], now()->addSeconds(45));
-
-                ProcessRealEstateMediaBatch::dispatch($cacheKey, $generation)
-                    ->delay(now()->addSeconds(3));
-
-                return response()->json([
-                    'success' => true,
-                    'queued' => true,
-                    'batched_media' => true,
-                    'isolated' => true,
-                ]);
-            }
-
-            ProcessRealEstateWhatsAppWebhook::dispatch($payload);
+            ProcessRealEstateMediaBatch::dispatch($cacheKey, $generation)
+                ->delay(now()->addSeconds(4));
 
             return response()->json([
                 'success' => true,
                 'queued' => true,
+                'batched_inbound' => true,
                 'isolated' => true,
             ]);
         } catch (Throwable $exception) {
@@ -171,21 +159,40 @@ class RealEstateWhatsAppWebhookController extends Controller
         }
     }
 
-    private function isBurstMediaPayload(array $payload): bool
+    private function canonicalContactKey(array $payload): string
     {
-        $message = data_get($payload, 'data.message', []);
+        $remoteJid = strtolower(trim((string) data_get(
+            $payload,
+            'data.key.remoteJid',
+            ''
+        )));
+        $remoteJidAlt = strtolower(trim((string) data_get(
+            $payload,
+            'data.key.remoteJidAlt',
+            ''
+        )));
 
-        if (! is_array($message)) {
-            return false;
+        // Evolution may alternate between a privacy-preserving @lid address
+        // and the real phone JID for consecutive messages from one contact.
+        // Prefer the phone alternative so both payloads share one debounce.
+        if (
+            str_ends_with($remoteJid, '@lid')
+            && $this->isPhoneJid($remoteJidAlt)
+        ) {
+            return $remoteJidAlt;
         }
 
-        $encoded = json_encode($message);
+        if ($this->isPhoneJid($remoteJid)) {
+            return $remoteJid;
+        }
 
-        return is_string($encoded) && (
-            str_contains($encoded, '"imageMessage"')
-            || str_contains($encoded, '"documentMessage"')
-            || str_contains($encoded, '"videoMessage"')
-        );
+        return $remoteJid !== '' ? $remoteJid : (string) Str::uuid();
+    }
+
+    private function isPhoneJid(string $jid): bool
+    {
+        return str_ends_with($jid, '@s.whatsapp.net')
+            || str_ends_with($jid, '@c.us');
     }
 
     private function normalizeEvent(mixed $event): string
