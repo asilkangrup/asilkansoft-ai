@@ -375,6 +375,37 @@ class RealEstateWhatsAppInboundService
             throw new RuntimeException('Emlak AI boş cevap üretti.');
         }
 
+        // AI generation can take longer than a fast customer message burst.
+        // Never deliver an answer prepared for an older turn after a newer
+        // customer message has already been persisted.
+        $newerInboundExists = ChatMessage::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('session_id', $sessionId)
+            ->where('sender_type', 'customer')
+            ->where('id', '>', $inboundMessage->id)
+            ->exists();
+
+        $bot->refresh();
+
+        if ($newerInboundExists || ! $bot->whatsappAiKullanilabilirMi()) {
+            Log::info('REAL ESTATE STALE OR DISABLED REPLY SUPPRESSED', [
+                'conversation_id' => $conversation->id,
+                'message_id' => $messageId,
+                'newer_inbound_exists' => $newerInboundExists,
+                'ai_enabled' => (bool) $bot->ai_enabled,
+            ]);
+
+            return [
+                'success' => true,
+                'ignored' => true,
+                'reason' => $newerInboundExists
+                    ? 'superseded_by_newer_customer_message'
+                    : 'ai_disabled_before_delivery',
+            ];
+        }
+
         $deliveryResult = $this->outboundDeliveryService->deliver(
             bot: $bot,
             instance: $instance,
