@@ -115,7 +115,7 @@ class RealEstateWhatsAppWebhookController extends Controller
             // the generic WAI endpoint from becoming an auth bypass.
             $payload['_real_estate_authorized'] = true;
 
-            // Debounce every inbound burst, not only media. Ads frequently
+            // Debounce every inbound burst, not only media. Wait for a short\n            // silence window so customers who type word by word receive one\n            // coherent reply instead of a reply to every fragment. Ads frequently
             // produce a photo followed by several short text messages. Keeping
             // them in one ordered batch ensures the full-resolution image is
             // analyzed before the single final reply and prevents duplicate
@@ -135,7 +135,7 @@ class RealEstateWhatsAppWebhookController extends Controller
             ], now()->addSeconds(45));
 
             ProcessRealEstateMediaBatch::dispatch($cacheKey, $generation)
-                ->delay(now()->addSeconds(4));
+                ->delay(now()->addSeconds(7));
 
             return response()->json([
                 'success' => true,
