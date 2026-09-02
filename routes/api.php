@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\RealEstateWhatsAppWebhookController;
 use App\Http\Controllers\WhatsAppWebhookController;
+use App\Models\RealEstateNextBestActionEvent;
 use App\Models\RealEstateOutboundSafetyEvent;
 use App\Services\RealEstateEvidenceLedgerService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
+use App\Services\RealEstateNextBestActionService;
 use App\Services\RealEstateOutboundSafetyService;
 use App\Services\RealEstateReadinessService;
 use Illuminate\Http\Request;
@@ -56,6 +58,8 @@ Route::prefix('real-estate')->group(function (): void {
             && class_exists(RealEstateEvidenceLedgerService::class);
         $outboundSafetyReady = Schema::hasTable('real_estate_outbound_safety_events')
             && class_exists(RealEstateOutboundSafetyService::class);
+        $nextBestActionReady = Schema::hasTable('real_estate_next_best_action_events')
+            && class_exists(RealEstateNextBestActionService::class);
 
         $snapshot['checks']['match_ledger_ready'] = $matchLedgerReady;
         $snapshot['match_ledger_telemetry_24h'] = $matchLedgerReady
@@ -126,10 +130,77 @@ Route::prefix('real-estate')->group(function (): void {
             ];
         }
 
+        $snapshot['checks']['next_best_action_orchestrator_ready'] = $nextBestActionReady;
+
+        if ($nextBestActionReady) {
+            $nextActionEvents = RealEstateNextBestActionEvent::query()
+                ->where('user_id', RealEstateIsolationService::USER_ID)
+                ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+                ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+                ->where('occurred_at', '>=', now()->subDay())
+                ->get([
+                    'conversation_control_id',
+                    'real_estate_profile_id',
+                    'action_code',
+                    'priority',
+                    'metadata',
+                ]);
+
+            $snapshot['next_best_action_telemetry_24h'] = [
+                'events' => $nextActionEvents->count(),
+                'blocking' => $nextActionEvents
+                    ->filter(fn ($event): bool => (bool) data_get(
+                        $event->metadata,
+                        'blocking',
+                        false
+                    ))->count(),
+                'high_priority' => $nextActionEvents
+                    ->where('priority', 'high')
+                    ->count(),
+                'verification_actions' => $nextActionEvents
+                    ->where('action_code', 'complete_property_verification')
+                    ->count(),
+                'valuation_actions' => $nextActionEvents
+                    ->filter(fn ($event): bool => in_array(
+                        $event->action_code,
+                        ['refresh_valuation_research', 'repair_comparable_integrity'],
+                        true
+                    ))->count(),
+                'match_review_actions' => $nextActionEvents
+                    ->filter(fn ($event): bool => in_array(
+                        $event->action_code,
+                        ['review_safe_match_candidates', 'review_safe_property_candidates'],
+                        true
+                    ))->count(),
+                'unique_profiles' => $nextActionEvents
+                    ->pluck('real_estate_profile_id')
+                    ->filter()
+                    ->unique()
+                    ->count(),
+                'unique_conversations' => $nextActionEvents
+                    ->pluck('conversation_control_id')
+                    ->filter()
+                    ->unique()
+                    ->count(),
+            ];
+        } else {
+            $snapshot['next_best_action_telemetry_24h'] = [
+                'events' => 0,
+                'blocking' => 0,
+                'high_priority' => 0,
+                'verification_actions' => 0,
+                'valuation_actions' => 0,
+                'match_review_actions' => 0,
+                'unique_profiles' => 0,
+                'unique_conversations' => 0,
+            ];
+        }
+
         foreach ([
             'match_ledger_ready' => $matchLedgerReady,
             'evidence_ledger_ready' => $evidenceLedgerReady,
             'outbound_safety_firewall_ready' => $outboundSafetyReady,
+            'next_best_action_orchestrator_ready' => $nextBestActionReady,
         ] as $check => $ready) {
             if ($ready) {
                 continue;
