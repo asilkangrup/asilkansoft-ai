@@ -22,6 +22,20 @@ class RealEstateValuationService
             return null;
         }
 
+        // Production WhatsApp is intentionally CRM-only. Market/comparable
+        // research is performed manually by the operator, never per customer
+        // message. Keep the service available in tests and future explicitly
+        // enabled internal workflows without spending customer-chat credit.
+        if (
+            ! app()->environment('testing')
+            && ! filter_var(
+                env('REAL_ESTATE_AUTOMATIC_MARKET_RESEARCH_ENABLED', false),
+                FILTER_VALIDATE_BOOL
+            )
+        ) {
+            return null;
+        }
+
         $profile = RealEstateProfile::query()
             ->isolatedProduction()
             ->where('conversation_control_id', $conversation->id)
@@ -206,6 +220,16 @@ class RealEstateValuationService
     public function promptFor(
         ConversationControl $conversation
     ): string {
+        if (
+            ! app()->environment('testing')
+            && ! filter_var(
+                env('REAL_ESTATE_AUTOMATIC_MARKET_RESEARCH_ENABLED', false),
+                FILTER_VALIDATE_BOOL
+            )
+        ) {
+            return '';
+        }
+
         if (! app(RealEstateIsolationService::class)->supportsConversation($conversation)) {
             return '';
         }
