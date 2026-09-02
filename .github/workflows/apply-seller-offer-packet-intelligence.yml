@@ -16,6 +16,45 @@ jobs:
         with:
           ref: feature/seller-offer-packet-intelligence
           fetch-depth: 0
+      - name: Repair final patch step
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('.github/scripts/apply_seller_offer_packet_intelligence.py')
+          s = p.read_text()
+          marker = '# 6) Reuse the structured offer-packet intelligence in the deterministic high-price reply.\n'
+          if marker not in s:
+              raise SystemExit('patch marker missing')
+          head = s.split(marker, 1)[0]
+          tail = r'''# 6) Reuse the structured offer-packet intelligence in the deterministic high-price reply.
+p = Path('app/Services/RealEstateWhatsAppInboundService.php')
+s = p.read_text()
+method = s.index('    private function deterministicSellerPriceSteeringAnswer(')
+start = s.index('        $data = is_array($profile->data) ? $profile->data : [];', method)
+return_pos = s.index('        return $answer;\n', start) + len('        return $answer;\n')
+new = ''' + "'''" + r'''        $packet = app(RealEstateSellerOfferPacketService::class)
+            ->summaryForProfile($profile);
+        $nextRequest = trim((string) ($packet['recommended_next_request'] ?? ''));
+
+        $answer = 'Fiyatı daha yüksek yazmak mümkün; ancak yatırımcı tarafında yüksek fiyatlar dönüşü zorlaştırabiliyor. '
+            .'Hızlı nakit düşünüyorsanız yatırımcılarımızdan teklif toplayalım.';
+
+        if ($nextRequest !== '') {
+            $answer .= "\n".$nextRequest;
+        } elseif ((bool) ($packet['ready_for_investor_offer'] ?? false)) {
+            $answer .= "\nDosya ön teklif toplamak için yeterli görünüyor; hızlı nakit tekliflerini değerlendirmeye geçebiliriz.";
+        }
+
+        return $answer;
+''' + "'''" + r'''
+s = s[:start] + new + s[return_pos:]
+p.write_text(s)
+
+Path('.github/scripts/apply_seller_offer_packet_intelligence.py').unlink(missing_ok=True)
+Path('.github/workflows/apply-seller-offer-packet-intelligence.yml').unlink(missing_ok=True)
+'''
+          p.write_text(head + marker + tail)
+          PY
       - name: Apply patch
         run: python3 .github/scripts/apply_seller_offer_packet_intelligence.py
       - name: Validate PHP syntax
