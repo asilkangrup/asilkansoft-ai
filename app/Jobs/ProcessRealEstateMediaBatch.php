@@ -90,7 +90,6 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
         // creates a fresh batch and its own scheduled job instead of being
         // deleted when this batch completes.
         $batch = Cache::pull($this->cacheKey);
-        Cache::forget($scheduledKey);
 
         if (! is_array($batch)) {
             return;
@@ -142,5 +141,38 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
                 throw $exception;
             }
         }
+
+        // A fragment may arrive after this job reads the cache but before it
+        // pulls the current batch. Keep the scheduled marker throughout
+        // processing, then atomically hand any newer pending burst to one new
+        // job. This closes the debounce race that could strand the customer's
+        // final word without a reply.
+        $this->schedulePendingBatch($scheduledKey);
+    }
+
+    private function schedulePendingBatch(string $scheduledKey): void
+    {
+        Cache::forget($scheduledKey);
+        $pending = Cache::get($this->cacheKey);
+
+        if (! is_array($pending)) {
+            return;
+        }
+
+        $generation = trim((string) ($pending['generation'] ?? ''));
+        $generation = $generation !== '' ? $generation : $this->generation;
+
+        if (! Cache::add($scheduledKey, true, now()->addSeconds(90))) {
+            return;
+        }
+
+        $delay = max(
+            1,
+            (int) ($pending['quiet_until'] ?? now()->timestamp)
+                - now()->timestamp
+        );
+
+        self::dispatch($this->cacheKey, $generation)
+            ->delay(now()->addSeconds($delay));
     }
 }
