@@ -6,6 +6,7 @@ use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\RealEstateProfile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -387,20 +388,32 @@ class RealEstateWhatsAppInboundService
             ->where('id', '>', $inboundMessage->id)
             ->exists();
 
+        $latestArrivalMessageId = Cache::get(
+            'real-estate-latest-inbound:'.hash('sha256', $phoneNumber)
+        );
+        $supersededAtWebhook = is_string($latestArrivalMessageId)
+            && trim($latestArrivalMessageId) !== ''
+            && trim($latestArrivalMessageId) !== $messageId;
+
         $bot->refresh();
 
-        if ($newerInboundExists || ! $bot->whatsappAiKullanilabilirMi()) {
+        if (
+            $newerInboundExists
+            || $supersededAtWebhook
+            || ! $bot->whatsappAiKullanilabilirMi()
+        ) {
             Log::info('REAL ESTATE STALE OR DISABLED REPLY SUPPRESSED', [
                 'conversation_id' => $conversation->id,
                 'message_id' => $messageId,
                 'newer_inbound_exists' => $newerInboundExists,
+                'superseded_at_webhook' => $supersededAtWebhook,
                 'ai_enabled' => (bool) $bot->ai_enabled,
             ]);
 
             return [
                 'success' => true,
                 'ignored' => true,
-                'reason' => $newerInboundExists
+                'reason' => ($newerInboundExists || $supersededAtWebhook)
                     ? 'superseded_by_newer_customer_message'
                     : 'ai_disabled_before_delivery',
             ];
