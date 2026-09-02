@@ -1,0 +1,133 @@
+name: Apply Deterministic Seller Price Reply
+
+on:
+  push:
+    branches: [fix/deterministic-seller-price-reply]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/deterministic-seller-price-reply
+          fetch-depth: 0
+      - name: Apply deterministic seller pricing and plain text
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          p = Path('app/Services/RealEstateWhatsAppInboundService.php')
+          s = p.read_text()
+          if 'use App\\Models\\RealEstateProfile;' not in s:
+              s = s.replace('use App\\Models\\ConversationControl;\n', 'use App\\Models\\ConversationControl;\nuse App\\Models\\RealEstateProfile;\n', 1)
+
+          old = '''        $answer = trim($this->openAIService->cevapVer(\n            mesajlar: $history,\n            aiBot: $bot,\n        ));\n'''
+          new = '''        $answer = $this->deterministicSellerPriceAnswer(\n            conversation: $conversation,\n            message: $message,\n        );\n\n        if ($answer === null) {\n            $answer = trim($this->openAIService->cevapVer(\n                mesajlar: $history,\n                aiBot: $bot,\n            ));\n        }\n'''
+          if old not in s and 'deterministicSellerPriceAnswer(' not in s:
+              raise SystemExit('answer block not found')
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          marker = '    private function botForInstance(string $instance): ?AiBot\n'
+          helper = r'''    private function deterministicSellerPriceAnswer(
+        ConversationControl $conversation,
+        string $message,
+    ): ?string {
+        $normalized = strtolower(strtr(trim($message), [
+            'İ' => 'i', 'I' => 'i', 'ı' => 'i',
+            'Ş' => 's', 'ş' => 's', 'Ğ' => 'g', 'ğ' => 'g',
+            'Ü' => 'u', 'ü' => 'u', 'Ö' => 'o', 'ö' => 'o',
+            'Ç' => 'c', 'ç' => 'c',
+        ]));
+
+        $priceIntent = false;
+        foreach ([
+            'ne kadara satabilirim', 'kaca satabilirim', 'kaca satilir',
+            'kaca gider', 'ne kadar eder', 'kac para eder',
+            'satis fiyati', 'gercekci satis',
+        ] as $signal) {
+            if (str_contains($normalized, $signal)) {
+                $priceIntent = true;
+                break;
+            }
+        }
+
+        if (! $priceIntent) {
+            return null;
+        }
+
+        $profile = RealEstateProfile::query()
+            ->isolatedProduction()
+            ->where('conversation_control_id', $conversation->id)
+            ->first();
+
+        if (! $profile || $profile->profile_type !== 'seller') {
+            return null;
+        }
+
+        $valuation = is_array($profile->valuation) ? $profile->valuation : [];
+        $realistic = $this->positivePrice($valuation['quick_sale_min'] ?? null)
+            ?? $this->positivePrice($valuation['realistic_sale_min'] ?? null)
+            ?? $this->positivePrice($valuation['market_min'] ?? null);
+
+        if ($realistic === null) {
+            return null;
+        }
+
+        $fastCashMin = round($realistic * 0.75 / 1000) * 1000;
+        $fastCashMax = round($realistic * 0.80 / 1000) * 1000;
+
+        return 'Gerçekçi satış fiyatı: yaklaşık '
+            .$this->formatTl($realistic)
+            .' TL — bu seviyede satış mümkün ama biraz bekleyebilir.'
+            ."\n"
+            .'Hızlı nakit alım bandı: yaklaşık '
+            .$this->formatTl($fastCashMin)
+            .'–'.$this->formatTl($fastCashMax)
+            .' TL.'
+            ."\n"
+            .'Acil nakde çevirmek isterseniz yatırımcılardan teklifleri toplayıp size iletebilirim.';
+    }
+
+    private function positivePrice(mixed $value): ?float
+    {
+        return is_numeric($value) && (float) $value > 0
+            ? (float) $value
+            : null;
+    }
+
+    private function formatTl(float $value): string
+    {
+        return number_format((int) round($value), 0, ',', '.');
+    }
+
+'''
+          if 'private function deterministicSellerPriceAnswer(' not in s:
+              if marker not in s:
+                  raise SystemExit('botForInstance marker not found')
+              s = s.replace(marker, helper + marker, 1)
+          p.write_text(s)
+
+          p = Path('app/Services/RealEstateOutboundDeliveryService.php')
+          s = p.read_text()
+          old = '''        $answer = trim((string) $safety['answer']);\n\n        if ($answer === '') {\n'''
+          new = '''        $answer = trim((string) $safety['answer']);\n        $answer = str_replace('*', '', $answer);\n\n        if ($answer === '') {\n'''
+          if "str_replace('*', '', $answer)" not in s:
+              if old not in s:
+                  raise SystemExit('outbound answer block not found')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          Path('.github/workflows/apply-deterministic-seller-price.yml').unlink()
+          PY
+          php -l app/Services/RealEstateWhatsAppInboundService.php
+          php -l app/Services/RealEstateOutboundDeliveryService.php
+          git config user.name "asilkangrup"
+          git config user.email "asilkangrup@gmail.com"
+          git add -A
+          git commit -m "Make seller price replies deterministic and plain text"
+          git push origin fix/deterministic-seller-price-reply
