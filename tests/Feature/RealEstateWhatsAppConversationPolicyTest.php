@@ -34,5 +34,42 @@ class RealEstateWhatsAppConversationPolicyTest extends TestCase
         );
         $this->assertStringContainsString('garantili kazanç', $prompt);
         $this->assertStringContainsString('en fazla 1-2 kritik kriter sor', $prompt);
+        $this->assertStringContainsString(
+            '1200 => 1.200.000 TL',
+            $prompt
+        );
+        $this->assertStringContainsString(
+            'ölçeği konuşma bağlamı belirler',
+            $prompt
+        );
+        $this->assertStringContainsString(
+            'tekrar satıcı fiyatını zorlamayı bırak',
+            $prompt
+        );
+    }
+
+    public function test_inbound_delivery_has_stale_turn_and_runtime_disable_guards(): void
+    {
+        $source = file_get_contents(app_path(
+            'Services/RealEstateWhatsAppInboundService.php'
+        ));
+
+        $this->assertIsString($source);
+        $this->assertStringContainsString(
+            "'superseded_by_newer_customer_message'",
+            $source
+        );
+        $this->assertStringContainsString(
+            "'ai_disabled_before_delivery'",
+            $source
+        );
+        $this->assertStringContainsString(
+            "->where('id', '>', \$inboundMessage->id)",
+            $source
+        );
+        $this->assertStringContainsString(
+            '\$bot->refresh();',
+            $source
+        );
     }
 }
