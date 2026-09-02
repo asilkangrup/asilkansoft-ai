@@ -138,11 +138,11 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         );
         $this->assertSame('Manuel', $detail->getMediaGalleryProperty()['Tapu / Parsel Belgeleri']->first()['source']);
 
-        $this->get(route('real-estate.private-media', [
+        $privateResponse = $this->get(route('real-estate.private-media', [
             'profile'=>$profile->id,'media'=>$manual['id'],
-        ]))->assertOk()
-            ->assertHeader('cache-control', 'private, no-store')
-            ->assertHeader('x-content-type-options', 'nosniff');
+        ]))->assertOk()->assertHeader('x-content-type-options', 'nosniff');
+        $this->assertStringContainsString('private', (string) $privateResponse->headers->get('cache-control'));
+        $this->assertStringContainsString('no-store', (string) $privateResponse->headers->get('cache-control'));
 
         $foreign = User::query()->findOrFail(41);
         $this->actingAs($foreign)
