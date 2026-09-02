@@ -12,9 +12,11 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 120;
+    public int $tries = 12;
 
     public int $timeout = 240;
+
+    public array $backoff = [2, 5, 10, 20, 30, 60];
 
     public function __construct(
         public string $cacheKey,
@@ -87,7 +89,27 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
 
         foreach ($payloads as $index => $payload) {
             unset($payload['_real_estate_authorized']);
-            $inbound->process($payload, suppressReply: $index < $last);
+
+            try {
+                $inbound->process($payload, suppressReply: $index < $last);
+            } catch (\Throwable $exception) {
+                // Preserve the failed turn and all following fragments. The
+                // queue will retry internally with backoff; customers never
+                // need to resend their first message after a transient AI or
+                // provider error.
+                Cache::put($this->cacheKey, [
+                    'generation' => $this->generation,
+                    'payloads' => array_slice($payloads, $index),
+                    'quiet_until' => now()->timestamp,
+                ], now()->addMinutes(10));
+                Cache::put(
+                    $scheduledKey,
+                    true,
+                    now()->addMinutes(10)
+                );
+
+                throw $exception;
+            }
         }
     }
 }
