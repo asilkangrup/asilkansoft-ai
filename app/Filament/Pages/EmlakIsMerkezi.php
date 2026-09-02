@@ -23,6 +23,7 @@ class EmlakIsMerkezi extends Page
     public array $callNotes = [];
     public array $callResults = [];
     public array $offerAmounts = [];
+    public array $reminderDates = [];
 
     public static function canAccess(): bool
     {
@@ -111,6 +112,7 @@ class EmlakIsMerkezi extends Page
                 ];
             })
             ->filter()
+            ->map(fn (array $task): array => $this->attachReminder($task, $history))
             ->sortByDesc(fn (array $task): int => $this->taskRank($task))
             ->values();
     }
@@ -150,6 +152,13 @@ class EmlakIsMerkezi extends Page
 
         if (in_array($result, ['Teklif verdi', 'Karşı teklif', 'Yeni teklif'], true) && $amount === null) {
             Notification::make()->title('Teklif tutarını girin')->warning()->send();
+            return;
+        }
+
+        $reminderAt = $this->parseReminder($this->reminderDates[$key] ?? null);
+
+        if (in_array($result, ['Ulaşılmadı', 'Tekrar ara'], true) && $reminderAt === null) {
+            Notification::make()->title('Tekrar arama tarihini seçin')->warning()->send();
             return;
         }
 
@@ -199,6 +208,8 @@ class EmlakIsMerkezi extends Page
                 'offer_amount' => $amount,
                 'match_score' => is_numeric($task['match_score'] ?? null) ? (int) $task['match_score'] : null,
                 'property_label' => (string) $task['property'],
+                'operator_reminder_at' => $reminderAt?->toIso8601String(),
+                'operator_reminder_internal_only' => $reminderAt !== null,
                 'follow_up_scheduling_allowed' => false,
                 'automatic_outbound_allowed' => false,
                 'contains_private_seller_floor' => false,
@@ -210,6 +221,7 @@ class EmlakIsMerkezi extends Page
         $this->callNotes[$key] = '';
         $this->callResults[$key] = '';
         $this->offerAmounts[$key] = '';
+        $this->reminderDates[$key] = '';
 
         Notification::make()->title('Görüşme ve sonraki aksiyon CRM’e kaydedildi')->success()->send();
     }
@@ -475,6 +487,51 @@ class EmlakIsMerkezi extends Page
         return is_numeric($amount) && (int) $amount > 0 ? (int) $amount : null;
     }
 
+    private function attachReminder(array $task, Collection $history): array
+    {
+        $task['reminder_at'] = null;
+        $task['reminder_future'] = false;
+
+        if (! is_numeric($task['investor_profile_id'] ?? null)) {
+            return $task;
+        }
+
+        $key = (int) $task['seller_profile_id']
+            .':'.(int) $task['investor_profile_id']
+            .':'.(string) $task['kind'];
+        $activity = $history->get($key);
+        $raw = $activity?->meta['operator_reminder_at'] ?? null;
+
+        if (! is_string($raw) || trim($raw) === '') {
+            return $task;
+        }
+
+        try {
+            $due = \Carbon\Carbon::parse($raw);
+            $task['reminder_at'] = $due;
+            $task['reminder_future'] = $due->isFuture();
+        } catch (\Throwable) {
+            return $task;
+        }
+
+        return $task;
+    }
+
+    private function parseReminder(mixed $value): ?\Carbon\Carbon
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            $date = \Carbon\Carbon::parse($value);
+
+            return $date->isFuture() ? $date : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     private function parseMoney(mixed $value): ?int
     {
         if ($value === null || trim((string) $value) === '') {
@@ -503,6 +560,10 @@ class EmlakIsMerkezi extends Page
 
     private function taskRank(array $task): int
     {
+        if ((bool) ($task['reminder_future'] ?? false)) {
+            return 0;
+        }
+
         return match ($task['kind'] ?? '') {
             'seller_final' => 5000 + (int) ($task['match_score'] ?? 0),
             'investor_counter' => 4000 + (int) ($task['match_score'] ?? 0),
