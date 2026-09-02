@@ -122,6 +122,25 @@ class RealEstateWhatsAppWebhookController extends Controller
             // discovery questions from concurrent jobs.
             $contactKey = $this->canonicalContactKey($payload);
             $cacheKey = 'real-estate-inbound-burst:'.hash('sha256', $contactKey);
+
+            // Record arrival immediately, before queued processing. An answer
+            // already being generated for an older turn can use this marker
+            // to fail closed even though the new payload is not persisted yet.
+            $phoneDigits = preg_replace(
+                '/\D+/',
+                '',
+                Str::before($contactKey, '@')
+            ) ?? '';
+            $messageId = trim((string) data_get($payload, 'data.key.id', ''));
+
+            if ($phoneDigits !== '' && $messageId !== '') {
+                Cache::put(
+                    'real-estate-latest-inbound:'.hash('sha256', $phoneDigits),
+                    $messageId,
+                    now()->addMinutes(5)
+                );
+            }
+
             $existing = Cache::get($cacheKey);
             $payloads = is_array($existing) && is_array($existing['payloads'] ?? null)
                 ? $existing['payloads']
