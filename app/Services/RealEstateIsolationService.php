@@ -16,6 +16,17 @@ class RealEstateIsolationService
 
     public const INSTANCE = 'emlak-ai-35';
 
+    public function currentOperatorHasAccess(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && (int) $user->id === self::USER_ID
+            && $user->activeOrganizations()
+                ->where('organizations.id', self::ORGANIZATION_ID)
+                ->exists();
+    }
+
     public function supportsBotIdentity(?AiBot $bot): bool
     {
         if (! $bot) {

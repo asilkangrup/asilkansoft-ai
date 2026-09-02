@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\ConversationControl;
 use App\Services\CrmActivityService;
 use App\Services\OrganizationAccessService;
+use App\Services\RealEstateIsolationService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Pages\Page;
@@ -25,6 +26,8 @@ class Gorevler extends Page
 
     protected static ?int $navigationSort = 33;
 
+    protected static string|\UnitEnum|null $navigationGroup = 'CRM';
+
     public string $search = '';
 
     public string $temperatureFilter = 'all';
@@ -33,11 +36,8 @@ class Gorevler extends Page
 
     public static function canAccess(): bool
     {
-        return app(
-            OrganizationAccessService::class
-        )->can(
-            'tasks'
-        );
+        return app(RealEstateIsolationService::class)->currentOperatorHasAccess()
+            || app(OrganizationAccessService::class)->can('tasks');
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -68,9 +68,8 @@ class Gorevler extends Page
 
     protected function canWriteTasks(): bool
     {
-        return $this
-            ->accessService()
-            ->canWriteCrm();
+        return app(RealEstateIsolationService::class)->currentOperatorHasAccess()
+            || $this->accessService()->canWriteCrm();
     }
 
     protected function scopedConversationQuery(): Builder
