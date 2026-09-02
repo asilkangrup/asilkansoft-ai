@@ -12,6 +12,8 @@ class RealEstateValuationResearchContextService
         'district',
         'neighborhood',
         'area_sqm',
+        'block_no',
+        'parcel_no',
         'title_deed_type',
         'zoning_status',
         'is_shared_title',

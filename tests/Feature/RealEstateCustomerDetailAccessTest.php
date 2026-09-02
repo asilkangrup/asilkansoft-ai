@@ -83,8 +83,8 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $dossier = $detail->getDossierProperty();
         $this->assertSame('123', $dossier['property']['Ada']);
         $this->assertSame('45', $dossier['property']['Parsel']);
-        $this->assertSame(3_120_000, $dossier['pricing']['Yatırımcı hedef üst']);
-        $this->assertSame(124_800, $dossier['pricing']['Tahmini komisyon']);
+        $this->assertNull($dossier['pricing']['Yatırımcı hedef üst']);
+        $this->assertNull($dossier['pricing']['Tahmini komisyon']);
         $this->assertNotContains('property_photo', $dossier['missing']);
         $this->assertNotContains('listing_reference', $dossier['missing']);
         $this->assertNotSame('', trim($dossier['call_script']));
@@ -144,7 +144,35 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         $this->assertStringContainsString('private', (string) $privateResponse->headers->get('cache-control'));
         $this->assertStringContainsString('no-store', (string) $privateResponse->headers->get('cache-control'));
 
+        $whatsappMedia = ChatMessage::query()->forceCreate([
+            'user_id'=>40,'organization_id'=>37,'ai_bot_id'=>35,
+            'session_id'=>$customer->session_id,'role'=>'user','sender_type'=>'customer',
+            'message'=>'[Fotoğraf]','message_type'=>'image','media_url'=>'pending-private-copy',
+            'media_mime_type'=>'image/jpeg','whatsapp_message_id'=>'private-photo','status'=>'received',
+        ]);
+        $privatePath = 'real-estate-inbound/'.$whatsappMedia->id.'/original.jpg';
+        Storage::disk('local')->put($privatePath, 'private-image');
+        $whatsappMedia->forceFill(['media_url'=>'private:'.$privatePath])->saveQuietly();
+        $profileData = $profile->data;
+        $profileData['media_findings'][] = [
+            'message_id'=>'private-photo','media_category'=>'property_photo','summary'=>'Özel WhatsApp fotoğrafı',
+        ];
+        $profile->forceFill(['data'=>$profileData])->saveQuietly();
+
+        $detail = new EmlakMusteriDetay;
+        $detail->customerId = $customer->id;
+        $privateGallery = $detail->getMediaGalleryProperty();
+        $this->assertSame(
+            route('real-estate.private-inbound-media', ['message'=>$whatsappMedia->id]),
+            $privateGallery['Arsa Fotoğrafları']->first()['url']
+        );
+        $this->get(route('real-estate.private-inbound-media', ['message'=>$whatsappMedia->id]))
+            ->assertOk()->assertHeader('x-content-type-options', 'nosniff');
+
         $foreign = User::query()->findOrFail(41);
+        $this->actingAs($foreign)
+            ->get(route('real-estate.private-inbound-media', ['message'=>$whatsappMedia->id]))
+            ->assertForbidden();
         $this->actingAs($foreign)
             ->get(route('real-estate.private-media', [
                 'profile'=>$profile->id,'media'=>$manual['id'],

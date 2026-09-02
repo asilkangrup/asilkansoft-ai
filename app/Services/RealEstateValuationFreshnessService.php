@@ -188,6 +188,11 @@ class RealEstateValuationFreshnessService
         }
 
         $reasons = [];
+
+        if (! $this->hasExactResearchIdentity($data)) {
+            $reasons[] = 'insufficient_property_identity';
+        }
+
         $storedFingerprint = trim((string) ($valuation['profile_fingerprint'] ?? ''));
 
         if ($storedFingerprint === '') {
@@ -323,6 +328,21 @@ class RealEstateValuationFreshnessService
             ->filter(fn ($item): bool => is_array($item))
             ->values()
             ->all();
+    }
+
+    private function hasExactResearchIdentity(array $data): bool
+    {
+        $hasParcelIdentity = filled($data['block_no'] ?? null)
+            && filled($data['parcel_no'] ?? null);
+
+        return filled($data['city'] ?? null)
+            && filled($data['property_type'] ?? null)
+            && filled($data['area_sqm'] ?? null)
+            && (
+                $hasParcelIdentity
+                || filled($data['location_url'] ?? null)
+                || filled($data['listing_url'] ?? null)
+            );
     }
 
     private function hasPricing(array $valuation): bool

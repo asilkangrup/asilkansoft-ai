@@ -7,6 +7,7 @@ use App\Models\ConversationControl;
 use App\Models\Organization;
 use App\Models\RealEstateProfile;
 use App\Models\User;
+use App\Services\RealEstateCommercialDealService;
 use App\Services\RealEstateConversationService;
 use App\Services\RealEstateDecisionService;
 use App\Services\RealEstateMatchService;
@@ -49,6 +50,39 @@ class RealEstateValuationFreshnessTest extends TestCase
             $service->fingerprint($profile->data),
             $profile->valuation['profile_fingerprint']
         );
+        $this->assertNull($conversation->fresh()->next_follow_up_at);
+    }
+
+    public function test_price_is_blocked_until_exact_property_identity_and_research_are_available(): void
+    {
+        [, $conversation] = $this->seedIsolatedSeller('identity-required');
+        $profile = $this->sellerProfile($conversation);
+        $data = $profile->data;
+        unset($data['location_url'], $data['listing_url'], $data['block_no'], $data['parcel_no']);
+        $profile->update(['data' => $data]);
+
+        $freshness = app(RealEstateValuationFreshnessService::class);
+        $profile->update([
+            'valuation' => $freshness->stamp($profile, $this->researchedValuation()),
+        ]);
+        $profile->refresh();
+
+        $assessment = $freshness->assess($profile);
+        $this->assertSame('stale', $assessment['status']);
+        $this->assertContains('insufficient_property_identity', $assessment['reasons']);
+        $this->assertFalse($assessment['usable_for_decision']);
+        $this->assertSame([], $freshness->valuationForDecision($profile));
+
+        $commercial = app(RealEstateCommercialDealService::class)->summaryForProfile($profile);
+        $this->assertSame('valuation_required', $commercial['state']);
+        $this->assertNull($commercial['realistic_sale_min']);
+        $this->assertNull($commercial['negotiation_target_max']);
+        $this->assertNull($commercial['expected_commission_amount']);
+
+        $this->assertNull(app(RealEstateValuationService::class)->process(
+            $conversation,
+            'Bu arsa kaç para eder?'
+        ));
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 

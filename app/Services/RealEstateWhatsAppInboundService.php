@@ -296,7 +296,7 @@ class RealEstateWhatsAppInboundService
             'last_contact_at' => now(),
         ])->save();
 
-        $this->memoryService->mesajKaydet(
+        $inboundMessage = $this->memoryService->mesajKaydet(
             userId: RealEstateIsolationService::USER_ID,
             aiBotId: RealEstateIsolationService::BOT_ID,
             sessionId: $sessionId,
@@ -305,6 +305,23 @@ class RealEstateWhatsAppInboundService
             senderType: 'customer',
             mediaContext: $mediaContext,
         );
+
+        if (in_array($mediaContext['type'] ?? null, ['image', 'document'], true)) {
+            try {
+                app(EvolutionMediaService::class)->persistPrivateInboundMedia(
+                    message: $inboundMessage,
+                    instanceName: $instance,
+                    mediaContext: $mediaContext,
+                );
+            } catch (Throwable $exception) {
+                Log::warning('REAL ESTATE INBOUND MEDIA PERSISTENCE FAILED', [
+                    'chat_message_id' => $inboundMessage->id,
+                    'message_id' => $messageId,
+                    'instance' => $instance,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         if ((bool) $conversation->human_takeover) {
             return [
@@ -447,7 +464,8 @@ class RealEstateWhatsAppInboundService
             return null;
         }
 
-        $valuation = is_array($profile->valuation) ? $profile->valuation : [];
+        $valuation = app(RealEstateValuationFreshnessService::class)
+            ->valuationForDecision($profile);
         $realistic = $this->positivePrice($valuation['quick_sale_min'] ?? null)
             ?? $this->positivePrice($valuation['realistic_sale_min'] ?? null)
             ?? $this->positivePrice($valuation['market_min'] ?? null);

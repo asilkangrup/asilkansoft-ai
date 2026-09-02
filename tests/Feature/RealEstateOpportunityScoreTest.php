@@ -10,6 +10,7 @@ use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\RealEstateCommercialDealService;
 use App\Services\RealEstateOpportunityScoreService;
+use App\Services\RealEstateValuationFreshnessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -124,11 +125,28 @@ class RealEstateOpportunityScoreTest extends TestCase
 
     private function profile(ConversationControl $conversation, array $data, array $valuation, int $complete, int $confidence): RealEstateProfile
     {
-        return RealEstateProfile::withoutEvents(fn () => RealEstateProfile::query()->forceCreate([
+        $data = array_merge([
+            'city'=>'Muğla','district'=>'Marmaris','area_sqm'=>1000,
+            'location_url'=>'https://maps.example.test/property',
+        ], $data);
+        $profile = RealEstateProfile::withoutEvents(fn () => RealEstateProfile::query()->forceCreate([
             'conversation_control_id'=>$conversation->id,'user_id'=>40,'ai_bot_id'=>35,
-            'profile_type'=>'seller','data'=>$data,'valuation'=>$valuation,
+            'profile_type'=>'seller','data'=>$data,'valuation'=>[],
             'completeness_score'=>$complete,'confidence_score'=>$confidence,
         ]));
+
+        if ($valuation !== []) {
+            $valuation['sources'] = ['https://example.test/1','https://example.test/2'];
+            $valuation['comparables'] = [
+                ['url'=>'https://example.test/1','listing_price'=>3_300_000,'area_sqm'=>1000,'location'=>'Marmaris','property_type'=>'arsa'],
+                ['url'=>'https://example.test/2','listing_price'=>3_500_000,'area_sqm'=>1100,'location'=>'Marmaris','property_type'=>'arsa'],
+            ];
+            $profile->forceFill([
+                'valuation'=>app(RealEstateValuationFreshnessService::class)->stamp($profile, $valuation),
+            ])->saveQuietly();
+        }
+
+        return $profile->fresh();
     }
 
     private function conversation(string $session): ConversationControl

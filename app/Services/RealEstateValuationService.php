@@ -249,12 +249,16 @@ PROMPT;
 
     private function minimumDataAvailable(array $data): bool
     {
+        $hasParcelIdentity = filled($data['block_no'] ?? null)
+            && filled($data['parcel_no'] ?? null);
+        $hasExactReference = $hasParcelIdentity
+            || filled($data['location_url'] ?? null)
+            || filled($data['listing_url'] ?? null);
+
         return filled($data['city'] ?? null)
             && filled($data['property_type'] ?? null)
-            && (
-                filled($data['district'] ?? null)
-                || filled($data['neighborhood'] ?? null)
-            );
+            && filled($data['area_sqm'] ?? null)
+            && $hasExactReference;
     }
 
 
