@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\EmlakFirsatlar;
 use App\Models\AiBot;
 use App\Models\ConversationControl;
 use App\Models\Organization;
@@ -16,7 +17,7 @@ class RealEstateOpportunityScoreTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_verified_investor_band_deal_becomes_high_priority_without_using_urgency(): void
+    public function test_verified_investor_band_deal_gets_extra_contact_priority_when_urgent(): void
     {
         $this->seedAccount();
         $conversation = $this->conversation('opportunity-strong');
@@ -44,13 +45,44 @@ class RealEstateOpportunityScoreTest extends TestCase
         $this->assertSame('actionable', $summary['state']);
         $this->assertContains($summary['grade'], ['exceptional','strong']);
         $this->assertGreaterThanOrEqual(65, $summary['score']);
-        $this->assertSame(0, $summary['components']['urgency_score_contribution']);
+        $this->assertSame(10, $summary['components']['urgency_priority']);
         $this->assertTrue($summary['metrics']['asking_within_investor_band']);
-        $this->assertFalse($summary['guardrails']['urgency_increases_score']);
+        $this->assertTrue($summary['guardrails']['urgency_may_increase_contact_priority']);
+        $this->assertFalse($summary['guardrails']['urgency_may_change_valuation_or_offer']);
         $this->assertFalse($summary['guardrails']['seller_distress_may_be_used_for_pressure']);
         $this->assertFalse($summary['guardrails']['private_seller_floor_included']);
         $json = json_encode($summary);
         $this->assertStringNotContainsString('2400000', $json);
+        $this->assertNull($conversation->fresh()->next_follow_up_at);
+    }
+
+    public function test_incomplete_document_file_remains_in_default_priority_queue_with_request_action(): void
+    {
+        $this->seedAccount();
+        $conversation = $this->conversation('opportunity-missing-document');
+        $profile = $this->profile($conversation, [
+            'property_type'=>'arsa','location'=>'Marmaris','asking_price'=>2_900_000,
+            'urgency'=>'medium',
+            'verification_intelligence'=>['status'=>'unverified','risk_score'=>10],
+            'fact_consistency_intelligence'=>['status'=>'consistent'],
+            'investor_offer_handoff_intelligence'=>[
+                'ready_for_operator_handoff'=>false,'candidate_count'=>0,
+                'recommended_operator_action'=>'Satıcıdan tapu fotoğrafını iste.',
+            ],
+        ], [
+            'realistic_sale_max'=>3_500_000,'investor_buy_max'=>2_800_000,'confidence_score'=>75,
+        ], 60, 75);
+
+        $summary = app(RealEstateOpportunityScoreService::class)->sync($profile);
+        $page = new EmlakFirsatlar;
+        $items = $page->getOpportunitiesProperty();
+
+        $this->assertSame('preparation_required', $summary['state']);
+        $this->assertSame(5, $summary['components']['urgency_priority']);
+        $this->assertSame('priority', $page->filter);
+        $this->assertCount(1, $items);
+        $this->assertSame($profile->id, $items->first()['id']);
+        $this->assertStringContainsString('tapu fotoğrafını iste', $items->first()['action']);
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
