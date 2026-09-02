@@ -33,6 +33,9 @@ class EmlakMusteriDetay extends Page
     public string $manualMediaCategory = 'property_photo';
     public string $titleOwnerRelation = 'unknown';
     public string $titleOwnerNote = '';
+    public string $negotiationOutcome = 'not_reached';
+    public ?string $negotiationAmount = null;
+    public string $negotiationNote = '';
 
     public static function canAccess(): bool
     {
@@ -253,6 +256,80 @@ class EmlakMusteriDetay extends Page
             ->get() ?? collect();
     }
 
+    public function getNegotiationWorkspaceProperty(): array
+    {
+        $profile = $this->profile;
+
+        if (! $profile || $profile->profile_type !== 'seller') {
+            return [];
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $commercial = app(RealEstateCommercialDealService::class)->summaryForProfile($profile);
+        $memory = is_array($data['negotiation_memory_intelligence'] ?? null)
+            ? $data['negotiation_memory_intelligence'] : [];
+        $latestPositions = is_array($memory['latest_positions'] ?? null)
+            ? $memory['latest_positions'] : [];
+        $confidentialFloor = data_get($latestPositions, 'seller_minimum_price.value');
+
+        if (! is_numeric($confidentialFloor)) {
+            $confidentialFloor = is_numeric($data['minimum_price'] ?? null)
+                ? (float) $data['minimum_price'] : null;
+        }
+
+        $history = $this->customer?->activities()
+            ->where('type', 'real_estate_seller_negotiation')
+            ->latest('id')
+            ->limit(12)
+            ->get()
+            ->map(fn ($activity): array => [
+                'title' => $activity->title,
+                'description' => $activity->description,
+                'outcome' => (string) data_get($activity->meta, 'outcome', ''),
+                'amount' => is_numeric(data_get($activity->meta, 'amount'))
+                    ? (int) data_get($activity->meta, 'amount') : null,
+                'created_at' => $activity->created_at?->format('d.m.Y H:i'),
+                'actor' => $activity->actorName(),
+            ])
+            ->values()
+            ->all() ?? [];
+
+        $realisticMin = $commercial['realistic_sale_min'] ?? null;
+        $realisticMax = $commercial['realistic_sale_max'] ?? null;
+        $investorMin = $commercial['negotiation_target_min'] ?? null;
+        $investorMax = $commercial['negotiation_target_max'] ?? null;
+        $valuationReady = is_numeric($realisticMin)
+            && is_numeric($realisticMax)
+            && is_numeric($investorMin)
+            && is_numeric($investorMax);
+
+        $recommendedAction = ! $valuationReady
+            ? 'Ada/parsel, konum ve güncel emsal araştırması tamamlanmadan fiyat savunması yapma; önce dosyayı netleştir.'
+            : 'Satıcının gerekçesini dinle, doğrulanmış piyasa bandını garanti vermeden anlat ve yalnız gerçek yatırımcı tekliflerini ilet.';
+
+        return [
+            'asking_price' => is_numeric($commercial['asking_price'] ?? null)
+                ? (int) $commercial['asking_price'] : null,
+            'realistic_sale_min' => is_numeric($realisticMin) ? (int) $realisticMin : null,
+            'realistic_sale_max' => is_numeric($realisticMax) ? (int) $realisticMax : null,
+            'investor_target_min' => is_numeric($investorMin) ? (int) $investorMin : null,
+            'investor_target_max' => is_numeric($investorMax) ? (int) $investorMax : null,
+            'confidential_floor' => is_numeric($confidentialFloor) ? (int) $confidentialFloor : null,
+            'valuation_ready' => $valuationReady,
+            'recommended_action' => $recommendedAction,
+            'call_script' => $valuationReady
+                ? 'Taşınmazı güncel piyasa verileriyle değerlendirdik. Bu rakamlar kesin satış garantisi değildir; isterseniz kriterleri uyan gerçek yatırımcılardan teklif toplayıp gelen teklifleri birlikte değerlendirebiliriz.'
+                : 'Doğru bir fiyat değerlendirmesi yapabilmemiz için taşınmazın ada/parsel veya konum bilgisini ve güncel fotoğraflarını netleştirelim.',
+            'history' => $history,
+            'guardrails' => [
+                'automatic_outbound_allowed' => false,
+                'seller_floor_is_confidential' => true,
+                'fake_offer_allowed' => false,
+                'price_guarantee_allowed' => false,
+            ],
+        ];
+    }
+
     public function getDetailsProperty(): array
     {
         $profile = $this->profile;
@@ -366,6 +443,72 @@ class EmlakMusteriDetay extends Page
         Notification::make()->title('Tapu sahipliği CRM’e kaydedildi')->success()->send();
     }
 
+    public function saveSellerNegotiation(): void
+    {
+        abort_unless(static::canAccess() && $this->profile?->profile_type === 'seller', 403);
+
+        $this->validate([
+            'negotiationOutcome' => ['required','in:not_reached,needs_time,willing_to_negotiate,counter_offer,accepted_real_offer,rejected_real_offer'],
+            'negotiationAmount' => ['nullable','numeric','min:1','max:999999999999'],
+            'negotiationNote' => ['nullable','string','max:1000'],
+        ]);
+
+        if (
+            in_array($this->negotiationOutcome, ['counter_offer','accepted_real_offer'], true)
+            && ! is_numeric($this->negotiationAmount)
+        ) {
+            $this->addError('negotiationAmount', 'Bu sonuç için görüşmede söylenen tutarı girin.');
+            return;
+        }
+
+        $profile = $this->profile;
+        $amount = is_numeric($this->negotiationAmount) ? (int) $this->negotiationAmount : null;
+        $note = trim($this->negotiationNote);
+        $label = $this->negotiationOutcomeLabel($this->negotiationOutcome);
+        $description = $label
+            .($amount ? ' · '.number_format($amount, 0, ',', '.').' TL' : '')
+            .($note !== '' ? ' · '.$note : '');
+
+        $this->customer?->activities()->create([
+            'user_id' => RealEstateIsolationService::USER_ID,
+            'ai_bot_id' => RealEstateIsolationService::BOT_ID,
+            'performed_by_user_id' => auth()->id(),
+            'type' => 'real_estate_seller_negotiation',
+            'title' => 'Satıcı pazarlık görüşmesi kaydedildi',
+            'description' => $description,
+            'meta' => [
+                'scope' => 'isolated_real_estate',
+                'profile_id' => $profile->id,
+                'outcome' => $this->negotiationOutcome,
+                'amount' => $amount,
+                'operator_entered' => true,
+                'customer_statement_confirmed_by_operator' => true,
+                'seller_floor_is_confidential' => true,
+                'automatic_outbound_allowed' => false,
+                'follow_up_scheduling_allowed' => false,
+                'fake_offer_allowed' => false,
+                'price_guarantee_allowed' => false,
+            ],
+        ]);
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $data['seller_negotiation_workspace'] = [
+            'last_outcome' => $this->negotiationOutcome,
+            'last_amount' => $amount,
+            'last_note' => $note !== '' ? $note : null,
+            'operator_confirmed' => true,
+            'updated_at' => now()->toIso8601String(),
+            'automatic_outbound_allowed' => false,
+        ];
+        $profile->updateQuietly(['data' => $data]);
+
+        $this->negotiationOutcome = 'not_reached';
+        $this->negotiationAmount = null;
+        $this->negotiationNote = '';
+
+        Notification::make()->title('Pazarlık sonucu CRM’e kaydedildi')->success()->send();
+    }
+
     public function saveNote(): void
     {
         $customer = $this->customer;
@@ -418,6 +561,19 @@ class EmlakMusteriDetay extends Page
         $note = trim((string) ($ownership['note'] ?? ''));
 
         return $note !== '' ? $label.' — '.$note : $label;
+    }
+
+    private function negotiationOutcomeLabel(string $outcome): string
+    {
+        return match ($outcome) {
+            'not_reached' => 'Satıcıya ulaşılamadı',
+            'needs_time' => 'Düşünmek için süre istedi',
+            'willing_to_negotiate' => 'Pazarlığa açık',
+            'counter_offer' => 'Karşı teklif verdi',
+            'accepted_real_offer' => 'Gerçek yatırımcı teklifini kabul etti',
+            'rejected_real_offer' => 'Gerçek yatırımcı teklifini reddetti',
+            default => 'Görüşme sonucu',
+        };
     }
 
     private function mediaCategoryLabel(string $category): string
