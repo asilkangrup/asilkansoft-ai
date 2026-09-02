@@ -159,6 +159,8 @@ class RealEstateCustomerDetailAccessTest extends TestCase
         ];
         $profile->forceFill(['data'=>$profileData])->saveQuietly();
 
+        $detail = new EmlakMusteriDetay;
+        $detail->customerId = $customer->id;
         $privateGallery = $detail->getMediaGalleryProperty();
         $this->assertSame(
             route('real-estate.private-inbound-media', ['message'=>$whatsappMedia->id]),
