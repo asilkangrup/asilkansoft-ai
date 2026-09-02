@@ -38,6 +38,7 @@ class RealEstateCrmOnlyCostModeTest extends TestCase
     {
         $batch = file_get_contents(app_path('Jobs/ProcessRealEstateMediaBatch.php'));
         $inbound = file_get_contents(app_path('Services/RealEstateWhatsAppInboundService.php'));
+        $prompt = file_get_contents(app_path('Services/RealEstateOpenAIService.php'));
 
         $this->assertStringContainsString('public int $tries = 2', $batch);
         $this->assertStringContainsString('analyzeMedia: false', $batch);
