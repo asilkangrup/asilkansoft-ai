@@ -10,6 +10,7 @@ use App\Services\RealEstateMatchLedgerService;
 use App\Services\RealEstateNextBestActionService;
 use App\Services\RealEstateOutboundSafetyService;
 use App\Services\RealEstateReadinessService;
+use App\Services\RealEstateValuationResearchLedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -60,6 +61,8 @@ Route::prefix('real-estate')->group(function (): void {
             && class_exists(RealEstateOutboundSafetyService::class);
         $nextBestActionReady = Schema::hasTable('real_estate_next_best_action_events')
             && class_exists(RealEstateNextBestActionService::class);
+        $valuationResearchLedgerReady = Schema::hasTable('real_estate_valuation_research_events')
+            && class_exists(RealEstateValuationResearchLedgerService::class);
 
         $snapshot['checks']['match_ledger_ready'] = $matchLedgerReady;
         $snapshot['match_ledger_telemetry_24h'] = $matchLedgerReady
@@ -196,11 +199,17 @@ Route::prefix('real-estate')->group(function (): void {
             ];
         }
 
+        $snapshot['checks']['valuation_research_ledger_ready'] = $valuationResearchLedgerReady;
+        $snapshot['valuation_research_telemetry_24h'] = $valuationResearchLedgerReady
+            ? app(RealEstateValuationResearchLedgerService::class)->telemetry24h()
+            : app(RealEstateValuationResearchLedgerService::class)->emptyTelemetry();
+
         foreach ([
             'match_ledger_ready' => $matchLedgerReady,
             'evidence_ledger_ready' => $evidenceLedgerReady,
             'outbound_safety_firewall_ready' => $outboundSafetyReady,
             'next_best_action_orchestrator_ready' => $nextBestActionReady,
+            'valuation_research_ledger_ready' => $valuationResearchLedgerReady,
         ] as $check => $ready) {
             if ($ready) {
                 continue;
