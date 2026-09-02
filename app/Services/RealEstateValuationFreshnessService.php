@@ -9,10 +9,6 @@ use Throwable;
 
 class RealEstateValuationFreshnessService
 {
-    private const REAL_ESTATE_USER_ID = 40;
-
-    private const REAL_ESTATE_BOT_ID = 35;
-
     private const TTL_DAYS = 7;
 
     private const MIN_DECISION_CONFIDENCE = 45;
@@ -385,7 +381,6 @@ class RealEstateValuationFreshnessService
 
     private function supports(RealEstateProfile $profile): bool
     {
-        return (int) $profile->user_id === self::REAL_ESTATE_USER_ID
-            && (int) $profile->ai_bot_id === self::REAL_ESTATE_BOT_ID;
+        return $profile->belongsToIsolatedProductionScope();
     }
 }

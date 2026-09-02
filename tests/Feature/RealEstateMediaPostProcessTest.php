@@ -25,6 +25,7 @@ class RealEstateMediaPostProcessTest extends TestCase
 
         ChatMessage::query()->create([
             'user_id' => 40,
+            'organization_id' => 37,
             'ai_bot_id' => 35,
             'session_id' => $conversation->session_id,
             'role' => 'user',
@@ -36,6 +37,7 @@ class RealEstateMediaPostProcessTest extends TestCase
 
         $media = ChatMessage::query()->create([
             'user_id' => 40,
+            'organization_id' => 37,
             'ai_bot_id' => 35,
             'session_id' => $conversation->session_id,
             'role' => 'user',
@@ -115,6 +117,7 @@ class RealEstateMediaPostProcessTest extends TestCase
 
         ChatMessage::query()->create([
             'user_id' => 40,
+            'organization_id' => 37,
             'ai_bot_id' => 35,
             'session_id' => $conversation->session_id,
             'role' => 'user',
@@ -239,6 +242,7 @@ class RealEstateMediaPostProcessTest extends TestCase
     ): ConversationControl {
         return ConversationControl::query()->create([
             'user_id' => 40,
+            'organization_id' => 37,
             'ai_bot_id' => $bot->id,
             'session_id' => $sessionId,
             'whatsapp_number' => '905550003333',
