@@ -50,6 +50,19 @@ class RealEstateLegacyCrmNavigationTest extends TestCase
         }
     }
 
+    public function test_customer_page_exposes_render_safe_live_kpi_trends(): void
+    {
+        $trends = (new Musteriler())->getLiveKpiTrendsProperty();
+
+        $this->assertSame(['new', 'hot', 'proposal', 'won'], array_keys($trends));
+
+        foreach ($trends as $trend) {
+            $this->assertSame('flat', $trend['trend_direction']);
+            $this->assertNotEmpty($trend['trend_label']);
+            $this->assertNotEmpty($trend['points']);
+        }
+    }
+
     public function test_non_isolated_user_does_not_receive_emlak_crm_override(): void
     {
         $user = User::query()->forceCreate([

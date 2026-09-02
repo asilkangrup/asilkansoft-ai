@@ -1169,6 +1169,28 @@ class Musteriler extends Page
             );
     }
 
+    /**
+     * KPI cards always need a render-safe trend payload. Trend analytics are
+     * intentionally neutral until a dedicated time-series source is available.
+     *
+     * @return array<string, array{trend_direction: string, trend_label: string, points: string}>
+     */
+    public function getLiveKpiTrendsProperty(): array
+    {
+        $neutral = [
+            'trend_direction' => 'flat',
+            'trend_label' => 'Güncel',
+            'points' => '0,21 18,21 36,21 54,21 72,21 90,21 108,21',
+        ];
+
+        return [
+            'new' => $neutral,
+            'hot' => $neutral,
+            'proposal' => $neutral,
+            'won' => $neutral,
+        ];
+    }
+
     /*
     |--------------------------------------------------------------------------
     | KPI
