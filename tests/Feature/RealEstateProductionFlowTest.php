@@ -30,7 +30,7 @@ class RealEstateProductionFlowTest extends TestCase
 
         $this->postJson('/api/real-estate/whatsapp/webhook', [
             'event' => 'messages.upsert',
-            'instance' => 'emlak-ai-test',
+            'instance' => 'emlak-ai-35',
         ])->assertStatus(401);
     }
 
@@ -51,6 +51,26 @@ class RealEstateProductionFlowTest extends TestCase
             ]);
     }
 
+    public function test_isolated_real_estate_webhook_rejects_legacy_instance_even_if_database_drifts(): void
+    {
+        $bot = $this->seedRealEstateBot();
+        $bot->update([
+            'whatsapp_instance' => 'gulten-sirketi-1',
+        ]);
+
+        $response = $this->withToken($this->jwt(self::WEBHOOK_SECRET))
+            ->postJson('/api/real-estate/whatsapp/webhook', [
+                'event' => 'messages.upsert',
+                'instance' => 'gulten-sirketi-1',
+            ]);
+
+        $response
+            ->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+            ]);
+    }
+
     public function test_isolated_real_estate_webhook_accepts_own_signed_instance_and_queues_processing(): void
     {
         $this->seedRealEstateBot();
@@ -59,7 +79,7 @@ class RealEstateProductionFlowTest extends TestCase
         $response = $this->withToken($this->jwt(self::WEBHOOK_SECRET))
             ->postJson('/api/real-estate/whatsapp/webhook', [
                 'event' => 'messages.upsert',
-                'instance' => 'emlak-ai-test',
+                'instance' => 'emlak-ai-35',
                 'data' => [
                     'key' => [
                         'id' => 'wamid-test-1',
@@ -82,31 +102,31 @@ class RealEstateProductionFlowTest extends TestCase
         Queue::assertPushed(ProcessWhatsAppWebhook::class);
     }
 
-    public function test_secure_provisioning_uses_current_evolution_webhook_schema_and_jwt_key(): void
+    public function test_secure_provisioning_uses_exact_instance_canonical_url_and_jwt_key(): void
     {
         $this->seedRealEstateBot();
 
         config([
+            'app.url' => 'https://wai.example.test',
             'evolution.url' => 'https://evolution.example.test',
             'evolution.api_key' => 'evolution-test-key',
         ]);
 
         Http::fake([
-            'https://evolution.example.test/webhook/set/emlak-ai-test' =>
+            'https://evolution.example.test/webhook/set/emlak-ai-35' =>
                 Http::response(['ok' => true], 200),
         ]);
 
-        app(RealEstateWhatsAppProvisioningService::class)->configureWebhook(
-            'emlak-ai-test',
-            'https://wai.example.test/api/real-estate/whatsapp/webhook'
-        );
+        app(RealEstateWhatsAppProvisioningService::class)
+            ->configureWebhook('emlak-ai-35');
 
         Http::assertSent(function ($request): bool {
             $webhook = $request['webhook'] ?? [];
 
-            return $request->url() === 'https://evolution.example.test/webhook/set/emlak-ai-test'
+            return $request->url() === 'https://evolution.example.test/webhook/set/emlak-ai-35'
                 && $request->hasHeader('apikey', 'evolution-test-key')
                 && ($webhook['enabled'] ?? null) === true
+                && ($webhook['url'] ?? null) === 'https://wai.example.test/api/real-estate/whatsapp/webhook'
                 && ($webhook['byEvents'] ?? null) === false
                 && ($webhook['base64'] ?? null) === false
                 && ($webhook['headers']['jwt_key'] ?? null) === self::WEBHOOK_SECRET
@@ -115,6 +135,25 @@ class RealEstateProductionFlowTest extends TestCase
                     'MESSAGES_UPDATE',
                 ];
         });
+    }
+
+    public function test_secure_provisioning_rejects_legacy_instance_without_contacting_evolution(): void
+    {
+        $this->seedRealEstateBot();
+        Http::fake();
+
+        try {
+            app(RealEstateWhatsAppProvisioningService::class)
+                ->configureWebhook('gulten-sirketi-1');
+            $this->fail('Legacy instance provisioning should fail closed.');
+        } catch (\Exception $exception) {
+            $this->assertStringContainsString(
+                'emlak-ai-35',
+                $exception->getMessage()
+            );
+        }
+
+        Http::assertNothingSent();
     }
 
     public function test_isolated_openai_key_is_encrypted_at_rest_without_changing_other_bots(): void
@@ -289,7 +328,7 @@ class RealEstateProductionFlowTest extends TestCase
             'status' => 'active',
             'business_sector' => 'real_estate',
             'lead_scoring_profile' => 'real_estate',
-            'whatsapp_instance' => 'emlak-ai-test',
+            'whatsapp_instance' => 'emlak-ai-35',
             'follow_up_enabled' => false,
             'second_follow_up_enabled' => false,
             'ai_enabled' => true,
