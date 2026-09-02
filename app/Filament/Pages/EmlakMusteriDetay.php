@@ -124,7 +124,7 @@ class EmlakMusteriDetay extends Page
                     '/admin/emlak-whatsapp-medya/'
                 );
 
-                if (! $isAllowedPrivateRoute && ! preg_match('/^https?:\\/\\//i', $url)) {
+                if (! $isAllowedPrivateRoute && ! preg_match('/^https?:\/\//i', $url)) {
                     return null;
                 }
 
