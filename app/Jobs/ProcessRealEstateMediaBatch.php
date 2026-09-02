@@ -103,13 +103,13 @@ class ProcessRealEstateMediaBatch implements ShouldQueue
             $payloads,
             fn (array $payload): bool => $this->isImagePayload($payload)
         ));
-        $representativeImageIndexes = count($imageIndexes) <= 3
-            ? $imageIndexes
-            : array_values(array_unique([
-                $imageIndexes[0],
-                $imageIndexes[(int) floor((count($imageIndexes) - 1) / 2)],
-                $imageIndexes[count($imageIndexes) - 1],
-            ]));
+        // A property-photo burst gets one representative vision pass.
+        // Every file is still persisted in the private CRM gallery, while
+        // avoiding several serial model calls before the customer receives a
+        // reply. Documents remain fully analyzed below.
+        $representativeImageIndexes = $imageIndexes === []
+            ? []
+            : [$imageIndexes[0]];
 
         foreach ($payloads as $index => $payload) {
             unset($payload['_real_estate_authorized']);
