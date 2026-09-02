@@ -136,16 +136,16 @@ class EmlakIsMerkezi extends Page
             return true;
         }
 
-        $latestMessageAt = ChatMessage::query()
+        $latestMessage = ChatMessage::query()
             ->where('user_id', RealEstateIsolationService::USER_ID)
             ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
             ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
             ->where('session_id', $conversation->session_id)
             ->latest('created_at')
-            ->value('created_at');
+            ->first(['created_at']);
 
-        return $latestMessageAt === null
-            || $latestMessageAt->lte(now()->subMinutes(self::WHATSAPP_IDLE_MINUTES));
+        return ! $latestMessage
+            || $latestMessage->created_at->lte(now()->subMinutes(self::WHATSAPP_IDLE_MINUTES));
     }
 
     public function outcomesFor(string $kind): array
