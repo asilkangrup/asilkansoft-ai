@@ -10,6 +10,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 class WhatsAppBagla extends Page
@@ -56,6 +57,29 @@ class WhatsAppBagla extends Page
 
         try {
             $this->record->refresh();
+
+            $isolation = app(RealEstateIsolationService::class);
+            $isDedicatedRealEstateBot = $isolation
+                ->dedicatedOpenAiOnlyForBot($this->record);
+
+            if ($isDedicatedRealEstateBot) {
+                $instanceName = trim((string) $this->record->whatsapp_instance);
+
+                if ($instanceName === '') {
+                    throw new RuntimeException(
+                        'Dedicated Emlak AI instance eksik. Yeni instance otomatik oluşturulmaz; '
+                        .RealEstateIsolationService::INSTANCE.' kullanılmalıdır.'
+                    );
+                }
+
+                if ($instanceName !== RealEstateIsolationService::INSTANCE) {
+                    throw new RuntimeException(
+                        'Dedicated Emlak AI yalnızca '
+                        .RealEstateIsolationService::INSTANCE
+                        .' instance ile çalışabilir.'
+                    );
+                }
+            }
 
             if (blank($this->record->whatsapp_instance)) {
                 $firmaAdi = Str::slug(
@@ -134,16 +158,19 @@ class WhatsAppBagla extends Page
         string $instanceName
     ): void {
         $baseUrl = rtrim((string) config('app.url'), '/');
-        $isIsolatedRealEstateBot =
-            (int) $this->record->id === RealEstateIsolationService::BOT_ID
-            && (int) $this->record->user_id === RealEstateIsolationService::USER_ID
-            && trim($instanceName) === RealEstateIsolationService::INSTANCE;
+        $isolation = app(RealEstateIsolationService::class);
+        $isDedicatedRealEstateBot = $isolation
+            ->dedicatedOpenAiOnlyForBot($this->record);
 
-        if ($isIsolatedRealEstateBot) {
-            app(RealEstateWhatsAppProvisioningService::class)->configureWebhook(
-                $instanceName,
-                $baseUrl.'/api/real-estate/whatsapp/webhook'
-            );
+        if ($isDedicatedRealEstateBot) {
+            if (trim($instanceName) !== RealEstateIsolationService::INSTANCE) {
+                throw new RuntimeException(
+                    'Dedicated Emlak AI webhook generic hatta yönlendirilemez.'
+                );
+            }
+
+            app(RealEstateWhatsAppProvisioningService::class)
+                ->configureWebhook($instanceName);
 
             return;
         }
