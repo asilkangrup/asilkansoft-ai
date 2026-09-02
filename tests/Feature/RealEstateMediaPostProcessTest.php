@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\RegisterRealEstateMediaCrmFinding;
 use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Services\RealEstateMediaAnalysisService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
 use Mockery;
 use Tests\TestCase;
 
@@ -20,6 +22,7 @@ class RealEstateMediaPostProcessTest extends TestCase
 
     public function test_isolated_media_row_removes_immediately_preceding_legacy_placeholder(): void
     {
+        Queue::fake();
         $bot = $this->seedRealEstateBot();
         $conversation = $this->conversation($bot, 'media-dedupe-video');
 
@@ -63,12 +66,13 @@ class RealEstateMediaPostProcessTest extends TestCase
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
-    public function test_successful_media_analysis_recomputes_verification_on_same_message(): void
+    public function test_media_observer_registers_crm_work_without_automatic_analysis_or_decision_recompute(): void
     {
+        Queue::fake();
         $bot = $this->seedRealEstateBot();
-        $conversation = $this->conversation($bot, 'media-verification-same-turn');
+        $conversation = $this->conversation($bot, 'media-crm-only-same-turn');
 
-        RealEstateProfile::query()->create([
+        $profile = RealEstateProfile::query()->create([
             'conversation_control_id' => $conversation->id,
             'user_id' => 40,
             'ai_bot_id' => 35,
@@ -80,42 +84,18 @@ class RealEstateMediaPostProcessTest extends TestCase
                 'area_sqm' => 1000,
                 'block_no' => '10',
                 'parcel_no' => '20',
-                'title_deed_type' => 'müstakil',
-                'zoning_status' => 'konut',
                 'asking_price' => 4000000,
-                'media_findings' => [[
-                    'message_id' => 'wamid-conflict',
-                    'document_type' => 'tapu',
-                    'city' => 'Muğla',
-                    'district' => 'Bodrum',
-                    'area_sqm' => 1000,
-                    'block_no' => '10',
-                    'parcel_no' => '20',
-                    'title_deed_type' => 'müstakil',
-                    'zoning_status' => 'konut',
-                    'confidence_score' => 92,
-                ]],
             ],
-            'valuation' => [
-                'market_min' => 3800000,
-                'market_max' => 4300000,
-                'investor_buy_max' => 3600000,
-                'confidence_score' => 80,
-            ],
-            'completeness_score' => 95,
-            'confidence_score' => 85,
+            'valuation' => [],
+            'completeness_score' => 80,
+            'confidence_score' => 70,
         ]);
 
         $mock = Mockery::mock(RealEstateMediaAnalysisService::class);
-        $mock->shouldReceive('process')
-            ->once()
-            ->andReturn([
-                'message_id' => 'wamid-conflict',
-                'document_type' => 'tapu',
-            ]);
+        $mock->shouldNotReceive('process');
         $this->app->instance(RealEstateMediaAnalysisService::class, $mock);
 
-        ChatMessage::query()->create([
+        $message = ChatMessage::query()->create([
             'user_id' => 40,
             'organization_id' => 37,
             'ai_bot_id' => 35,
@@ -125,36 +105,20 @@ class RealEstateMediaPostProcessTest extends TestCase
             'message' => '[Fotoğraf]',
             'message_type' => 'image',
             'media_mime_type' => 'image/jpeg',
-            'media_filename' => 'tapu.jpg',
-            'whatsapp_message_id' => 'wamid-conflict',
+            'media_filename' => 'arsa.jpg',
+            'whatsapp_message_id' => 'wamid-crm-only',
             'status' => 'received',
         ]);
 
-        $profile = RealEstateProfile::query()
-            ->where('conversation_control_id', $conversation->id)
-            ->firstOrFail();
-        $conversation->refresh();
+        Queue::assertPushed(
+            RegisterRealEstateMediaCrmFinding::class,
+            fn (RegisterRealEstateMediaCrmFinding $job): bool => $job->chatMessageId === $message->id
+        );
 
-        $this->assertSame(
-            'blocked',
-            $profile->data['verification_intelligence']['status']
-        );
-        $this->assertGreaterThanOrEqual(
-            85,
-            $profile->data['verification_intelligence']['risk_score']
-        );
-        $this->assertFalse(
-            $profile->data['decision_intelligence']['ready_for_match']
-        );
-        $this->assertContains(
-            'real_estate:verification:blocked',
-            $conversation->etiketler()
-        );
-        $this->assertStringContainsString(
-            'ilçe çelişkisini',
-            (string) $conversation->next_best_action
-        );
-        $this->assertNull($conversation->next_follow_up_at);
+        $profile->refresh();
+        $this->assertArrayNotHasKey('verification_intelligence', $profile->data);
+        $this->assertArrayNotHasKey('decision_intelligence', $profile->data);
+        $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
     public function test_media_analysis_returns_existing_finding_without_external_call(): void
