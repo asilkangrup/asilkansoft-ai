@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AiBot;
 use App\Models\ChatMessage;
+use App\Models\ConversationControl;
 use App\Models\Organization;
 use App\Models\RealEstateOutboundDelivery;
 use App\Models\User;
@@ -224,7 +225,7 @@ class RealEstateOutboundDeliveryGuardTest extends TestCase
             'status' => 'active',
         ]);
 
-        return AiBot::query()->forceCreate([
+        $bot = AiBot::query()->forceCreate([
             'id' => 35,
             'user_id' => 40,
             'name' => 'Emlak AI',
@@ -243,5 +244,21 @@ class RealEstateOutboundDeliveryGuardTest extends TestCase
             'follow_up_enabled' => false,
             'second_follow_up_enabled' => false,
         ]);
+
+        foreach (range(1, 5) as $suffix) {
+            $number = '90555000000'.$suffix;
+            ConversationControl::query()->create([
+                'user_id' => 40,
+                'organization_id' => 37,
+                'ai_bot_id' => 35,
+                'session_id' => 'whatsapp:35:'.$number,
+                'whatsapp_number' => $number,
+                'lead_status' => 'new',
+                'next_follow_up_at' => null,
+                'human_takeover' => false,
+            ]);
+        }
+
+        return $bot;
     }
 }
