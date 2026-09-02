@@ -13,7 +13,9 @@ use App\Services\OpenAIService;
 use App\Services\RealEstateAwareCrmConversationSummaryService;
 use App\Services\RealEstateAwareCrmManagerSummaryService;
 use App\Services\RealEstateAwareFinanceLeadExtractorService;
+use App\Services\RealEstateLiveReadinessService;
 use App\Services\RealEstateOpenAIService;
+use App\Services\RealEstateReadinessService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -41,6 +43,13 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             FinanceLeadExtractorService::class,
             RealEstateAwareFinanceLeadExtractorService::class
+        );
+
+        // Health/readiness must use Evolution's live state for the isolated
+        // instance instead of trusting a potentially stale ai_bots status flag.
+        $this->app->bind(
+            RealEstateReadinessService::class,
+            RealEstateLiveReadinessService::class
         );
     }
 
