@@ -369,6 +369,10 @@ class RealEstateWhatsAppInboundService
         );
 
         if ($answer === null) {
+            $answer = $this->deterministicCompanyInformationAnswer($message);
+        }
+
+        if ($answer === null) {
             $answer = $this->deterministicSellerPriceAnswer(
                 conversation: $conversation,
                 message: $message,
@@ -544,6 +548,36 @@ class RealEstateWhatsAppInboundService
             .'Gayrimenkul satıcısı mısınız, yoksa yatırımcı mısınız?';
     }
 
+    private function deterministicCompanyInformationAnswer(
+        string $message,
+    ): ?string {
+        $normalized = $this->normalizeTurkishText($message);
+        $parts = [];
+
+        foreach (['komisyon', 'hizmet bedeli', 'yuzde kac', 'ucretiniz'] as $signal) {
+            if (str_contains($normalized, $signal)) {
+                $parts[] = 'Alıcıdan %2, satıcıdan da %2 hizmet komisyonu alıyoruz.';
+                break;
+            }
+        }
+
+        foreach (['adres', 'neredesiniz', 'nerede bulunuyorsunuz', 'yeriniz nerede', 'ofis'] as $signal) {
+            if (str_contains($normalized, $signal)) {
+                $parts[] = 'Merkezimiz İstanbul Bahçeşehir’de.';
+                break;
+            }
+        }
+
+        foreach (['hangi iller', 'hangi sehirler', 'tum turkiye', 'turkiye geneli', 'her yerde', 'sehir disi'] as $signal) {
+            if (str_contains($normalized, $signal)) {
+                $parts[] = 'Tüm Türkiye genelinde hizmet veriyoruz.';
+                break;
+            }
+        }
+
+        return $parts === [] ? null : implode(' ', $parts);
+    }
+
     private function deterministicSellerPriceAnswer(
         ConversationControl $conversation,
         string $message,
@@ -622,6 +656,19 @@ class RealEstateWhatsAppInboundService
                 $valuationIntent = true;
                 break;
             }
+        }
+
+        if (
+            ! $valuationIntent
+            && str_contains($normalized, 'ada')
+            && str_contains($normalized, 'parsel')
+            && preg_match('/\\d/u', $normalized) === 1
+        ) {
+            // The synchronous CRM pipeline has already extracted the parcel
+            // identity and completed any eligible fresh research before this
+            // reply is selected. Connect that result directly to negotiation
+            // instead of asking the seller another discovery question.
+            $valuationIntent = true;
         }
 
         if (! $valuationIntent) {
