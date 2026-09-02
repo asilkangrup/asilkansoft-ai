@@ -85,4 +85,16 @@ jobs:
           php -l routes/console.php
 
       - name: Run full isolated real-estate feature suite
-        run: php artisan test tests/Feature/RealEstate*.php
+        shell: bash
+        run: |
+          set -o pipefail
+          php artisan test tests/Feature/RealEstate*.php 2>&1 | tee /tmp/real-estate-test-output.txt
+
+      - name: Upload isolated real-estate failure output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-real-estate-test-output
+          path: /tmp/real-estate-test-output.txt
+          if-no-files-found: ignore
+          retention-days: 1
