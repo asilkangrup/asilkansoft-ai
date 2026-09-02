@@ -12,6 +12,7 @@ use App\Services\RealEstateMatchLedgerService;
 use App\Services\RealEstateNextBestActionDecisionBridgeService;
 use App\Services\RealEstateNextBestActionService;
 use App\Services\RealEstateOperatorAlertService;
+use App\Services\RealEstateOpportunityScoreService;
 use App\Services\RealEstateSellerMotivationService;
 use App\Services\RealEstateSellerOfferPacketService;
 use App\Services\RealEstateSellerInvestorHandoffService;
@@ -46,6 +47,8 @@ class RealEstateProfileObserver
         app(RealEstateSellerOfferPacketService::class)->sync($profile);
         $profile->refresh();
         app(RealEstateSellerInvestorHandoffService::class)->sync($profile);
+        $profile->refresh();
+        app(RealEstateOpportunityScoreService::class)->sync($profile);
         $profile->refresh();
 
         $this->recordEvidence($profile, $conversation);
