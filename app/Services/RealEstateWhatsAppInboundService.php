@@ -330,7 +330,13 @@ class RealEstateWhatsAppInboundService
             mediaContext: $mediaContext,
         );
 
-        if (in_array($mediaContext['type'] ?? null, ['image', 'document'], true)) {
+        $isPhotoOrDocument = in_array(
+            $mediaContext['type'] ?? null,
+            ['image', 'document'],
+            true
+        );
+
+        if ($isPhotoOrDocument) {
             try {
                 app(EvolutionMediaService::class)->persistPrivateInboundMedia(
                     message: $inboundMessage,
@@ -366,13 +372,19 @@ class RealEstateWhatsAppInboundService
         $history = $this->memoryService->openAIMesajlariHazirla(
             userId: RealEstateIsolationService::USER_ID,
             sessionId: $sessionId,
-            limit: 8,
+            limit: 50,
         );
 
-        $answer = $this->deterministicFirstContactRoleQuestion(
-            conversation: $conversation,
-            message: $message,
-        );
+        $answer = $isPhotoOrDocument
+            ? $this->deterministicMediaWrittenDetailsAnswer($conversation)
+            : null;
+
+        if ($answer === null) {
+            $answer = $this->deterministicFirstContactRoleQuestion(
+                conversation: $conversation,
+                message: $message,
+            );
+        }
 
         if ($answer === null) {
             $answer = $this->deterministicCompanyInformationAnswer($message);
@@ -504,6 +516,46 @@ class RealEstateWhatsAppInboundService
             'message' => 'Emlak AI cevabı gönderildi.',
             'delivery_deduplicated' => ! (bool) $deliveryResult['sent_now'],
         ];
+    }
+
+    private function deterministicMediaWrittenDetailsAnswer(
+        ConversationControl $conversation,
+    ): string {
+        $profile = RealEstateProfile::query()
+            ->isolatedProduction()
+            ->where('conversation_control_id', $conversation->id)
+            ->first();
+
+        $answer = 'Fotoğrafı/belgeyi dosyanıza kaydettim. Bilgileri doğru kaydedebilmemiz için görseldeki taşınmaz bilgilerini yazılı olarak da göndermeniz gerekiyor. '
+            .'Lütfen taşınmaz türü, il/ilçe/mahalle, m², satış fiyatı ve varsa ada/parsel bilgisini yazılı olarak atar mısınız?';
+
+        if (! $profile) {
+            return $answer."\nAyrıca gayrimenkul satıcısı mısınız, yoksa yatırımcı mısınız?";
+        }
+
+        if ($profile->profile_type !== 'seller') {
+            return $answer;
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $state = is_array($data['seller_fast_cash_handoff'] ?? null)
+            ? $data['seller_fast_cash_handoff']
+            : [];
+
+        if (filled($state['asked_at'] ?? null)) {
+            return $answer;
+        }
+
+        $state['asked_at'] = now()->toIso8601String();
+        $state['market_research_mode'] = 'manual_operator';
+        $state['automatic_price_generated'] = false;
+        $data['seller_fast_cash_handoff'] = $state;
+        $profile->forceFill(['data' => $data])->save();
+
+        return $answer."\n"
+            .'Taşınmazları yatırımcılarımıza hızlı nakit fiyatıyla sunuyoruz. Yatırımcı fiyatı normal satış beklentinizden bir miktar düşük olabilir; uygun teklif oluşursa ödeme ve işlem süreci daha hızlı ilerleyebilir.'
+            ."\n"
+            .'Hızlı nakitte son fiyatınız nedir? Yatırımcılardan hızlı nakit fiyatı almak ister misiniz?';
     }
 
     private function deterministicFirstContactRoleQuestion(
@@ -731,34 +783,15 @@ class RealEstateWhatsAppInboundService
             return null;
         }
 
-        $normalized = $this->normalizeTurkishText($message);
-        $priceIntent = collect([
-            'ne kadar eder', 'kac para eder', 'kaca satilir', 'kaca gider',
-            'emsal', 'fiyat', 'siz bakin', 'siz soyleyin', 'son fiyat',
-            'acil', 'nakit', 'yatirimciya sun',
-        ])->contains(fn (string $signal): bool => str_contains($normalized, $signal));
-
-        $hasLocation = filled($data['city'] ?? null)
-            || filled($data['district'] ?? null)
-            || filled($data['neighborhood'] ?? null);
-        $fileReadyForPriceQuestion = filled($data['property_type'] ?? null)
-            && $hasLocation
-            && filled($data['area_sqm'] ?? null)
-            && $this->positivePrice($data['asking_price'] ?? null) !== null;
-
-        if (! $priceIntent && ! $fileReadyForPriceQuestion) {
-            return null;
-        }
-
         $state['asked_at'] = now()->toIso8601String();
         $state['market_research_mode'] = 'manual_operator';
         $state['automatic_price_generated'] = false;
         $data['seller_fast_cash_handoff'] = $state;
         $profile->forceFill(['data' => $data])->save();
 
-        return 'Taşınmazınızı yatırımcı ağımıza sunabiliriz. Yatırımcı teklifi normal satış beklentinizden biraz daha düşük olabilir; uygun yatırımcıyla anlaşılırsa nakit ve işlem süreci daha hızlı ilerler.'
+        return 'Taşınmazları yatırımcılarımıza hızlı nakit fiyatıyla sunuyoruz. Yatırımcı fiyatı normal satış beklentinizden bir miktar düşük olabilir; uygun teklif oluşursa ödeme ve işlem süreci daha hızlı ilerleyebilir.'
             ."\n"
-            .'Hızlı nakit satışta değerlendirebileceğiniz son fiyat nedir? Bu fiyatla yatırımcılarımıza sunalım mı?';
+            .'Hızlı nakitte son fiyatınız nedir? Yatırımcılardan hızlı nakit fiyatı almak ister misiniz?';
     }
 
     private function deterministicSellerPriceAnswer(
@@ -845,7 +878,7 @@ class RealEstateWhatsAppInboundService
             ! $valuationIntent
             && str_contains($normalized, 'ada')
             && str_contains($normalized, 'parsel')
-            && preg_match('/\\d/u', $normalized) === 1
+            && preg_match('/\d/u', $normalized) === 1
         ) {
             // The synchronous CRM pipeline has already extracted the parcel
             // identity and completed any eligible fresh research before this
@@ -956,7 +989,7 @@ class RealEstateWhatsAppInboundService
                 continue;
             }
 
-            if (! preg_match('/(\\d{1,3}(?:\\.\\d{3})+)\\s*TL/iu', $text, $match)) {
+            if (! preg_match('/(\d{1,3}(?:\.\d{3})+)\s*TL/iu', $text, $match)) {
                 continue;
             }
 
