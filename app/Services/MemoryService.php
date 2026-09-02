@@ -258,6 +258,10 @@ class MemoryService
                         trim(app(RealEstateValuationService::class)->promptFor($conversation)),
                         trim(app(RealEstateDecisionService::class)->promptFor($conversation)),
                         trim(app(RealEstateMatchService::class)->promptFor($conversation)),
+                        // The deterministic orchestrator is the last-word action
+                        // policy after valuation/verification/match guards. It
+                        // must be delivered to the chat model on every turn.
+                        trim(app(RealEstateNextBestActionService::class)->promptFor($conversation)),
                     ])
                         ->filter()
                         ->implode("\n\n");

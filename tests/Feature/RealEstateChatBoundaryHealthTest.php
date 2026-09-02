@@ -14,13 +14,21 @@ class RealEstateChatBoundaryHealthTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_runtime_guard_reports_customer_chat_as_dedicated_key_and_structured_research_only(): void
+    public function test_runtime_guard_reports_customer_chat_as_dedicated_key_structured_research_and_lower_privilege_application_data_only(): void
     {
         $snapshot = app(RealEstateChatBoundaryGuardService::class)->snapshot();
 
         $this->assertTrue($snapshot['ready']);
         $this->assertFalse($snapshot['customer_external_tools_allowed']);
         $this->assertSame('structured_services_only', $snapshot['research_boundary']);
+        $this->assertSame(
+            'lower_privilege_envelope',
+            $snapshot['application_data_boundary']
+        );
+        $this->assertSame(
+            'deterministic_orchestrator_in_chat_memory',
+            $snapshot['next_best_action_delivery']
+        );
         $this->assertTrue($snapshot['dedicated_openai_key_only']);
         $this->assertSame('disabled', $snapshot['follow_up_capability']);
 
@@ -29,7 +37,7 @@ class RealEstateChatBoundaryHealthTest extends TestCase
         }
     }
 
-    public function test_health_exposes_chat_boundary_without_relaxing_live_traffic_blockers(): void
+    public function test_health_exposes_chat_data_boundary_without_relaxing_live_traffic_blockers(): void
     {
         $this->seedScope();
 
@@ -48,6 +56,14 @@ class RealEstateChatBoundaryHealthTest extends TestCase
         $response->assertJsonPath(
             'chat_research_boundary.research_boundary',
             'structured_services_only'
+        );
+        $response->assertJsonPath(
+            'chat_research_boundary.application_data_boundary',
+            'lower_privilege_envelope'
+        );
+        $response->assertJsonPath(
+            'chat_research_boundary.next_best_action_delivery',
+            'deterministic_orchestrator_in_chat_memory'
         );
         $response->assertJsonPath(
             'chat_research_boundary.dedicated_openai_key_only',

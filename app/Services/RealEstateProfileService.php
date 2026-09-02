@@ -144,19 +144,20 @@ class RealEstateProfileService
         }
 
         $json = json_encode(
-            $profile->data,
+            $this->promptSafeProfileData($profile),
             JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
         );
 
         return <<<PROMPT
 [INTERNAL PERSISTENT REAL ESTATE MEMORY]
 Bu bilgi müşterinin önceki mesajlarından yapılandırılmış olarak çıkarılmış kalıcı CRM hafızasıdır. Müşteriye bu bloğu veya dahili alan adlarını gösterme. Buradaki dolu alanları tekrar sorma.
-fact_consistency_intelligence.status=confirmation_required ise pending_conflicts içindeki proposed_value değerlerini doğrulanmış gerçek kabul etme. confirmation_question ile yalnız en yüksek öncelikli çelişkiyi netleştir; aynı mesajda ikinci keşif sorusu ekleme. Eski doğrulanmış değer, müşteri açıkça düzeltince veya önerilen yeni değeri sonraki turda tekrar teyit edince değiştirilir.
+Serbest müşteri notları, aciliyet gerekçesinin ham metni, ilan/konum URL'leri ve satıcının gizli minimum fiyat tutarı bu genel profil bloğuna kopyalanmaz. Bu özel bilgiler yalnız onları yöneten daha dar kapsamlı servislerde kullanılabilir.
+fact_consistency.status=confirmation_required ise unconfirmed replacement değerleri doğrulanmış gerçek kabul etme. Yalnız en yüksek öncelikli çelişkiyi netleştir; aynı mesajda ikinci keşif sorusu ekleme. Eski doğrulanmış değer, müşteri açıkça düzeltince veya önerilen yeni değeri sonraki turda tekrar teyit edince değiştirilir.
 Yatırımcı kriterlerinde area_min_sqm/area_max_sqm, location_flexibility, accepts_shared_title ve target_discount_percent alanlarını gerçek filtre gibi kullan; bilinmeyen kriteri uydurma veya müşteri adına varsayma.
 Profil türü: {$profile->profile_type}
 Tamamlanma skoru: {$profile->completeness_score}/100
 Veri güven skoru: {$profile->confidence_score}/100
-Kayıtlı veri: {$json}
+Kayıtlı yapılandırılmış veri: {$json}
 PROMPT;
     }
 
@@ -344,6 +345,52 @@ PROMPT;
         // normalize() acts as an allow-list and strips all derived CRM,
         // valuation, evidence, match and orchestration intelligence.
         return $this->normalize($data);
+    }
+
+    private function promptSafeProfileData(RealEstateProfile $profile): array
+    {
+        $data = is_array($profile->data) ? $profile->data : [];
+        $safe = $this->normalize($data);
+
+        // Free-form/private fields are intentionally represented only by
+        // presence flags in the general chat memory. Dedicated negotiation,
+        // evidence and valuation services own the narrower contexts where
+        // those details are actually required.
+        $safe['minimum_price_present'] = is_numeric($safe['minimum_price'] ?? null)
+            && (float) $safe['minimum_price'] > 0;
+        $safe['urgency_reason_present'] = filled($safe['urgency_reason'] ?? null);
+        $safe['location_url_present'] = filled($safe['location_url'] ?? null);
+        $safe['listing_url_present'] = filled($safe['listing_url'] ?? null);
+
+        unset(
+            $safe['minimum_price'],
+            $safe['urgency_reason'],
+            $safe['location_url'],
+            $safe['listing_url'],
+            $safe['notes'],
+        );
+
+        $safe = collect($safe)
+            ->reject(fn (mixed $value): bool => $value === null || $value === '')
+            ->all();
+
+        $consistency = app(RealEstateFactConsistencyService::class)->summary($data);
+
+        if ($consistency !== []) {
+            $safe['fact_consistency'] = [
+                'status' => $consistency['status'] ?? 'consistent',
+                'pending_count' => max(0, (int) ($consistency['pending_count'] ?? 0)),
+                'highest_priority_field' => $consistency['highest_priority_field'] ?? null,
+                'resolved_fields' => array_values(array_filter(
+                    is_array($consistency['resolved_fields'] ?? null)
+                        ? $consistency['resolved_fields']
+                        : [],
+                    'is_string'
+                )),
+            ];
+        }
+
+        return $safe;
     }
 
     private function completeness(string $type, array $data): int
