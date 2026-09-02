@@ -7,6 +7,7 @@ use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Models\RealEstateWebhookReceipt;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -37,12 +38,23 @@ class RealEstateInboundRecoveryService
         $failedBefore = now()->subSeconds($failedAgeSeconds);
         $staleProcessingBefore = now()->subMinutes(self::STALE_PROCESSING_MINUTES);
 
+        $recoverableMessageIds = ChatMessage::query()
+            ->select('whatsapp_message_id')
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('sender_type', 'customer')
+            ->whereNotNull('whatsapp_message_id');
+
         $receipts = RealEstateWebhookReceipt::query()
             ->where('user_id', RealEstateIsolationService::USER_ID)
             ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
             ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
             ->where('instance', RealEstateIsolationService::INSTANCE)
             ->where('event', 'messages.upsert')
+            // Unsupported/empty/provider-only receipts must never consume the
+            // small recovery batch and starve real persisted customer turns.
+            ->whereIn('whatsapp_message_id', $recoverableMessageIds)
             ->where(function ($query) use ($failedBefore, $staleProcessingBefore): void {
                 $query
                     ->where(function ($failed) use ($failedBefore): void {
@@ -52,13 +64,13 @@ class RealEstateInboundRecoveryService
                             ->where('processed_at', '<=', $failedBefore);
                     })
                     ->orWhere(function ($ignored) use ($failedBefore): void {
-                        // An earlier worker may have marked a valid inbound as
-                        // ignored while a newer debounce job was expected to
-                        // answer it. If that job never produced an AI/human
-                        // reply, recoverReceipt's latest-turn and reply checks
-                        // make retrying the saved customer message safe.
+                        // Only an original ignored receipt (no terminal recovery
+                        // reason yet) is eligible. Once recovery classifies it
+                        // as superseded/already answered/ineligible, last_error
+                        // makes that decision terminal and prevents re-scanning.
                         $ignored
                             ->where('status', 'ignored')
+                            ->whereNull('last_error')
                             ->whereNotNull('processed_at')
                             ->where('processed_at', '<=', $failedBefore);
                     })
@@ -69,7 +81,10 @@ class RealEstateInboundRecoveryService
                             ->where('processing_started_at', '<=', $staleProcessingBefore);
                     });
             })
-            ->orderBy('id')
+            // Recover the newest customer failures first. The previous oldest-
+            // first query could repeatedly spend the limit on historic ignored
+            // receipts while a current advertising lead remained unanswered.
+            ->orderByDesc('id')
             ->limit($limit)
             ->get();
 
@@ -108,6 +123,8 @@ class RealEstateInboundRecoveryService
             ->first();
 
         if (! $message) {
+            $this->closeIgnored($receipt, 'recovery_customer_message_missing');
+
             return 'skipped';
         }
 
@@ -140,18 +157,11 @@ class RealEstateInboundRecoveryService
             return 'already_answered';
         }
 
-        $receiptState = $this->receiptService->begin(
-            instance: RealEstateIsolationService::INSTANCE,
-            event: 'messages.upsert',
-            messageId: (string) $receipt->whatsapp_message_id,
-            phoneNumber: $receipt->phone_number,
-        );
+        $activeReceipt = $this->claimForRecovery($receipt);
 
-        if (! (bool) ($receiptState['should_process'] ?? false)) {
+        if (! $activeReceipt) {
             return 'busy';
         }
-
-        $activeReceipt = $receiptState['receipt'] ?? $receipt;
 
         try {
             $bot = AiBot::query()
@@ -292,6 +302,65 @@ class RealEstateInboundRecoveryService
 
             return 'failed';
         }
+    }
+
+    /**
+     * Re-open only a receipt already proven safe by recoverReceipt's latest-
+     * turn and reply checks. Generic webhook begin() intentionally treats an
+     * ignored receipt as terminal duplicate; recovery needs this narrower,
+     * transaction-locked transition for a stranded final debounce turn.
+     */
+    private function claimForRecovery(
+        RealEstateWebhookReceipt $receipt,
+    ): ?RealEstateWebhookReceipt {
+        return DB::transaction(function () use ($receipt): ?RealEstateWebhookReceipt {
+            $locked = RealEstateWebhookReceipt::query()
+                ->whereKey($receipt->id)
+                ->where('user_id', RealEstateIsolationService::USER_ID)
+                ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+                ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+                ->where('instance', RealEstateIsolationService::INSTANCE)
+                ->where('event', 'messages.upsert')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $locked) {
+                return null;
+            }
+
+            if (in_array($locked->status, ['replied', 'processed'], true)) {
+                return null;
+            }
+
+            if (
+                $locked->status === 'processing'
+                && $locked->processing_started_at
+                && $locked->processing_started_at->gt(
+                    now()->subMinutes(self::STALE_PROCESSING_MINUTES)
+                )
+            ) {
+                return null;
+            }
+
+            if (! in_array($locked->status, ['failed', 'ignored', 'processing'], true)) {
+                return null;
+            }
+
+            if ($locked->status === 'ignored' && filled($locked->last_error)) {
+                return null;
+            }
+
+            $locked->forceFill([
+                'status' => 'processing',
+                'attempts' => (int) $locked->attempts + 1,
+                'last_error' => null,
+                'processing_started_at' => now(),
+                'processed_at' => null,
+                'replied_at' => null,
+            ])->save();
+
+            return $locked->fresh();
+        }, 3);
     }
 
     private function closeIgnored(
