@@ -21,6 +21,7 @@ class InspectRealEstateInvestorHandoffs extends Command
 
         $statuses = [
             'ready' => 0,
+            'authorization_required' => 0,
             'investor_sourcing' => 0,
             'comparable_review' => 0,
             'valuation_required' => 0,
@@ -52,9 +53,11 @@ class InspectRealEstateInvestorHandoffs extends Command
             ],
             'seller_profiles' => $profiles->count(),
             'ready_for_operator_handoff' => $statuses['ready'],
+            'authorization_required_before_handoff' => $statuses['authorization_required'],
             'eligible_candidate_refs' => $candidateCount,
             'statuses' => $statuses,
             'contains_customer_pii' => false,
+            'authorization_gate_enforced' => true,
             'automatic_investor_outreach_allowed' => false,
             'automatic_customer_follow_up_allowed' => false,
             'human_review_required_before_investor_contact' => true,
@@ -72,6 +75,7 @@ class InspectRealEstateInvestorHandoffs extends Command
         $this->info('Emlak AI yatırımcı handoff özeti');
         $this->line('Satıcı profili: '.$result['seller_profiles']);
         $this->line('Operatör handoff hazır: '.$result['ready_for_operator_handoff']);
+        $this->line('Yetkilendirme bekleyen: '.$result['authorization_required_before_handoff']);
         $this->line('Uygun aday referansı: '.$result['eligible_candidate_refs']);
         $this->line('Durumlar: '.json_encode($statuses, JSON_UNESCAPED_UNICODE));
 
