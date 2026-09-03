@@ -19,13 +19,15 @@ class RealEstateClosingRiskService
 
         $authorization = app(RealEstateAuthorizationService::class)->readiness($seller);
         $authorizationStatus = (string) ($authorization['status'] ?? 'incomplete');
+        $authorizationExpired = $authorizationStatus === 'expired'
+            || $this->storedAuthorizationExpired($seller);
         $case ??= app(RealEstateClosingService::class)->caseForPair($seller->id, $investor->id);
         $signals = [];
 
-        if (! (bool) ($authorization['ready'] ?? false)) {
-            $signals[] = $authorizationStatus === 'expired'
-                ? 'authorization_expired'
-                : 'authorization_not_ready';
+        if ($authorizationExpired) {
+            $signals[] = 'authorization_expired';
+        } elseif (! (bool) ($authorization['ready'] ?? false)) {
+            $signals[] = 'authorization_not_ready';
         }
 
         if (! is_array($case)) {
@@ -88,7 +90,7 @@ class RealEstateClosingRiskService
         $appointment = $this->date($case['appointment_at'] ?? null);
         if (! $appointment) {
             $signals[] = 'appointment_missing';
-        } elseif ($appointment->isPast() && ! $deedTransfer) {
+        } elseif ($appointment->isPast()) {
             $signals[] = 'appointment_missed_or_unconfirmed';
         }
 
@@ -288,6 +290,14 @@ class RealEstateClosingRiskService
         return (int) ($case['user_id'] ?? 0) === RealEstateIsolationService::USER_ID
             && (int) ($case['organization_id'] ?? 0) === RealEstateIsolationService::ORGANIZATION_ID
             && (int) ($case['ai_bot_id'] ?? 0) === RealEstateIsolationService::BOT_ID;
+    }
+
+    private function storedAuthorizationExpired(RealEstateProfile $seller): bool
+    {
+        $expiresAt = data_get($seller->data, 'authorization_control.expires_at');
+        $expires = $this->date($expiresAt);
+
+        return $expires?->endOfDay()->isPast() ?? false;
     }
 
     private function date(mixed $value): ?Carbon
