@@ -24,6 +24,11 @@ class RealEstateMatchVerificationFilterService
             return [];
         }
 
+        if (in_array($profile->profile_type, ['investor', 'buyer'], true)) {
+            app(RealEstateInvestorExclusionMemoryService::class)->sync($profile);
+            $profile->refresh();
+        }
+
         $data = is_array($profile->data) ? $profile->data : [];
         $matches = is_array($data['opportunity_matches'] ?? null)
             ? $data['opportunity_matches']
@@ -75,13 +80,25 @@ class RealEstateMatchVerificationFilterService
                         ->whereIn('profile_type', ['investor', 'buyer'])
                         ->first();
 
-                    return $investor !== null
-                        && $this->profileFactConsistent($investor);
+                    if (
+                        $investor === null
+                        || ! $this->profileFactConsistent($investor)
+                    ) {
+                        return false;
+                    }
+
+                    // Explicit negative criteria are derived only from customer
+                    // messages in the isolated conversation. They are hard
+                    // no-go rules: a broad positive city/type list must never
+                    // reintroduce a property the investor explicitly rejected.
+                    return ! app(RealEstateInvestorExclusionMemoryService::class)
+                        ->blocks($investor, $seller);
                 })
                 ->values()
                 ->all();
         }
 
+        $data = is_array($profile->fresh()?->data) ? $profile->fresh()->data : $data;
         $data['opportunity_matches'] = $matches;
         $data['opportunity_match_summary'] = [
             'count' => count($matches),
@@ -90,6 +107,7 @@ class RealEstateMatchVerificationFilterService
             'verification_filtered' => true,
             'evidence_quality_filtered' => true,
             'fact_consistency_filtered' => true,
+            'explicit_investor_exclusion_filtered' => true,
             'blocked_by_fact_consistency' => ! $this->profileFactConsistent($profile),
             'updated_at' => now()->toIso8601String(),
         ];
