@@ -96,6 +96,8 @@ class EmlakCrm extends Page
                     $record['title'],
                     $record['location'],
                     $record['notes'],
+                    $record['summary'],
+                    $record['next_action'],
                 ])), $search);
             })
             ->values();
@@ -145,14 +147,52 @@ class EmlakCrm extends Page
             'score' => (int) ($profile->completeness_score ?? 0),
             'confidence' => (int) ($profile->confidence_score ?? 0),
             'match_count' => (int) ($handoff['candidate_count'] ?? count((array) ($data['opportunity_matches'] ?? []))),
-            'next_action' => $isInvestor
+            'summary' => $this->conversationSummary($profile, $data, $isInvestor, $location, $type, $area, $asking, $budget, $handoff),
+            'next_action' => trim((string) ($conversation?->next_best_action ?? '')) ?: ($isInvestor
                 ? $this->investorNextAction($data)
-                : (string) ($handoff['recommended_operator_action'] ?? 'Satıcı dosyasındaki eksikleri tamamla.'),
+                : (string) ($handoff['recommended_operator_action'] ?? 'Satıcı dosyasındaki eksikleri tamamla.')),
             'notes' => trim((string) ($conversation?->notes ?? '')),
             'updated_at' => ($profile->last_extracted_at ?? $profile->updated_at)?->diffForHumans() ?? '—',
             'customer_url' => $conversation ? url('/admin/emlak-musteri-detay?customer='.$conversation->id) : null,
             'is_investor' => $isInvestor,
         ];
+    }
+
+    private function conversationSummary(
+        RealEstateProfile $profile,
+        array $data,
+        bool $isInvestor,
+        string $location,
+        string $type,
+        ?string $area,
+        ?int $asking,
+        ?int $budget,
+        array $handoff
+    ): string {
+        $existing = trim((string) ($profile->conversation?->ai_summary ?? ''));
+        if ($existing !== '') {
+            return $existing;
+        }
+
+        if ($isInvestor) {
+            $parts = [$location.' bölgesinde '.$type.' arıyor'];
+            if ($budget !== null) {
+                $parts[] = 'azami bütçe '.number_format($budget, 0, ',', '.').' TL';
+            }
+
+            return implode(' · ', $parts).'. Kriterleri uygun portföylerle eşleştirilecek.';
+        }
+
+        $parts = [$location.' konumunda '.$type];
+        if ($area !== null) {
+            $parts[] = $area.' m²';
+        }
+        if ($asking !== null) {
+            $parts[] = 'istenen fiyat '.number_format($asking, 0, ',', '.').' TL';
+        }
+        $parts[] = (int) ($handoff['candidate_count'] ?? count((array) ($data['opportunity_matches'] ?? []))).' yatırımcı adayı';
+
+        return implode(' · ', $parts).'.';
     }
 
     private function investorStatus(array $data): string

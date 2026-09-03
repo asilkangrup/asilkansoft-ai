@@ -49,7 +49,9 @@ class RealEstateOpportunityScoreTest extends TestCase
         $this->assertSame('actionable', $summary['state']);
         $this->assertContains($summary['grade'], ['exceptional','strong']);
         $this->assertGreaterThanOrEqual(65, $summary['score']);
-        $this->assertSame(10, $summary['components']['urgency_priority']);
+        $this->assertSame(20, $summary['components']['urgency_priority']);
+        $this->assertSame(3, $summary['metrics']['urgency_rank']);
+        $this->assertSame('Acil satış', $summary['metrics']['urgency_label']);
         $this->assertTrue($summary['metrics']['asking_within_investor_band']);
         $this->assertSame('investor_ready', $commercial['state']);
         $this->assertSame(2_600_000, $commercial['negotiation_target_min']);
@@ -90,7 +92,8 @@ class RealEstateOpportunityScoreTest extends TestCase
         $items = $page->getOpportunitiesProperty();
 
         $this->assertSame('preparation_required', $summary['state']);
-        $this->assertSame(5, $summary['components']['urgency_priority']);
+        $this->assertSame(10, $summary['components']['urgency_priority']);
+        $this->assertSame(2, $summary['metrics']['urgency_rank']);
         $this->assertSame('priority', $page->filter);
         $this->assertCount(1, $items);
         $this->assertSame($profile->id, $items->first()['id']);
@@ -121,6 +124,45 @@ class RealEstateOpportunityScoreTest extends TestCase
         $this->assertContains('verification_risk_blocks_action', $summary['reasons']);
         $this->assertStringContainsString('yatırımcıya sunma', $summary['recommended_operator_action']);
         $this->assertNull($conversation->fresh()->next_follow_up_at);
+    }
+
+    public function test_short_sale_timeline_ranks_above_higher_scored_standard_file(): void
+    {
+        $this->seedAccount();
+
+        $standard = $this->profile($this->conversation('standard-priority'), [
+            'property_type' => 'arsa', 'location' => 'İstanbul', 'asking_price' => 2_000_000,
+            'urgency' => 'low',
+            'verification_intelligence' => ['status' => 'verified', 'risk_score' => 0],
+            'fact_consistency_intelligence' => ['status' => 'consistent'],
+            'investor_offer_handoff_intelligence' => [
+                'ready_for_operator_handoff' => true, 'candidate_count' => 8, 'strongest_match_score' => 100,
+            ],
+        ], [
+            'realistic_sale_max' => 3_000_000, 'investor_buy_max' => 2_200_000, 'confidence_score' => 100,
+        ], 100, 100);
+
+        $urgent = $this->profile($this->conversation('urgent-priority'), [
+            'property_type' => 'tarla', 'location' => 'Kırklareli', 'asking_price' => 4_000_000,
+            'timeline' => 'hemen',
+            'verification_intelligence' => ['status' => 'unverified', 'risk_score' => 0],
+            'fact_consistency_intelligence' => ['status' => 'consistent'],
+            'investor_offer_handoff_intelligence' => [
+                'ready_for_operator_handoff' => false, 'candidate_count' => 0,
+            ],
+        ], [
+            'realistic_sale_max' => 3_000_000, 'investor_buy_max' => 2_200_000, 'confidence_score' => 40,
+        ], 40, 40);
+
+        $page = new EmlakFirsatlar;
+        $items = $page->getOpportunitiesProperty();
+
+        $this->assertSame($urgent->id, $items->first()['id']);
+        $this->assertSame('Acil satış', $items->first()['urgency_label']);
+        $this->assertSame('hemen', $items->first()['sale_timeline']);
+        $this->assertNotSame($standard->id, $items->first()['id']);
+        $this->assertNotEmpty($items->first()['summary']);
+        $this->assertNotEmpty($items->first()['action']);
     }
 
     private function profile(ConversationControl $conversation, array $data, array $valuation, int $complete, int $confidence): RealEstateProfile
