@@ -18,9 +18,9 @@ class RealEstateOperatorAlertTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_critical_verification_risk_opens_one_deduplicated_operator_alert(): void
+    public function test_person_risk_alert_is_not_created_for_verification_conflict(): void
     {
-        [$bot, $conversation] = $this->seedIsolatedAccount('operator-risk');
+        [$bot, $conversation] = $this->seedIsolatedAccount('operator-risk-disabled');
 
         $profile = RealEstateProfile::query()->create([
             'conversation_control_id' => $conversation->id,
@@ -33,10 +33,7 @@ class RealEstateOperatorAlertTest extends TestCase
                     'risk_score' => 92,
                     'safe_to_match' => false,
                     'next_best_action' => 'İlçe çelişkisini netleştir.',
-                    'conflicts' => [[
-                        'field' => 'district',
-                        'severity' => 'critical',
-                    ]],
+                    'conflicts' => [['field' => 'district', 'severity' => 'critical']],
                 ],
             ],
             'valuation' => [],
@@ -44,24 +41,11 @@ class RealEstateOperatorAlertTest extends TestCase
             'confidence_score' => 65,
         ]);
 
-        $this->assertDatabaseHas('real_estate_operator_alerts', [
-            'user_id' => 40,
-            'organization_id' => 37,
-            'ai_bot_id' => 35,
+        $this->assertDatabaseMissing('real_estate_operator_alerts', [
             'real_estate_profile_id' => $profile->id,
             'type' => 'verification_risk',
-            'severity' => 'critical',
             'status' => 'open',
         ]);
-
-        $profile->touch();
-
-        $this->assertSame(
-            1,
-            RealEstateOperatorAlert::query()
-                ->where('alert_key', 'verification_risk:'.$profile->id)
-                ->count()
-        );
         $this->assertFalse($conversation->fresh()->human_takeover);
         $this->assertNull($conversation->fresh()->next_follow_up_at);
         $this->assertSame(35, $bot->id);
@@ -181,47 +165,43 @@ class RealEstateOperatorAlertTest extends TestCase
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
-    public function test_alert_is_resolved_when_the_risk_condition_disappears(): void
+    public function test_historical_person_risk_alert_is_resolved_on_sync(): void
     {
         [, $conversation] = $this->seedIsolatedAccount('operator-resolve');
 
-        $profile = RealEstateProfile::query()->create([
+        $profile = RealEstateProfile::withoutEvents(fn () => RealEstateProfile::query()->create([
             'conversation_control_id' => $conversation->id,
             'user_id' => 40,
             'ai_bot_id' => 35,
             'profile_type' => 'seller',
-            'data' => [
-                'verification_intelligence' => [
-                    'status' => 'blocked',
-                    'risk_score' => 90,
-                    'safe_to_match' => false,
-                    'conflicts' => [['field' => 'parcel_no', 'severity' => 'critical']],
-                ],
-            ],
+            'data' => [],
             'valuation' => [],
             'completeness_score' => 50,
             'confidence_score' => 50,
+        ]));
+
+        RealEstateOperatorAlert::query()->create([
+            'user_id' => 40,
+            'organization_id' => 37,
+            'ai_bot_id' => 35,
+            'conversation_control_id' => $conversation->id,
+            'real_estate_profile_id' => $profile->id,
+            'alert_key' => 'verification_risk:'.$profile->id,
+            'type' => 'verification_risk',
+            'severity' => 'critical',
+            'status' => 'open',
+            'title' => 'Eski risk kaydı',
+            'message' => 'Eski risk kaydı',
+            'payload' => [],
+            'opened_at' => now(),
         ]);
 
-        $alert = RealEstateOperatorAlert::query()
-            ->where('alert_key', 'verification_risk:'.$profile->id)
-            ->firstOrFail();
-        $this->assertSame('open', $alert->status);
+        app(RealEstateOperatorAlertService::class)->sync($profile);
 
-        $profile->update([
-            'data' => [
-                'verification_intelligence' => [
-                    'status' => 'corroborated',
-                    'risk_score' => 15,
-                    'safe_to_match' => true,
-                    'conflicts' => [],
-                ],
-            ],
+        $this->assertDatabaseHas('real_estate_operator_alerts', [
+            'alert_key' => 'verification_risk:'.$profile->id,
+            'status' => 'resolved',
         ]);
-
-        $alert->refresh();
-        $this->assertSame('resolved', $alert->status);
-        $this->assertNotNull($alert->resolved_at);
     }
 
     public function test_out_of_scope_profile_never_creates_operator_alerts(): void
