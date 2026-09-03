@@ -18,47 +18,21 @@ class RealEstateClosingRiskService
         }
 
         $authorization = app(RealEstateAuthorizationService::class)->readiness($seller);
+        $authorizationStatus = (string) ($authorization['status'] ?? 'incomplete');
         $case ??= app(RealEstateClosingService::class)->caseForPair($seller->id, $investor->id);
-
         $signals = [];
-        $riskLevel = 'ready';
-        $nextAction = 'continue_closing_controls';
-        $nextActionLabel = 'Kapanış kontrollerini insan doğrulamasıyla sürdür.';
 
         if (! (bool) ($authorization['ready'] ?? false)) {
-            $authorizationStatus = (string) ($authorization['status'] ?? 'incomplete');
             $signals[] = $authorizationStatus === 'expired'
                 ? 'authorization_expired'
                 : 'authorization_not_ready';
-            $riskLevel = in_array($authorizationStatus, ['expired', 'review_required'], true)
-                ? 'critical'
-                : 'warning';
-            $nextAction = $authorizationStatus === 'expired'
-                ? 'renew_seller_authorization'
-                : 'complete_seller_authorization';
-            $nextActionLabel = $authorizationStatus === 'expired'
-                ? 'Geçerli satıcı yetkilendirmesini yenile; kapanış ilerlemesini otomatik olarak sürdürme.'
-                : 'Satıcı yetkilendirme kontrolünü tamamla; kapanış ilerlemesini otomatik olarak sürdürme.';
         }
 
         if (! is_array($case)) {
-            if ($riskLevel !== 'critical') {
-                $riskLevel = 'warning';
-                $nextAction = 'open_closing_case';
-                $nextActionLabel = 'Kabul edilmiş gerçek teklif için insan kontrollü kapanış dosyasını aç.';
-            }
             $signals[] = 'closing_case_not_opened';
+            [$level, $action, $label] = $this->decision($signals);
 
-            return $this->result(
-                $seller,
-                $investor,
-                null,
-                $riskLevel,
-                $signals,
-                $nextAction,
-                $nextActionLabel,
-                false,
-            );
+            return $this->result($seller, $investor, null, $level, $signals, $action, $label, false);
         }
 
         if (! $this->supportsCase($case)) {
@@ -82,123 +56,54 @@ class RealEstateClosingRiskService
             );
         }
 
-        $agreedPrice = is_numeric($case['agreed_price'] ?? null)
-            ? (int) $case['agreed_price']
-            : 0;
-        $depositAmount = is_numeric($case['deposit_amount'] ?? null)
-            ? (int) $case['deposit_amount']
-            : 0;
+        $agreedPrice = is_numeric($case['agreed_price'] ?? null) ? (int) $case['agreed_price'] : 0;
+        $depositAmount = is_numeric($case['deposit_amount'] ?? null) ? (int) $case['deposit_amount'] : 0;
         $depositReceived = (bool) ($case['deposit_received'] ?? false);
         $finalPayment = (bool) ($case['final_payment_verified'] ?? false);
         $deedTransfer = (bool) ($case['deed_transfer_completed'] ?? false);
 
         if ($depositAmount > 0 && $agreedPrice > 0 && $depositAmount > $agreedPrice) {
             $signals[] = 'deposit_exceeds_agreed_price';
-            [$riskLevel, $nextAction, $nextActionLabel] = $this->escalate(
-                $riskLevel,
-                'critical',
-                'resolve_payment_amount_inconsistency',
-                'Kapora ve anlaşılan satış bedeli tutarlarını insan kontrolüyle düzelt; hiçbir ödeme/devir adımını otomatik ilerletme.'
-            );
         }
-
         if ($depositReceived && $depositAmount <= 0) {
             $signals[] = 'deposit_received_without_amount';
-            [$riskLevel, $nextAction, $nextActionLabel] = $this->escalate(
-                $riskLevel,
-                'critical',
-                'verify_deposit_record',
-                'Kapora tahsilat kaydını ve tutarını insan kontrolüyle doğrula.'
-            );
         }
-
         if ($deedTransfer && ! $finalPayment) {
             $signals[] = 'deed_transfer_without_final_payment';
-            [$riskLevel, $nextAction, $nextActionLabel] = $this->escalate(
-                $riskLevel,
-                'critical',
-                'resolve_payment_transfer_inconsistency',
-                'Tapu devri ile nihai ödeme kaydı arasındaki kritik tutarsızlığı insan kontrolüyle çöz.'
-            );
         } elseif ($finalPayment && ! $deedTransfer) {
             $signals[] = 'final_payment_pending_deed_transfer';
-            [$riskLevel, $nextAction, $nextActionLabel] = $this->escalate(
-                $riskLevel,
-                'warning',
-                'confirm_deed_transfer',
-                'Nihai ödeme doğrulandı. Resmî tapu devrini ayrıca insan kontrolüyle teyit et.'
-            );
         }
 
-        $checks = [
+        $criticalChecks = [
             'title_deed_verified',
             'identity_authority_verified',
             'encumbrance_checked',
             'tax_fee_checked',
             'payment_method_confirmed',
         ];
-        $missingChecks = collect($checks)
-            ->reject(fn (string $field): bool => (bool) ($case[$field] ?? false))
-            ->values()
-            ->all();
-
-        if ($missingChecks !== []) {
+        if (collect($criticalChecks)->contains(fn (string $field): bool => ! (bool) ($case[$field] ?? false))) {
             $signals[] = 'critical_checks_incomplete';
-            [$riskLevel, $nextAction, $nextActionLabel] = $this->escalate(
-                $riskLevel,
-                'warning',
-                'verify_closing_documents_and_payment_plan',
-                'Tapu, taraf yetkisi, takyidat, harç ve güvenli ödeme kontrollerindeki eksikleri insan doğrulamasıyla tamamla.'
-            );
         }
 
         $appointment = $this->date($case['appointment_at'] ?? null);
         if (! $appointment) {
             $signals[] = 'appointment_missing';
-            [$riskLevel, $nextAction, $nextActionLabel] = $this->escalate(
-                $riskLevel,
-                'warning',
-                'schedule_deed_appointment',
-                'Tapu randevusunu insan tarafından teyit ederek planla.'
-            );
         } elseif ($appointment->isPast() && ! $deedTransfer) {
             $signals[] = 'appointment_missed_or_unconfirmed';
-            [$riskLevel, $nextAction, $nextActionLabel] = $this->escalate(
-                $riskLevel,
-                'critical',
-                'resolve_missed_appointment',
-                'Geçmiş tapu randevusunun sonucunu insan kontrolüyle teyit et; gerekirse yeni randevu planla.'
-            );
         }
 
         $updatedAt = $this->date($case['updated_at'] ?? null);
-        $stale = $updatedAt
-            ? $updatedAt->lt(now()->subHours(48))
-            : true;
+        $stale = $updatedAt ? $updatedAt->lt(now()->subHours(48)) : true;
         if ($stale) {
             $signals[] = 'closing_case_stale';
-            [$riskLevel, $nextAction, $nextActionLabel] = $this->escalate(
-                $riskLevel,
-                'warning',
-                'review_stale_closing_case',
-                'Kapanış dosyası 48 saattir güncellenmemiş. Son gerçek durumu insan kontrolüyle doğrula.'
-            );
         }
-
         if ($signals === []) {
             $signals[] = 'closing_controls_current';
         }
 
-        return $this->result(
-            $seller,
-            $investor,
-            $case,
-            $riskLevel,
-            $signals,
-            $nextAction,
-            $nextActionLabel,
-            $stale,
-        );
+        [$level, $action, $label] = $this->decision($signals);
+
+        return $this->result($seller, $investor, $case, $level, $signals, $action, $label, $stale);
     }
 
     public function health(): array
@@ -240,21 +145,17 @@ class RealEstateClosingRiskService
             }
 
             $signals = (array) ($assessment['signal_codes'] ?? []);
-            if (in_array('closing_case_not_opened', $signals, true)) {
-                $counts['case_not_opened']++;
-            }
-            if (
+            $counts['case_not_opened'] += in_array('closing_case_not_opened', $signals, true) ? 1 : 0;
+            $counts['authorization_not_ready'] += (
                 in_array('authorization_not_ready', $signals, true)
                 || in_array('authorization_expired', $signals, true)
-            ) {
-                $counts['authorization_not_ready']++;
-            }
-            if (in_array('appointment_missed_or_unconfirmed', $signals, true)) {
-                $counts['appointment_missed_or_unconfirmed']++;
-            }
-            if ((bool) ($assessment['stale'] ?? false)) {
-                $counts['stale']++;
-            }
+            ) ? 1 : 0;
+            $counts['appointment_missed_or_unconfirmed'] += in_array(
+                'appointment_missed_or_unconfirmed',
+                $signals,
+                true
+            ) ? 1 : 0;
+            $counts['stale'] += (bool) ($assessment['stale'] ?? false) ? 1 : 0;
         }
 
         return [
@@ -272,6 +173,71 @@ class RealEstateClosingRiskService
             'contains_customer_payload' => false,
             'contains_customer_pii' => false,
             'live_traffic_blocking' => false,
+        ];
+    }
+
+    /**
+     * @return array{0:string,1:string,2:string}
+     */
+    private function decision(array $signals): array
+    {
+        $priority = [
+            'authorization_expired' => [
+                'critical', 'renew_seller_authorization',
+                'Geçerli satıcı yetkilendirmesini yenile; kapanış ilerlemesini otomatik olarak sürdürme.',
+            ],
+            'authorization_not_ready' => [
+                'critical', 'complete_seller_authorization',
+                'Satıcı yetkilendirme kontrolünü tamamla; kapanış ilerlemesini otomatik olarak sürdürme.',
+            ],
+            'deed_transfer_without_final_payment' => [
+                'critical', 'resolve_payment_transfer_inconsistency',
+                'Tapu devri ile nihai ödeme kaydı arasındaki kritik tutarsızlığı insan kontrolüyle çöz.',
+            ],
+            'deposit_exceeds_agreed_price' => [
+                'critical', 'resolve_payment_amount_inconsistency',
+                'Kapora ve anlaşılan satış bedeli tutarlarını insan kontrolüyle düzelt; ödeme/devir adımını otomatik ilerletme.',
+            ],
+            'deposit_received_without_amount' => [
+                'critical', 'verify_deposit_record',
+                'Kapora tahsilat kaydını ve tutarını insan kontrolüyle doğrula.',
+            ],
+            'appointment_missed_or_unconfirmed' => [
+                'critical', 'resolve_missed_appointment',
+                'Geçmiş tapu randevusunun sonucunu insan kontrolüyle teyit et; gerekirse yeni randevu planla.',
+            ],
+            'critical_checks_incomplete' => [
+                'warning', 'verify_closing_documents_and_payment_plan',
+                'Tapu, taraf yetkisi, takyidat, harç ve güvenli ödeme kontrollerindeki eksikleri insan doğrulamasıyla tamamla.',
+            ],
+            'final_payment_pending_deed_transfer' => [
+                'warning', 'confirm_deed_transfer',
+                'Nihai ödeme doğrulandı. Resmî tapu devrini ayrıca insan kontrolüyle teyit et.',
+            ],
+            'appointment_missing' => [
+                'warning', 'schedule_deed_appointment',
+                'Tapu randevusunu insan tarafından teyit ederek planla.',
+            ],
+            'closing_case_stale' => [
+                'warning', 'review_stale_closing_case',
+                'Kapanış dosyası 48 saattir güncellenmemiş. Son gerçek durumu insan kontrolüyle doğrula.',
+            ],
+            'closing_case_not_opened' => [
+                'warning', 'open_closing_case',
+                'Kabul edilmiş gerçek teklif için insan kontrollü kapanış dosyasını aç.',
+            ],
+        ];
+
+        foreach ($priority as $signal => $decision) {
+            if (in_array($signal, $signals, true)) {
+                return $decision;
+            }
+        }
+
+        return [
+            'ready',
+            'continue_closing_controls',
+            'Kapanış kontrollerini insan doğrulamasıyla sürdür.',
         ];
     }
 
@@ -335,21 +301,6 @@ class RealEstateClosingRiskService
         } catch (Throwable) {
             return null;
         }
-    }
-
-    private function escalate(
-        string $current,
-        string $candidate,
-        string $action,
-        string $label,
-    ): array {
-        $rank = ['ready' => 0, 'warning' => 1, 'critical' => 2, 'completed' => 3];
-
-        if (($rank[$candidate] ?? 0) > ($rank[$current] ?? 0)) {
-            return [$candidate, $action, $label];
-        }
-
-        return [$current, $action, $label];
     }
 
     private function riskLabel(string $level): string
