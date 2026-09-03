@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\AlarmMerkezi;
+use App\Filament\Pages\EmlakCrm;
 use App\Filament\Pages\Gorevler;
 use App\Filament\Pages\Musteriler;
 use App\Filament\Pages\Raporlar;
@@ -18,11 +19,11 @@ class RealEstateLegacyCrmNavigationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_isolated_emlak_owner_can_see_legacy_crm_navigation(): void
+    public function test_isolated_emlak_owner_can_only_see_dedicated_crm_navigation(): void
     {
         $user = User::query()->forceCreate([
             'id'=>40,'name'=>'Emlak Owner','email'=>'emlak-crm@example.test',
-            'password'=>Hash::make('test'),'is_admin'=>false,
+            'password'=>Hash::make('test'),'is_admin'=>true,
         ]);
         Organization::query()->forceCreate([
             'id'=>37,'owner_user_id'=>40,'name'=>'Emlak AI','slug'=>'emlak-legacy-crm',
@@ -35,18 +36,16 @@ class RealEstateLegacyCrmNavigationTest extends TestCase
         $this->actingAs($user);
 
         $this->assertTrue(app(RealEstateIsolationService::class)->currentOperatorHasAccess());
-        $this->assertTrue(Musteriler::canAccess());
-        $this->assertTrue(SatisPipeline::canAccess());
-        $this->assertTrue(Gorevler::canAccess());
-        $this->assertTrue(AlarmMerkezi::canAccess());
-        $this->assertTrue(Raporlar::canAccess());
+        $this->assertTrue(EmlakCrm::canAccess());
+        $this->assertTrue(EmlakCrm::shouldRegisterNavigation());
 
         foreach ([
             Musteriler::class, SatisPipeline::class, Gorevler::class,
             AlarmMerkezi::class, Raporlar::class,
         ] as $page) {
             $this->assertSame('CRM', $page::getNavigationGroup());
-            $this->assertTrue($page::shouldRegisterNavigation());
+            $this->assertFalse($page::canAccess());
+            $this->assertFalse($page::shouldRegisterNavigation());
         }
     }
 
