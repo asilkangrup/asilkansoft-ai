@@ -16,8 +16,13 @@ class RealEstateInvestorPresentationService
 
         $profile->loadMissing('conversation');
         $data = is_array($profile->data) ? $profile->data : [];
-        $packet = is_array($data['seller_offer_packet_intelligence'] ?? null)
-            ? $data['seller_offer_packet_intelligence'] : [];
+        $packet = app(RealEstateSellerOfferPacketService::class)
+            ->summaryForProfile($profile);
+        $authorization = app(RealEstateAuthorizationService::class)
+            ->readiness($profile);
+        $packetReady = (bool) ($packet['ready_for_investor_offer'] ?? false);
+        $authorizationReady = (bool) ($authorization['ready_for_investor_presentation'] ?? false);
+        $exportAllowed = $packetReady && $authorizationReady;
 
         $city = $this->first($data, ['city']);
         $district = $this->first($data, ['district']);
@@ -28,7 +33,15 @@ class RealEstateInvestorPresentationService
         return [
             'reference' => 'EML-'.$profile->id,
             'title' => trim(($location ?: 'Türkiye').' '.$type),
-            'status' => (string) ($packet['status'] ?? 'draft'),
+            'status' => $exportAllowed ? 'ready_for_authorized_presentation' : 'draft_blocked',
+            'packet_status' => (string) ($packet['status'] ?? 'draft'),
+            'authorization_status' => (string) ($authorization['status'] ?? 'incomplete'),
+            'authorization_status_label' => (string) ($authorization['status_label'] ?? 'Eksik kontrol bulunuyor'),
+            'authorization_blocking_reason_codes' => array_values(
+                $authorization['blocking_reason_codes'] ?? []
+            ),
+            'export_allowed' => $exportAllowed,
+            'offer_collection_allowed' => $exportAllowed,
             'facts' => [
                 'Taşınmaz türü' => $type,
                 'İl' => $city,
@@ -42,7 +55,13 @@ class RealEstateInvestorPresentationService
                 'Hisse durumu' => $this->first($data, ['owner_share', 'share_status']),
             ],
             'photos' => $this->photos($profile, $data),
-            'offer_note' => 'Bu dosya için kriterleri uyan gerçek yatırımcılardan teklifler toplanmaktadır.',
+            'offer_note' => $exportAllowed
+                ? 'Yetkilendirmesi tamamlanan bu dosya kriterleri uygun yatırımcılara operatör tarafından manuel olarak sunulabilir. Gerçek yatırımcı teklifi ancak ilgili yatırımcıyla doğrudan teyit edildikten sonra kaydedilir.'
+                : 'Bu dosya yalnız operatör taslağıdır. Satıcı yetkilendirme/sunum onayı ve yatırımcı teklif dosyası tamamlanmadan dış paylaşım veya teklif toplama yapılmamalıdır.',
+            'authorization_note' => $exportAllowed
+                ? 'Satıcı sunum onayı ve yetkilendirme kontrolü kayıtlıdır. Dış paylaşım yine operatör incelemesiyle yapılır.'
+                : (string) ($authorization['recommended_operator_action']
+                    ?? 'Yetkilendirme kontrolü tamamlanmadan dış paylaşım yapma.'),
             'buyer_fee_note' => 'Alıcı hizmet bedeli, aksi yazılı kararlaştırılmadıkça satış bedelinin %2’sidir.',
             'disclaimer' => 'Bu sunum bilgilendirme amaçlıdır; kesin fiyat, getiri veya satış garantisi içermez. Tapu, imar ve diğer resmi bilgiler işlem öncesinde yetkili kurumlardan doğrulanmalıdır.',
             'guardrails' => [
@@ -51,6 +70,10 @@ class RealEstateInvestorPresentationService
                 'seller_notes_included' => false,
                 'seller_confidential_floor_included' => false,
                 'automatic_outbound_allowed' => false,
+                'automatic_customer_follow_up_allowed' => false,
+                'authorization_required_before_external_presentation' => true,
+                'export_allowed' => $exportAllowed,
+                'offer_collection_allowed' => $exportAllowed,
             ],
         ];
     }
