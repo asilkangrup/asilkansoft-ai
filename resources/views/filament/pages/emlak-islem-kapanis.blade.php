@@ -4,6 +4,7 @@
 .ek-card{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 9px 28px rgba(15,35,25,.04)}.ek-side{padding:15px;align-self:start;position:sticky;top:15px}.ek-side h2{font-size:18px;font-weight:900}.ek-search{width:100%;margin:10px 0;border:1px solid var(--line)!important;border-radius:13px!important}
 .ek-deal{display:block;width:100%;text-align:left;border:1px solid var(--line);background:#f8faf9;border-radius:14px;padding:12px;margin-top:8px}.ek-deal.active{border-color:#178c4d;background:#eef9f2}.ek-deal b,.ek-deal small{display:block}.ek-deal small{margin-top:4px;color:var(--muted)}
 .ek-main{padding:22px}.ek-head{display:flex;justify-content:space-between;gap:12px}.ek-head h1{font-size:25px;font-weight:900}.ek-head p{margin-top:5px;color:var(--muted)}.ek-status{height:30px;padding:0 11px;border-radius:999px;display:inline-flex;align-items:center;background:#eef4ff;color:#315b9c;font-size:11px;font-weight:900}
+.ek-risk{margin:14px 0;padding:14px 15px;border-radius:15px;border:1px solid #dfe7e3;background:#f6f9f7}.ek-risk b{display:block;font-size:13px}.ek-risk p{margin:5px 0 0;font-size:12px;color:#4d5e55}.ek-risk.critical{background:#fff1f1;border-color:#f2c7c7}.ek-risk.critical b{color:#a62929}.ek-risk.warning{background:#fff8e8;border-color:#eddcae}.ek-risk.warning b{color:#80601a}.ek-risk.completed{background:#eef9f2;border-color:#c9e8d3}.ek-risk.completed b{color:#157345}
 .ek-price{margin:16px 0;padding:14px;border-radius:15px;background:#f2f8f4}.ek-price small,.ek-field label{display:block;color:var(--muted);font-size:11px;font-weight:900}.ek-price b{display:block;font-size:22px;margin-top:4px}
 .ek-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.ek-field input,.ek-field textarea{width:100%;border:1px solid var(--line)!important;border-radius:12px!important}.ek-field label{margin-bottom:5px}.ek-wide{grid-column:1/-1}
 .ek-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:17px 0}.ek-check{display:flex;gap:9px;padding:12px;border-radius:13px;background:#f6f9f7}.ek-check input{margin-top:3px}.ek-check b{font-size:12px}.ek-check small{display:block;color:var(--muted);font-size:10px;margin-top:3px}
@@ -18,7 +19,7 @@
         <input class="ek-search" type="search" wire:model.live.debounce.350ms="search" placeholder="Taşınmaz veya taraf ara">
         @forelse($this->deals as $deal)
             @php
-                $case=app(AppServicesRealEstateClosingService::class)->caseForPair($deal['seller_profile_id'],$deal['investor_profile_id']);
+                $case=app(\App\Services\RealEstateClosingService::class)->caseForPair($deal['seller_profile_id'],$deal['investor_profile_id']);
                 $property=collect([data_get($deal['seller']->data,'location'),data_get($deal['seller']->data,'property_type')])->filter()->implode(' · ');
             @endphp
             <button class="ek-deal {{ $selectedKey === $deal['key'] ? 'active' : '' }}" wire:click="selectDeal('{{ $deal['key'] }}')">
@@ -40,6 +41,13 @@
                 </div>
                 <div class="ek-status">{{ $this->statusLabel }}</div>
             </div>
+
+            @if($this->closingRisk !== [])
+                <div class="ek-risk {{ $this->closingRisk['risk_level'] ?? 'warning' }}">
+                    <b>{{ $this->closingRisk['risk_label'] ?? 'Operatör kontrolü gerekiyor' }}</b>
+                    <p>{{ $this->closingRisk['next_best_action_label'] ?? 'Kapanış dosyasını insan kontrolüyle gözden geçir.' }}</p>
+                </div>
+            @endif
 
             <div class="ek-price">
                 <small>KABUL EDİLEN GERÇEK TEKLİF</small>
