@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\RealEstateProfile;
+use App\Services\RealEstateClosingRiskService;
 use App\Services\RealEstateClosingService;
 use App\Services\RealEstateIsolationService;
 use BackedEnum;
@@ -134,6 +135,26 @@ class EmlakIslemKapanis extends Page
         return app(RealEstateClosingService::class)->caseForPair(
             (int) $this->selectedDeal['seller_profile_id'],
             (int) $this->selectedDeal['investor_profile_id'],
+        );
+    }
+
+    public function getClosingRiskProperty(): array
+    {
+        if (! $this->selectedDeal) {
+            return [];
+        }
+
+        $seller = $this->selectedDeal['seller'] ?? null;
+        $investor = $this->selectedDeal['investor'] ?? null;
+
+        if (! $seller instanceof RealEstateProfile || ! $investor instanceof RealEstateProfile) {
+            return [];
+        }
+
+        return app(RealEstateClosingRiskService::class)->assess(
+            $seller,
+            $investor,
+            $this->closingCase,
         );
     }
 
