@@ -3,16 +3,18 @@
 namespace App\Services;
 
 use App\Models\CrmActivity;
-use App\Models\RealEstateClosingCase;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class RealEstateClosingService
 {
+    private const DATA_KEY = 'transaction_closing_cases';
+
     public function acceptedDeals(): Collection
     {
         $profiles = RealEstateProfile::query()
@@ -65,7 +67,7 @@ class RealEstateClosingService
         RealEstateProfile $investor,
         array $input,
         ?User $operator = null,
-    ): RealEstateClosingCase {
+    ): array {
         $this->assertPair($seller, $investor);
 
         $deal = $this->acceptedDeals()->first(
@@ -117,6 +119,7 @@ class RealEstateClosingService
         }
 
         $status = $this->status($validated, $checksComplete);
+        $key = (string) $investor->id;
 
         return DB::transaction(function () use (
             $seller,
@@ -124,22 +127,37 @@ class RealEstateClosingService
             $validated,
             $operator,
             $status,
-        ): RealEstateClosingCase {
-            $case = RealEstateClosingCase::query()->updateOrCreate([
+            $key,
+        ): array {
+            $locked = RealEstateProfile::query()
+                ->whereKey($seller->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless($locked->belongsToIsolatedProductionScope(), 403);
+
+            $data = is_array($locked->data) ? $locked->data : [];
+            $cases = is_array($data[self::DATA_KEY] ?? null) ? $data[self::DATA_KEY] : [];
+            $previous = is_array($cases[$key] ?? null) ? $cases[$key] : [];
+            $now = now()->toIso8601String();
+
+            $state = [
+                'id' => $seller->id.':'.$investor->id,
                 'user_id' => RealEstateIsolationService::USER_ID,
                 'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
                 'ai_bot_id' => RealEstateIsolationService::BOT_ID,
                 'seller_profile_id' => $seller->id,
                 'investor_profile_id' => $investor->id,
-            ], [
                 'status' => $status,
+                'status_label' => $this->statusLabel($status),
                 'agreed_price' => (int) $validated['agreed_price'],
                 'title_deed_verified' => (bool) $validated['title_deed_verified'],
                 'identity_authority_verified' => (bool) $validated['identity_authority_verified'],
                 'encumbrance_checked' => (bool) $validated['encumbrance_checked'],
                 'tax_fee_checked' => (bool) $validated['tax_fee_checked'],
                 'payment_method_confirmed' => (bool) $validated['payment_method_confirmed'],
-                'appointment_at' => $validated['appointment_at'] ?? null,
+                'appointment_at' => filled($validated['appointment_at'] ?? null)
+                    ? Carbon::parse($validated['appointment_at'])->toIso8601String()
+                    : null,
                 'appointment_location' => trim((string) ($validated['appointment_location'] ?? '')) ?: null,
                 'deposit_amount' => is_numeric($validated['deposit_amount'] ?? null)
                     ? (int) $validated['deposit_amount']
@@ -148,11 +166,30 @@ class RealEstateClosingService
                 'final_payment_verified' => (bool) $validated['final_payment_verified'],
                 'deed_transfer_completed' => (bool) $validated['deed_transfer_completed'],
                 'operator_note' => trim((string) ($validated['operator_note'] ?? '')) ?: null,
-                'closed_at' => $status === 'completed' ? now() : null,
+                'closed_at' => $status === 'completed' ? ($previous['closed_at'] ?? $now) : null,
+                'updated_at' => $now,
                 'updated_by_user_id' => $operator?->id,
-            ]);
+                'automatic_outbound_allowed' => false,
+                'customer_follow_up_allowed' => false,
+                'contains_private_seller_floor' => false,
+                'contains_customer_pii' => false,
+                'history' => collect((array) ($previous['history'] ?? []))
+                    ->push([
+                        'status' => $status,
+                        'recorded_at' => $now,
+                        'recorded_by_user_id' => $operator?->id,
+                        'automatic_outbound_allowed' => false,
+                    ])
+                    ->take(-25)
+                    ->values()
+                    ->all(),
+            ];
 
-            $seller->conversation?->activities()->create([
+            $cases[$key] = $state;
+            $data[self::DATA_KEY] = $cases;
+            $locked->forceFill(['data' => $data])->saveQuietly();
+
+            $locked->conversation?->activities()->create([
                 'user_id' => RealEstateIsolationService::USER_ID,
                 'ai_bot_id' => RealEstateIsolationService::BOT_ID,
                 'performed_by_user_id' => $operator?->id,
@@ -162,7 +199,7 @@ class RealEstateClosingService
                 'new_value' => $status,
                 'meta' => [
                     'scope' => 'isolated_real_estate',
-                    'closing_case_id' => $case->id,
+                    'closing_case_id' => $state['id'],
                     'seller_profile_id' => $seller->id,
                     'investor_profile_id' => $investor->id,
                     'status' => $status,
@@ -175,51 +212,42 @@ class RealEstateClosingService
                 ],
             ]);
 
-            return $case->fresh();
+            return $this->summary($state);
         });
     }
 
-    public function summary(RealEstateClosingCase $case): array
+    public function summary(array $case): array
     {
         if (! $this->supportsCase($case)) {
             return [];
         }
 
-        return [
-            'id' => $case->id,
-            'seller_profile_id' => $case->seller_profile_id,
-            'investor_profile_id' => $case->investor_profile_id,
-            'status' => $case->status,
-            'status_label' => $this->statusLabel($case->status),
-            'agreed_price' => $case->agreed_price,
-            'title_deed_verified' => $case->title_deed_verified,
-            'identity_authority_verified' => $case->identity_authority_verified,
-            'encumbrance_checked' => $case->encumbrance_checked,
-            'tax_fee_checked' => $case->tax_fee_checked,
-            'payment_method_confirmed' => $case->payment_method_confirmed,
-            'appointment_at' => $case->appointment_at?->toIso8601String(),
-            'appointment_location' => $case->appointment_location,
-            'deposit_amount' => $case->deposit_amount,
-            'deposit_received' => $case->deposit_received,
-            'final_payment_verified' => $case->final_payment_verified,
-            'deed_transfer_completed' => $case->deed_transfer_completed,
-            'closed_at' => $case->closed_at?->toIso8601String(),
+        return array_merge($case, [
+            'status_label' => $this->statusLabel((string) ($case['status'] ?? 'document_review')),
             'automatic_outbound_allowed' => false,
             'customer_follow_up_allowed' => false,
             'contains_private_seller_floor' => false,
             'contains_customer_pii' => false,
-        ];
+        ]);
     }
 
-    public function caseForPair(int $sellerProfileId, int $investorProfileId): ?RealEstateClosingCase
+    public function caseForPair(int $sellerProfileId, int $investorProfileId): ?array
     {
-        return RealEstateClosingCase::query()
-            ->where('user_id', RealEstateIsolationService::USER_ID)
-            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
-            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
-            ->where('seller_profile_id', $sellerProfileId)
-            ->where('investor_profile_id', $investorProfileId)
+        $seller = RealEstateProfile::query()
+            ->isolatedProduction()
+            ->where('profile_type', 'seller')
+            ->whereKey($sellerProfileId)
             ->first();
+
+        if (! $seller) {
+            return null;
+        }
+
+        $case = data_get($seller->data, self::DATA_KEY.'.'.$investorProfileId);
+
+        return is_array($case) && $this->supportsCase($case)
+            ? $this->summary($case)
+            : null;
     }
 
     private function offerActivities(): Collection
@@ -260,11 +288,11 @@ class RealEstateClosingService
         );
     }
 
-    private function supportsCase(RealEstateClosingCase $case): bool
+    private function supportsCase(array $case): bool
     {
-        return (int) $case->user_id === RealEstateIsolationService::USER_ID
-            && (int) $case->organization_id === RealEstateIsolationService::ORGANIZATION_ID
-            && (int) $case->ai_bot_id === RealEstateIsolationService::BOT_ID;
+        return (int) ($case['user_id'] ?? 0) === RealEstateIsolationService::USER_ID
+            && (int) ($case['organization_id'] ?? 0) === RealEstateIsolationService::ORGANIZATION_ID
+            && (int) ($case['ai_bot_id'] ?? 0) === RealEstateIsolationService::BOT_ID;
     }
 
     private function status(array $input, bool $checksComplete): string
