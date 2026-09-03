@@ -29,6 +29,11 @@ class RealEstateCommercialConsistencyGuardService
         );
         $summary = $service->summary($data);
         $blocked = ($summary['status'] ?? 'consistent') === 'confirmation_required';
+        $factConsistency = is_array($data['fact_consistency_intelligence'] ?? null)
+            ? $data['fact_consistency_intelligence']
+            : [];
+        $propertyFactConflict = ($factConsistency['status'] ?? 'consistent')
+            === 'confirmation_required';
 
         if ($blocked) {
             $data['opportunity_matches'] = [];
@@ -65,33 +70,39 @@ class RealEstateCommercialConsistencyGuardService
                 }
             }
 
-            $question = trim((string) ($summary['confirmation_question'] ?? ''));
-            $data['next_best_action_intelligence'] = [
-                'action_code' => 'confirm_commercial_terms_conflict',
-                'priority' => 'high',
-                'action_text' => $question !== ''
-                    ? $question
-                    : 'Çelişkili fiyat veya bütçe bilgisini müşteriden tek soruyla netleştir.',
-                'single_question' => $question !== '' ? $question : null,
-                'blocking' => true,
-                'reason_codes' => array_values(array_map(
-                    static fn (string $code): string => 'commercial_'.$code,
-                    array_filter(
-                        is_array($summary['conflict_codes'] ?? null)
-                            ? $summary['conflict_codes']
-                            : [],
-                        'is_string'
-                    )
-                )),
-                'match_count' => 0,
-                'guardrails' => [
-                    'automatic_customer_follow_up_allowed' => false,
-                    'automatic_investor_outreach_allowed' => false,
-                    'private_seller_floor_included' => false,
-                    'commercial_terms_must_be_confirmed_before_matching' => true,
-                ],
-                'updated_at' => now()->toIso8601String(),
-            ];
+            // Stable property-identity conflicts are more fundamental than a
+            // commercial contradiction. Always block matching/handoff here,
+            // but preserve the already-selected property confirmation question
+            // so the customer is never asked two competing questions at once.
+            if (! $propertyFactConflict) {
+                $question = trim((string) ($summary['confirmation_question'] ?? ''));
+                $data['next_best_action_intelligence'] = [
+                    'action_code' => 'confirm_commercial_terms_conflict',
+                    'priority' => 'high',
+                    'action_text' => $question !== ''
+                        ? $question
+                        : 'Çelişkili fiyat veya bütçe bilgisini müşteriden tek soruyla netleştir.',
+                    'single_question' => $question !== '' ? $question : null,
+                    'blocking' => true,
+                    'reason_codes' => array_values(array_map(
+                        static fn (string $code): string => 'commercial_'.$code,
+                        array_filter(
+                            is_array($summary['conflict_codes'] ?? null)
+                                ? $summary['conflict_codes']
+                                : [],
+                            'is_string'
+                        )
+                    )),
+                    'match_count' => 0,
+                    'guardrails' => [
+                        'automatic_customer_follow_up_allowed' => false,
+                        'automatic_investor_outreach_allowed' => false,
+                        'private_seller_floor_included' => false,
+                        'commercial_terms_must_be_confirmed_before_matching' => true,
+                    ],
+                    'updated_at' => now()->toIso8601String(),
+                ];
+            }
         }
 
         $profile->forceFill(['data' => $data])->saveQuietly();
@@ -108,7 +119,7 @@ class RealEstateCommercialConsistencyGuardService
             'next_follow_up_at' => null,
         ];
 
-        if ($blocked) {
+        if ($blocked && ! $propertyFactConflict) {
             $attributes['next_best_action'] = $data['next_best_action_intelligence']['action_text'];
         }
 
@@ -129,6 +140,12 @@ class RealEstateCommercialConsistencyGuardService
 
         RealEstateProfile::query()
             ->isolatedProduction()
+            ->whereHas('conversation', function ($query): void {
+                $query
+                    ->where('user_id', RealEstateIsolationService::USER_ID)
+                    ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+                    ->where('ai_bot_id', RealEstateIsolationService::BOT_ID);
+            })
             ->get(['id', 'profile_type', 'data'])
             ->each(function (RealEstateProfile $profile) use ($service, &$counts): void {
                 $counts['profiles']++;
