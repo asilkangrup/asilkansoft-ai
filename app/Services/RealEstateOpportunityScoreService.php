@@ -72,7 +72,8 @@ class RealEstateOpportunityScoreService
             ['moderate', 'high'],
             true
         ) ? 5 : 0;
-        $urgencyScore = $this->urgencyScore($data, $motivation);
+        $urgency = $this->urgencyPriority($data, $motivation);
+        $urgencyScore = $urgency['score'];
 
         $factBlocked = ($fact['status'] ?? null) === 'confirmation_required';
         $verificationStatus = (string) ($verification['status'] ?? 'unverified');
@@ -117,6 +118,9 @@ class RealEstateOpportunityScoreService
                 'strongest_match_score' => $matchScore ?: null,
                 'valuation_confidence' => $valuationConfidence,
                 'file_completeness' => $completeness,
+                'urgency_rank' => $urgency['rank'],
+                'urgency_label' => $urgency['label'],
+                'sale_timeline' => $urgency['timeline'],
             ],
             'recommended_operator_action' => $this->action($state, $grade, $handoff),
             'reasons' => array_values(array_filter([
@@ -141,15 +145,30 @@ class RealEstateOpportunityScoreService
         ];
     }
 
-    private function urgencyScore(array $data, array $motivation): int
+    private function urgencyPriority(array $data, array $motivation): array
     {
         $level = mb_strtolower(trim((string) ($motivation['motivation_level'] ?? $data['urgency'] ?? '')));
+        $timeline = trim((string) ($data['timeline'] ?? $data['sale_timeline'] ?? data_get($motivation, 'timeline', '')));
+        $normalizedTimeline = mb_strtolower($timeline);
 
-        return match ($level) {
-            'high', 'high_explicit', 'urgent', 'acil', 'çok_acil', 'cok_acil' => 10,
-            'medium', 'medium_explicit', 'moderate', 'orta' => 5,
-            default => 0,
-        };
+        $urgentTimeline = $normalizedTimeline !== '' && preg_match(
+            '/\\b(hemen|acil|en kısa|en kisa|bu hafta|[1-7] gün|[1-7] gun|1 hafta|7 gün|7 gun|15 gün|15 gun|2 hafta)\\b/u',
+            $normalizedTimeline
+        );
+        $shortTimeline = $normalizedTimeline !== '' && preg_match(
+            '/\\b(1 ay|bir ay|30 gün|30 gun|kısa süre|kisa sure)\\b/u',
+            $normalizedTimeline
+        );
+
+        if (in_array($level, ['high', 'high_explicit', 'urgent', 'acil', 'çok_acil', 'cok_acil'], true) || $urgentTimeline) {
+            return ['rank' => 3, 'score' => 20, 'label' => 'Acil satış', 'timeline' => $timeline ?: null];
+        }
+
+        if (in_array($level, ['medium', 'medium_explicit', 'moderate', 'orta'], true) || $shortTimeline) {
+            return ['rank' => 2, 'score' => 10, 'label' => 'Kısa sürede satış', 'timeline' => $timeline ?: null];
+        }
+
+        return ['rank' => 1, 'score' => 0, 'label' => 'Standart öncelik', 'timeline' => $timeline ?: null];
     }
 
     private function priceScore(?float $asking, ?float $realisticMax, ?float $investorMax): int
