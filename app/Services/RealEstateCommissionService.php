@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RealEstateProfile;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -150,10 +151,10 @@ class RealEstateCommissionService
                 'buyer_remaining_amount' => $buyerRemaining,
                 'total_remaining_amount' => $sellerRemaining + $buyerRemaining,
                 'seller_collected_at' => filled($validated['seller_collected_at'] ?? null)
-                    ? now()->parse($validated['seller_collected_at'])->toIso8601String()
+                    ? Carbon::parse($validated['seller_collected_at'])->toIso8601String()
                     : null,
                 'buyer_collected_at' => filled($validated['buyer_collected_at'] ?? null)
-                    ? now()->parse($validated['buyer_collected_at'])->toIso8601String()
+                    ? Carbon::parse($validated['buyer_collected_at'])->toIso8601String()
                     : null,
                 'seller_receipt_reference' => trim((string) ($validated['seller_receipt_reference'] ?? '')) ?: null,
                 'buyer_receipt_reference' => trim((string) ($validated['buyer_receipt_reference'] ?? '')) ?: null,
