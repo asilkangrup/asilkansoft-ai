@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\RealEstateProfile;
+use App\Services\RealEstateAuthorizationNextBestActionService;
 use App\Services\RealEstateCaseLifecycleService;
 use App\Services\RealEstateEvidenceLedgerService;
 use App\Services\RealEstateFactConsistencyActionService;
@@ -70,6 +71,13 @@ class RealEstateProfileObserver
         // valuation / verification / matching filter in a turn therefore gets
         // the last word on the single next action exposed to the AI context.
         app(RealEstateNextBestActionService::class)->process($conversation);
+
+        // A seller may be technically verified and have a real compatible
+        // investor while still lacking a valid mandate/presentation consent.
+        // Keep that as a hard operator-side gate after ordinary matching NBA,
+        // without asking the customer an invented legal question or scheduling
+        // a follow-up. A harder property-fact conflict below still wins.
+        app(RealEstateAuthorizationNextBestActionService::class)->sync($conversation);
 
         // A customer-side conflict in stable property identity is even more
         // fundamental than valuation or matching readiness. Keep the last
