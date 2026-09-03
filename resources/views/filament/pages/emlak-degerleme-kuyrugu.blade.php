@@ -66,7 +66,7 @@
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="text-lg font-bold text-gray-950 dark:text-white">Operatör araştırma listesi</h2>
-                    <p class="mt-1 text-xs text-gray-500">Sıralama: emsal bütünlüğü → güncellik → lead önceliği. Aynı dosyaya eşzamanlı ikinci ücretli çalışma açılmaz.</p>
+                    <p class="mt-1 text-xs text-gray-500">Sıralama: emsal bütünlüğü → güncellik → lead önceliği. Kimlik/doğrulama gibi daha güçlü bir blokaj varken ücretli araştırma düğmesi açılmaz.</p>
                 </div>
                 <input
                     type="search"
@@ -82,7 +82,8 @@
                         $profile = $profiles->get((int) ($item['profile_id'] ?? 0));
                         $status = (string) ($item['request_status'] ?? '');
                         $busy = in_array($status, ['queued', 'running'], true);
-                        $canQueue = (bool) ($summary['ready'] ?? false) && ! $busy;
+                        $researchActionActive = (bool) ($item['research_action_active'] ?? false);
+                        $canQueue = (bool) ($summary['ready'] ?? false) && ! $busy && $researchActionActive;
                     @endphp
                     <article class="rounded-2xl border border-gray-200 p-4 dark:border-white/10">
                         <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -99,6 +100,9 @@
                                         <span class="rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-800">Başarısız</span>
                                     @elseif ($status === 'blocked')
                                         <span class="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800">Bloklu</span>
+                                    @endif
+                                    @if (! $researchActionActive)
+                                        <span class="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300">Önce üst blokajı çöz</span>
                                     @endif
                                 </div>
                                 <p class="mt-1 text-sm text-gray-500">{{ $propertyLabel($profile) }}</p>
@@ -131,7 +135,7 @@
                                     @disabled(! $canQueue)
                                     class="inline-flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-45"
                                 >
-                                    {{ $busy ? 'Araştırma sırada' : 'Güncel emsal araştırmasını çalıştır' }}
+                                    {{ $busy ? 'Araştırma sırada' : ($researchActionActive ? 'Güncel emsal araştırmasını çalıştır' : 'Önce üst blokajı çöz') }}
                                 </button>
                                 <p class="text-[11px] leading-4 text-gray-500">Tek seferlik operatör işlemi. Otomatik tekrar, WhatsApp gönderimi veya müşteri takibi yoktur.</p>
                             </div>
