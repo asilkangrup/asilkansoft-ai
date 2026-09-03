@@ -17,7 +17,7 @@ class RealEstateInvestorPresentationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_isolated_operator_gets_printable_privacy_safe_investor_presentation(): void
+    public function test_isolated_operator_gets_printable_privacy_safe_investor_presentation_only_when_authorized(): void
     {
         $user = $this->seedAccounts();
         $seller = $this->conversation(40, 37, 35, 'presentation-seller', 'Gizli Satıcı', '905551112233');
@@ -37,7 +37,12 @@ class RealEstateInvestorPresentationTest extends TestCase
                 'zoning_status'=>'Konut',
                 'asking_price'=>4_300_000,
                 'minimum_price'=>3_100_000,
-                'seller_offer_packet_intelligence'=>['status'=>'ready'],
+                'media_findings'=>[[
+                    'media_category'=>'property_photo',
+                    'document_type'=>'Taşınmaz fotoğrafı',
+                    'confidence_score'=>0,
+                ]],
+                'authorization_control'=>$this->readyAuthorization(),
             ],
             'valuation'=>[],
         ]));
@@ -49,9 +54,15 @@ class RealEstateInvestorPresentationTest extends TestCase
         $this->assertTrue(EmlakYatirimciSunumlari::canAccess());
         $this->assertSame('Muğla', $presentation['facts']['İl']);
         $this->assertSame('123', $presentation['facts']['Ada']);
+        $this->assertTrue($presentation['export_allowed']);
+        $this->assertTrue($presentation['offer_collection_allowed']);
+        $this->assertSame('ready_for_authorized_presentation', $presentation['status']);
+        $this->assertSame('ready', $presentation['authorization_status']);
         $this->assertStringContainsString('%2', $presentation['buyer_fee_note']);
         $this->assertFalse($presentation['guardrails']['automatic_outbound_allowed']);
+        $this->assertFalse($presentation['guardrails']['automatic_customer_follow_up_allowed']);
         $this->assertFalse($presentation['guardrails']['seller_confidential_floor_included']);
+        $this->assertTrue($presentation['guardrails']['authorization_required_before_external_presentation']);
         $this->assertStringNotContainsString('Gizli Satıcı', $encoded);
         $this->assertStringNotContainsString('905551112233', $encoded);
         $this->assertStringNotContainsString('4300000', $encoded);
@@ -61,6 +72,49 @@ class RealEstateInvestorPresentationTest extends TestCase
         $page->selectedProfileId = $profile->id;
         $this->assertSame($profile->id, $page->getSelectedProfileProperty()?->id);
         $this->assertCount(1, $page->getProfilesProperty());
+    }
+
+    public function test_complete_seller_packet_without_authorization_is_draft_only_and_cannot_be_exported(): void
+    {
+        $this->seedAccounts();
+        $seller = $this->conversation(40, 37, 35, 'presentation-blocked', 'Gizli Satıcı 2', '905551112244');
+        $profile = RealEstateProfile::withoutEvents(fn () => RealEstateProfile::query()->forceCreate([
+            'conversation_control_id'=>$seller->id,
+            'user_id'=>40,
+            'ai_bot_id'=>35,
+            'profile_type'=>'seller',
+            'data'=>[
+                'city'=>'Muğla',
+                'district'=>'Bodrum',
+                'property_type'=>'villa',
+                'area_sqm'=>280,
+                'asking_price'=>12_000_000,
+                'block_no'=>'10',
+                'parcel_no'=>'20',
+                'media_findings'=>[[
+                    'media_category'=>'property_photo',
+                    'document_type'=>'Taşınmaz fotoğrafı',
+                    'confidence_score'=>0,
+                ]],
+            ],
+            'valuation'=>[],
+        ]));
+
+        $presentation = app(RealEstateInvestorPresentationService::class)->build($profile);
+        $encoded = json_encode($presentation, JSON_UNESCAPED_UNICODE);
+
+        $this->assertFalse($presentation['export_allowed']);
+        $this->assertFalse($presentation['offer_collection_allowed']);
+        $this->assertSame('draft_blocked', $presentation['status']);
+        $this->assertSame('incomplete', $presentation['authorization_status']);
+        $this->assertContains('mandate_missing', $presentation['authorization_blocking_reason_codes']);
+        $this->assertStringContainsString('yalnız operatör taslağıdır', $presentation['offer_note']);
+        $this->assertStringContainsString('Yetkilendirme', $presentation['authorization_note']);
+        $this->assertFalse($presentation['guardrails']['export_allowed']);
+        $this->assertFalse($presentation['guardrails']['offer_collection_allowed']);
+        $this->assertStringNotContainsString('Gizli Satıcı 2', $encoded);
+        $this->assertStringNotContainsString('905551112244', $encoded);
+        $this->assertStringNotContainsString('12000000', $encoded);
     }
 
     public function test_foreign_and_investor_profiles_never_enter_seller_presentations(): void
@@ -92,6 +146,22 @@ class RealEstateInvestorPresentationTest extends TestCase
 
         $this->actingAs(User::query()->findOrFail(41));
         $this->assertFalse(EmlakYatirimciSunumlari::canAccess());
+    }
+
+    private function readyAuthorization(): array
+    {
+        return [
+            'status'=>'ready',
+            'mandate_type'=>'exclusive',
+            'signed_at'=>now()->toDateString(),
+            'expires_at'=>now()->addMonths(3)->toDateString(),
+            'seller_presentation_consent'=>true,
+            'commission_terms_acknowledged'=>true,
+            'title_owner_confirmed'=>true,
+            'authorization_document_present'=>true,
+            'legal_review_required'=>false,
+            'history'=>[],
+        ];
     }
 
     private function conversation(
@@ -180,7 +250,7 @@ class RealEstateInvestorPresentationTest extends TestCase
             'status'=>'active',
             'business_sector'=>'real_estate',
             'lead_scoring_profile'=>'real_estate',
-            'whatsapp_instance'=>'foreign-presentation',
+            'whatsapp_instance'=>'foreign-authorization',
             'follow_up_enabled'=>false,
             'second_follow_up_enabled'=>false,
             'ai_enabled'=>true,
