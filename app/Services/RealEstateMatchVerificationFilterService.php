@@ -109,6 +109,8 @@ class RealEstateMatchVerificationFilterService
             'fact_consistency_filtered' => true,
             'explicit_investor_exclusion_filtered' => true,
             'blocked_by_fact_consistency' => ! $this->profileFactConsistent($profile),
+            'unverified_documents_block_candidate_matching' => false,
+            'verification_required_before_investor_presentation' => true,
             'updated_at' => now()->toIso8601String(),
         ];
 
@@ -147,17 +149,16 @@ class RealEstateMatchVerificationFilterService
         $verification = is_array($data['verification_intelligence'] ?? null)
             ? $data['verification_intelligence']
             : [];
-        $evidenceQuality = app(RealEstateEvidenceQualityService::class)
-            ->assess($seller, persist: false);
+        $status = (string) ($verification['status'] ?? 'unverified');
+        $riskScore = (int) ($verification['risk_score'] ?? 0);
 
-        return (bool) ($verification['safe_to_match'] ?? false)
-            && ! in_array(
-                (string) ($verification['status'] ?? 'unverified'),
-                ['blocked', 'high_risk', 'unverified'],
-                true
-            )
-            && (int) ($verification['risk_score'] ?? 100) < 55
-            && (bool) ($evidenceQuality['sufficient_for_matching'] ?? false);
+        // Candidate matching is an internal CRM discovery step, not permission
+        // to present the property or collect an offer. Missing/unverified
+        // documents therefore remain visible as a flagged match. Only an
+        // explicit conflict/block removes the pair. Handoff, presentation and
+        // closing services still require verification and authorization.
+        return ! in_array($status, ['blocked', 'high_risk'], true)
+            && $riskScore < 70;
     }
 
     private function matchTags(array $currentTags, array $matches): array

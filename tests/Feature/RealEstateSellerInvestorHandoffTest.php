@@ -90,6 +90,36 @@ class RealEstateSellerInvestorHandoffTest extends TestCase
         $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
+    public function test_unverified_document_keeps_candidates_but_blocks_presentation_handoff(): void
+    {
+        $bot = $this->seedIsolatedAccount('handoff-unverified-candidate');
+        $conversation = $this->conversation($bot, 'handoff-unverified-candidate');
+        $data = $this->readyData();
+        $data['verification_intelligence'] = [
+            'status' => 'unverified',
+            'risk_score' => 0,
+            'safe_to_match' => false,
+            'conflicts' => [],
+        ];
+        $profile = $this->sellerProfileQuietly($conversation, $data);
+        $valuation = app(RealEstateValuationFreshnessService::class)->stamp(
+            $profile,
+            $this->valuation(),
+            CarbonImmutable::now()
+        );
+        RealEstateProfile::withoutEvents(fn () => $profile->forceFill(['valuation' => $valuation])->save());
+        app(RealEstateSellerOfferPacketService::class)->sync($profile->fresh());
+
+        $summary = app(RealEstateSellerInvestorHandoffService::class)->sync($profile->fresh());
+
+        $this->assertSame(1, $summary['candidate_count']);
+        $this->assertSame('verification_required', $summary['status']);
+        $this->assertFalse($summary['ready_for_operator_handoff']);
+        $this->assertFalse($summary['guardrails']['investor_presentation_export_allowed']);
+        $this->assertStringContainsString('doğrulanmamış dosyayı yatırımcıya sunma', $summary['recommended_operator_action']);
+        $this->assertNull($conversation->fresh()->next_follow_up_at);
+    }
+
     public function test_ready_handoff_opens_deduplicated_internal_operator_alert_without_sending_follow_up(): void
     {
         $bot = $this->seedIsolatedAccount('handoff-alert');

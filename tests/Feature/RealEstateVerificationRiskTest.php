@@ -208,6 +208,71 @@ class RealEstateVerificationRiskTest extends TestCase
         $this->assertNull($investorConversation->next_follow_up_at);
     }
 
+    public function test_unverified_seller_document_does_not_remove_internal_candidate_match(): void
+    {
+        $bot = $this->seedRealEstateBot();
+        $sellerConversation = $this->conversation($bot, 'unverified-candidate');
+        $investorConversation = $this->conversation(
+            $bot,
+            'unverified-candidate-investor',
+            ['business:real_estate_investor']
+        );
+
+        $seller = $this->sellerProfile($sellerConversation, [
+            'property_type' => 'arsa',
+            'city' => 'Muğla',
+            'district' => 'Marmaris',
+            'asking_price' => 4000000,
+            'verification_intelligence' => [
+                'status' => 'unverified',
+                'risk_score' => 0,
+                'safe_to_match' => false,
+            ],
+        ]);
+
+        $investor = RealEstateProfile::query()->create([
+            'conversation_control_id' => $investorConversation->id,
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'profile_type' => 'investor',
+            'data' => [
+                'property_type' => 'arsa',
+                'city' => 'Muğla',
+                'budget_max' => 5000000,
+            ],
+            'valuation' => [],
+            'completeness_score' => 80,
+            'confidence_score' => 80,
+        ]);
+
+        $data = $investor->data;
+        $data['opportunity_matches'] = [[
+            'candidate_profile_id' => $seller->id,
+            'candidate_conversation_id' => $sellerConversation->id,
+            'candidate_role' => 'seller',
+            'seller_profile_id' => $seller->id,
+            'seller_conversation_id' => $sellerConversation->id,
+            'investor_profile_id' => $investor->id,
+            'investor_conversation_id' => $investorConversation->id,
+            'match_score' => 91,
+            'grade' => 'strong',
+        ]];
+        $investor->update(['data' => $data]);
+
+        $matches = app(RealEstateMatchVerificationFilterService::class)
+            ->process($investorConversation);
+
+        $this->assertCount(1, $matches);
+        $this->assertSame($seller->id, $matches[0]['seller_profile_id']);
+        $this->assertFalse(
+            $investor->fresh()->data['opportunity_match_summary']['unverified_documents_block_candidate_matching']
+        );
+        $this->assertTrue(
+            $investor->fresh()->data['opportunity_match_summary']['verification_required_before_investor_presentation']
+        );
+        $this->assertNull($investorConversation->fresh()->next_follow_up_at);
+    }
+
     public function test_investor_media_mismatch_does_not_create_seller_verification_risk(): void
     {
         $bot = $this->seedRealEstateBot();
