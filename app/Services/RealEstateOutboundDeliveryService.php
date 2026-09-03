@@ -15,6 +15,8 @@ class RealEstateOutboundDeliveryService
 {
     public const CONFIRMED_NOT_SENT_MARKER = 'Operatör kontrolü sonrası yeniden gönderilmeden abandoned olarak kapatıldı.';
 
+    public const RECIPIENT_UNREACHABLE_MARKER = 'Evolution hedef numaranın WhatsApp hesabı olmadığını kesin olarak bildirdi; otomatik yeniden gönderim kapatıldı.';
+
     public function __construct(
         private readonly RealEstateIsolationService $isolation,
         private readonly RealEstateOutboundSafetyService $outboundSafetyService,
@@ -28,6 +30,11 @@ class RealEstateOutboundDeliveryService
      * Once a network attempt starts, an exception is treated as uncertain
      * rather than automatically retried. This deliberately prefers a visible
      * operator-recovery case over sending a customer a duplicate AI reply.
+     *
+     * Evolution's explicit `exists:false` recipient rejection is the one safe
+     * exception to quarantine semantics: it proves the provider did not have a
+     * WhatsApp destination to accept the message, so the row becomes terminal
+     * abandoned and is never eligible for automatic recovery.
      *
      * @return array{
      *     delivery:RealEstateOutboundDelivery,
@@ -166,6 +173,17 @@ class RealEstateOutboundDeliveryService
 
             return $this->result($delivery->fresh(), sentNow: true);
         } catch (Throwable $exception) {
+            if ($this->isExplicitRecipientRejection($exception)) {
+                $delivery->forceFill([
+                    'status' => 'abandoned',
+                    'whatsapp_message_id' => null,
+                    'sent_at' => null,
+                    'last_error' => self::RECIPIENT_UNREACHABLE_MARKER,
+                ])->save();
+
+                return $this->result($delivery->fresh(), sentNow: false);
+            }
+
             $delivery->forceFill([
                 'status' => 'uncertain',
                 'last_error' => mb_substr($exception->getMessage(), 0, 2000),
@@ -453,6 +471,14 @@ class RealEstateOutboundDeliveryService
         ) {
             throw new RuntimeException('İzole Emlak AI outbound kayıt kapsamı ihlali.');
         }
+    }
+
+    private function isExplicitRecipientRejection(Throwable $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+        $message = preg_replace('/\s+/', '', $message) ?? $message;
+
+        return str_contains($message, '"exists":false');
     }
 
     private function looksLikeUniqueViolation(QueryException $exception): bool
