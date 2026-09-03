@@ -176,6 +176,7 @@ class RealEstateInvestorExclusionMemoryService
                 'unknown_preferences_are_not_exclusions' => true,
                 'assistant_messages_are_not_evidence' => true,
                 're_inclusion_overrides_older_exclusion' => true,
+                'nearest_criterion_cue_wins' => true,
                 'no_binding_offer_inferred' => true,
                 'follow_up_scheduling_allowed' => false,
             ],
@@ -194,7 +195,7 @@ class RealEstateInvestorExclusionMemoryService
                 continue;
             }
 
-            $negative = $this->hasCueNear(
+            $negativeDistance = $this->nearestCueDistance(
                 message: $message,
                 criterion: $normalized,
                 cues: [
@@ -202,7 +203,7 @@ class RealEstateInvestorExclusionMemoryService
                     'dusunmuyorum', 'kabul etmiyorum', 'uygun degil',
                 ],
             );
-            $positive = $this->hasCueNear(
+            $positiveDistance = $this->nearestCueDistance(
                 message: $message,
                 criterion: $normalized,
                 cues: [
@@ -211,11 +212,27 @@ class RealEstateInvestorExclusionMemoryService
                 ],
             );
 
-            if ($negative === $positive) {
+            if ($negativeDistance === null && $positiveDistance === null) {
                 continue;
             }
 
-            $next = $negative;
+            // A message can contain one positive criterion and one negative
+            // criterion, e.g. "Muğla olur ama tarla istemiyorum". Bind the
+            // sentiment to the closest cue instead of treating any cue in the
+            // whole sentence as applying to every mentioned criterion.
+            if (
+                $negativeDistance !== null
+                && $positiveDistance !== null
+                && $negativeDistance === $positiveDistance
+            ) {
+                continue;
+            }
+
+            $next = $negativeDistance !== null
+                && (
+                    $positiveDistance === null
+                    || $negativeDistance < $positiveDistance
+                );
             $previous = $state[$normalized]['excluded'] ?? null;
             $state[$normalized] = [
                 'display' => $display,
@@ -227,21 +244,51 @@ class RealEstateInvestorExclusionMemoryService
         return $changed;
     }
 
-    private function hasCueNear(
+    private function nearestCueDistance(
         string $message,
         string $criterion,
         array $cues,
-    ): bool {
-        $criterionPattern = preg_quote($criterion, '/').'[\\pL]{0,5}';
-        $cuePattern = implode('|', array_map(
-            fn (string $cue): string => preg_quote($cue, '/'),
-            $cues
-        ));
+    ): ?int {
+        preg_match_all(
+            '/(?<![\\pL\\pN])'.preg_quote($criterion, '/').'[\\pL]{0,5}(?![\\pL\\pN])/u',
+            $message,
+            $criterionMatches,
+            PREG_OFFSET_CAPTURE,
+        );
 
-        return preg_match(
-            '/(?:'.$criterionPattern.'.{0,28}(?:'.$cuePattern.')|(?:'.$cuePattern.').{0,28}'.$criterionPattern.')/u',
-            $message
-        ) === 1;
+        if (($criterionMatches[0] ?? []) === []) {
+            return null;
+        }
+
+        $closest = null;
+
+        foreach ($cues as $cue) {
+            preg_match_all(
+                '/(?<![\\pL\\pN])'.preg_quote($cue, '/').'(?![\\pL\\pN])/u',
+                $message,
+                $cueMatches,
+                PREG_OFFSET_CAPTURE,
+            );
+
+            foreach ($criterionMatches[0] as $criterionMatch) {
+                $criterionOffset = (int) ($criterionMatch[1] ?? 0);
+
+                foreach (($cueMatches[0] ?? []) as $cueMatch) {
+                    $cueOffset = (int) ($cueMatch[1] ?? 0);
+                    $distance = abs($criterionOffset - $cueOffset);
+
+                    if ($distance > 36) {
+                        continue;
+                    }
+
+                    if ($closest === null || $distance < $closest) {
+                        $closest = $distance;
+                    }
+                }
+            }
+        }
+
+        return $closest;
     }
 
     private function mentions(string $message, string $criterion): bool
