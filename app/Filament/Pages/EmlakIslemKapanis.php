@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\RealEstateClosingCase;
 use App\Models\RealEstateProfile;
 use App\Services\RealEstateClosingService;
 use App\Services\RealEstateIsolationService;
@@ -126,7 +125,7 @@ class EmlakIslemKapanis extends Page
         );
     }
 
-    public function getClosingCaseProperty(): ?RealEstateClosingCase
+    public function getClosingCaseProperty(): ?array
     {
         if (! $this->selectedDeal) {
             return null;
@@ -141,7 +140,7 @@ class EmlakIslemKapanis extends Page
     public function getStatusLabelProperty(): string
     {
         return app(RealEstateClosingService::class)->statusLabel(
-            $this->closingCase?->status ?? 'document_review'
+            (string) ($this->closingCase['status'] ?? 'document_review')
         );
     }
 
@@ -164,19 +163,23 @@ class EmlakIslemKapanis extends Page
         $case = $this->closingCase;
         $deal = $this->selectedDeal;
 
-        $this->agreedPrice = (string) ($case?->agreed_price ?? $deal['agreed_price'] ?? '');
-        $this->titleDeedVerified = (bool) ($case?->title_deed_verified ?? false);
-        $this->identityAuthorityVerified = (bool) ($case?->identity_authority_verified ?? false);
-        $this->encumbranceChecked = (bool) ($case?->encumbrance_checked ?? false);
-        $this->taxFeeChecked = (bool) ($case?->tax_fee_checked ?? false);
-        $this->paymentMethodConfirmed = (bool) ($case?->payment_method_confirmed ?? false);
-        $this->appointmentAt = $case?->appointment_at?->format('Y-m-d\TH:i');
-        $this->appointmentLocation = (string) ($case?->appointment_location ?? '');
-        $this->depositAmount = $case?->deposit_amount ? (string) $case->deposit_amount : null;
-        $this->depositReceived = (bool) ($case?->deposit_received ?? false);
-        $this->finalPaymentVerified = (bool) ($case?->final_payment_verified ?? false);
-        $this->deedTransferCompleted = (bool) ($case?->deed_transfer_completed ?? false);
-        $this->operatorNote = (string) ($case?->operator_note ?? '');
+        $this->agreedPrice = (string) ($case['agreed_price'] ?? $deal['agreed_price'] ?? '');
+        $this->titleDeedVerified = (bool) ($case['title_deed_verified'] ?? false);
+        $this->identityAuthorityVerified = (bool) ($case['identity_authority_verified'] ?? false);
+        $this->encumbranceChecked = (bool) ($case['encumbrance_checked'] ?? false);
+        $this->taxFeeChecked = (bool) ($case['tax_fee_checked'] ?? false);
+        $this->paymentMethodConfirmed = (bool) ($case['payment_method_confirmed'] ?? false);
+        $this->appointmentAt = filled($case['appointment_at'] ?? null)
+            ? \Illuminate\Support\Carbon::parse($case['appointment_at'])->format('Y-m-d\TH:i')
+            : null;
+        $this->appointmentLocation = (string) ($case['appointment_location'] ?? '');
+        $this->depositAmount = filled($case['deposit_amount'] ?? null)
+            ? (string) $case['deposit_amount']
+            : null;
+        $this->depositReceived = (bool) ($case['deposit_received'] ?? false);
+        $this->finalPaymentVerified = (bool) ($case['final_payment_verified'] ?? false);
+        $this->deedTransferCompleted = (bool) ($case['deed_transfer_completed'] ?? false);
+        $this->operatorNote = (string) ($case['operator_note'] ?? '');
     }
 
     private function dealExists(string $key): bool
