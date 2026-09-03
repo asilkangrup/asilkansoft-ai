@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\RealEstateProfile;
 use App\Services\RealEstateAuthorizationNextBestActionService;
 use App\Services\RealEstateCaseLifecycleService;
+use App\Services\RealEstateCommercialConsistencyGuardService;
 use App\Services\RealEstateEvidenceLedgerService;
 use App\Services\RealEstateFactConsistencyActionService;
 use App\Services\RealEstateInvestorMandateService;
@@ -87,6 +88,14 @@ class RealEstateProfileObserver
         app(RealEstateFactConsistencyActionService::class)->sync($conversation);
 
         app(RealEstateNextBestActionDecisionBridgeService::class)->sync($conversation);
+
+        // Commercial terms are intentionally allowed to move during negotiation,
+        // but an impossible active state (seller floor above asking price or an
+        // inverted investor budget range) must never feed matching/handoff. Run
+        // this last so the privacy-safe confirmation question and hard block
+        // cannot be overwritten by softer orchestration layers in the same save.
+        $profile->refresh();
+        app(RealEstateCommercialConsistencyGuardService::class)->sync($profile);
     }
 
     private function recordEvidence(
