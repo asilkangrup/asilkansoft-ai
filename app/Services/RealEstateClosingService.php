@@ -6,6 +6,7 @@ use App\Models\CrmActivity;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -155,7 +156,7 @@ class RealEstateClosingService
                 'tax_fee_checked' => (bool) $validated['tax_fee_checked'],
                 'payment_method_confirmed' => (bool) $validated['payment_method_confirmed'],
                 'appointment_at' => filled($validated['appointment_at'] ?? null)
-                    ? now()->parse($validated['appointment_at'])->toIso8601String()
+                    ? Carbon::parse($validated['appointment_at'])->toIso8601String()
                     : null,
                 'appointment_location' => trim((string) ($validated['appointment_location'] ?? '')) ?: null,
                 'deposit_amount' => is_numeric($validated['deposit_amount'] ?? null)
