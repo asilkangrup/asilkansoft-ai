@@ -7,7 +7,6 @@ use App\Models\AiBot;
 use App\Models\ConversationControl;
 use App\Models\CrmActivity;
 use App\Models\Organization;
-use App\Models\RealEstateClosingCase;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\RealEstateClosingService;
@@ -42,18 +41,18 @@ class RealEstateClosingWorkspaceTest extends TestCase
             'deed_transfer_completed' => false,
         ]), $operator);
 
-        $this->assertSame('completion_review', $review->status);
-        $this->assertNull($review->closed_at);
+        $this->assertSame('completion_review', $review['status']);
+        $this->assertNull($review['closed_at']);
 
         $completed = $service->save($seller, $investor, $this->payload([
             'final_payment_verified' => true,
             'deed_transfer_completed' => true,
         ]), $operator);
-        $summary = $service->summary($completed);
+        $summary = $completed;
         $encoded = json_encode($summary, JSON_UNESCAPED_UNICODE);
 
-        $this->assertSame('completed', $completed->status);
-        $this->assertNotNull($completed->closed_at);
+        $this->assertSame('completed', $completed['status']);
+        $this->assertNotNull($completed['closed_at']);
         $this->assertSame(3_000_000, $summary['agreed_price']);
         $this->assertFalse($summary['automatic_outbound_allowed']);
         $this->assertFalse($summary['customer_follow_up_allowed']);
@@ -79,7 +78,7 @@ class RealEstateClosingWorkspaceTest extends TestCase
         $page->selectedKey = $seller->id.':'.$investor->id;
         $this->assertTrue(EmlakIslemKapanis::canAccess());
         $this->assertCount(1, $page->getDealsProperty());
-        $this->assertSame($completed->id, $page->getClosingCaseProperty()?->id);
+        $this->assertSame($completed['id'], $page->getClosingCaseProperty()['id'] ?? null);
     }
 
     public function test_unaccepted_or_unauthorized_pair_cannot_open_closing_case(): void
@@ -111,7 +110,8 @@ class RealEstateClosingWorkspaceTest extends TestCase
         $foreignInvestor = $this->profile($foreignInvestorConversation, 41, 36, 'investor');
         $this->acceptedActivity($foreignSellerConversation, $foreignSeller, $foreignInvestor, 9_000_000, 41, 36);
 
-        RealEstateClosingCase::query()->create([
+        $foreignCase = [
+            'id' => $foreignSeller->id.':'.$foreignInvestor->id,
             'user_id' => 41,
             'organization_id' => 38,
             'ai_bot_id' => 36,
@@ -119,12 +119,17 @@ class RealEstateClosingWorkspaceTest extends TestCase
             'investor_profile_id' => $foreignInvestor->id,
             'status' => 'completed',
             'agreed_price' => 9_000_000,
-        ]);
+        ];
+        $foreignData = is_array($foreignSeller->data) ? $foreignSeller->data : [];
+        $foreignData['transaction_closing_cases'] = [
+            (string) $foreignInvestor->id => $foreignCase,
+        ];
+        $foreignSeller->forceFill(['data' => $foreignData])->saveQuietly();
 
         $service = app(RealEstateClosingService::class);
         $this->assertCount(0, $service->acceptedDeals());
         $this->assertNull($service->caseForPair($foreignSeller->id, $foreignInvestor->id));
-        $this->assertSame([], $service->summary(RealEstateClosingCase::query()->firstOrFail()));
+        $this->assertSame([], $service->summary($foreignCase));
 
         $this->actingAs($operator);
         $this->assertCount(0, (new EmlakIslemKapanis)->getDealsProperty());
