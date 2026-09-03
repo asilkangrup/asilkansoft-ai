@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
+use App\Models\RealEstateOutboundDelivery;
 use App\Models\RealEstateWebhookReceipt;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,11 @@ class RealEstateInboundRecoveryService
      * This is not a follow-up scheduler: it never starts a conversation and
      * never sends when a newer customer turn or an operator/AI reply exists.
      *
+     * A previously `processed` receipt is eligible only when its outbound row
+     * is terminal `abandoned`, has no provider/sent evidence, and carries the
+     * exact operator-confirmed-not-sent marker. Generic uncertain deliveries
+     * remain permanently excluded from automatic recovery.
+     *
      * @return array<string,int>
      */
     public function recover(int $limit = 5, int $failedAgeSeconds = 90): array
@@ -46,6 +52,21 @@ class RealEstateInboundRecoveryService
             ->where('sender_type', 'customer')
             ->whereNotNull('whatsapp_message_id');
 
+        $confirmedAbandonedMessageIds = RealEstateOutboundDelivery::query()
+            ->select('inbound_whatsapp_message_id')
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('instance', RealEstateIsolationService::INSTANCE)
+            ->where('status', 'abandoned')
+            ->whereNull('whatsapp_message_id')
+            ->whereNull('sent_at')
+            ->where(
+                'last_error',
+                RealEstateOutboundDeliveryService::CONFIRMED_NOT_SENT_MARKER
+            )
+            ->whereNotNull('inbound_whatsapp_message_id');
+
         $receipts = RealEstateWebhookReceipt::query()
             ->where('user_id', RealEstateIsolationService::USER_ID)
             ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
@@ -55,7 +76,11 @@ class RealEstateInboundRecoveryService
             // Unsupported/empty/provider-only receipts must never consume the
             // small recovery batch and starve real persisted customer turns.
             ->whereIn('whatsapp_message_id', $recoverableMessageIds)
-            ->where(function ($query) use ($failedBefore, $staleProcessingBefore): void {
+            ->where(function ($query) use (
+                $failedBefore,
+                $staleProcessingBefore,
+                $confirmedAbandonedMessageIds,
+            ): void {
                 $query
                     ->where(function ($failed) use ($failedBefore): void {
                         $failed
@@ -79,6 +104,16 @@ class RealEstateInboundRecoveryService
                             ->where('status', 'processing')
                             ->whereNotNull('processing_started_at')
                             ->where('processing_started_at', '<=', $staleProcessingBefore);
+                    })
+                    ->orWhere(function ($processed) use (
+                        $failedBefore,
+                        $confirmedAbandonedMessageIds,
+                    ): void {
+                        $processed
+                            ->where('status', 'processed')
+                            ->whereNotNull('processed_at')
+                            ->where('processed_at', '<=', $failedBefore)
+                            ->whereIn('whatsapp_message_id', $confirmedAbandonedMessageIds);
                     });
             })
             // Recover the newest customer failures first. The previous oldest-
@@ -157,7 +192,20 @@ class RealEstateInboundRecoveryService
             return 'already_answered';
         }
 
-        $activeReceipt = $this->claimForRecovery($receipt);
+        $abandonedDelivery = $receipt->status === 'processed'
+            ? $this->outboundDeliveryService->confirmedAbandonedForInbound(
+                (string) $message->whatsapp_message_id
+            )
+            : null;
+
+        if ($receipt->status === 'processed' && ! $abandonedDelivery) {
+            return 'skipped';
+        }
+
+        $activeReceipt = $this->claimForRecovery(
+            $receipt,
+            allowProcessedConfirmedAbandoned: $abandonedDelivery !== null,
+        );
 
         if (! $activeReceipt) {
             return 'busy';
@@ -253,6 +301,14 @@ class RealEstateInboundRecoveryService
                 return 'superseded';
             }
 
+            if ($abandonedDelivery) {
+                $abandonedDelivery = $this->outboundDeliveryService
+                    ->reopenConfirmedAbandonedForRecovery(
+                        delivery: $abandonedDelivery,
+                        replacementAnswer: $answer,
+                    );
+            }
+
             $deliveryResult = $this->outboundDeliveryService->deliver(
                 bot: $bot,
                 instance: RealEstateIsolationService::INSTANCE,
@@ -284,6 +340,7 @@ class RealEstateInboundRecoveryService
                 'ai_bot_id' => RealEstateIsolationService::BOT_ID,
                 'message_id_hash' => hash('sha256', (string) $message->whatsapp_message_id),
                 'sent_now' => (bool) ($deliveryResult['sent_now'] ?? false),
+                'operator_confirmed_not_sent_recovery' => $abandonedDelivery !== null,
             ]);
 
             return 'replied';
@@ -307,13 +364,19 @@ class RealEstateInboundRecoveryService
     /**
      * Re-open only a receipt already proven safe by recoverReceipt's latest-
      * turn and no-reply checks. Generic webhook begin() intentionally treats
-     * an ignored receipt as a terminal duplicate, so recovery owns this much
-     * narrower transaction-locked transition instead of mutating it unlocked.
+     * ignored/processed receipts as terminal duplicates, so recovery owns this
+     * much narrower transaction-locked transition instead of mutating it
+     * unlocked. Processed receipts are allowed only after an exact isolated
+     * abandoned delivery has already passed the confirmed-not-sent predicate.
      */
     private function claimForRecovery(
         RealEstateWebhookReceipt $receipt,
+        bool $allowProcessedConfirmedAbandoned = false,
     ): ?RealEstateWebhookReceipt {
-        return DB::transaction(function () use ($receipt): ?RealEstateWebhookReceipt {
+        return DB::transaction(function () use (
+            $receipt,
+            $allowProcessedConfirmedAbandoned,
+        ): ?RealEstateWebhookReceipt {
             $locked = RealEstateWebhookReceipt::query()
                 ->whereKey($receipt->id)
                 ->where('user_id', RealEstateIsolationService::USER_ID)
@@ -328,7 +391,14 @@ class RealEstateInboundRecoveryService
                 return null;
             }
 
-            if (in_array($locked->status, ['replied', 'processed'], true)) {
+            if ($locked->status === 'replied') {
+                return null;
+            }
+
+            if (
+                $locked->status === 'processed'
+                && ! $allowProcessedConfirmedAbandoned
+            ) {
                 return null;
             }
 
@@ -342,7 +412,11 @@ class RealEstateInboundRecoveryService
                 return null;
             }
 
-            if (! in_array($locked->status, ['failed', 'ignored', 'processing'], true)) {
+            if (! in_array(
+                $locked->status,
+                ['failed', 'ignored', 'processing', 'processed'],
+                true
+            )) {
                 return null;
             }
 
