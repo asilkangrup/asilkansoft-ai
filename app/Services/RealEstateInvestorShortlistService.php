@@ -38,6 +38,7 @@ class RealEstateInvestorShortlistService
                 'automatic_outbound_allowed' => false,
                 'automatic_follow_up_allowed' => false,
                 'operator_review_required' => true,
+                'multiple_investors_per_seller_allowed' => true,
                 'seller_confidential_floor_exposed' => false,
                 'seller_urgency_exposed' => false,
                 'cross_tenant_candidates_allowed' => false,
@@ -178,7 +179,7 @@ class RealEstateInvestorShortlistService
         return match ($readiness) {
             'ready_to_call' => 'Yatırımcıyı operatör olarak ara; dosyayı ve fiyat bandını insan kontrolünde sun.',
             'criteria_incomplete' => 'Yatırımcı kriterlerindeki eksik yüksek değerli alanı netleştir; otomatik takip veya mesaj gönderme.',
-            default => 'Eşleşme nedenlerini ve riskleri kontrol et; uygun görürsen yatırımcıyı manuel ara.',
+            default => 'Eşleşme nedenlerini ve kontrol maddelerini incele; uygun görürsen yatırımcıyı manuel ara.',
         };
     }
 

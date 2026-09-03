@@ -132,37 +132,10 @@ class RealEstateOperatorAlertService
         $operatorContactEligible = app(RealEstateConversationHandoffService::class)
             ->operatorContactEligible($conversation);
 
-        $verificationStatus = (string) ($verification['status'] ?? '');
-        $riskScore = (int) ($verification['risk_score'] ?? 0);
-
-        if (
-            $profile->profile_type === 'seller'
-            && in_array($verificationStatus, ['blocked', 'high_risk'], true)
-        ) {
-            $critical = $verificationStatus === 'blocked' || $riskScore >= 85;
-            $alerts[] = [
-                'alert_key' => 'verification_risk:'.$profile->id,
-                'type' => 'verification_risk',
-                'severity' => $critical ? 'critical' : 'high',
-                'title' => $critical
-                    ? 'Kritik emlak doğrulama çelişkisi'
-                    : 'Yüksek riskli emlak doğrulaması',
-                'message' => (string) ($verification['next_best_action']
-                    ?? 'Belge ve müşteri beyanı arasındaki çelişkiyi operatör incelemeli.'),
-                'payload' => [
-                    'verification_status' => $verificationStatus,
-                    'risk_score' => $riskScore,
-                    'conflict_fields' => collect($verification['conflicts'] ?? [])
-                        ->filter(fn ($conflict): bool => is_array($conflict))
-                        ->pluck('field')
-                        ->filter()
-                        ->unique()
-                        ->values()
-                        ->all(),
-                    'safe_to_match' => (bool) ($verification['safe_to_match'] ?? false),
-                ],
-            ];
-        }
+        // Person-risk classification is intentionally disabled. Existing
+        // verification_risk alerts remain in MANAGED_TYPES only so the next sync
+        // resolves historical records. Document/property consistency checks still
+        // protect matching, but customers are never labelled as risky people.
 
         $leadScore = max((int) ($decision['lead_score'] ?? 0), (int) ($conversation->lead_score ?? 0));
         $temperature = (string) ($decision['lead_temperature'] ?? $conversation->lead_temperature ?? '');

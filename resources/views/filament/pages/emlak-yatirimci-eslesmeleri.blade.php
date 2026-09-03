@@ -50,7 +50,7 @@
                     <div class="re-toolbar">
                         <div>
                             <div class="re-title">{{ $this->selectedSeller->conversation?->customer_name ?: 'Satıcı' }}</div>
-                            <div class="re-muted">{{ $short['property_label'] ?? 'Taşınmaz bilgisi eksik' }} · {{ $short['candidate_count'] ?? 0 }} aday · {{ $short['ready_to_call_count'] ?? 0 }} aramaya hazır</div>
+                            <div class="re-muted">{{ $short['property_label'] ?? 'Taşınmaz bilgisi eksik' }} · {{ $short['candidate_count'] ?? 0 }} yatırımcı eşleşmesi · {{ $short['ready_to_call_count'] ?? 0 }} aramaya hazır</div>
                         </div>
                         <button type="button" wire:click="refreshMatches" class="re-btn">Eşleşmeleri yeniden hesapla</button>
                     </div>
@@ -63,7 +63,7 @@
                             <option value="review_match">Eşleşmeyi incele</option>
                         </select>
                     </div>
-                    <div class="re-guard">Bu ekran yalnız operatör karar desteğidir. Otomatik WhatsApp mesajı veya takip göndermez; satıcının gizli taban fiyatı ve aciliyet gerekçesi yatırımcı eşleşmesine aktarılmaz.</div>
+                    <div class="re-guard">Bir satıcı, kriterleri uyan birden fazla yatırımcıyla aynı anda eşleşebilir. Sistem kişi risk etiketi üretmez; yalnız eksik taşınmaz ve kriter bilgilerini kontrol maddesi olarak gösterir. Otomatik WhatsApp mesajı veya takip göndermez; satıcının gizli taban fiyatı ve aciliyet gerekçesi yatırımcı eşleşmesine aktarılmaz.</div>
                 </section>
 
                 <div class="re-grid">
