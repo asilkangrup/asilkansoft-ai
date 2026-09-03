@@ -43,14 +43,51 @@ class RealEstateSellerInvestorHandoffTest extends TestCase
 
         $this->assertSame('ready', $summary['status']);
         $this->assertTrue($summary['ready_for_operator_handoff']);
+        $this->assertTrue($summary['checks']['authorization_ready']);
+        $this->assertTrue($summary['authorization']['ready']);
         $this->assertSame(1, $summary['candidate_count']);
         $this->assertSame('strong', $summary['strongest_match_grade']);
         $this->assertSame(91, $summary['strongest_match_score']);
         $this->assertFalse($summary['guardrails']['automatic_investor_outreach_allowed']);
         $this->assertFalse($summary['guardrails']['automatic_customer_follow_up_allowed']);
         $this->assertTrue($summary['guardrails']['human_review_required_before_investor_contact']);
+        $this->assertTrue($summary['guardrails']['authorization_required_before_investor_contact']);
+        $this->assertTrue($summary['guardrails']['investor_presentation_export_allowed']);
         $this->assertContains('real_estate:handoff:ready', $conversation->etiketler());
         $this->assertNull($conversation->next_follow_up_at);
+    }
+
+    public function test_verified_matched_seller_without_authorization_is_blocked_before_investor_handoff(): void
+    {
+        $bot = $this->seedIsolatedAccount('handoff-auth-blocked');
+        $conversation = $this->conversation($bot, 'handoff-auth-blocked');
+        $data = $this->readyData();
+        unset($data['authorization_control']);
+        $profile = $this->sellerProfileQuietly($conversation, $data);
+        $valuation = app(RealEstateValuationFreshnessService::class)->stamp(
+            $profile,
+            $this->valuation(),
+            CarbonImmutable::now()
+        );
+        RealEstateProfile::withoutEvents(fn () => $profile->forceFill(['valuation' => $valuation])->save());
+        app(RealEstateSellerOfferPacketService::class)->sync($profile->fresh());
+
+        $summary = app(RealEstateSellerInvestorHandoffService::class)->sync($profile->fresh());
+        app(RealEstateOperatorAlertService::class)->sync($profile->fresh());
+
+        $this->assertSame('authorization_required', $summary['status']);
+        $this->assertFalse($summary['ready_for_operator_handoff']);
+        $this->assertFalse($summary['checks']['authorization_ready']);
+        $this->assertFalse($summary['authorization']['ready']);
+        $this->assertContains('mandate_missing', $summary['authorization']['blocking_reason_codes']);
+        $this->assertFalse($summary['guardrails']['investor_presentation_export_allowed']);
+        $this->assertDatabaseMissing('real_estate_operator_alerts', [
+            'real_estate_profile_id' => $profile->id,
+            'type' => 'investor_offer_handoff',
+            'status' => 'open',
+        ]);
+        $this->assertContains('real_estate:handoff:authorization_required', $conversation->fresh()->etiketler());
+        $this->assertNull($conversation->fresh()->next_follow_up_at);
     }
 
     public function test_ready_handoff_opens_deduplicated_internal_operator_alert_without_sending_follow_up(): void
@@ -171,6 +208,18 @@ class RealEstateSellerInvestorHandoffTest extends TestCase
             'parcel_no' => '45',
             'zoning_status' => 'konut',
             'title_deed_type' => 'müstakil',
+            'authorization_control' => [
+                'status' => 'ready',
+                'mandate_type' => 'exclusive',
+                'signed_at' => now()->toDateString(),
+                'expires_at' => now()->addMonths(3)->toDateString(),
+                'seller_presentation_consent' => true,
+                'commission_terms_acknowledged' => true,
+                'title_owner_confirmed' => true,
+                'authorization_document_present' => true,
+                'legal_review_required' => false,
+                'history' => [],
+            ],
             'verification_intelligence' => [
                 'status' => 'corroborated',
                 'risk_score' => 10,
