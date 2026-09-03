@@ -39,8 +39,15 @@ class Musteriler extends Page
 
     public static function canAccess(): bool
     {
-        return (bool) auth()->user()?->is_admin
-            || app(RealEstateIsolationService::class)->currentOperatorHasAccess();
+        $isolation = app(RealEstateIsolationService::class);
+
+        // The isolated Emlak account uses only the dedicated Emlak CRM.
+        // Deny this legacy WAI CRM even when the owner also has admin rights.
+        if ($isolation->currentOperatorHasAccess()) {
+            return false;
+        }
+
+        return (bool) auth()->user()?->is_admin;
     }
 
     public static function shouldRegisterNavigation(): bool
