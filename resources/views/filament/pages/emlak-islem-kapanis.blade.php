@@ -24,7 +24,7 @@
             <button class="ek-deal {{ $selectedKey === $deal['key'] ? 'active' : '' }}" wire:click="selectDeal('{{ $deal['key'] }}')">
                 <b>{{ $property ?: 'Taşınmaz' }}</b>
                 <small>{{ $deal['seller']->conversation?->customer_name ?: 'Satıcı' }} ↔ {{ $deal['investor']->conversation?->customer_name ?: 'Yatırımcı' }}</small>
-                <small>{{ $case ? app(AppServicesRealEstateClosingService::class)->statusLabel($case->status) : 'Kapanış dosyası açılacak' }}</small>
+                <small>{{ $case ? app(\App\Services\RealEstateClosingService::class)->statusLabel($case['status']) : 'Kapanış dosyası açılacak' }}</small>
             </button>
         @empty
             <div class="ek-empty">Kapanışa aktarılabilecek kabul edilmiş gerçek teklif bulunmuyor.</div>
