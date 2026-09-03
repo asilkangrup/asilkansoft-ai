@@ -117,6 +117,56 @@ class RealEstateCommercialConsistencyGuardService
         return $summary;
     }
 
+    public function health(): array
+    {
+        $service = app(RealEstateCommercialConsistencyService::class);
+        $counts = [
+            'profiles' => 0,
+            'blocked' => 0,
+            'seller_floor_above_asking' => 0,
+            'investor_budget_range_inverted' => 0,
+        ];
+
+        RealEstateProfile::query()
+            ->isolatedProduction()
+            ->get(['id', 'profile_type', 'data'])
+            ->each(function (RealEstateProfile $profile) use ($service, &$counts): void {
+                $counts['profiles']++;
+                $assessment = $service->assess(
+                    (string) $profile->profile_type,
+                    is_array($profile->data) ? $profile->data : []
+                );
+
+                if (($assessment['status'] ?? 'consistent') !== 'confirmation_required') {
+                    return;
+                }
+
+                $counts['blocked']++;
+
+                foreach ($assessment['conflict_codes'] ?? [] as $code) {
+                    if (array_key_exists($code, $counts)) {
+                        $counts[$code]++;
+                    }
+                }
+            });
+
+        return [
+            'state' => $counts['blocked'] > 0 ? 'attention_required' : 'healthy',
+            'counts' => $counts,
+            'scope' => [
+                'user_id' => RealEstateIsolationService::USER_ID,
+                'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+                'ai_bot_id' => RealEstateIsolationService::BOT_ID,
+                'instance' => RealEstateIsolationService::INSTANCE,
+            ],
+            'privacy' => [
+                'customer_pii_included' => false,
+                'commercial_values_included' => false,
+                'raw_messages_included' => false,
+            ],
+        ];
+    }
+
     private function operatorAction(mixed $conflict): string
     {
         return match ($conflict) {
