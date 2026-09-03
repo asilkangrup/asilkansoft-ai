@@ -25,6 +25,24 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
         $outboundState = $this->outboundReconciliationState();
         $closingHealth = app(RealEstateClosingRiskService::class)->health();
 
+        try {
+            $commissionHealth = app(RealEstateCommissionIntegrityService::class)->health();
+        } catch (\Throwable $exception) {
+            report($exception);
+            $commissionHealth = [
+                'ready' => false,
+                'state' => 'unavailable',
+                'counts' => [],
+                'automatic_outbound_allowed' => false,
+                'automatic_payment_request_allowed' => false,
+                'customer_follow_up_allowed' => false,
+                'contains_customer_payload' => false,
+                'contains_customer_pii' => false,
+                'contains_private_seller_floor' => false,
+                'live_traffic_blocking' => false,
+            ];
+        }
+
         $snapshot['whatsapp_connection_state'] = $state;
         $snapshot['whatsapp_connection_source'] = 'evolution_live';
         $snapshot['checks']['whatsapp_connected'] = $connected;
@@ -34,6 +52,8 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
         $snapshot['outbound_reconciliation'] = $outboundState;
         $snapshot['closing_health'] = $closingHealth;
         $snapshot['checks']['closing_health_observable'] = (bool) ($closingHealth['ready'] ?? false);
+        $snapshot['commission_health'] = $commissionHealth;
+        $snapshot['checks']['commission_health_observable'] = (bool) ($commissionHealth['ready'] ?? false);
 
         $blocking = array_values(array_filter(
             $snapshot['blocking_checks'] ?? [],
@@ -43,6 +63,7 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
                 && $check !== 'media_admission_gate_ready'
                 && $check !== 'unresolved_outbound_deliveries'
                 && $check !== 'closing_health_observable'
+                && $check !== 'commission_health_observable'
         ));
 
         if (! $connected) {
@@ -63,6 +84,10 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
 
         if (! (bool) ($closingHealth['ready'] ?? false)) {
             $blocking[] = 'closing_health_observable';
+        }
+
+        if (! (bool) ($commissionHealth['ready'] ?? false)) {
+            $blocking[] = 'commission_health_observable';
         }
 
         $snapshot['blocking_checks'] = array_values(array_unique($blocking));
