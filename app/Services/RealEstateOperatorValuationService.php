@@ -52,14 +52,21 @@ class RealEstateOperatorValuationService
                 );
                 $actionCode = trim((string) ($plan['action_code'] ?? ''));
                 $requestStatus = trim((string) ($request['status'] ?? '')) ?: null;
-                $needsResearch = in_array($actionCode, [
+                $researchActionActive = in_array($actionCode, [
                     'refresh_valuation_research',
                     'repair_comparable_integrity',
-                ], true)
-                    || ($leadScore >= 60 && ! (bool) ($freshness['usable_for_matching'] ?? false));
+                ], true);
 
+                // The deterministic next-best-action orchestrator has already
+                // ranked stronger blockers such as identity/verification/core
+                // data collection. Do not infer a paid valuation task merely
+                // from lead score + stale/missing valuation, otherwise the
+                // operator queue could spend credit before the stronger blocker
+                // is resolved. Historical failed/blocked requests remain visible
+                // for observability, but are marked inactive and cannot be
+                // re-queued from the UI until valuation becomes the active NBA.
                 if (
-                    ! $needsResearch
+                    ! $researchActionActive
                     && ! in_array($requestStatus, ['queued', 'running', 'failed', 'blocked'], true)
                 ) {
                     return null;
@@ -81,6 +88,7 @@ class RealEstateOperatorValuationService
                     'action_code' => $actionCode !== ''
                         ? $actionCode
                         : 'refresh_valuation_research',
+                    'research_action_active' => $researchActionActive,
                     'priority_score' => min(500, $priorityBase + $leadScore),
                     'lead_score' => $leadScore,
                     'lead_temperature' => (string) (
@@ -125,8 +133,11 @@ class RealEstateOperatorValuationService
                 && ! (bool) $bot->second_follow_up_enabled,
             'state' => 'operator_triggered_only',
             'counts' => [
-                'needs_research' => $items->count(),
-                'high_priority' => $items->where('priority_score', '>=', 320)->count(),
+                'needs_research' => $items->where('research_action_active', true)->count(),
+                'high_priority' => $items
+                    ->where('research_action_active', true)
+                    ->where('priority_score', '>=', 320)
+                    ->count(),
                 'queued' => $items->where('request_status', 'queued')->count(),
                 'running' => $items->where('request_status', 'running')->count(),
                 'failed' => $items->where('request_status', 'failed')->count(),
