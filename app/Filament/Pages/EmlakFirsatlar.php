@@ -73,6 +73,10 @@ class EmlakFirsatlar extends Page
                     'match_score' => data_get($score, 'metrics.strongest_match_score'),
                     'completeness' => (int) data_get($score, 'metrics.file_completeness', 0),
                     'valuation_confidence' => (int) data_get($score, 'metrics.valuation_confidence', 0),
+                    'urgency_rank' => (int) data_get($score, 'metrics.urgency_rank', 1),
+                    'urgency_label' => (string) data_get($score, 'metrics.urgency_label', 'Standart öncelik'),
+                    'sale_timeline' => data_get($score, 'metrics.sale_timeline'),
+                    'summary' => $this->sellerSummary($profile, $location, $type, $data),
                     'asking_price' => $deal['asking_price'] ?? null,
                     'realistic_sale_min' => $deal['realistic_sale_min'] ?? null,
                     'realistic_sale_max' => $deal['realistic_sale_max'] ?? null,
@@ -96,7 +100,16 @@ class EmlakFirsatlar extends Page
                     $search
                 );
             })
-            ->sortByDesc('score')
+            ->sort(function (array $left, array $right): int {
+                $blocked = ($left['state'] === 'blocked') <=> ($right['state'] === 'blocked');
+                if ($blocked !== 0) {
+                    return $blocked;
+                }
+
+                return ($right['urgency_rank'] <=> $left['urgency_rank'])
+                    ?: ($right['score'] <=> $left['score'])
+                    ?: ($right['id'] <=> $left['id']);
+            })
             ->values();
     }
 
@@ -151,6 +164,22 @@ class EmlakFirsatlar extends Page
             'blocked' => $item['state'] === 'blocked',
             default => true,
         };
+    }
+
+    private function sellerSummary(RealEstateProfile $profile, string $location, string $type, array $data): string
+    {
+        $existing = trim((string) ($profile->conversation?->ai_summary ?? ''));
+        if ($existing !== '') {
+            return $existing;
+        }
+
+        $area = $this->first($data, ['area_sqm', 'square_meters', 'property.area_sqm', 'size_sqm']);
+        $parts = [trim($location.' '.$type)];
+        if ($area !== null) {
+            $parts[] = $area.' m²';
+        }
+
+        return implode(' · ', $parts).'. Satış dosyası ve yatırımcı eşleşmeleri takip ediliyor.';
     }
 
     private function first(array $data, array $keys): ?string
