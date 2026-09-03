@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\ConversationControl;
 use App\Models\RealEstateProfile;
 
 class RealEstateSellerInvestorHandoffService
@@ -42,16 +41,9 @@ class RealEstateSellerInvestorHandoffService
 
     public function summaryForProfile(RealEstateProfile $profile): array
     {
-        if (! $this->supports($profile)) {
-            return [];
-        }
-
-        $data = is_array($profile->data) ? $profile->data : [];
-        $existing = is_array($data[self::DATA_KEY] ?? null)
-            ? $data[self::DATA_KEY]
+        return $this->supports($profile)
+            ? $this->sync($profile)
             : [];
-
-        return $existing !== [] ? $existing : $this->build($profile);
     }
 
     private function build(RealEstateProfile $profile): array
@@ -65,6 +57,8 @@ class RealEstateSellerInvestorHandoffService
             ->assess($profile);
         $evidence = app(RealEstateEvidenceQualityService::class)
             ->assess($profile, persist: false);
+        $authorization = app(RealEstateAuthorizationService::class)
+            ->readiness($profile);
         $factConsistency = app(RealEstateFactConsistencyService::class)
             ->summary($data);
         $verification = is_array($data['verification_intelligence'] ?? null)
@@ -90,6 +84,7 @@ class RealEstateSellerInvestorHandoffService
             'valuation_fresh' => (bool) ($freshness['usable_for_matching'] ?? false),
             'comparables_sufficient' => (bool) ($integrity['sufficient_for_matching'] ?? false),
             'eligible_investor_match' => $matches->isNotEmpty(),
+            'authorization_ready' => (bool) ($authorization['ready'] ?? false),
         ];
 
         $status = match (false) {
@@ -100,6 +95,7 @@ class RealEstateSellerInvestorHandoffService
             $checks['valuation_fresh'] => 'valuation_required',
             $checks['comparables_sufficient'] => 'comparable_review',
             $checks['eligible_investor_match'] => 'investor_sourcing',
+            $checks['authorization_ready'] => 'authorization_required',
             default => 'ready',
         };
 
@@ -125,6 +121,15 @@ class RealEstateSellerInvestorHandoffService
             'status' => $status,
             'ready_for_operator_handoff' => $status === 'ready',
             'checks' => $checks,
+            'authorization' => [
+                'status' => $authorization['status'] ?? 'incomplete',
+                'ready' => (bool) ($authorization['ready'] ?? false),
+                'blocking_reason_codes' => array_values(
+                    $authorization['blocking_reason_codes'] ?? []
+                ),
+                'seller_commission_percent' => RealEstateAuthorizationService::SELLER_COMMISSION_PERCENT,
+                'buyer_commission_percent' => RealEstateAuthorizationService::BUYER_COMMISSION_PERCENT,
+            ],
             'candidate_count' => $matches->count(),
             'strongest_match_score' => $topCandidates[0]['match_score'] ?? null,
             'strongest_match_grade' => $topCandidates[0]['grade'] ?? null,
@@ -135,6 +140,7 @@ class RealEstateSellerInvestorHandoffService
                 freshness: $freshness,
                 evidence: $evidence,
                 integrity: $integrity,
+                authorization: $authorization,
             ),
             'guardrails' => [
                 'automatic_investor_outreach_allowed' => false,
@@ -143,6 +149,8 @@ class RealEstateSellerInvestorHandoffService
                 'private_seller_floor_included' => false,
                 'customer_pii_included' => false,
                 'human_review_required_before_investor_contact' => true,
+                'authorization_required_before_investor_contact' => true,
+                'investor_presentation_export_allowed' => $status === 'ready',
             ],
         ];
     }
@@ -153,6 +161,7 @@ class RealEstateSellerInvestorHandoffService
         array $freshness,
         array $evidence,
         array $integrity,
+        array $authorization,
     ): string {
         return match ($status) {
             'packet_incomplete' => (string) ($packet['recommended_next_request']
@@ -163,8 +172,10 @@ class RealEstateSellerInvestorHandoffService
                 ?? 'Yatırımcıya sunmadan önce yeterli belge/taşınmaz kanıtını tamamla.'),
             'valuation_required' => 'Güncel ve yeterli emsal araştırmasını tamamla; eski veya zayıf değerlemeyle yatırımcı teklifi toplama.',
             'comparable_review' => 'Emsal setini konum, taşınmaz türü, fiyat/m² ve kaynak bütünlüğü açısından güçlendir; ardından eşleştirmeyi yeniden hesapla.',
-            'investor_sourcing' => 'Dosya yatırımcı sunumuna hazır ancak uygun aktif yatırımcı eşleşmesi yok. Mevcut yatırımcı mandatlarını gözden geçir; müşteriye otomatik takip mesajı gönderme.',
-            'ready' => 'Dosya ve uygun yatırımcı eşleşmeleri hazır. En güçlü adayları operatör inceleyip gerçek yatırımcı teması/teklif toplama sürecini manuel başlatsın; otomatik mesaj veya sahte teklif üretme.',
+            'investor_sourcing' => 'Dosya veri ve doğrulama açısından hazır ancak uygun aktif yatırımcı eşleşmesi yok. Mevcut yatırımcı mandatlarını gözden geçir; müşteriye otomatik takip mesajı gönderme.',
+            'authorization_required' => (string) ($authorization['recommended_operator_action']
+                ?? 'Yetkilendirme ve sunum onayı tamamlanmadan yatırımcı sunumu veya teklif toplama adımına geçme.'),
+            'ready' => 'Dosya, geçerli yetkilendirme ve uygun yatırımcı eşleşmeleri hazır. En güçlü adayları operatör inceleyip gerçek yatırımcı teması/teklif toplama sürecini manuel başlatsın; otomatik mesaj veya sahte teklif üretme.',
             default => 'Dosyayı operatör incelemesine al.',
         };
     }
