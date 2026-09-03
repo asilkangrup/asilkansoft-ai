@@ -16,7 +16,7 @@ class RealEstateInvestorMandateService
 
         $data = is_array($profile->data) ? $profile->data : [];
         $exclusions = app(RealEstateInvestorExclusionMemoryService::class)
-            ->summaryForProfile($profile);
+            ->sync($profile);
         $profile->refresh();
         $data = is_array($profile->data) ? $profile->data : $data;
         $summary = $this->build($data, $exclusions);
@@ -46,21 +46,24 @@ class RealEstateInvestorMandateService
             return [];
         }
 
+        // Customer no-go messages can arrive without changing a structured
+        // profile field. Rebuild the read-side mandate from the latest
+        // customer-only exclusion memory rather than returning a stale cached
+        // mandate that predates the rejection or later re-inclusion.
+        $exclusions = app(RealEstateInvestorExclusionMemoryService::class)
+            ->sync($profile);
+        $profile->refresh();
         $data = is_array($profile->data) ? $profile->data : [];
         $existing = is_array($data[self::DATA_KEY] ?? null)
             ? $data[self::DATA_KEY]
             : [];
+        $summary = $this->build($data, $exclusions);
 
-        if ($existing !== []) {
+        if ($existing !== [] && $this->comparable($existing) === $summary) {
             return $existing;
         }
 
-        $exclusions = app(RealEstateInvestorExclusionMemoryService::class)
-            ->summaryForProfile($profile);
-        $profile->refresh();
-        $data = is_array($profile->data) ? $profile->data : $data;
-
-        return $this->build($data, $exclusions);
+        return $summary;
     }
 
     private function build(array $data, array $exclusions = []): array
