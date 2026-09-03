@@ -371,6 +371,77 @@ class RealEstateOpportunityMatchingTest extends TestCase
         $this->assertNull($investorConversation->next_follow_up_at);
     }
 
+    public function test_one_seller_can_match_more_than_five_compatible_investors(): void
+    {
+        $bot = $this->seedRealEstateBot();
+        $sellerConversation = $this->conversation(
+            $bot,
+            'seller-many-investors',
+            '905550000001',
+            ['business:real_estate_seller']
+        );
+
+        RealEstateProfile::withoutEvents(fn () => RealEstateProfile::query()->create([
+            'conversation_control_id' => $sellerConversation->id,
+            'user_id' => 40,
+            'ai_bot_id' => 35,
+            'profile_type' => 'seller',
+            'data' => [
+                'property_type' => 'arsa',
+                'city' => 'İstanbul',
+                'district' => 'Silivri',
+                'area_sqm' => 1000,
+                'asking_price' => 4000000,
+                'title_deed_type' => 'müstakil',
+                'zoning_status' => 'konut',
+            ],
+            'valuation' => ['investor_buy_max' => 3600000],
+            'completeness_score' => 100,
+            'confidence_score' => 85,
+        ]));
+
+        foreach (range(1, 8) as $index) {
+            $conversation = $this->conversation(
+                $bot,
+                'investor-many-'.$index,
+                '9055500000'.str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
+                ['business:real_estate_investor']
+            );
+
+            RealEstateProfile::withoutEvents(fn () => RealEstateProfile::query()->create([
+                'conversation_control_id' => $conversation->id,
+                'user_id' => 40,
+                'ai_bot_id' => 35,
+                'profile_type' => 'investor',
+                'data' => [
+                    'property_type' => 'arsa',
+                    'city' => 'İstanbul',
+                    'district' => 'Silivri',
+                    'budget_max' => 4500000 + $index,
+                    'financing' => 'cash',
+                ],
+                'valuation' => [],
+                'completeness_score' => 90,
+                'confidence_score' => 80,
+            ]));
+        }
+
+        $matches = app(RealEstateMatchService::class)->process($sellerConversation);
+
+        $this->assertCount(8, $matches);
+        $this->assertCount(8, collect($matches)->pluck('investor_profile_id')->unique());
+        $this->assertTrue(
+            RealEstateProfile::query()
+                ->where('conversation_control_id', $sellerConversation->id)
+                ->firstOrFail()
+                ->data['opportunity_match_summary']['many_to_many_matching']
+        );
+        $this->assertSame(50, RealEstateProfile::query()
+            ->where('conversation_control_id', $sellerConversation->id)
+            ->firstOrFail()
+            ->data['opportunity_match_summary']['maximum_candidates_per_profile']);
+    }
+
     public function test_matching_service_is_hard_scoped_to_fresh_real_estate_account(): void
     {
         $otherUser = User::query()->create([
