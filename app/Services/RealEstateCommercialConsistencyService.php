@@ -17,11 +17,27 @@ class RealEstateCommercialConsistencyService
             return $data;
         }
 
-        $conflicts = $this->conflicts($profileType, $data);
         $previous = is_array($data[self::DATA_KEY] ?? null)
             ? $data[self::DATA_KEY]
             : [];
-        $summary = [
+        $summary = $this->assess($profileType, $data);
+
+        if ($this->comparable($previous) !== $summary) {
+            $summary['updated_at'] = now()->toIso8601String();
+        } elseif (isset($previous['updated_at'])) {
+            $summary['updated_at'] = $previous['updated_at'];
+        }
+
+        $data[self::DATA_KEY] = $summary;
+
+        return $data;
+    }
+
+    public function assess(string $profileType, array $data): array
+    {
+        $conflicts = $this->conflicts($profileType, $data);
+
+        return [
             'status' => $conflicts === [] ? 'consistent' : 'confirmation_required',
             'profile_type' => $profileType,
             'conflict_count' => count($conflicts),
@@ -36,16 +52,6 @@ class RealEstateCommercialConsistencyService
                 'follow_up_scheduling_allowed' => false,
             ],
         ];
-
-        if ($this->comparable($previous) !== $summary) {
-            $summary['updated_at'] = now()->toIso8601String();
-        } elseif (isset($previous['updated_at'])) {
-            $summary['updated_at'] = $previous['updated_at'];
-        }
-
-        $data[self::DATA_KEY] = $summary;
-
-        return $data;
     }
 
     public function summary(array $profileData): array
