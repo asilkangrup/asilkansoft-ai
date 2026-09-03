@@ -36,8 +36,14 @@ class SatisPipeline extends Page
 
     public static function canAccess(): bool
     {
-        return app(RealEstateIsolationService::class)->currentOperatorHasAccess()
-            || app(OrganizationAccessService::class)->can('pipeline');
+        $isolation = app(RealEstateIsolationService::class);
+
+        // Keep legacy WAI CRM outside the isolated Emlak workspace.
+        if ($isolation->currentOperatorHasAccess()) {
+            return false;
+        }
+
+        return app(OrganizationAccessService::class)->can('pipeline');
     }
 
     public static function shouldRegisterNavigation(): bool
