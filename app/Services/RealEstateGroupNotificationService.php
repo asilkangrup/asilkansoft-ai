@@ -60,9 +60,6 @@ class RealEstateGroupNotificationService
 
         $conversation = $profile->conversation()->first();
 
-        // Sorular tamamlandığı anda yatırımcıya yalnız bir kez insan doğrulama
-        // adımını açıkça bildir. Bu mesaj otomatik takip değildir; onboarding
-        // kapanışının parçasıdır.
         if (
             blank($notifications['investor_verification_notice_sent_at'] ?? null)
             && filled($conversation?->whatsapp_number)
@@ -70,7 +67,7 @@ class RealEstateGroupNotificationService
             $this->whatsAppService->sendText(
                 instanceName: RealEstateIsolationService::INSTANCE,
                 number: (string) $conversation->whatsapp_number,
-                text: 'Teşekkür ederiz, yatırımcı kriterlerinizi kaydettik. Ekip arkadaşlarımız kısa süre içinde doğrulama amacıyla sizi arayarak bilgilerinizi teyit edecek ve ardından sizi yatırımcı sistemimize dahil edecektir.',
+                text: 'Bilgileriniz alınmıştır. Ekip arkadaşlarımız kaydınızı doğrulamak ve detaylı bilgi vermek için kısa süre içinde sizi arayacaktır.',
             );
 
             $notifications['investor_verification_notice_sent_at'] = now()->toIso8601String();
