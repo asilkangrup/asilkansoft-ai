@@ -38,18 +38,12 @@ class SatilikMiPortfolioPublisherService
         }
 
         if (! $this->configured()) {
-            Log::info('SATILIKMI PORTFOLIO PUBLISHER NOT CONFIGURED', [
-                'profile_id' => $profile->id,
-            ]);
-
+            Log::info('SATILIKMI PORTFOLIO PUBLISHER NOT CONFIGURED', ['profile_id' => $profile->id]);
             return null;
         }
 
         try {
-            $response = $this->client()->post(
-                '/integrations/emlak-ai/portfolios',
-                $this->payload($profile, $data),
-            );
+            $response = $this->client()->post('/integrations/emlak-ai/portfolios', $this->payload($profile, $data));
 
             if (! $response->successful()) {
                 Log::warning('SATILIKMI PORTFOLIO CREATE FAILED', [
@@ -57,7 +51,6 @@ class SatilikMiPortfolioPublisherService
                     'status' => $response->status(),
                     'body' => mb_substr($response->body(), 0, 1000),
                 ]);
-
                 return null;
             }
 
@@ -67,10 +60,7 @@ class SatilikMiPortfolioPublisherService
             $referenceNo = trim((string) data_get($result, 'referenceNo', ''));
 
             if ($publicId === '' || $shareUrl === '') {
-                Log::warning('SATILIKMI PORTFOLIO RESPONSE INVALID', [
-                    'profile_id' => $profile->id,
-                ]);
-
+                Log::warning('SATILIKMI PORTFOLIO RESPONSE INVALID', ['profile_id' => $profile->id]);
                 return null;
             }
 
@@ -103,7 +93,6 @@ class SatilikMiPortfolioPublisherService
                 'profile_id' => $profile->id,
                 'message' => $exception->getMessage(),
             ]);
-
             return null;
         }
     }
@@ -130,9 +119,93 @@ class SatilikMiPortfolioPublisherService
             'blockNo' => $this->nullableString($data, ['block_no', 'block', 'ada']),
             'parcelNo' => $this->nullableString($data, ['parcel_no', 'parcel', 'parsel']),
             'zoningStatus' => $this->nullableString($data, ['zoning_status', 'zoning']),
+            'highlights' => $this->publicHighlights($data),
+            'locationAdvantages' => $this->locationAdvantages($data),
             'pitch' => $this->publicPitch($urgency, $motivationLevel),
             'urgencyLabel' => $this->urgencyLabel($urgency, $motivationLevel),
-        ], static fn ($value): bool => $value !== null && $value !== '');
+        ], static fn ($value): bool => $value !== null && $value !== '' && $value !== []);
+    }
+
+    private function publicHighlights(array $data): array
+    {
+        $map = [
+            'road_frontage' => 'Yola cepheli',
+            'electricity_available' => 'Elektrik mevcut',
+            'water_available' => 'Su mevcut',
+            'natural_gas_available' => 'Doğalgaz mevcut',
+            'sewer_available' => 'Kanalizasyon mevcut',
+            'internet_available' => 'İnternet altyapısı mevcut',
+            'flat_land' => 'Düz arazi',
+            'corner_parcel' => 'Köşe parsel',
+            'sea_view' => 'Deniz manzaralı',
+            'villa_suitable' => 'Villa yapımına uygun',
+            'commercial_potential' => 'Ticari potansiyel',
+            'investment_zone' => 'Yatırım bölgesinde',
+        ];
+
+        $items = [];
+        foreach ($map as $key => $label) {
+            if (($data[$key] ?? null) === true) {
+                $items[] = $label;
+            }
+        }
+
+        $zoning = mb_strtolower(trim((string) ($data['zoning_status'] ?? '')));
+        if ($zoning !== '' && ! str_contains($zoning, 'yok') && ! str_contains($zoning, 'bilinm')) {
+            $items[] = 'İmar bilgisi mevcut';
+        }
+
+        return $this->keywordAdvantages($data, $items, false);
+    }
+
+    private function locationAdvantages(array $data): array
+    {
+        $map = [
+            'near_main_road' => 'Ana yola yakın',
+            'near_sea' => 'Denize yakın',
+            'near_city_center' => 'Şehir merkezine yakın',
+            'near_hospital' => 'Hastaneye yakın',
+            'near_school' => 'Okula yakın',
+            'near_public_transport' => 'Toplu taşımaya yakın',
+            'near_market' => 'Market / çarşıya yakın',
+            'near_industrial_or_tourism_zone' => 'Sanayi / turizm / yatırım bölgesine yakın',
+        ];
+
+        $items = [];
+        foreach ($map as $key => $label) {
+            if (($data[$key] ?? null) === true) {
+                $items[] = $label;
+            }
+        }
+
+        return $this->keywordAdvantages($data, $items, true);
+    }
+
+    private function keywordAdvantages(array $data, array $items, bool $locationOnly): array
+    {
+        $text = mb_strtolower(trim(implode(' ', array_filter([
+            is_scalar($data['notes'] ?? null) ? (string) $data['notes'] : '',
+            is_scalar($data['property_advantages'] ?? null) ? (string) $data['property_advantages'] : '',
+            is_scalar($data['location_advantages'] ?? null) ? (string) $data['location_advantages'] : '',
+        ]))));
+
+        $keywords = $locationOnly ? [
+            'ana yola' => 'Ana yola yakın', 'denize' => 'Denize yakın', 'merkeze' => 'Şehir merkezine yakın',
+            'hastane' => 'Hastaneye yakın', 'okul' => 'Okula yakın', 'toplu taşıma' => 'Toplu taşımaya yakın',
+            'market' => 'Market / çarşıya yakın', 'turizm' => 'Turizm bölgesine yakın',
+        ] : [
+            'yola cephe' => 'Yola cepheli', 'elektrik' => 'Elektrik mevcut', 'su var' => 'Su mevcut',
+            'doğalgaz' => 'Doğalgaz mevcut', 'kanalizasyon' => 'Kanalizasyon mevcut', 'düz arazi' => 'Düz arazi',
+            'köşe parsel' => 'Köşe parsel', 'manzara' => 'Manzaralı', 'villa' => 'Villa yapımına uygun',
+        ];
+
+        foreach ($keywords as $needle => $label) {
+            if ($text !== '' && str_contains($text, $needle)) {
+                $items[] = $label;
+            }
+        }
+
+        return array_values(array_slice(array_unique($items), 0, 20));
     }
 
     private function publicPitch(?string $urgency, string $motivationLevel): string
@@ -140,15 +213,12 @@ class SatilikMiPortfolioPublisherService
         if ($urgency === 'high' || $motivationLevel === 'high_explicit') {
             return 'Satıcı kısa sürede satışa açık. Acil nakit teklifleri iletilebilir.';
         }
-
         if ($urgency === 'medium' || $motivationLevel === 'medium_explicit') {
             return 'Satıcı satışa açık. Ciddi yatırımcıların nakit teklifleri değerlendirilebilir.';
         }
-
         if ($urgency === 'low' || $motivationLevel === 'low_explicit') {
             return 'Güncel yatırım portföyüdür. Uygun yatırımcı teklifleri satıcıya iletilebilir.';
         }
-
         return 'Satıcı yatırımcı tekliflerini değerlendirmeye açık. Nakit teklifler iletilebilir.';
     }
 
@@ -166,23 +236,14 @@ class SatilikMiPortfolioPublisherService
         $type = $this->stringValue($data, ['property_type'], 'Gayrimenkul');
         $district = $this->nullableString($data, ['district']);
         $city = $this->nullableString($data, ['city']);
-
-        $location = collect([$district, $city])
-            ->filter(fn ($value): bool => is_string($value) && trim($value) !== '')
-            ->implode(' / ');
-
-        return $location !== ''
-            ? $type.' · '.$location
-            : $type.' yatırım portföyü';
+        $location = collect([$district, $city])->filter(fn ($value): bool => is_string($value) && trim($value) !== '')->implode(' / ');
+        return $location !== '' ? $type.' · '.$location : $type.' yatırım portföyü';
     }
 
     private function uploadPhotos(RealEstateProfile $profile, string $publicId): int
     {
         $conversation = $profile->conversation()->first();
-
-        if (! $conversation) {
-            return 0;
-        }
+        if (! $conversation) return 0;
 
         $messageIds = ChatMessage::query()
             ->where('user_id', RealEstateIsolationService::USER_ID)
@@ -195,9 +256,7 @@ class SatilikMiPortfolioPublisherService
             ->pluck('id')
             ->all();
 
-        if ($messageIds === []) {
-            return 0;
-        }
+        if ($messageIds === []) return 0;
 
         $mediaRows = RealEstatePrivateMedia::query()
             ->isolatedProduction()
@@ -209,48 +268,23 @@ class SatilikMiPortfolioPublisherService
             ->get();
 
         $uploaded = 0;
-
         foreach ($mediaRows as $index => $media) {
             $bytes = base64_decode((string) $media->content_base64, true);
-
-            if (! is_string($bytes) || $bytes === '') {
-                continue;
-            }
+            if (! is_string($bytes) || $bytes === '') continue;
 
             $mime = strtolower(trim((string) $media->mime_type));
-            $extension = match ($mime) {
-                'image/png' => 'png',
-                'image/webp' => 'webp',
-                default => 'jpg',
-            };
+            $extension = match ($mime) { 'image/png' => 'png', 'image/webp' => 'webp', default => 'jpg' };
 
             try {
                 $response = $this->client()
-                    ->attach('file', $bytes, 'portfolio-'.($index + 1).'.'.$extension, [
-                        'Content-Type' => $mime !== '' ? $mime : 'image/jpeg',
-                    ])
+                    ->attach('file', $bytes, 'portfolio-'.($index + 1).'.'.$extension, ['Content-Type' => $mime !== '' ? $mime : 'image/jpeg'])
                     ->post('/integrations/emlak-ai/portfolios/'.$publicId.'/media');
-
-                if ($response->successful()) {
-                    $uploaded++;
-                } else {
-                    Log::warning('SATILIKMI PORTFOLIO MEDIA UPLOAD FAILED', [
-                        'profile_id' => $profile->id,
-                        'public_id' => $publicId,
-                        'media_id' => $media->id,
-                        'status' => $response->status(),
-                    ]);
-                }
+                if ($response->successful()) $uploaded++;
+                else Log::warning('SATILIKMI PORTFOLIO MEDIA UPLOAD FAILED', ['profile_id' => $profile->id, 'public_id' => $publicId, 'media_id' => $media->id, 'status' => $response->status()]);
             } catch (Throwable $exception) {
-                Log::warning('SATILIKMI PORTFOLIO MEDIA UPLOAD EXCEPTION', [
-                    'profile_id' => $profile->id,
-                    'public_id' => $publicId,
-                    'media_id' => $media->id,
-                    'message' => $exception->getMessage(),
-                ]);
+                Log::warning('SATILIKMI PORTFOLIO MEDIA UPLOAD EXCEPTION', ['profile_id' => $profile->id, 'public_id' => $publicId, 'media_id' => $media->id, 'message' => $exception->getMessage()]);
             }
         }
-
         return $uploaded;
     }
 
@@ -258,14 +292,7 @@ class SatilikMiPortfolioPublisherService
     {
         $baseUrl = rtrim((string) config('services.satilikmi.api_url'), '/');
         $key = (string) config('services.satilikmi.integration_key');
-
-        return Http::baseUrl($baseUrl)
-            ->withHeaders([
-                'x-integration-key' => $key,
-                'Accept' => 'application/json',
-            ])
-            ->timeout(45)
-            ->connectTimeout(8);
+        return Http::baseUrl($baseUrl)->withHeaders(['x-integration-key' => $key, 'Accept' => 'application/json'])->timeout(45)->connectTimeout(8);
     }
 
     private function configured(): bool
@@ -283,12 +310,8 @@ class SatilikMiPortfolioPublisherService
     {
         foreach ($keys as $key) {
             $value = $data[$key] ?? null;
-
-            if (is_scalar($value) && trim((string) $value) !== '') {
-                return mb_substr(trim((string) $value), 0, 160);
-            }
+            if (is_scalar($value) && trim((string) $value) !== '') return mb_substr(trim((string) $value), 0, 160);
         }
-
         return null;
     }
 
@@ -296,12 +319,8 @@ class SatilikMiPortfolioPublisherService
     {
         foreach ($keys as $key) {
             $value = $data[$key] ?? null;
-
-            if (is_numeric($value) && (float) $value > 0) {
-                return (float) $value;
-            }
+            if (is_numeric($value) && (float) $value > 0) return (float) $value;
         }
-
         return null;
     }
 }
