@@ -8,6 +8,7 @@ use App\Services\RealEstateCaseLifecycleService;
 use App\Services\RealEstateCommercialConsistencyGuardService;
 use App\Services\RealEstateEvidenceLedgerService;
 use App\Services\RealEstateFactConsistencyActionService;
+use App\Services\RealEstateGroupNotificationService;
 use App\Services\RealEstateInvestorMandateService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
@@ -37,9 +38,6 @@ class RealEstateProfileObserver
             return;
         }
 
-        // Valuation data may contain prose/labels originating from web search.
-        // Remove that untrusted research text before any deterministic CRM,
-        // negotiation or prompt-building service can consume the saved profile.
         app(RealEstateValuationResearchOutputGuardService::class)->sanitize($profile);
         $profile->refresh();
 
@@ -48,10 +46,6 @@ class RealEstateProfileObserver
         app(RealEstateSellerMotivationService::class)->sync($profile);
         $profile->refresh();
 
-        // Ownership relationship is derived only from an explicit customer
-        // statement in the isolated conversation. This is deliberately done
-        // before the seller packet so the bot/CRM can avoid asking again when
-        // the customer has already said whose name the title deed is under.
         app(RealEstateTitleOwnershipIntelligenceService::class)->sync($profile);
         $profile->refresh();
 
@@ -65,35 +59,20 @@ class RealEstateProfileObserver
         $this->recordEvidence($profile, $conversation);
         app(RealEstateOperatorAlertService::class)->sync($profile);
         app(RealEstateMatchLedgerService::class)->sync($profile);
+
+        // The AI never chats in groups. Inbound @g.us traffic remains ignored;
+        // this service only pushes notification summaries to the three exact
+        // Emlak AI operational groups.
+        app(RealEstateGroupNotificationService::class)->sync($profile);
+        $profile->refresh();
+
         app(RealEstateCaseLifecycleService::class)->sync($profile);
 
-        // Recompute after every guarded profile mutation. Both services save
-        // quietly, so they cannot recurse through this observer. The final
-        // valuation / verification / matching filter in a turn therefore gets
-        // the last word on the single next action exposed to the AI context.
         app(RealEstateNextBestActionService::class)->process($conversation);
-
-        // A seller may be technically verified and have a real compatible
-        // investor while still lacking a valid mandate/presentation consent.
-        // Keep that as a hard operator-side gate after ordinary matching NBA,
-        // without asking the customer an invented legal question or scheduling
-        // a follow-up. A harder property-fact conflict below still wins.
         app(RealEstateAuthorizationNextBestActionService::class)->sync($conversation);
-
-        // A customer-side conflict in stable property identity is even more
-        // fundamental than valuation or matching readiness. Keep the last
-        // confirmed fact in memory and require one deterministic confirmation
-        // question before any unconfirmed replacement can influence pricing or
-        // investor matching.
         app(RealEstateFactConsistencyActionService::class)->sync($conversation);
-
         app(RealEstateNextBestActionDecisionBridgeService::class)->sync($conversation);
 
-        // Commercial terms are intentionally allowed to move during negotiation,
-        // but an impossible active state (seller floor above asking price or an
-        // inverted investor budget range) must never feed matching/handoff. Run
-        // this last so the privacy-safe confirmation question and hard block
-        // cannot be overwritten by softer orchestration layers in the same save.
         $profile->refresh();
         app(RealEstateCommercialConsistencyGuardService::class)->sync($profile);
     }
