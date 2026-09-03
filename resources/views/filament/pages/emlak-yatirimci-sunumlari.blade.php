@@ -10,19 +10,20 @@
 .ep-sheet{padding:28px}
 .ep-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:2px solid #183f2b;padding-bottom:20px}
 .ep-brand{font-size:13px;font-weight:900;letter-spacing:.08em;color:#168a4b}.ep-title{font-size:28px;font-weight:900;line-height:1.15;margin:7px 0}
-.ep-ref{color:#6f7a74;font-size:12px}.ep-badge{background:#eaf8ef;color:#147b43;border-radius:999px;padding:8px 11px;font-weight:800;font-size:12px}
+.ep-ref{color:#6f7a74;font-size:12px}.ep-badges{display:flex;flex-direction:column;gap:7px;align-items:flex-end}.ep-badge{background:#eaf8ef;color:#147b43;border-radius:999px;padding:8px 11px;font-weight:800;font-size:12px}.ep-badge.blocked{background:#fff3db;color:#9a5b00}
 .ep-actions{display:flex;gap:8px;margin:18px 0}.ep-actions button{border:0;border-radius:12px;padding:11px 16px;background:#168a4b;color:#fff;font-weight:800}
 .ep-section{margin-top:22px}.ep-section h2{font-size:17px;font-weight:900;margin-bottom:11px}
 .ep-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.ep-fact{background:#f5f8f6;border-radius:13px;padding:12px}
 .ep-fact small,.ep-fact b{display:block}.ep-fact small{color:#748078;font-weight:700;font-size:11px;text-transform:uppercase}.ep-fact b{margin-top:5px}
 .ep-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.ep-photo{border:1px solid #e0e7e3;border-radius:14px;overflow:hidden;background:#f7f9f8}.ep-photo img{display:block;width:100%;height:240px;object-fit:cover}.ep-photo p{font-size:12px;padding:9px;margin:0}
-.ep-note{padding:14px;border-radius:14px;background:#f0f7f3;margin-top:10px}.ep-warning{background:#fff8e8}
-.ep-empty{padding:30px;text-align:center;color:#69766f}
-@media(max-width:850px){.ep-shell{grid-template-columns:1fr}.ep-sidebar{position:static}.ep-sheet{padding:18px}.ep-facts,.ep-gallery{grid-template-columns:1fr}.ep-photo img{height:210px}.ep-title{font-size:23px}}
+.ep-note{padding:14px;border-radius:14px;background:#f0f7f3;margin-top:10px}.ep-warning{background:#fff8e8}.ep-blocker{border:1px solid #f0d28a;background:#fff8e8;color:#6f4a00;padding:15px;border-radius:14px;margin:18px 0;font-weight:700;line-height:1.55}.ep-blocker small{display:block;margin-top:5px;font-weight:600;color:#846629}
+.ep-empty{padding:30px;text-align:center;color:#69766f}.ep-print-blocked{display:none}
+@media(max-width:850px){.ep-shell{grid-template-columns:1fr}.ep-sidebar{position:static}.ep-sheet{padding:18px}.ep-facts,.ep-gallery{grid-template-columns:1fr}.ep-photo img{height:210px}.ep-title{font-size:23px}.ep-badges{align-items:flex-start}}
 @media print{
  body{background:#fff!important}.fi-sidebar,.fi-topbar,.fi-header,.ep-sidebar,.ep-actions{display:none!important}
  .fi-main,.fi-main-ctn{margin:0!important;padding:0!important}.ep-shell{display:block}.ep-card{border:0;box-shadow:none}.ep-sheet{padding:0}
  .ep-photo{break-inside:avoid}.ep-photo img{height:220px}.ep-note{break-inside:avoid}
+ .ep-export-blocked .ep-presentable-content{display:none!important}.ep-export-blocked .ep-print-blocked{display:block!important;padding:40px;font-size:18px;font-weight:800;border:2px solid #b86d00}
 }
 </style>
 
@@ -44,52 +45,76 @@
         @endforelse
     </aside>
 
-    <main class="ep-card ep-sheet">
-        @if($this->presentation)
-            <div class="ep-top">
-                <div>
-                    <div class="ep-brand">ASILKAN GAYRİMENKUL · YATIRIMCI SUNUMU</div>
-                    <div class="ep-title">{{ $this->presentation['title'] }}</div>
-                    <div class="ep-ref">Dosya no: {{ $this->presentation['reference'] }} · Türkiye geneli hizmet</div>
-                </div>
-                <div class="ep-badge">Satıcı kimliği gizli</div>
+    @php
+        $presentation=$this->presentation;
+        $exportAllowed=(bool)($presentation['export_allowed'] ?? false);
+    @endphp
+
+    <main class="ep-card ep-sheet {{ $presentation && ! $exportAllowed ? 'ep-export-blocked' : '' }}">
+        @if($presentation)
+            <div class="ep-print-blocked">
+                Yetkilendirme tamamlanmadan bu dosyanın yatırımcı sunumu olarak yazdırılması veya PDF dışa aktarımı engellenmiştir.
             </div>
 
-            <div class="ep-actions">
-                <button type="button" onclick="window.print()">Yazdır / PDF Kaydet</button>
-            </div>
-
-            <section class="ep-section">
-                <h2>Taşınmaz Bilgileri</h2>
-                <div class="ep-facts">
-                    @foreach($this->presentation['facts'] as $label => $value)
-                        @if(filled($value))
-                            <div class="ep-fact"><small>{{ $label }}</small><b>{{ $value }}</b></div>
-                        @endif
-                    @endforeach
+            <div class="ep-presentable-content">
+                <div class="ep-top">
+                    <div>
+                        <div class="ep-brand">ASILKAN GAYRİMENKUL · YATIRIMCI SUNUMU</div>
+                        <div class="ep-title">{{ $presentation['title'] }}</div>
+                        <div class="ep-ref">Dosya no: {{ $presentation['reference'] }} · Türkiye geneli hizmet</div>
+                    </div>
+                    <div class="ep-badges">
+                        <div class="ep-badge">Satıcı kimliği gizli</div>
+                        <div class="ep-badge {{ $exportAllowed ? '' : 'blocked' }}">
+                            {{ $exportAllowed ? 'Yetkilendirme hazır' : 'Dış paylaşım kilitli' }}
+                        </div>
+                    </div>
                 </div>
-            </section>
 
-            @if($this->presentation['photos']->isNotEmpty())
+                @if($exportAllowed)
+                    <div class="ep-actions">
+                        <button type="button" onclick="window.print()">Yazdır / PDF Kaydet</button>
+                    </div>
+                @else
+                    <div class="ep-blocker">
+                        Yatırımcı sunumu şu anda yalnız operatör taslağıdır; yazdırma/PDF ve dış paylaşım kapalıdır.
+                        <small>{{ $presentation['authorization_note'] ?? 'Yetkilendirme kontrolünü tamamlayın.' }}</small>
+                    </div>
+                @endif
+
                 <section class="ep-section">
-                    <h2>Taşınmaz Fotoğrafları</h2>
-                    <div class="ep-gallery">
-                        @foreach($this->presentation['photos'] as $photo)
-                            <div class="ep-photo">
-                                <img src="{{ $photo['url'] }}" alt="Taşınmaz fotoğrafı">
-                                <p>{{ $photo['summary'] ?: 'Taşınmaz fotoğrafı' }}</p>
-                            </div>
+                    <h2>Taşınmaz Bilgileri</h2>
+                    <div class="ep-facts">
+                        @foreach($presentation['facts'] as $label => $value)
+                            @if(filled($value))
+                                <div class="ep-fact"><small>{{ $label }}</small><b>{{ $value }}</b></div>
+                            @endif
                         @endforeach
                     </div>
                 </section>
-            @endif
 
-            <section class="ep-section">
-                <h2>Teklif Süreci</h2>
-                <div class="ep-note">{{ $this->presentation['offer_note'] }}</div>
-                <div class="ep-note">{{ $this->presentation['buyer_fee_note'] }}</div>
-                <div class="ep-note ep-warning">{{ $this->presentation['disclaimer'] }}</div>
-            </section>
+                @if($presentation['photos']->isNotEmpty())
+                    <section class="ep-section">
+                        <h2>Taşınmaz Fotoğrafları</h2>
+                        <div class="ep-gallery">
+                            @foreach($presentation['photos'] as $photo)
+                                <div class="ep-photo">
+                                    <img src="{{ $photo['url'] }}" alt="Taşınmaz fotoğrafı">
+                                    <p>{{ $photo['summary'] ?: 'Taşınmaz fotoğrafı' }}</p>
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
+                <section class="ep-section">
+                    <h2>Teklif Süreci</h2>
+                    <div class="ep-note">{{ $presentation['offer_note'] }}</div>
+                    <div class="ep-note">{{ $presentation['authorization_note'] }}</div>
+                    <div class="ep-note">{{ $presentation['buyer_fee_note'] }}</div>
+                    <div class="ep-note ep-warning">{{ $presentation['disclaimer'] }}</div>
+                </section>
+            </div>
         @else
             <div class="ep-empty">Sunum için soldan izole bir satıcı dosyası seçin.</div>
         @endif
