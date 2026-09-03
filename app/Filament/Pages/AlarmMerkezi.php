@@ -47,8 +47,14 @@ class AlarmMerkezi extends Page
 
     public static function canAccess(): bool
     {
-        return app(RealEstateIsolationService::class)->currentOperatorHasAccess()
-            || app(OrganizationAccessService::class)->can('alarms');
+        $isolation = app(RealEstateIsolationService::class);
+
+        // Keep legacy WAI CRM outside the isolated Emlak workspace.
+        if ($isolation->currentOperatorHasAccess()) {
+            return false;
+        }
+
+        return app(OrganizationAccessService::class)->can('alarms');
     }
 
     public static function shouldRegisterNavigation(): bool
