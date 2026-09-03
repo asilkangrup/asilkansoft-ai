@@ -23,6 +23,7 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
         $mediaAdmissionGateReady = app(RealEstateMediaAnalysisService::class)
             instanceof RealEstateGuardedMediaAnalysisService;
         $outboundState = $this->outboundReconciliationState();
+        $closingHealth = app(RealEstateClosingRiskService::class)->health();
 
         $snapshot['whatsapp_connection_state'] = $state;
         $snapshot['whatsapp_connection_source'] = 'evolution_live';
@@ -31,6 +32,8 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
         $snapshot['checks']['media_admission_gate_ready'] = $mediaAdmissionGateReady;
         $snapshot['checks']['unresolved_outbound_deliveries'] = $outboundState['blocking'];
         $snapshot['outbound_reconciliation'] = $outboundState;
+        $snapshot['closing_health'] = $closingHealth;
+        $snapshot['checks']['closing_health_observable'] = (bool) ($closingHealth['ready'] ?? false);
 
         $blocking = array_values(array_filter(
             $snapshot['blocking_checks'] ?? [],
@@ -39,6 +42,7 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
                 && $check !== 'fact_consistency_guard_ready'
                 && $check !== 'media_admission_gate_ready'
                 && $check !== 'unresolved_outbound_deliveries'
+                && $check !== 'closing_health_observable'
         ));
 
         if (! $connected) {
@@ -55,6 +59,10 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
 
         if ($outboundState['blocking'] > 0) {
             $blocking[] = 'unresolved_outbound_deliveries';
+        }
+
+        if (! (bool) ($closingHealth['ready'] ?? false)) {
+            $blocking[] = 'closing_health_observable';
         }
 
         $snapshot['blocking_checks'] = array_values(array_unique($blocking));
