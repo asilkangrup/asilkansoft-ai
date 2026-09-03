@@ -13,9 +13,12 @@ class RealEstateGroupNotificationService
     private const INVESTOR_GROUP = 'Emlak AI - Yeni Yatırımcılar';
     private const PORTFOLIO_GROUP = 'Emlak AI - Yeni Portföyler';
     private const MATCH_GROUP = 'Emlak AI - Sıcak Eşleşmeler';
+    private const PUBLIC_INVESTOR_GROUP = 'Emlak AI - Yatırımcılar';
+    private const PUBLIC_CONTACT_PHONE = '0536 475 00 98';
 
     public function __construct(
         private readonly WhatsAppService $whatsAppService,
+        private readonly SatilikMiPortfolioPublisherService $portfolioPublisher,
     ) {
     }
 
@@ -29,6 +32,8 @@ class RealEstateGroupNotificationService
             $this->notifyInvestorIfReady($profile);
             $profile->refresh();
             $this->notifyPortfolioIfReady($profile);
+            $profile->refresh();
+            $this->publishPortfolioToInvestorGroupIfReady($profile);
             $profile->refresh();
             $this->notifyStrongMatches($profile);
         } catch (Throwable $exception) {
@@ -89,11 +94,6 @@ class RealEstateGroupNotificationService
             'Yatırım Hedefi: '.$this->value($data, ['investment_goal']),
             'Bütçe: '.$this->budget($data),
             'Finansman: '.$this->value($data, ['financing']),
-            'm² Tercihi: '.$this->area($data),
-            'Risk Tercihi: '.$this->value($data, ['risk_preference']),
-            'Hisseli Tapu: '.$this->boolValue($data['accepts_shared_title'] ?? null),
-            'Hedef İskonto: '.$this->discount($data),
-            'İşlem Süresi: '.$this->value($data, ['timeline']),
             '',
             'Durum: Telefonla doğrulama bekliyor.',
             'Sıradaki adım: Ekip arkadaşı yatırımcıyı arayıp doğrulasın ve sisteme dahil etsin.',
@@ -151,6 +151,101 @@ class RealEstateGroupNotificationService
         $notifications['portfolio_sent_at'] = now()->toIso8601String();
         $data['group_notifications'] = $notifications;
         $profile->forceFill(['data' => $data])->saveQuietly();
+    }
+
+    /**
+     * Public investor group is deliberately fed only from a privacy-scrubbed
+     * Satılık mı? portfolio page. Seller identity, phone, asking price and
+     * confidential floor never appear in this message or its public payload.
+     */
+    private function publishPortfolioToInvestorGroupIfReady(RealEstateProfile $profile): void
+    {
+        if ($profile->profile_type !== 'seller') {
+            return;
+        }
+
+        $data = is_array($profile->data) ? $profile->data : [];
+        $handoff = is_array($data['seller_fast_cash_handoff'] ?? null)
+            ? $data['seller_fast_cash_handoff']
+            : [];
+        $notifications = is_array($data['group_notifications'] ?? null)
+            ? $data['group_notifications']
+            : [];
+
+        if (
+            blank($handoff['completed_at'] ?? null)
+            || filled($notifications['public_investor_group_sent_at'] ?? null)
+        ) {
+            return;
+        }
+
+        $publication = $this->portfolioPublisher->publish($profile);
+
+        if (! is_array($publication) || blank($publication['share_url'] ?? null)) {
+            return;
+        }
+
+        $profile->refresh();
+        $data = is_array($profile->data) ? $profile->data : [];
+        $notifications = is_array($data['group_notifications'] ?? null)
+            ? $data['group_notifications']
+            : [];
+        $motivation = is_array($data['seller_motivation_intelligence'] ?? null)
+            ? $data['seller_motivation_intelligence']
+            : [];
+
+        $message = implode("\n", array_filter([
+            $this->publicHeadline($data, $motivation),
+            '',
+            'Referans: '.($publication['reference_no'] ?? 'Portföy'),
+            'Tür: '.$this->value($data, ['property_type']),
+            'Konum: '.$this->location($data),
+            'Alan: '.$this->singleArea($data),
+            '',
+            $this->publicOpportunityText($data, $motivation),
+            '',
+            '📸 Fotoğraflar ve portföy detayları:',
+            (string) $publication['share_url'],
+            '',
+            '📞 Teklif vermek ve detaylı bilgi almak için:',
+            self::PUBLIC_CONTACT_PHONE,
+        ]));
+
+        if (! $this->sendToNamedGroup(self::PUBLIC_INVESTOR_GROUP, $message)) {
+            return;
+        }
+
+        $notifications['public_investor_group_sent_at'] = now()->toIso8601String();
+        $notifications['public_investor_group_share_url'] = $publication['share_url'];
+        $data['group_notifications'] = $notifications;
+        $profile->forceFill(['data' => $data])->saveQuietly();
+    }
+
+    private function publicHeadline(array $data, array $motivation): string
+    {
+        $urgency = (string) ($data['urgency'] ?? '');
+        $motivationLevel = (string) ($motivation['motivation_level'] ?? '');
+
+        return ($urgency === 'high' || $motivationLevel === 'high_explicit')
+            ? '🔥 ACİL SATIŞ FIRSATI'
+            : '🏠 YENİ YATIRIM FIRSATI';
+    }
+
+    private function publicOpportunityText(array $data, array $motivation): string
+    {
+        $urgency = (string) ($data['urgency'] ?? '');
+        $motivationLevel = (string) ($motivation['motivation_level'] ?? '');
+
+        return match (true) {
+            $urgency === 'high', $motivationLevel === 'high_explicit'
+                => 'Satıcı kısa sürede satışa açık. Acil nakit teklifleri iletilebilir.',
+            $urgency === 'medium', $motivationLevel === 'medium_explicit'
+                => 'Satıcı satışa açık. Ciddi yatırımcıların nakit teklifleri değerlendirilebilir.',
+            $urgency === 'low', $motivationLevel === 'low_explicit'
+                => 'Güncel yatırım portföyüdür. Uygun yatırımcı teklifleri satıcıya iletilebilir.',
+            default
+                => 'Satıcı yatırımcı tekliflerini değerlendirmeye açık. Nakit teklifler iletilebilir.',
+        };
     }
 
     private function notifyStrongMatches(RealEstateProfile $profile): void
@@ -276,20 +371,6 @@ class RealEstateGroupNotificationService
         return $min.' - '.$max;
     }
 
-    private function area(array $data): string
-    {
-        $min = $data['area_min_sqm'] ?? null;
-        $max = $data['area_max_sqm'] ?? null;
-
-        if (! is_numeric($min) && ! is_numeric($max)) {
-            return 'Esnek / Belirtilmedi';
-        }
-
-        return (is_numeric($min) ? number_format((float) $min, 0, ',', '.').' m²' : '—')
-            .' - '
-            .(is_numeric($max) ? number_format((float) $max, 0, ',', '.').' m²' : '—');
-    }
-
     private function singleArea(array $data): string
     {
         foreach (['area_sqm', 'sqm', 'land_area_sqm'] as $key) {
@@ -310,25 +391,13 @@ class RealEstateGroupNotificationService
 
     private function parcel(array $data): string
     {
-        $ada = $data['block'] ?? $data['ada'] ?? null;
-        $parsel = $data['parcel'] ?? $data['parsel'] ?? null;
+        $ada = $data['block_no'] ?? $data['block'] ?? $data['ada'] ?? null;
+        $parsel = $data['parcel_no'] ?? $data['parcel'] ?? $data['parsel'] ?? null;
 
         if (blank($ada) && blank($parsel)) {
             return 'Belirtilmedi';
         }
 
         return 'Ada '.($ada ?: '—').' / Parsel '.($parsel ?: '—');
-    }
-
-    private function boolValue(mixed $value): string
-    {
-        return is_bool($value) ? ($value ? 'Evet' : 'Hayır') : 'Belirtilmedi';
-    }
-
-    private function discount(array $data): string
-    {
-        $value = $data['target_discount_percent'] ?? null;
-
-        return is_numeric($value) ? '%'.rtrim(rtrim(number_format((float) $value, 2, ',', ''), '0'), ',') : 'Belirtilmedi';
     }
 }
