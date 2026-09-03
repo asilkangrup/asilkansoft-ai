@@ -15,7 +15,11 @@ class RealEstateInvestorMandateService
         }
 
         $data = is_array($profile->data) ? $profile->data : [];
-        $summary = $this->build($data);
+        $exclusions = app(RealEstateInvestorExclusionMemoryService::class)
+            ->summaryForProfile($profile);
+        $profile->refresh();
+        $data = is_array($profile->data) ? $profile->data : $data;
+        $summary = $this->build($data, $exclusions);
         $existing = is_array($data[self::DATA_KEY] ?? null)
             ? $data[self::DATA_KEY]
             : [];
@@ -47,10 +51,19 @@ class RealEstateInvestorMandateService
             ? $data[self::DATA_KEY]
             : [];
 
-        return $existing !== [] ? $existing : $this->build($data);
+        if ($existing !== []) {
+            return $existing;
+        }
+
+        $exclusions = app(RealEstateInvestorExclusionMemoryService::class)
+            ->summaryForProfile($profile);
+        $profile->refresh();
+        $data = is_array($profile->data) ? $profile->data : $data;
+
+        return $this->build($data, $exclusions);
     }
 
-    private function build(array $data): array
+    private function build(array $data, array $exclusions = []): array
     {
         $checks = [
             'budget_max' => $this->filled($data, 'budget_max'),
@@ -102,6 +115,15 @@ class RealEstateInvestorMandateService
             ->keys()
             ->values()
             ->all();
+        $excludedPropertyTypes = $this->safeStringArray(
+            $exclusions['excluded_property_types'] ?? []
+        );
+        $excludedCities = $this->safeStringArray(
+            $exclusions['excluded_cities'] ?? []
+        );
+        $excludedDistricts = $this->safeStringArray(
+            $exclusions['excluded_districts'] ?? []
+        );
 
         return [
             'strength_score' => min(100, $score),
@@ -118,6 +140,9 @@ class RealEstateInvestorMandateService
             'criteria_presence' => $checks,
             'missing_high_value_criteria' => $missing,
             'recommended_next_question' => $this->recommendedNextQuestion($checks),
+            'explicit_exclusions_present' => ($excludedPropertyTypes !== [])
+                || ($excludedCities !== [])
+                || ($excludedDistricts !== []),
             'explicit_match_constraints' => [
                 'area_min_sqm' => $this->positive($data['area_min_sqm'] ?? null),
                 'area_max_sqm' => $this->positive($data['area_max_sqm'] ?? null),
@@ -130,9 +155,14 @@ class RealEstateInvestorMandateService
                 'target_discount_percent' => $this->boundedPercent(
                     $data['target_discount_percent'] ?? null
                 ),
+                'excluded_property_types' => $excludedPropertyTypes,
+                'excluded_cities' => $excludedCities,
+                'excluded_districts' => $excludedDistricts,
             ],
             'guardrails' => [
                 'unknown_preferences_are_not_hard_rejections' => true,
+                'explicit_customer_exclusions_are_hard_rejections' => true,
+                're_inclusion_overrides_older_exclusion' => true,
                 'criteria_must_come_from_customer_memory' => true,
                 'no_binding_offer_inferred' => true,
                 'seller_private_floor_exposed' => false,
@@ -192,6 +222,22 @@ class RealEstateInvestorMandateService
         $value = (float) $value;
 
         return $value >= 0 && $value <= 60 ? $value : null;
+    }
+
+    private function safeStringArray(mixed $values): array
+    {
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return collect($values)
+            ->filter(fn ($value): bool => is_scalar($value))
+            ->map(fn ($value): string => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->take(20)
+            ->values()
+            ->all();
     }
 
     private function supports(RealEstateProfile $profile): bool
