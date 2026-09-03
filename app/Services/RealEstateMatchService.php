@@ -10,7 +10,7 @@ class RealEstateMatchService
 {
     private const MATCH_TAG_PREFIX = 'real_estate:match:';
 
-    private const MAX_MATCHES = 5;
+    private const MAX_MATCHES = 50;
 
     private const MIN_BUDGET_COVERAGE_FOR_MATCH = 0.80;
 
@@ -43,6 +43,8 @@ class RealEstateMatchService
             'strongest_grade' => $matches[0]['grade'] ?? null,
             'mandate_aware' => true,
             'multi_value_criteria_aware' => true,
+            'many_to_many_matching' => true,
+            'maximum_candidates_per_profile' => self::MAX_MATCHES,
             'seller_protection_aware' => true,
             'seller_urgency_score_neutral' => true,
             'updated_at' => now()->toIso8601String(),
