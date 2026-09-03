@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\RealEstateProfile;
-use Illuminate\Support\Collection;
 
 class RealEstateInvestorShortlistService
 {
@@ -22,7 +21,7 @@ class RealEstateInvestorShortlistService
             : [];
 
         $rows = collect($matches)
-            ->filter('is_array')
+            ->filter(fn (mixed $match): bool => is_array($match))
             ->map(fn (array $match): ?array => $this->row($seller, $match))
             ->filter()
             ->unique('investor_profile_id')
@@ -202,7 +201,7 @@ class RealEstateInvestorShortlistService
         }
 
         return collect($value)
-            ->filter('is_string')
+            ->filter(fn (mixed $item): bool => is_string($item))
             ->map(fn (string $item): string => trim($item))
             ->filter()
             ->take(8)
