@@ -13,6 +13,8 @@ use Throwable;
 
 class RealEstateOutboundDeliveryService
 {
+    public const CONFIRMED_NOT_SENT_MARKER = 'Operatör kontrolü sonrası yeniden gönderilmeden abandoned olarak kapatıldı.';
+
     public function __construct(
         private readonly RealEstateIsolationService $isolation,
         private readonly RealEstateOutboundSafetyService $outboundSafetyService,
@@ -69,17 +71,11 @@ class RealEstateOutboundDeliveryService
             throw new RuntimeException('İzole Emlak AI outbound konuşma kapsamı bulunamadı.');
         }
 
-        $safety = $this->outboundSafetyService->protect(
+        $answer = $this->safeAnswer(
             conversation: $conversation,
             answer: $answer,
             inboundMessageId: $inboundMessageId,
         );
-        $answer = trim((string) $safety['answer']);
-        $answer = str_replace('*', '', $answer);
-
-        if ($answer === '') {
-            throw new RuntimeException('İzole Emlak AI outbound güvenlik filtresi boş cevap üretti.');
-        }
 
         $deliveryKey = hash('sha256', $instance.'|'.$inboundMessageId);
         $answerHash = hash('sha256', $answer);
@@ -109,6 +105,13 @@ class RealEstateOutboundDeliveryService
         }
 
         if ($delivery->status === 'uncertain') {
+            return $this->result($delivery, sentNow: false);
+        }
+
+        if ($delivery->status === 'abandoned') {
+            // `abandoned` is terminal. A generic retry must never revive it:
+            // only the narrow confirmed-not-sent recovery path may re-arm the
+            // row after latest-turn/no-reply checks have also passed.
             return $this->result($delivery, sentNow: false);
         }
 
@@ -172,6 +175,96 @@ class RealEstateOutboundDeliveryService
 
             return $this->result($delivery->fresh(), sentNow: false);
         }
+    }
+
+    /**
+     * Return a previously abandoned delivery only when an operator explicitly
+     * recorded that no WhatsApp message was sent and there is still no provider
+     * message id or sent timestamp. This is intentionally much narrower than
+     * treating every abandoned row as retryable.
+     */
+    public function confirmedAbandonedForInbound(
+        string $inboundMessageId,
+    ): ?RealEstateOutboundDelivery {
+        $inboundMessageId = trim($inboundMessageId);
+
+        if ($inboundMessageId === '') {
+            return null;
+        }
+
+        return RealEstateOutboundDelivery::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('instance', RealEstateIsolationService::INSTANCE)
+            ->where('inbound_whatsapp_message_id', $inboundMessageId)
+            ->where('status', 'abandoned')
+            ->whereNull('whatsapp_message_id')
+            ->whereNull('sent_at')
+            ->where('last_error', self::CONFIRMED_NOT_SENT_MARKER)
+            ->first();
+    }
+
+    /**
+     * Re-arm exactly one operator-confirmed not-sent delivery with a fresh,
+     * safety-filtered answer. The transaction rechecks every no-send invariant
+     * so a provider reconciliation or concurrent worker can make this fail
+     * closed instead of creating a duplicate.
+     */
+    public function reopenConfirmedAbandonedForRecovery(
+        RealEstateOutboundDelivery $delivery,
+        string $replacementAnswer,
+    ): RealEstateOutboundDelivery {
+        $this->assertDeliveryScope($delivery);
+
+        $conversation = ConversationControl::query()
+            ->where('user_id', RealEstateIsolationService::USER_ID)
+            ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+            ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+            ->where('session_id', $delivery->session_id)
+            ->first();
+
+        if (! $conversation || ! $this->isolation->supportsConversation($conversation)) {
+            throw new RuntimeException('İzole Emlak AI recovery konuşma kapsamı bulunamadı.');
+        }
+
+        $answer = $this->safeAnswer(
+            conversation: $conversation,
+            answer: $replacementAnswer,
+            inboundMessageId: (string) $delivery->inbound_whatsapp_message_id,
+        );
+
+        return DB::transaction(function () use ($delivery, $answer): RealEstateOutboundDelivery {
+            $locked = RealEstateOutboundDelivery::query()
+                ->whereKey($delivery->id)
+                ->where('user_id', RealEstateIsolationService::USER_ID)
+                ->where('organization_id', RealEstateIsolationService::ORGANIZATION_ID)
+                ->where('ai_bot_id', RealEstateIsolationService::BOT_ID)
+                ->where('instance', RealEstateIsolationService::INSTANCE)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (
+                $locked->status !== 'abandoned'
+                || filled($locked->whatsapp_message_id)
+                || filled($locked->sent_at)
+                || (string) $locked->last_error !== self::CONFIRMED_NOT_SENT_MARKER
+            ) {
+                throw new RuntimeException(
+                    'Abandoned Emlak AI teslimatı yeniden açılmaya uygun değil; duplicate güvenliği nedeniyle işlem durduruldu.'
+                );
+            }
+
+            $locked->forceFill([
+                'status' => 'reserved',
+                'answer' => $answer,
+                'answer_hash' => hash('sha256', $answer),
+                'sending_started_at' => null,
+                'last_error' => null,
+            ])->save();
+
+            return $locked->fresh();
+        }, 3);
     }
 
     public function persistAssistantMessage(
@@ -252,6 +345,31 @@ class RealEstateOutboundDeliveryService
 
             return true;
         }, 3);
+    }
+
+    private function safeAnswer(
+        ConversationControl $conversation,
+        string $answer,
+        string $inboundMessageId,
+    ): string {
+        $answer = trim($answer);
+
+        if ($answer === '') {
+            throw new RuntimeException('İzole Emlak AI outbound cevabı boş olamaz.');
+        }
+
+        $safety = $this->outboundSafetyService->protect(
+            conversation: $conversation,
+            answer: $answer,
+            inboundMessageId: $inboundMessageId,
+        );
+        $answer = str_replace('*', '', trim((string) $safety['answer']));
+
+        if ($answer === '') {
+            throw new RuntimeException('İzole Emlak AI outbound güvenlik filtresi boş cevap üretti.');
+        }
+
+        return $answer;
     }
 
     private function reserve(
