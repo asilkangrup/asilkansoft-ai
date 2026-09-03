@@ -42,6 +42,7 @@ class RealEstateMatchService
             'strongest_score' => $matches[0]['match_score'] ?? null,
             'strongest_grade' => $matches[0]['grade'] ?? null,
             'mandate_aware' => true,
+            'multi_value_criteria_aware' => true,
             'seller_protection_aware' => true,
             'seller_urgency_score_neutral' => true,
             'updated_at' => now()->toIso8601String(),
@@ -184,36 +185,30 @@ PROMPT;
             false
         );
 
-        $sellerCity = $this->normalize($sellerData['city'] ?? null);
-        $investorCity = $this->normalize($investorData['city'] ?? null);
-        $sellerType = $this->normalize($sellerData['property_type'] ?? null);
-        $investorType = $this->normalize($investorData['property_type'] ?? null);
+        // Investors frequently state several acceptable cities or property
+        // types in one WhatsApp answer (for example "Bilecik, Kütahya" or
+        // "arsa, tarla"). Treat those as explicit OR criteria instead of one
+        // impossible literal value. Seller values remain compatible with the
+        // same parser so manually-entered arrays are safe too.
+        $sellerCities = $this->normalizedValues($sellerData['city'] ?? null);
+        $investorCities = $this->normalizedValues($investorData['city'] ?? null);
+        $sellerTypes = $this->normalizedValues($sellerData['property_type'] ?? null);
+        $investorTypes = $this->normalizedValues($investorData['property_type'] ?? null);
+        $cityMatch = $this->overlapResult($sellerCities, $investorCities);
+        $typeMatch = $this->overlapResult($sellerTypes, $investorTypes);
 
-        if (
-            $sellerCity !== null
-            && $investorCity !== null
-            && $sellerCity !== $investorCity
-        ) {
+        if ($cityMatch === false || $typeMatch === false) {
             return null;
         }
 
-        if (
-            $sellerType !== null
-            && $investorType !== null
-            && $sellerType !== $investorType
-        ) {
-            return null;
-        }
-
-        $sellerDistrict = $this->normalize($sellerData['district'] ?? null);
-        $investorDistrict = $this->normalize($investorData['district'] ?? null);
+        $sellerDistricts = $this->normalizedValues($sellerData['district'] ?? null);
+        $investorDistricts = $this->normalizedValues($investorData['district'] ?? null);
+        $districtMatch = $this->overlapResult($sellerDistricts, $investorDistricts);
         $locationFlexibility = $this->locationFlexibility($investorData['location_flexibility'] ?? null);
 
         if (
             $locationFlexibility === 'strict_district'
-            && $sellerDistrict !== null
-            && $investorDistrict !== null
-            && $sellerDistrict !== $investorDistrict
+            && $districtMatch === false
         ) {
             return null;
         }
@@ -260,28 +255,24 @@ PROMPT;
         $reasons = [];
         $risks = [];
 
-        if ($sellerCity !== null && $sellerCity === $investorCity) {
+        if ($cityMatch === true) {
             $score += 25;
-            $reasons[] = 'Hedef il aynı.';
+            $reasons[] = 'Hedef il yatırımcının kabul ettiği bölgelerden biri.';
         } else {
             $risks[] = 'İl eşleşmesi tam doğrulanmadı.';
         }
 
-        if ($sellerType !== null && $sellerType === $investorType) {
+        if ($typeMatch === true) {
             $score += 20;
-            $reasons[] = 'Taşınmaz türü yatırımcı kriteriyle aynı.';
+            $reasons[] = 'Taşınmaz türü yatırımcının kabul ettiği türlerden biri.';
         } else {
             $risks[] = 'Taşınmaz türü kriteri eksik.';
         }
 
-        if (
-            $sellerDistrict !== null
-            && $investorDistrict !== null
-            && $sellerDistrict === $investorDistrict
-        ) {
+        if ($districtMatch === true) {
             $score += 15;
             $reasons[] = 'İlçe tercihi doğrudan eşleşiyor.';
-        } elseif ($sellerDistrict === null || $investorDistrict === null) {
+        } elseif ($districtMatch === null) {
             $score += 4;
             $risks[] = 'İlçe kriterlerinden biri eksik.';
         } elseif ($locationFlexibility === 'flexible') {
@@ -401,11 +392,11 @@ PROMPT;
             'reasons' => array_values(array_unique($reasons)),
             'risks' => array_values(array_unique($risks)),
             'criteria_checks' => [
+                'multi_value_criteria_aware' => true,
+                'city_match' => $cityMatch,
+                'property_type_match' => $typeMatch,
                 'location_flexibility' => $locationFlexibility,
-                'district_match' => $sellerDistrict !== null
-                    && $investorDistrict !== null
-                    ? $sellerDistrict === $investorDistrict
-                    : null,
+                'district_match' => $districtMatch,
                 'seller_area_sqm' => $sellerArea,
                 'area_min_sqm' => $areaMin,
                 'area_max_sqm' => $areaMax,
@@ -518,6 +509,51 @@ PROMPT;
         );
 
         return $tags->unique()->values()->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizedValues(mixed $value): array
+    {
+        $values = is_array($value) ? $value : [$value];
+        $normalized = [];
+
+        foreach ($values as $raw) {
+            if (! is_scalar($raw)) {
+                continue;
+            }
+
+            $raw = trim((string) $raw);
+            if ($raw === '') {
+                continue;
+            }
+
+            $parts = preg_split(
+                '/\s*(?:,|;|\||\/)\s*|\s+(?:ve|veya)\s+/ui',
+                $raw,
+                -1,
+                PREG_SPLIT_NO_EMPTY
+            );
+
+            foreach (is_array($parts) ? $parts : [$raw] as $part) {
+                $item = $this->normalize($part);
+                if ($item !== null) {
+                    $normalized[] = $item;
+                }
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    private function overlapResult(array $left, array $right): ?bool
+    {
+        if ($left === [] || $right === []) {
+            return null;
+        }
+
+        return array_intersect($left, $right) !== [];
     }
 
     private function normalize(mixed $value): ?string
