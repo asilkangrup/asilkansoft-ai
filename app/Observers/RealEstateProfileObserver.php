@@ -9,6 +9,7 @@ use App\Services\RealEstateCommercialConsistencyGuardService;
 use App\Services\RealEstateEvidenceLedgerService;
 use App\Services\RealEstateFactConsistencyActionService;
 use App\Services\RealEstateGroupNotificationService;
+use App\Services\RealEstateInvestorBroadcastService;
 use App\Services\RealEstateInvestorMandateService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
@@ -61,9 +62,11 @@ class RealEstateProfileObserver
         app(RealEstateMatchLedgerService::class)->sync($profile);
 
         // The AI never chats in groups. Inbound @g.us traffic remains ignored;
-        // this service only pushes notification summaries to the three exact
-        // Emlak AI operational groups.
+        // these services only push controlled notification summaries to exact
+        // Emlak AI groups.
         app(RealEstateGroupNotificationService::class)->sync($profile);
+        $profile->refresh();
+        app(RealEstateInvestorBroadcastService::class)->sync($profile);
         $profile->refresh();
 
         app(RealEstateCaseLifecycleService::class)->sync($profile);
