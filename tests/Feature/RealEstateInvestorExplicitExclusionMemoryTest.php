@@ -9,6 +9,7 @@ use App\Models\Organization;
 use App\Models\RealEstateProfile;
 use App\Models\User;
 use App\Services\RealEstateInvestorExclusionMemoryService;
+use App\Services\RealEstateInvestorMandateService;
 use App\Services\RealEstateMatchVerificationFilterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -45,6 +46,14 @@ class RealEstateInvestorExplicitExclusionMemoryTest extends TestCase
         $this->assertSame($summary['excluded_property_types'], $stored['excluded_property_types']);
         $this->assertArrayNotHasKey('raw_message', $stored);
         $this->assertArrayNotHasKey('whatsapp_number', $stored);
+
+        $mandate = app(RealEstateInvestorMandateService::class)
+            ->summaryForProfile($profile->fresh());
+        $this->assertTrue($mandate['explicit_exclusions_present']);
+        $this->assertContains(
+            'tarla',
+            $mandate['explicit_match_constraints']['excluded_property_types']
+        );
     }
 
     public function test_later_explicit_re_inclusion_removes_older_exclusion(): void
@@ -103,7 +112,12 @@ class RealEstateInvestorExplicitExclusionMemoryTest extends TestCase
 
         $this->customerMessage($investorConversation, 'Muğla olur ama tarla istemiyorum, sadece arsa bakıyorum.');
 
-        $sellerData = $seller->data;
+        $this->assertTrue(
+            app(RealEstateInvestorExclusionMemoryService::class)
+                ->blocks($investor->fresh(), $seller->fresh())
+        );
+
+        $sellerData = $seller->fresh()->data;
         $sellerData['opportunity_matches'] = [[
             'seller_profile_id' => $seller->id,
             'investor_profile_id' => $investor->id,
@@ -114,7 +128,9 @@ class RealEstateInvestorExplicitExclusionMemoryTest extends TestCase
             'reasons' => ['Lokasyon ve bütçe uyumlu.'],
             'risks' => [],
         ]];
-        $seller->update(['data' => $sellerData]);
+        RealEstateProfile::withoutEvents(
+            fn () => $seller->update(['data' => $sellerData])
+        );
 
         $matches = app(RealEstateMatchVerificationFilterService::class)
             ->process($sellerConversation);
@@ -144,8 +160,10 @@ class RealEstateInvestorExplicitExclusionMemoryTest extends TestCase
             'id' => 36,
             'user_id' => 41,
             'name' => 'Foreign Bot',
+            'company_name' => 'Foreign',
             'status' => 'active',
             'business_sector' => 'real_estate',
+            'lead_scoring_profile' => 'real_estate',
             'whatsapp_instance' => 'foreign-instance',
             'follow_up_enabled' => false,
             'second_follow_up_enabled' => false,
