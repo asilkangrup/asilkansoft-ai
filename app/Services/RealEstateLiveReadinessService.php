@@ -99,9 +99,17 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
     /**
      * A normal in-flight send must not make the whole production service look
      * unhealthy. Only uncertain rows and sends stuck at the network boundary
-     * for at least two minutes are readiness blockers.
+     * for at least two minutes are readiness blockers. Explicit provider
+     * `exists:false` outcomes are terminal no-send facts: expose only their
+     * aggregate count for operations without blocking unrelated live traffic.
      *
-     * @return array{fresh_sending:int,stale_sending:int,uncertain:int,blocking:int}
+     * @return array{
+     *     fresh_sending:int,
+     *     stale_sending:int,
+     *     uncertain:int,
+     *     recipient_unreachable_abandoned:int,
+     *     blocking:int
+     * }
      */
     private function outboundReconciliationState(): array
     {
@@ -132,11 +140,19 @@ class RealEstateLiveReadinessService extends RealEstateReadinessService
         $uncertain = (clone $base)
             ->where('status', 'uncertain')
             ->count();
+        $recipientUnreachableAbandoned = (clone $base)
+            ->where('status', 'abandoned')
+            ->where(
+                'last_error',
+                RealEstateOutboundDeliveryService::RECIPIENT_UNREACHABLE_MARKER
+            )
+            ->count();
 
         return [
             'fresh_sending' => $freshSending,
             'stale_sending' => $staleSending,
             'uncertain' => $uncertain,
+            'recipient_unreachable_abandoned' => $recipientUnreachableAbandoned,
             'blocking' => $staleSending + $uncertain,
         ];
     }
