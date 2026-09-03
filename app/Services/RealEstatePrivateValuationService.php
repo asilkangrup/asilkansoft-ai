@@ -15,10 +15,14 @@ class RealEstatePrivateValuationService
             ->with('conversation')
             ->get()
             ->keyBy('id');
+        $acceptedKeys = app(RealEstateClosingService::class)
+            ->acceptedDeals()
+            ->pluck('key')
+            ->flip();
 
         return $profiles
             ->where('profile_type', 'seller')
-            ->flatMap(function (RealEstateProfile $seller) use ($profiles): array {
+            ->flatMap(function (RealEstateProfile $seller) use ($profiles, $acceptedKeys): array {
                 $cases = data_get($seller->data, 'transaction_closing_cases', []);
 
                 if (! is_array($cases)) {
@@ -26,8 +30,14 @@ class RealEstatePrivateValuationService
                 }
 
                 return collect($cases)
-                    ->map(function (mixed $case, mixed $investorId) use ($seller, $profiles): ?array {
-                        if (! is_array($case) || ! $this->isVerifiedClosing($case, $seller, (int) $investorId)) {
+                    ->map(function (mixed $case, mixed $investorId) use ($seller, $profiles, $acceptedKeys): ?array {
+                        $pairKey = $seller->id.':'.(int) $investorId;
+
+                        if (
+                            ! $acceptedKeys->has($pairKey)
+                            || ! is_array($case)
+                            || ! $this->isVerifiedClosing($case, $seller, (int) $investorId)
+                        ) {
                             return null;
                         }
 
