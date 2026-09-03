@@ -5,6 +5,7 @@ use App\Http\Controllers\WhatsAppWebhookController;
 use App\Models\RealEstateNextBestActionEvent;
 use App\Models\RealEstateOutboundSafetyEvent;
 use App\Services\RealEstateChatBoundaryGuardService;
+use App\Services\RealEstateCommissionIntegrityService;
 use App\Services\RealEstateEvidenceLedgerService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateMatchLedgerService;
@@ -71,6 +72,32 @@ Route::prefix('real-estate')->group(function (): void {
             && class_exists(RealEstateMediaProcessingLedgerService::class);
         $chatBoundary = app(RealEstateChatBoundaryGuardService::class)->snapshot();
         $chatBoundaryReady = (bool) ($chatBoundary['ready'] ?? false);
+
+        try {
+            $commissionHealth = app(RealEstateCommissionIntegrityService::class)->health();
+            $commissionHealthReady = (bool) ($commissionHealth['ready'] ?? false);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $commissionHealthReady = false;
+            $commissionHealth = [
+                'ready' => false,
+                'state' => 'unavailable',
+                'scope' => [
+                    'user_id' => RealEstateIsolationService::USER_ID,
+                    'organization_id' => RealEstateIsolationService::ORGANIZATION_ID,
+                    'bot_id' => RealEstateIsolationService::BOT_ID,
+                    'instance' => RealEstateIsolationService::INSTANCE,
+                ],
+                'counts' => [],
+                'automatic_outbound_allowed' => false,
+                'automatic_payment_request_allowed' => false,
+                'customer_follow_up_allowed' => false,
+                'contains_customer_payload' => false,
+                'contains_customer_pii' => false,
+                'contains_private_seller_floor' => false,
+                'live_traffic_blocking' => false,
+            ];
+        }
 
         $snapshot['checks']['match_ledger_ready'] = $matchLedgerReady;
         $snapshot['match_ledger_telemetry_24h'] = $matchLedgerReady
@@ -219,6 +246,8 @@ Route::prefix('real-estate')->group(function (): void {
 
         $snapshot['checks']['chat_research_boundary_ready'] = $chatBoundaryReady;
         $snapshot['chat_research_boundary'] = $chatBoundary;
+        $snapshot['checks']['commission_health_observable'] = $commissionHealthReady;
+        $snapshot['commission_health'] = $commissionHealth;
 
         foreach ([
             'match_ledger_ready' => $matchLedgerReady,
@@ -228,6 +257,7 @@ Route::prefix('real-estate')->group(function (): void {
             'valuation_research_ledger_ready' => $valuationResearchLedgerReady,
             'media_analysis_firewall_ready' => $mediaSafetyReady,
             'chat_research_boundary_ready' => $chatBoundaryReady,
+            'commission_health_observable' => $commissionHealthReady,
         ] as $check => $ready) {
             if ($ready) {
                 continue;
