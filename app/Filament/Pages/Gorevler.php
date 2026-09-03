@@ -36,8 +36,14 @@ class Gorevler extends Page
 
     public static function canAccess(): bool
     {
-        return app(RealEstateIsolationService::class)->currentOperatorHasAccess()
-            || app(OrganizationAccessService::class)->can('tasks');
+        $isolation = app(RealEstateIsolationService::class);
+
+        // Keep legacy WAI CRM outside the isolated Emlak workspace.
+        if ($isolation->currentOperatorHasAccess()) {
+            return false;
+        }
+
+        return app(OrganizationAccessService::class)->can('tasks');
     }
 
     public static function shouldRegisterNavigation(): bool
