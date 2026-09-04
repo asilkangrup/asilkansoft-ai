@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\WaiDemoLead;
 use App\Services\WaiLeadDemoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class TrackedPublicDemoController extends PublicDemoController
 {
@@ -19,7 +21,8 @@ class TrackedPublicDemoController extends PublicDemoController
             && is_array($payload)
             && ($payload['success'] ?? false) === true
         ) {
-            $token = $this->tokenFromReferer((string) $request->headers->get('referer', ''));
+            $token = $this->tokenFromReferer((string) $request->headers->get('referer', ''))
+                ?? $this->tokenFromPayload($request);
 
             if ($token !== null) {
                 app(WaiLeadDemoService::class)->recordTestConversation(
@@ -40,5 +43,25 @@ class TrackedPublicDemoController extends PublicDemoController
         }
 
         return $matches[1] ?? null;
+    }
+
+    private function tokenFromPayload(Request $request): ?string
+    {
+        if (! Schema::hasTable('wai_demo_leads')) {
+            return null;
+        }
+
+        $company = trim((string) $request->input('company_name', ''));
+        $description = trim((string) $request->input('company_description', ''));
+
+        if ($company === '' || $description === '') {
+            return null;
+        }
+
+        return WaiDemoLead::query()
+            ->where('company_name', $company)
+            ->where('company_description', $description)
+            ->latest('id')
+            ->value('token');
     }
 }
