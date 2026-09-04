@@ -25,14 +25,20 @@ class WaiDemoLeadResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Demo Takip';
 
+    protected static ?string $slug = 'demo-takip';
+
     protected static ?int $navigationSort = 3;
 
     public static function canViewAny(): bool
     {
         $user = Filament::auth()->user();
 
-        return (bool) $user
-            && ((bool) $user->is_admin || (int) $user->id === 43);
+        if (! $user) {
+            return false;
+        }
+
+        return (bool) $user->is_admin
+            || strtolower(trim((string) $user->email)) === 'atakansoykangulle@gmail.com';
     }
 
     public static function shouldRegisterNavigation(): bool
