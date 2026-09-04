@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\PublicDemoController;
 use App\Http\Controllers\RealEstatePrivateMediaController;
+use App\Http\Controllers\TrackedPublicDemoController;
 use App\Http\Controllers\WaiLeadDemoController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,7 +23,7 @@ Route::get('/demo/lead/{token}/whatsapp/status', [WaiLeadDemoController::class, 
     ->middleware('throttle:60,1')
     ->name('demo.lead.whatsapp.status');
 
-Route::post('/demo/chat', [PublicDemoController::class, 'chat'])
+Route::post('/demo/chat', [TrackedPublicDemoController::class, 'chat'])
     ->middleware('throttle:20,1')
     ->name('demo.chat');
 
