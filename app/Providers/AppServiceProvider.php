@@ -18,6 +18,8 @@ use App\Services\RealEstateLiveReadinessService;
 use App\Services\RealEstateMediaAnalysisService;
 use App\Services\RealEstateReadinessService;
 use App\Services\TenantAwareOpenAIService;
+use App\Services\WhatsAppService;
+use App\Services\WaiSalesAwareWhatsAppService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -27,6 +29,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             OpenAIService::class,
             TenantAwareOpenAIService::class
+        );
+
+        $this->app->bind(
+            WhatsAppService::class,
+            WaiSalesAwareWhatsAppService::class
         );
 
         // Shared CRM/finance services below use the global WAI OpenAI facade.
