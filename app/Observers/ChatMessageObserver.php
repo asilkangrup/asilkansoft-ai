@@ -15,8 +15,15 @@ class ChatMessageObserver
     private const REAL_ESTATE_ORGANIZATION_ID = 37;
     private const REAL_ESTATE_BOT_ID = 35;
 
+    private const WAI_SALES_USER_ID = 43;
+    private const WAI_SALES_BOT_ID = 39;
+
     public function created(ChatMessage $message): void
     {
+        if ($this->removeWaiSalesAssistantDuplicate($message)) {
+            return;
+        }
+
         if (
             (int) $message->user_id !== self::REAL_ESTATE_USER_ID
             || (int) $message->organization_id !== self::REAL_ESTATE_ORGANIZATION_ID
@@ -41,13 +48,6 @@ class ChatMessageObserver
             return;
         }
 
-        // Production is intentionally CRM-only for inbound media. The
-        // full-resolution file is persisted by the isolated inbound service.
-        // Never invoke vision/OCR from a model observer: it creates hidden
-        // token spend and can promote unverified image text into CRM facts.
-        // If the seller profile already exists, update its deterministic
-        // gallery/checklist immediately. On a first-ever media turn the profile
-        // is created just after this observer returns, so use the delayed job.
         $conversationId = ConversationControl::query()
             ->where('user_id', self::REAL_ESTATE_USER_ID)
             ->where('organization_id', self::REAL_ESTATE_ORGANIZATION_ID)
@@ -70,6 +70,60 @@ class ChatMessageObserver
 
         RegisterRealEstateMediaCrmFinding::dispatch($message->id)
             ->delay(now()->addSeconds(2));
+    }
+
+    private function removeWaiSalesAssistantDuplicate(ChatMessage $message): bool
+    {
+        if (
+            (int) $message->user_id !== self::WAI_SALES_USER_ID
+            || (int) $message->ai_bot_id !== self::WAI_SALES_BOT_ID
+            || $message->role !== 'assistant'
+            || $message->sender_type !== 'ai'
+        ) {
+            return false;
+        }
+
+        try {
+            $previous = ChatMessage::query()
+                ->where('user_id', self::WAI_SALES_USER_ID)
+                ->where('ai_bot_id', self::WAI_SALES_BOT_ID)
+                ->where('session_id', $message->session_id)
+                ->where('role', 'assistant')
+                ->where('sender_type', 'ai')
+                ->where('id', '<', $message->id)
+                ->latest('id')
+                ->first();
+
+            if (! $previous) {
+                return false;
+            }
+
+            $sameText = trim((string) $previous->message) === trim((string) $message->message);
+            $sameWindow = $previous->created_at
+                && $message->created_at
+                && abs($previous->created_at->diffInSeconds($message->created_at, false)) <= 15;
+
+            if (! $sameText || ! $sameWindow) {
+                return false;
+            }
+
+            $message->deleteQuietly();
+
+            Log::info('WAI SALES DUPLICATE ASSISTANT MESSAGE REMOVED', [
+                'kept_chat_message_id' => $previous->id,
+                'removed_chat_message_id' => $message->id,
+                'session_id' => $message->session_id,
+            ]);
+
+            return true;
+        } catch (Throwable $exception) {
+            Log::warning('WAI SALES DUPLICATE ASSISTANT CLEANUP FAILED', [
+                'chat_message_id' => $message->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     private function removeLegacyPlaceholderDuplicate(ChatMessage $mediaMessage): void
