@@ -51,7 +51,7 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
         }
 
         if ($answers['task'] === '') {
-            return 'Yapay zekânın ana görevi ne olsun?';
+            return $this->taskQuestion($answers['sector']);
         }
 
         if ($answers['style'] === '') {
@@ -71,6 +71,23 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
     private function welcome(): string
     {
         return "1 gün ücretsiz deneyebilirsiniz. Size birkaç kısa soru soracağım; verdiğiniz bilgilere göre deneme yapay zekânızı anlık hazırlayıp test linkini göndereceğim. Beğenirseniz ardından WhatsApp'ınıza bağlayabilirsiniz.\n\nİşletme adınız nedir?";
+    }
+
+    private function taskQuestion(string $sector): string
+    {
+        $s = Str::lower($sector);
+
+        $examples = match (true) {
+            str_contains($s, 'emlak'), str_contains($s, 'gayrimenkul') => 'gelen mesajları cevaplama, ilan bilgisi verme, randevu alma',
+            str_contains($s, 'güzellik'), str_contains($s, 'klinik'), str_contains($s, 'estetik') => 'randevu alma, hizmet bilgisi verme, müşteri sorularını yanıtlama',
+            str_contains($s, 'gıda'), str_contains($s, 'market'), str_contains($s, 'restoran'), str_contains($s, 'yemek') => 'sipariş alma, ürün bilgisi verme, teslimat sorularını yanıtlama',
+            str_contains($s, 'e-ticaret'), str_contains($s, 'eticaret') => 'ürün sorularını yanıtlama, sipariş alma, kargo durumunu açıklama',
+            str_contains($s, 'inşaat'), str_contains($s, 'yapı') => 'ürün/hizmet sorularını yanıtlama, teklif ön bilgisi alma, talep toplama',
+            str_contains($s, 'otomotiv'), str_contains($s, 'galeri'), str_contains($s, 'oto') => 'araç bilgisi verme, müşteri talebi toplama, randevu oluşturma',
+            default => 'müşteri sorularını yanıtlama, talep toplama, randevu veya sipariş alma',
+        };
+
+        return 'Yapay zekânın ana görevi ne olsun? (örn. '.$examples.')';
     }
 
     private function hasSetupStarted(array $messages): bool
