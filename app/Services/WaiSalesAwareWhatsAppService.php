@@ -33,6 +33,14 @@ class WaiSalesAwareWhatsAppService extends WhatsAppService
             }
         }
 
+        if (
+            str_contains($text, '/demo/lead/')
+            && ! str_contains($text, 'Sadece verdiğiniz 4 kısa cevapla')
+        ) {
+            $text = rtrim($text)
+                ."\n\nSadece verdiğiniz 4 kısa cevapla ne kadar akıllı ve işletmenize uygun çalışabildiğini keşfedin. Demoyu beğenirseniz yapay zekânız işletmenizin ihtiyaçlarına, süreçlerine ve kurallarına göre çok daha detaylı şekilde tamamen size özel kurgulanacaktır.";
+        }
+
         return parent::sendText($instanceName, $number, $text);
     }
 
