@@ -22,6 +22,8 @@ class WaiLeadDemoController extends Controller
             throw new NotFoundHttpException('Demo bağlantısının süresi dolmuş veya bağlantı geçersiz.');
         }
 
+        $service->markOpened($token);
+
         return view('wai-lead-demo', [
             'token' => $token,
             'lead' => $lead,
@@ -81,10 +83,13 @@ class WaiLeadDemoController extends Controller
                 Cache::put($cacheKey, $bot->id, now()->addDay());
             }
 
+            $demoService->markConnectStarted($token, $bot);
+
             $state = $whatsAppService->connectionState((string) $bot->whatsapp_instance);
 
             if ($state === 'open') {
                 $bot->forceFill(['whatsapp_status' => 'connected'])->save();
+                $demoService->markConnected($token, $bot);
 
                 return response()->json([
                     'success' => true,
@@ -131,8 +136,12 @@ class WaiLeadDemoController extends Controller
         try {
             $state = $whatsAppService->connectionState((string) $bot->whatsapp_instance);
 
-            if ($state === 'open' && $bot->whatsapp_status !== 'connected') {
-                $bot->forceFill(['whatsapp_status' => 'connected'])->save();
+            if ($state === 'open') {
+                if ($bot->whatsapp_status !== 'connected') {
+                    $bot->forceFill(['whatsapp_status' => 'connected'])->save();
+                }
+
+                $demoService->markConnected($token, $bot);
             }
 
             return response()->json([
