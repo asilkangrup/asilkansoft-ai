@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AiBot;
 use App\Models\WaiDemoLead;
+use App\Models\WaiDemoMessage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -74,6 +75,39 @@ class WaiLeadDemoService
             ->where('token', $token)
             ->whereNull('first_opened_at')
             ->update(['first_opened_at' => now()]);
+    }
+
+    public function recordTestConversation(string $token, string $userMessage, string $assistantMessage): void
+    {
+        if (! Schema::hasTable('wai_demo_leads')) {
+            return;
+        }
+
+        $lead = WaiDemoLead::query()->where('token', $token)->first();
+
+        if (! $lead) {
+            return;
+        }
+
+        if (Schema::hasTable('wai_demo_messages')) {
+            WaiDemoMessage::query()->create([
+                'wai_demo_lead_id' => $lead->id,
+                'role' => 'user',
+                'message' => mb_substr(trim($userMessage), 0, 5000),
+            ]);
+
+            WaiDemoMessage::query()->create([
+                'wai_demo_lead_id' => $lead->id,
+                'role' => 'assistant',
+                'message' => mb_substr(trim($assistantMessage), 0, 10000),
+            ]);
+        }
+
+        $lead->increment('test_message_count');
+        $lead->forceFill([
+            'first_opened_at' => $lead->first_opened_at ?: now(),
+            'last_tested_at' => now(),
+        ])->save();
     }
 
     public function markTestMessage(string $token): void
