@@ -25,37 +25,36 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
             ->values()
             ->all();
 
-        $lastUser = '';
-        foreach (array_reverse($messages) as $item) {
-            if (($item['role'] ?? '') === 'user') {
-                $lastUser = (string) ($item['content'] ?? '');
-                break;
-            }
-        }
+        $lastUser = $this->lastUserMessage($messages);
+        $normalizedUser = $this->normalize($lastUser);
 
-        $normalizedUser = Str::lower(trim($lastUser));
         if (in_array($normalizedUser, ['başa dön', 'basa don', 'sıfırla', 'sifirla'], true)) {
             return $this->welcome();
         }
 
+        $setupStarted = $this->hasSetupStarted($messages);
+
+        if ($this->isWaiQuestion($lastUser)) {
+            $withoutLastUser = $messages;
+            for ($i = count($withoutLastUser) - 1; $i >= 0; $i--) {
+                if (($withoutLastUser[$i]['role'] ?? '') === 'user') {
+                    array_splice($withoutLastUser, $i, 1);
+                    break;
+                }
+            }
+
+            $answers = $this->extractAnswers($withoutLastUser);
+            $reply = trim(parent::cevapVer($mesajlar, $aiBot));
+            $next = $this->nextQuestion($answers, $setupStarted);
+
+            return $next !== '' ? $reply."\n\n".$next : $reply;
+        }
+
         $answers = $this->extractAnswers($messages);
+        $next = $this->nextQuestion($answers, $setupStarted);
 
-        if ($answers['company'] === '') {
-            return $this->hasSetupStarted($messages)
-                ? 'İşletme adınız nedir?'
-                : $this->welcome();
-        }
-
-        if ($answers['sector'] === '') {
-            return 'Hangi sektörde faaliyet gösteriyorsunuz?';
-        }
-
-        if ($answers['task'] === '') {
-            return $this->taskQuestion($answers['sector']);
-        }
-
-        if ($answers['style'] === '') {
-            return 'Konuşma üslubunu nasıl istersiniz? (ör. samimi, kurumsal, kısa ve net)';
+        if ($next !== '') {
+            return $next;
         }
 
         return $this->createDemoLink($answers);
@@ -70,12 +69,33 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
 
     private function welcome(): string
     {
-        return "1 gün ücretsiz deneyebilirsiniz. Size birkaç kısa soru soracağım; verdiğiniz bilgilere göre deneme yapay zekânızı anlık hazırlayıp test linkini göndereceğim. Beğenirseniz ardından WhatsApp'ınıza bağlayabilirsiniz.\n\nİşletme adınız nedir?";
+        return "1 gün ücretsiz deneyebilirsiniz. Size 4 kısa soru soracağım; verdiğiniz bilgilere göre deneme yapay zekânızı anlık hazırlayıp Test Sohbeti linkini göndereceğim. Beğenirseniz ardından WhatsApp'ınıza bağlayabilirsiniz.\n\nİşletme adınız nedir?";
+    }
+
+    private function nextQuestion(array $answers, bool $setupStarted): string
+    {
+        if ($answers['company'] === '') {
+            return $setupStarted ? 'İşletme adınız nedir?' : $this->welcome();
+        }
+
+        if ($answers['sector'] === '') {
+            return 'Hangi sektörde faaliyet gösteriyorsunuz?';
+        }
+
+        if ($answers['task'] === '') {
+            return $this->taskQuestion($answers['sector']);
+        }
+
+        if ($answers['style'] === '') {
+            return 'Konuşma üslubunu nasıl istersiniz? (örn. samimi, kurumsal, kısa ve net)';
+        }
+
+        return '';
     }
 
     private function taskQuestion(string $sector): string
     {
-        $s = Str::lower($sector);
+        $s = $this->normalize($sector);
 
         $examples = match (true) {
             str_contains($s, 'emlak'), str_contains($s, 'gayrimenkul') => 'gelen mesajları cevaplama, ilan bilgisi verme, randevu alma',
@@ -120,7 +140,7 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
                 continue;
             }
 
-            $value = Str::lower(trim((string) ($item['content'] ?? '')));
+            $value = $this->normalize((string) ($item['content'] ?? ''));
             if (in_array($value, ['başa dön', 'basa don', 'sıfırla', 'sifirla'], true)) {
                 $start = $index + 1;
                 $answers = ['company' => '', 'sector' => '', 'task' => '', 'style' => ''];
@@ -142,7 +162,7 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
                 continue;
             }
 
-            if ($role === 'user' && $pending !== null && $content !== '') {
+            if ($role === 'user' && $pending !== null && $content !== '' && ! $this->isWaiQuestion($content)) {
                 $answers[$pending] = $content;
                 $pending = null;
             }
@@ -153,9 +173,9 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
 
     private function questionField(string $text): ?string
     {
-        $text = Str::lower($text);
+        $text = $this->normalize($text);
 
-        if (str_contains($text, 'işletme ad') || str_contains($text, 'firma ad')) {
+        if (str_contains($text, 'işletme ad') || str_contains($text, 'şletme ad') || str_contains($text, 'firma ad')) {
             return 'company';
         }
 
@@ -178,6 +198,43 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
         return null;
     }
 
+    private function isWaiQuestion(string $text): bool
+    {
+        $n = $this->normalize($text);
+
+        if ($n === '' || ! str_contains($text, '?')) {
+            return false;
+        }
+
+        foreach ([
+            'wai', 'fiyat', 'ücret', 'paket', 'nasıl çalış', 'ne yap', 'özellik',
+            'whatsapp', 'entegrasyon', 'kurulum', 'crm', 'yapay zeka', 'yapay zekâ',
+        ] as $needle) {
+            if (str_contains($n, $this->normalize($needle))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function lastUserMessage(array $messages): string
+    {
+        foreach (array_reverse($messages) as $item) {
+            if (($item['role'] ?? '') === 'user') {
+                return (string) ($item['content'] ?? '');
+            }
+        }
+
+        return '';
+    }
+
+    private function normalize(string $text): string
+    {
+        $text = Str::lower(trim($text));
+        return str_replace(["i̇", "ı̇"], ['i', 'ı'], $text);
+    }
+
     private function createDemoLink(array $answers): string
     {
         $description = implode("\n", [
@@ -194,7 +251,7 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
         ]);
 
         if (($demo['status'] ?? null) === 'created' && ! empty($demo['url'])) {
-            return "Hazır ✅ Deneme yapay zekânızı oluşturdum. Aşağıdaki linkten direkt Test Sohbeti'ne geçebilirsiniz:\n".$demo['url']."\n\nBeğenirseniz test ekranından WhatsApp'ınıza bağlayıp 1 gün ücretsiz deneyebilirsiniz.";
+            return "Hazır ✅ Size özel deneme yapay zekânızı oluşturdum. Aşağıdaki linkten direkt Test Sohbeti'ne geçebilirsiniz:\n".$demo['url']."\n\nBeğenirseniz test ekranından WhatsApp'ınıza bağlayıp 1 gün ücretsiz deneyebilirsiniz.";
         }
 
         return 'Deneme bağlantısı hazırlanırken kısa bir sorun oluştu. Lütfen tekrar deneyin.';
