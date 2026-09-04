@@ -17,7 +17,7 @@ use App\Services\RealEstateGuardedMediaAnalysisService;
 use App\Services\RealEstateLiveReadinessService;
 use App\Services\RealEstateMediaAnalysisService;
 use App\Services\RealEstateReadinessService;
-use App\Services\WaiSalesSetupOpenAIService;
+use App\Services\WaiLifecycleOpenAIService;
 use App\Services\WhatsAppService;
 use App\Services\WaiSalesAwareWhatsAppService;
 use Illuminate\Support\ServiceProvider;
@@ -28,7 +28,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(
             OpenAIService::class,
-            WaiSalesSetupOpenAIService::class
+            WaiLifecycleOpenAIService::class
         );
 
         $this->app->bind(
