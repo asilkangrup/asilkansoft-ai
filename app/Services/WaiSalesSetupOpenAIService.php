@@ -69,6 +69,7 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
     private function isTemporaryDemoBot(?AiBot $bot): bool
     {
         return $bot instanceof AiBot
+            && (int) $bot->id !== 39
             && str_starts_with(trim((string) $bot->whatsapp_instance), 'wai-demo-');
     }
 
@@ -159,6 +160,7 @@ PROMPT;
     private function isWaiSalesBot(?AiBot $bot): bool
     {
         return $bot instanceof AiBot
+            && (int) $bot->id === 39
             && Str::lower(trim((string) $bot->business_sector)) === 'saas'
             && Str::lower(trim((string) $bot->role)) === 'sales';
     }
@@ -347,7 +349,7 @@ PROMPT;
         ]);
 
         if (($demo['status'] ?? null) === 'created' && ! empty($demo['url'])) {
-            return "Hazır ✅ Size özel deneme yapay zekânızı oluşturdum. Aşağıdaki linkten direkt Test Sohbeti'ne geçebilirsiniz:\n".$demo['url']."\n\nBeğenirseniz test ekranından WhatsApp'ınıza bağlayıp 1 gün ücretsiz deneyebilirsiniz.";
+            return "Hazır ✅ Size özel deneme yapay zekânızı oluşturdum. Aşağıdaki linkten direkt Test Sohbeti'ne geçebilirsiniz:\n".$demo['url']."\n\nSadece verdiğiniz 4 kısa cevapla ne kadar akıllı ve işletmenize uygun çalışabildiğini keşfedin. Demoyu beğenirseniz yapay zekânız işletmenizin ihtiyaçlarına, süreçlerine ve kurallarına göre çok daha detaylı şekilde tamamen size özel kurgulanacaktır.\n\nBeğenirseniz test ekranından WhatsApp'ınıza bağlayıp 1 gün ücretsiz deneyebilirsiniz.";
         }
 
         return 'Deneme bağlantısı hazırlanırken kısa bir sorun oluştu. Lütfen tekrar deneyin.';
