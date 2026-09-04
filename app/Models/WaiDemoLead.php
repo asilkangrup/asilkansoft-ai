@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WaiDemoLead extends Model
 {
@@ -32,5 +33,10 @@ class WaiDemoLead extends Model
     public function temporaryBot(): BelongsTo
     {
         return $this->belongsTo(AiBot::class, 'temporary_bot_id');
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(WaiDemoMessage::class, 'wai_demo_lead_id')->orderBy('id');
     }
 }
