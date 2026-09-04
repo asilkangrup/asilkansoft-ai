@@ -22,7 +22,11 @@ class TrackedPublicDemoController extends PublicDemoController
             $token = $this->tokenFromReferer((string) $request->headers->get('referer', ''));
 
             if ($token !== null) {
-                app(WaiLeadDemoService::class)->markTestMessage($token);
+                app(WaiLeadDemoService::class)->recordTestConversation(
+                    token: $token,
+                    userMessage: (string) $request->input('message', ''),
+                    assistantMessage: (string) ($payload['message'] ?? ''),
+                );
             }
         }
 
