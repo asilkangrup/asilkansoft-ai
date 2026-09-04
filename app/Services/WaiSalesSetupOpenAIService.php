@@ -167,7 +167,7 @@ PROMPT;
 
     private function welcome(): string
     {
-        return "1 gün ücretsiz deneyebilirsiniz. Size 4 kısa soru soracağım; verdiğiniz bilgilere göre deneme yapay zekânızı anlık hazırlayıp Test Sohbeti linkini göndereceğim. Beğenirseniz ardından WhatsApp'ınıza bağlayabilirsiniz.\n\nİşletme adınız nedir?";
+        return "Merhaba 👋 Şu anda WAI canlı demosundasınız. Size sadece 4 kısa soruda işletmenize özel yapay zekânın ne kadar akıllı çalışabildiğini göstereceğim. Cevaplarınıza göre Test Sohbetinizi anlık oluşturacağım; beğenirseniz WhatsApp'ınıza bağlayıp 1 gün ücretsiz deneyebilirsiniz.\n\nİlk olarak işletme adınız nedir?";
     }
 
     private function nextQuestion(array $answers, bool $setupStarted): string
@@ -300,15 +300,26 @@ PROMPT;
     {
         $n = $this->normalize($text);
 
-        if ($n === '' || ! str_contains($text, '?')) {
+        if ($n === '') {
             return false;
         }
 
         foreach ([
             'wai', 'fiyat', 'ücret', 'paket', 'nasıl çalış', 'ne yap', 'özellik',
             'whatsapp', 'entegrasyon', 'kurulum', 'crm', 'yapay zeka', 'yapay zekâ',
+            'ne kadar', 'kaç para', 'ücretsiz mi', 'demo nedir',
         ] as $needle) {
             if (str_contains($n, $this->normalize($needle))) {
+                return true;
+            }
+        }
+
+        if (str_contains($text, '?')) {
+            return true;
+        }
+
+        foreach (['neden ', 'nasıl ', 'nedir', 'ne zaman', 'nerede', 'nereye', 'hangi ', 'kaç ', 'var mı', 'olur mu'] as $questionCue) {
+            if (str_contains($n, $questionCue)) {
                 return true;
             }
         }
