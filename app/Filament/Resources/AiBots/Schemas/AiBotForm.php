@@ -76,10 +76,9 @@ class AiBotForm
                     ])
                     ->columns(2),
 
-                Section::make('Emlak AI API')
-                    ->description('Bu alan yalnızca bağımsız Emlak AI hesabı içindir. Anahtar WAI genel anahtarından ayrıdır.')
+                Section::make('OpenAI API')
+                    ->description('Bu bot için ayrı OpenAI API anahtarı kullanabilirsiniz. Anahtar girilirse yalnızca bu bot kendi anahtarıyla çalışır; boş bırakırsanız genel WAI anahtarı kullanılır.')
                     ->icon('heroicon-o-key')
-                    ->visible(fn (?AiBot $record): bool => (int) ($record?->id ?? 0) === 35)
                     ->schema([
                         TextInput::make('openai_api_key')
                             ->label('OpenAI API Anahtarı')
