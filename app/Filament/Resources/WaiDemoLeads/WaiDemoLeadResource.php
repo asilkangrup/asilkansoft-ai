@@ -5,6 +5,7 @@ namespace App\Filament\Resources\WaiDemoLeads;
 use App\Filament\Resources\WaiDemoLeads\Pages\ListWaiDemoLeads;
 use App\Models\WaiDemoLead;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
@@ -84,6 +85,12 @@ class WaiDemoLeadResource extends Resource
                     ->numeric()
                     ->sortable(),
 
+                TextColumn::make('last_tested_at')
+                    ->label('Son Test')
+                    ->dateTime('d.m.Y H:i')
+                    ->placeholder('Henüz test yok')
+                    ->sortable(),
+
                 TextColumn::make('first_opened_at')
                     ->label('Test Açıldı')
                     ->dateTime('d.m.Y H:i')
@@ -112,16 +119,25 @@ class WaiDemoLeadResource extends Resource
                     ->placeholder('—')
                     ->sortable(),
 
-                TextColumn::make('temporary_bot_id')
-                    ->label('Demo Bot')
-                    ->placeholder('—'),
-
                 TextColumn::make('created_at')
                     ->label('Oluşturuldu')
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
             ])
             ->filters([])
+            ->recordActions([
+                Action::make('showChat')
+                    ->label('Sohbeti Gör')
+                    ->icon('heroicon-o-chat-bubble-left-right')
+                    ->color('info')
+                    ->modalHeading(fn (WaiDemoLead $record): string => $record->company_name.' · Test Sohbeti')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Kapat')
+                    ->modalWidth('3xl')
+                    ->modalContent(fn (WaiDemoLead $record) => view('filament.wai-demo-chat', [
+                        'messages' => $record->messages()->get(),
+                    ])),
+            ])
             ->defaultSort('created_at', 'desc');
     }
 
