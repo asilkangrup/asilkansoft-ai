@@ -40,8 +40,6 @@ class MemoryService
             && (int) $aiBotId === self::REAL_ESTATE_BOT_ID;
 
         if ($isolatedRealEstate) {
-            // Never let the fresh Emlak AI memory fall through to another
-            // organization owned by user 40.
             $organizationId = self::REAL_ESTATE_ORGANIZATION_ID;
         } else {
             $organizationId = ConversationControl::query()
@@ -78,9 +76,7 @@ class MemoryService
             'media_duration' => $mediaContext['duration'] ?? null,
             'media_size' => $mediaContext['size'] ?? null,
             'whatsapp_message_id' => $mediaContext['message_id'] ?? null,
-            'status' => $senderType === 'customer'
-                ? 'received'
-                : ($isolatedRealEstate ? 'sent' : null),
+            'status' => $senderType === 'customer' ? 'received' : 'sent',
         ];
 
         $isolatedInboundMessageId = $isolatedRealEstate
@@ -260,9 +256,6 @@ class MemoryService
                         trim(app(RealEstateValuationService::class)->promptFor($conversation)),
                         trim(app(RealEstateDecisionService::class)->promptFor($conversation)),
                         trim(app(RealEstateMatchService::class)->promptFor($conversation)),
-                        // The deterministic orchestrator is the last-word action
-                        // policy after valuation/verification/match guards. It
-                        // must be delivered to the chat model on every turn.
                         trim(app(RealEstateNextBestActionService::class)->promptFor($conversation)),
                     ])
                         ->filter()
