@@ -38,8 +38,9 @@ class EmlakCrm extends Page
 
     public function setTab(string $tab): void
     {
-        if (in_array($tab, ['portfolios', 'sellers', 'investors'], true)) {
+        if (in_array($tab, ['portfolios', 'sellers', 'investors', 'region'], true)) {
             $this->tab = $tab;
+            $this->search = '';
         }
     }
 
@@ -71,21 +72,26 @@ class EmlakCrm extends Page
             ->isolatedProduction()
             ->with('conversation')
             ->latest('last_extracted_at')
-            ->limit(250)
+            ->limit(500)
             ->get();
 
         $profiles = match ($this->tab) {
             'investors' => $profiles->filter(
                 fn (RealEstateProfile $profile): bool => in_array($profile->profile_type, ['investor', 'buyer'], true)
             ),
+            'region' => $profiles,
             default => $profiles->where('profile_type', 'seller'),
         };
 
+        $search = mb_strtolower(trim($this->search));
+
+        if ($this->tab === 'region' && $search === '') {
+            return collect();
+        }
+
         return $profiles
             ->map(fn (RealEstateProfile $profile): array => $this->record($profile))
-            ->filter(function (array $record): bool {
-                $search = mb_strtolower(trim($this->search));
-
+            ->filter(function (array $record) use ($search): bool {
                 if ($search === '') {
                     return true;
                 }
@@ -155,6 +161,7 @@ class EmlakCrm extends Page
             'updated_at' => ($profile->last_extracted_at ?? $profile->updated_at)?->diffForHumans() ?? '—',
             'customer_url' => $conversation ? url('/admin/emlak-musteri-detay?customer='.$conversation->id) : null,
             'is_investor' => $isInvestor,
+            'role_label' => $isInvestor ? 'YATIRIMCI' : 'PORTFÖY',
         ];
     }
 
