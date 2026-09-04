@@ -11,6 +11,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class WaiDemoLeadResource extends Resource
 {
@@ -37,6 +38,15 @@ class WaiDemoLeadResource extends Resource
     public static function shouldRegisterNavigation(): bool
     {
         return static::canViewAny();
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        if (! Schema::hasTable('wai_demo_leads')) {
+            return null;
+        }
+
+        return (string) WaiDemoLead::query()->count();
     }
 
     public static function canCreate(): bool
@@ -74,7 +84,7 @@ class WaiDemoLeadResource extends Resource
                     ->placeholder('Açılmadı')
                     ->sortable(),
 
-                TextColumn::make('whatsapp_connected_at')
+                TextColumn::make('whatsapp_instance')
                     ->label('WhatsApp')
                     ->badge()
                     ->formatStateUsing(
