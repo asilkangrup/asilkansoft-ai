@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\PublicDemoController;
 use App\Http\Controllers\RealEstatePrivateMediaController;
+use App\Http\Controllers\WaiLeadDemoController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,6 +33,11 @@ Route::view('/', 'home')
 | WhatsApp webhook sisteminden tamamen bağımsızdır.
 |
 */
+
+Route::get('/demo/lead/{token}', [WaiLeadDemoController::class, 'show'])
+    ->where('token', '[A-Za-z0-9]{48}')
+    ->middleware('throttle:60,1')
+    ->name('demo.lead.show');
 
 Route::post('/demo/chat', [PublicDemoController::class, 'chat'])
     ->middleware('throttle:20,1')
