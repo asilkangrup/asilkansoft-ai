@@ -65,5 +65,6 @@ function startPoll(){clearInterval(poll);poll=setInterval(async()=>{try{const r=
 function showConnected(){clearInterval(poll);qrbox.innerHTML='<div style="font-size:58px">✓</div>';waStatus.innerHTML='<span class="connected">WhatsApp bağlandı. 1 günlük denemeniz başladı.</span>';connect.textContent='WhatsApp bağlı ✓'}
 send.addEventListener('click',submit);input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit()}});input.addEventListener('input',()=>{input.style.height='45px';input.style.height=Math.min(input.scrollHeight,110)+'px'});connect.addEventListener('click',connectWA);document.getElementById('closeSheet').addEventListener('click',()=>sheet.classList.add('hidden'));
 </script>
+<!-- WAI demo deployment sync -->
 </body>
 </html>
