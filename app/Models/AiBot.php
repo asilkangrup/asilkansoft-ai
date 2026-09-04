@@ -131,26 +131,18 @@ class AiBot extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | İZOLE EMLAK AI OPENAI ANAHTARI
+    | BOT BAZLI OPENAI ANAHTARI
     |--------------------------------------------------------------------------
     |
-    | Yalnızca fresh Emlak AI botunun (user_id=40, bot_id=35) özel anahtarını
-    | APP_KEY ile veritabanında şifreli saklarız. Diğer WAI botlarının mevcut
-    | anahtar davranışına dokunmayız. Eski/plaintext bir Emlak AI değeri varsa
-    | getter geriye dönük uyumluluk için okuyabilir; bir sonraki kayıtta şifrelenir.
+    | Her bot kendi OpenAI anahtarını kullanabilir. Anahtar APP_KEY ile
+    | veritabanında şifreli saklanır. Daha önce plaintext kaydedilmiş değerler
+    | geriye dönük uyumluluk için okunabilir; bir sonraki kayıtta şifrelenir.
     |
     */
 
     public function setOpenaiApiKeyAttribute(mixed $value): void
     {
         $normalized = trim((string) ($value ?? ''));
-
-        if (! $this->isIsolatedRealEstateBot()) {
-            $this->attributes['openai_api_key'] =
-                $normalized === '' ? null : $normalized;
-
-            return;
-        }
 
         $this->attributes['openai_api_key'] =
             $normalized === ''
@@ -164,10 +156,6 @@ class AiBot extends Model
 
         if ($stored === '') {
             return null;
-        }
-
-        if (! $this->isIsolatedRealEstateBot()) {
-            return $stored;
         }
 
         try {
