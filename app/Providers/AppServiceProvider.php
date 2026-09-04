@@ -16,8 +16,8 @@ use App\Services\RealEstateAwareFinanceLeadExtractorService;
 use App\Services\RealEstateGuardedMediaAnalysisService;
 use App\Services\RealEstateLiveReadinessService;
 use App\Services\RealEstateMediaAnalysisService;
-use App\Services\RealEstateOpenAIService;
 use App\Services\RealEstateReadinessService;
+use App\Services\TenantAwareOpenAIService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -26,7 +26,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(
             OpenAIService::class,
-            RealEstateOpenAIService::class
+            TenantAwareOpenAIService::class
         );
 
         // Shared CRM/finance services below use the global WAI OpenAI facade.
