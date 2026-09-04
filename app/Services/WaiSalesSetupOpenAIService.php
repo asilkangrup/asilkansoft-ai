@@ -22,60 +22,43 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
                 'content' => trim((string) ($item['content'] ?? $item['message'] ?? '')),
             ])
             ->filter(fn (array $item): bool => $item['content'] !== '')
-            ->values();
+            ->values()
+            ->all();
 
-        $lastUser = $messages->where('role', 'user')->last()['content'] ?? '';
-        $lastAssistant = $messages->where('role', 'assistant')->last()['content'] ?? '';
+        $lastUser = '';
+        foreach (array_reverse($messages) as $item) {
+            if (($item['role'] ?? '') === 'user') {
+                $lastUser = (string) ($item['content'] ?? '');
+                break;
+            }
+        }
+
         $normalizedUser = Str::lower(trim($lastUser));
-
         if (in_array($normalizedUser, ['başa dön', 'basa don', 'sıfırla', 'sifirla'], true)) {
             return $this->welcome();
         }
 
-        if ($lastAssistant === '' || ! $this->isSetupQuestion($lastAssistant)) {
-            return $this->welcome();
+        $answers = $this->extractAnswers($messages);
+
+        if ($answers['company'] === '') {
+            return $this->hasSetupStarted($messages)
+                ? 'İşletme adınız nedir?'
+                : $this->welcome();
         }
 
-        if (str_contains($lastAssistant, 'İşletme adınız nedir?')) {
+        if ($answers['sector'] === '') {
             return 'Hangi sektörde faaliyet gösteriyorsunuz?';
         }
 
-        if (str_contains($lastAssistant, 'Hangi sektörde faaliyet gösteriyorsunuz?')) {
+        if ($answers['task'] === '') {
             return 'Yapay zekânın ana görevi ne olsun?';
         }
 
-        if (str_contains($lastAssistant, 'Yapay zekânın ana görevi ne olsun?')) {
+        if ($answers['style'] === '') {
             return 'Konuşma üslubunu nasıl istersiniz? (ör. samimi, kurumsal, kısa ve net)';
         }
 
-        if (str_contains($lastAssistant, 'Konuşma üslubunu nasıl istersiniz?')) {
-            $answers = $this->extractAnswers($messages->all());
-
-            if ($answers['company'] === '' || $answers['sector'] === '' || $answers['task'] === '') {
-                return $this->welcome();
-            }
-
-            $description = implode("\n", [
-                'Sektör: '.$answers['sector'],
-                'Ana görev: '.$answers['task'],
-                'Konuşma üslubu: '.($answers['style'] !== '' ? $answers['style'] : 'doğal ve kısa'),
-                'Bu demo yapay zekası müşterilerle '.$answers['sector'].' sektörüne uygun, gerçek bir işletme temsilcisi gibi konuşmalıdır.',
-            ]);
-
-            $demo = app(WaiLeadDemoService::class)->create([
-                'company_name' => $answers['company'],
-                'company_description' => $description,
-                'role' => 'sales',
-            ]);
-
-            if (($demo['status'] ?? null) === 'created' && ! empty($demo['url'])) {
-                return "Hazır ✅ Size özel deneme yapay zekânızı oluşturdum. Aşağıdaki linkten hemen müşteri gibi yazıp test edebilirsiniz:\n".$demo['url']."\n\nBeğenirseniz test ekranından WhatsApp'ınıza bağlayıp 1 gün ücretsiz deneyebilirsiniz.";
-            }
-
-            return 'Deneme bağlantısı hazırlanırken kısa bir sorun oluştu. Lütfen tekrar deneyin.';
-        }
-
-        return $this->welcome();
+        return $this->createDemoLink($answers);
     }
 
     private function isWaiSalesBot(?AiBot $bot): bool
@@ -90,12 +73,19 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
         return "1 gün ücretsiz deneyebilirsiniz. Size birkaç kısa soru soracağım; verdiğiniz bilgilere göre deneme yapay zekânızı anlık hazırlayıp test linkini göndereceğim. Beğenirseniz ardından WhatsApp'ınıza bağlayabilirsiniz.\n\nİşletme adınız nedir?";
     }
 
-    private function isSetupQuestion(string $text): bool
+    private function hasSetupStarted(array $messages): bool
     {
-        return str_contains($text, 'İşletme adınız nedir?')
-            || str_contains($text, 'Hangi sektörde faaliyet gösteriyorsunuz?')
-            || str_contains($text, 'Yapay zekânın ana görevi ne olsun?')
-            || str_contains($text, 'Konuşma üslubunu nasıl istersiniz?');
+        foreach ($messages as $item) {
+            if (($item['role'] ?? '') !== 'assistant') {
+                continue;
+            }
+
+            if ($this->questionField((string) ($item['content'] ?? '')) !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function extractAnswers(array $messages): array
@@ -107,24 +97,31 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
             'style' => '',
         ];
 
-        $pending = null;
-
-        foreach ($messages as $item) {
-            if (! is_array($item)) {
+        $start = 0;
+        foreach ($messages as $index => $item) {
+            if (($item['role'] ?? '') !== 'user') {
                 continue;
             }
 
+            $value = Str::lower(trim((string) ($item['content'] ?? '')));
+            if (in_array($value, ['başa dön', 'basa don', 'sıfırla', 'sifirla'], true)) {
+                $start = $index + 1;
+                $answers = ['company' => '', 'sector' => '', 'task' => '', 'style' => ''];
+            }
+        }
+
+        $pending = null;
+
+        for ($i = $start, $count = count($messages); $i < $count; $i++) {
+            $item = $messages[$i];
             $role = (string) ($item['role'] ?? '');
-            $content = trim((string) ($item['content'] ?? $item['message'] ?? ''));
+            $content = trim((string) ($item['content'] ?? ''));
 
             if ($role === 'assistant') {
-                $pending = match (true) {
-                    str_contains($content, 'İşletme adınız nedir?') => 'company',
-                    str_contains($content, 'Hangi sektörde faaliyet gösteriyorsunuz?') => 'sector',
-                    str_contains($content, 'Yapay zekânın ana görevi ne olsun?') => 'task',
-                    str_contains($content, 'Konuşma üslubunu nasıl istersiniz?') => 'style',
-                    default => null,
-                };
+                $field = $this->questionField($content);
+                if ($field !== null) {
+                    $pending = $field;
+                }
                 continue;
             }
 
@@ -135,5 +132,54 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
         }
 
         return $answers;
+    }
+
+    private function questionField(string $text): ?string
+    {
+        $text = Str::lower($text);
+
+        if (str_contains($text, 'işletme ad') || str_contains($text, 'firma ad')) {
+            return 'company';
+        }
+
+        if (str_contains($text, 'sektör')) {
+            return 'sector';
+        }
+
+        if (
+            str_contains($text, 'ana görev')
+            || str_contains($text, 'görevi ne')
+            || str_contains($text, 'ne yapsın')
+        ) {
+            return 'task';
+        }
+
+        if (str_contains($text, 'üslup') || str_contains($text, 'nasıl konuş')) {
+            return 'style';
+        }
+
+        return null;
+    }
+
+    private function createDemoLink(array $answers): string
+    {
+        $description = implode("\n", [
+            'Sektör: '.$answers['sector'],
+            'Ana görev: '.$answers['task'],
+            'Konuşma üslubu: '.$answers['style'],
+            'Bu demo yapay zekası müşterilerle '.$answers['sector'].' sektörüne uygun, gerçek bir işletme temsilcisi gibi konuşmalıdır.',
+        ]);
+
+        $demo = app(WaiLeadDemoService::class)->create([
+            'company_name' => $answers['company'],
+            'company_description' => $description,
+            'role' => 'sales',
+        ]);
+
+        if (($demo['status'] ?? null) === 'created' && ! empty($demo['url'])) {
+            return "Hazır ✅ Deneme yapay zekânızı oluşturdum. Aşağıdaki linkten direkt Test Sohbeti'ne geçebilirsiniz:\n".$demo['url']."\n\nBeğenirseniz test ekranından WhatsApp'ınıza bağlayıp 1 gün ücretsiz deneyebilirsiniz.";
+        }
+
+        return 'Deneme bağlantısı hazırlanırken kısa bir sorun oluştu. Lütfen tekrar deneyin.';
     }
 }
