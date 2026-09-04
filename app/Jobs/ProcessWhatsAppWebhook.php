@@ -18,6 +18,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use OpenAI\Laravel\Facades\OpenAI;
 
 class ProcessWhatsAppWebhook implements ShouldQueue
 {
@@ -120,16 +121,49 @@ class ProcessWhatsAppWebhook implements ShouldQueue
             $payload
         );
 
-        $controller->handle(
-            request: $request,
-            memoryService: $memoryService,
-            openAIService: $openAIService,
-            whatsAppService: $whatsAppService,
-            orderService: $orderService,
-            financeLeadService: $financeLeadService,
-            financeLeadExtractorService: $financeLeadExtractorService,
-            leadScoringService: $leadScoringService,
-            crmCustomerExtractorService: $crmCustomerExtractorService,
-        );
+        /*
+        |--------------------------------------------------------------------------
+        | BOT BAZLI OPENAI API İZOLASYONU
+        |--------------------------------------------------------------------------
+        |
+        | WhatsApp instance'ına bağlı botun kendi OpenAI anahtarı varsa yalnızca
+        | bu job boyunca onu kullanırız. İş bitince global WAI anahtarını geri
+        | yükleriz; böylece farklı tenantlar aynı PHP process'inde anahtar sızdırmaz.
+        |
+        */
+        $previousOpenAiKey = config('openai.api_key');
+        $dedicatedOpenAiKey = '';
+
+        if ($instance !== '') {
+            $apiBot = AiBot::query()
+                ->where('whatsapp_instance', $instance)
+                ->first();
+
+            $dedicatedOpenAiKey = trim((string) ($apiBot?->openai_api_key ?? ''));
+        }
+
+        if ($dedicatedOpenAiKey !== '') {
+            config(['openai.api_key' => $dedicatedOpenAiKey]);
+            OpenAI::clearResolvedInstances();
+        }
+
+        try {
+            $controller->handle(
+                request: $request,
+                memoryService: $memoryService,
+                openAIService: $openAIService,
+                whatsAppService: $whatsAppService,
+                orderService: $orderService,
+                financeLeadService: $financeLeadService,
+                financeLeadExtractorService: $financeLeadExtractorService,
+                leadScoringService: $leadScoringService,
+                crmCustomerExtractorService: $crmCustomerExtractorService,
+            );
+        } finally {
+            if ($dedicatedOpenAiKey !== '') {
+                config(['openai.api_key' => $previousOpenAiKey]);
+                OpenAI::clearResolvedInstances();
+            }
+        }
     }
 }
