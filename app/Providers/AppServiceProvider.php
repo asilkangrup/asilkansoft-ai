@@ -17,7 +17,7 @@ use App\Services\RealEstateGuardedMediaAnalysisService;
 use App\Services\RealEstateLiveReadinessService;
 use App\Services\RealEstateMediaAnalysisService;
 use App\Services\RealEstateReadinessService;
-use App\Services\TenantAwareOpenAIService;
+use App\Services\WaiSalesSetupOpenAIService;
 use App\Services\WhatsAppService;
 use App\Services\WaiSalesAwareWhatsAppService;
 use Illuminate\Support\ServiceProvider;
@@ -28,7 +28,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(
             OpenAIService::class,
-            TenantAwareOpenAIService::class
+            WaiSalesSetupOpenAIService::class
         );
 
         $this->app->bind(
@@ -36,9 +36,6 @@ class AppServiceProvider extends ServiceProvider
             WaiSalesAwareWhatsAppService::class
         );
 
-        // Shared CRM/finance services below use the global WAI OpenAI facade.
-        // Route user 40 / bot 35 through explicit real-estate-aware wrappers so
-        // the isolated tenant can never fall through to that global credential.
         $this->app->bind(
             CrmConversationSummaryService::class,
             RealEstateAwareCrmConversationSummaryService::class
@@ -54,17 +51,11 @@ class AppServiceProvider extends ServiceProvider
             RealEstateAwareFinanceLeadExtractorService::class
         );
 
-        // The parser includes media_context metadata on every inbound turn.
-        // Ignore non-image/document contexts before the strict media firewall so
-        // ordinary text/location/audio/video traffic cannot inflate rejection
-        // telemetry. Actual media still uses the same fail-closed analyzer.
         $this->app->bind(
             RealEstateMediaAnalysisService::class,
             RealEstateGuardedMediaAnalysisService::class
         );
 
-        // Health/readiness must use Evolution's live state for the isolated
-        // instance instead of trusting a potentially stale ai_bots status flag.
         $this->app->bind(
             RealEstateReadinessService::class,
             RealEstateLiveReadinessService::class
