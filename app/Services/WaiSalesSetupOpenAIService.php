@@ -191,7 +191,7 @@ class WaiSalesSetupOpenAIService extends TenantAwareOpenAIService
             return 'task';
         }
 
-        if (str_contains($text, 'üslup') || str_contains($text, 'nasıl konuş')) {
+        if (str_contains($text, 'üslup') || str_contains($text, 'üslub') || str_contains($text, 'nasıl konuş')) {
             return 'style';
         }
 
