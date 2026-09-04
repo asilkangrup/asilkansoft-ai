@@ -1,0 +1,1 @@
+Deploy reset-aware WAI sales memory.
