@@ -12,10 +12,6 @@ class WaiSalesOutreachService
         $sector = $this->sectorFor($lead);
         $normalized = Str::lower(trim($message));
 
-        // İşletmenin otomatik karşılama mesajı ile gerçek insan cevabı aynı
-        // 10 saniyelik pakette birleşebilir. Paket içinde "evet / doğru /
-        // buyurun" gibi gerçek insan sinyali varsa otomatik mesaj filtresi
-        // bütün paketi susturmamalıdır.
         if (
             in_array($lead->status, ['opened', 'ready'], true)
             && $this->isLikelyBusinessAutoReply($normalized)
@@ -134,18 +130,28 @@ class WaiSalesOutreachService
             return $stored;
         }
 
-        $name = Str::lower($lead->company_name);
+        return $this->sectorForName($lead->company_name);
+    }
+
+    public function sectorForName(string $companyName): string
+    {
+        $name = Str::lower($companyName);
         $groups = [
-            'Güzellik / Estetik' => ['beauty','estetic','estetik','nail','spa','makeup','hair studio','güzellik'],
-            'Mobilya / Ev Dekorasyon' => ['mobilya','curtain','home accessories','seramik','furniture'],
-            'Oto Servis / Otomotiv' => ['oto','auto','motor','car','motors','servis','tuning','detailing','ppf'],
-            'Emlak' => ['property','emlak','real estate'],
-            'Kuaför / Berber' => ['barber','hairdresser','kuaför'],
-            'Sağlık / Klinik' => ['clinic','dental','klinik'],
-            'Teknik Servis / Tamir' => ['bilgisayar','elektrik','çilingir','tamir','alarm','güvenlik','plumbing'],
-            'Yeme-İçme / Kafe' => ['cafe','coffee','restaurant'],
-            'Fotoğraf / Organizasyon' => ['wedding','fotoğraf','party','balloon'],
-            'Temizlik / Ev Hizmetleri' => ['temizlik','clean','handyman','ilaçlama'],
+            'Güzellik / Estetik' => ['beauty','estetic','estetik','nail','spa','makeup','hair studio','güzellik','epilasyon'],
+            'Mobilya / Ev Dekorasyon' => ['mobilya','curtain','home accessories','seramik','furniture','dekorasyon'],
+            'Oto Servis / Otomotiv' => ['oto','auto','motor','car','motors','servis','tuning','detailing','ppf','otomotiv'],
+            'Emlak' => ['property','emlak','real estate','gayrimenkul'],
+            'Kuaför / Berber' => ['barber','hairdresser','kuaför','berber'],
+            'Sağlık / Klinik' => ['clinic','dental','klinik','diş','dent'],
+            'Teknik Servis / Tamir' => ['bilgisayar','elektrik','çilingir','tamir','alarm','güvenlik','plumbing','tesisat','tesisatçı','teknik servis','tech','iletişim'],
+            'Yeme-İçme / Kafe' => ['cafe','coffee','restaurant','cookie','pastane','tatlı','bakery','kahve'],
+            'Fotoğraf / Organizasyon' => ['wedding','fotoğraf','party','balloon','organizasyon'],
+            'Temizlik / Ev Hizmetleri' => ['temizlik','clean','handyman','ilaçlama','pest'],
+            'Spor / Fitness' => ['fitness','gym','pilates','spor'],
+            'Dövme / Tattoo' => ['tattoo','dövme','piercing'],
+            'Çiçekçi' => ['flower','flowers','çiçek','florist'],
+            'Moda / Tekstil' => ['moda','tekstil','iç giyim','lingerie','nakış','tişört baskı','tshirt','giyim','pijama','bridal'],
+            'Hediyelik / Dekorasyon' => ['gift','hediyelik','mosaic lamps','mozaik lamba'],
         ];
 
         foreach ($groups as $sector => $keywords) {
@@ -156,7 +162,7 @@ class WaiSalesOutreachService
             }
         }
 
-        return 'Yerel İşletme';
+        return 'Bilinmeyen';
     }
 
     private function firstSalesMessage(string $sector): string
@@ -169,10 +175,15 @@ class WaiSalesOutreachService
             'Kuaför / Berber' => 'Hizmet, fiyat, uygun saat ve randevu sorularını karşılayıp randevuya kadar ilerletebilir.',
             'Sağlık / Klinik' => 'Hizmet ve randevu taleplerini karşılayıp temel bilgileri toplayabilir.',
             'Teknik Servis / Tamir' => 'Arıza ve hizmet taleplerini toplayıp servis veya teklif aşamasına taşıyabilir.',
-            'Yeme-İçme / Kafe' => 'Menü, rezervasyon, sipariş ve sık sorulan soruları otomatik karşılayabilir.',
+            'Yeme-İçme / Kafe' => 'Menü, sipariş, rezervasyon ve sık sorulan soruları karşılayabilir.',
             'Fotoğraf / Organizasyon' => 'Tarih, etkinlik türü, paket ve fiyat taleplerini toplayıp teklif aşamasına kadar ilerletebilir.',
             'Temizlik / Ev Hizmetleri' => 'Konum, hizmet türü, tarih ve iş detaylarını alıp teklif veya randevu aşamasına taşıyabilir.',
-            default => 'WhatsApp’tan gelen müşterileri karşılayabilir, sık sorulan soruları cevaplayabilir ve satış veya randevu aşamasına kadar ilerletebilir.',
+            'Spor / Fitness' => 'Üyelik, ders, paket ve randevu taleplerini karşılayıp kayıt sürecine ilerletebilir.',
+            'Dövme / Tattoo' => 'Tasarım, bölge, ölçü ve randevu taleplerini toplayıp görüşme veya randevu aşamasına taşıyabilir.',
+            'Çiçekçi' => 'Ürün, teslimat adresi, tarih ve sipariş taleplerini toplayıp sipariş aşamasına ilerletebilir.',
+            'Moda / Tekstil' => 'Ürün, beden, model, stok ve sipariş taleplerini karşılayıp satış aşamasına ilerletebilir.',
+            'Hediyelik / Dekorasyon' => 'Ürün, model, teslimat ve sipariş taleplerini karşılayıp satış aşamasına ilerletebilir.',
+            default => 'WhatsApp’tan gelen müşterileri karşılayabilir ve taleplerini doğru ekibe yönlendirebilir.',
         };
 
         return "Ben WAI ekibinden size ulaşıyorum. Numaranızı işletmenizin internette herkese açık iletişim bilgilerinden buldum.\n\n{$sector} işletmeleri için geliştirdiğimiz bir yapay zeka sistemimiz var. {$capability}\n\nNasıl çalıştığı hakkında bilgi almak ister misiniz?";
