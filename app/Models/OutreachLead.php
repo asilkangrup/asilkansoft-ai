@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\WaiOutreachLeadPolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,7 @@ class OutreachLead extends Model
     protected $fillable = [
         'user_id',
         'company_name',
+        'sector',
         'phone_e164',
         'source',
         'source_url',
@@ -36,6 +38,13 @@ class OutreachLead extends Model
         'replied_at' => 'datetime',
         'ai_activated_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (OutreachLead $lead): void {
+            app(WaiOutreachLeadPolicy::class)->prepareForCreate($lead);
+        });
+    }
 
     public function user(): BelongsTo
     {
