@@ -11,10 +11,40 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Support\Collection;
 
 class ListOutreachLeads extends ListRecords
 {
     protected static string $resource = OutreachLeadResource::class;
+
+    protected string $view = 'filament.resources.outreach-leads.pages.list-outreach-leads';
+
+    public function getMobileLeads(): Collection
+    {
+        $user = Filament::auth()->user();
+
+        if (! $user) {
+            return collect();
+        }
+
+        return OutreachLead::query()
+            ->when(! $user->is_admin, fn ($query) => $query->where('user_id', $user->id))
+            ->freshFirst()
+            ->limit(100)
+            ->get();
+    }
+
+    public function getMobileStats(): array
+    {
+        $leads = $this->getMobileLeads();
+
+        return [
+            'ready' => $leads->where('status', 'ready')->count(),
+            'opened' => $leads->where('status', 'opened')->count(),
+            'replied' => $leads->whereIn('status', ['replied', 'ai_active'])->count(),
+            'verified' => $leads->where('whatsapp_status', 'verified')->count(),
+        ];
+    }
 
     protected function getHeaderActions(): array
     {
