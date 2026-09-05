@@ -12,9 +12,15 @@ class WaiSalesOutreachService
         $sector = $this->sectorFor($lead);
         $normalized = Str::lower(trim($message));
 
-        // İşletmelerin otomatik karşılama mesajlarını insan cevabı / ret sayma.
-        // Lead 'opened' olarak kalır; gerçek kişi cevap verdiğinde satış akışı başlar.
-        if (in_array($lead->status, ['opened', 'ready'], true) && $this->isLikelyBusinessAutoReply($normalized)) {
+        // İşletmenin otomatik karşılama mesajı ile gerçek insan cevabı aynı
+        // 10 saniyelik pakette birleşebilir. Paket içinde "evet / doğru /
+        // buyurun" gibi gerçek insan sinyali varsa otomatik mesaj filtresi
+        // bütün paketi susturmamalıdır.
+        if (
+            in_array($lead->status, ['opened', 'ready'], true)
+            && $this->isLikelyBusinessAutoReply($normalized)
+            && ! $this->hasHumanAffirmation($normalized)
+        ) {
             return ['action' => 'ignore', 'sector' => $sector, 'reason' => 'business_auto_reply'];
         }
 
@@ -170,6 +176,14 @@ class WaiSalesOutreachService
         };
 
         return "Ben WAI ekibinden size ulaşıyorum. Numaranızı işletmenizin internette herkese açık iletişim bilgilerinden buldum.\n\n{$sector} işletmeleri için geliştirdiğimiz bir yapay zeka sistemimiz var. {$capability}\n\nNasıl çalıştığı hakkında bilgi almak ister misiniz?";
+    }
+
+    private function hasHumanAffirmation(string $message): bool
+    {
+        return $this->containsAny($message, [
+            'evet','doğru','dogru','buyurun','buyrun','olur','olabilir','tamam',
+            'dinliyorum','anlatın','anlatin','bilgi alabilirim','nedir','nasıl çalışıyor','nasil calisiyor',
+        ]);
     }
 
     private function isLikelyBusinessAutoReply(string $message): bool
