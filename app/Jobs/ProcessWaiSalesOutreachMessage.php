@@ -8,6 +8,7 @@ use App\Models\ConversationControl;
 use App\Models\OutreachLead;
 use App\Services\MemoryService;
 use App\Services\OpenAIService;
+use App\Services\WaiLeadDemoService;
 use App\Services\WaiSalesHotLeadNotifier;
 use App\Services\WaiSalesOutreachService;
 use App\Services\WhatsAppService;
@@ -40,6 +41,7 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
         WhatsAppService $whatsAppService,
         WaiSalesOutreachService $salesService,
         WaiSalesHotLeadNotifier $hotLeadNotifier,
+        WaiLeadDemoService $demoService,
     ): void {
         if ($this->instance !== WaiSalesOutreachWebhookController::INSTANCE) {
             return;
@@ -91,7 +93,6 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
             ->where('phone_e164', $phoneE164)
             ->first();
 
-        // Hard safety boundary: this sales bot never answers numbers that are not in the panel.
         if (! $lead) {
             Log::info('WAI SALES OUTREACH IGNORED NON-PANEL NUMBER', ['phone' => $phoneE164]);
             return;
@@ -99,16 +100,8 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
 
         $sessionId = 'whatsapp:'.$bot->id.':'.$phoneDigits;
         $conversation = ConversationControl::query()->firstOrCreate(
-            [
-                'ai_bot_id' => $bot->id,
-                'session_id' => $sessionId,
-            ],
-            [
-                'user_id' => $bot->user_id,
-                'whatsapp_number' => $phoneDigits,
-                'unread_count' => 0,
-                'human_takeover' => false,
-            ]
+            ['ai_bot_id' => $bot->id, 'session_id' => $sessionId],
+            ['user_id' => $bot->user_id, 'whatsapp_number' => $phoneDigits, 'unread_count' => 0, 'human_takeover' => false]
         );
 
         if ($conversation->human_takeover) {
@@ -129,6 +122,7 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
         ])->save();
 
         try {
+            $statusBeforeDecision = (string) $lead->status;
             $decision = $salesService->decide($lead, $combinedMessage);
             $action = (string) ($decision['action'] ?? 'ignore');
 
@@ -138,6 +132,21 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
 
             if (in_array($action, ['reply', 'reply_hot'], true)) {
                 $answer = trim((string) ($decision['answer'] ?? ''));
+
+                if ($statusBeforeDecision === 'demo_offered' && $action === 'reply_hot') {
+                    $sector = (string) ($decision['sector'] ?? $salesService->sectorFor($lead));
+                    $demo = $demoService->create([
+                        'company_name' => $lead->company_name,
+                        'sector' => $sector,
+                        'role' => 'sales',
+                    ]);
+
+                    if (($demo['status'] ?? null) === 'created' && filled($demo['url'] ?? null)) {
+                        $answer = "Hazır ✅ Size özel test yapay zekasını oluşturdum:\n".(string) $demo['url'].
+                            "\n\nŞu an yalnızca işletme adınızı ve sektörünüzü biliyor; buna rağmen sektörünüze uygun gerçek bir müşteri temsilcisi gibi konuşacak. Canlı kurulumda fiyatlarınızı, ürün/hizmetlerinizi, çalışma saatlerinizi, şirket kurallarınızı, kampanyalarınızı ve istediğiniz tüm yönlendirme akışlarını tamamen size özel tanımlıyoruz.\n\nTest edin; beğenirseniz 3 gün ücretsiz canlı kullanım ve kurulum desteği sağlayabiliriz.";
+                    }
+                }
+
                 if ($answer === '') {
                     return;
                 }
@@ -216,10 +225,6 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
             message: $answer,
         );
 
-        $whatsAppService->sendText(
-            $this->instance,
-            $phoneDigits,
-            $answer,
-        );
+        $whatsAppService->sendText($this->instance, $phoneDigits, $answer);
     }
 }
