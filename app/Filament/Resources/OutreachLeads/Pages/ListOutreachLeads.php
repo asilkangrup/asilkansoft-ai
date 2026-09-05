@@ -30,7 +30,6 @@ class ListOutreachLeads extends ListRecords
         return OutreachLead::query()
             ->when(! $user->is_admin, fn ($query) => $query->where('user_id', $user->id))
             ->freshFirst()
-            ->limit(100)
             ->get();
     }
 
