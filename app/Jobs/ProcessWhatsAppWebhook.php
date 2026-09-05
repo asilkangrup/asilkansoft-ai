@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Http\Controllers\WhatsAppWebhookController;
 use App\Models\AiBot;
+use App\Models\ConversationControl;
 use App\Services\CrmCustomerExtractorService;
 use App\Services\FinanceLeadExtractorService;
 use App\Services\FinanceLeadService;
@@ -17,6 +18,7 @@ use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use OpenAI\Laravel\Facades\OpenAI;
 
@@ -31,16 +33,6 @@ class ProcessWhatsAppWebhook implements ShouldQueue
     public function __construct(
         public array $payload
     ) {
-        /*
-        |--------------------------------------------------------------------------
-        | PRODUCTION'DA AYRI QUEUE WORKER YOK
-        |--------------------------------------------------------------------------
-        |
-        | Coolify bu uygulamayı yalnızca `php artisan serve` ile çalıştırıyor.
-        | Database queue'ya atılan WhatsApp işleri worker olmadığı için bekler.
-        | Bu job bu nedenle sync bağlantısında çalışır.
-        |
-        */
         $this->onConnection('sync');
     }
 
@@ -59,11 +51,6 @@ class ProcessWhatsAppWebhook implements ShouldQueue
     ): void {
         $payload = $this->payload;
 
-        /*
-        |--------------------------------------------------------------------------
-        | EVOLUTION API EVENT ADINI NORMALIZE ET
-        |--------------------------------------------------------------------------
-        */
         $event = strtolower(trim((string) ($payload['event'] ?? '')));
 
         if ($event !== '') {
@@ -74,19 +61,63 @@ class ProcessWhatsAppWebhook implements ShouldQueue
             );
         }
 
+        $instance = trim((string) ($payload['instance'] ?? ''));
+
         /*
         |--------------------------------------------------------------------------
-        | İZOLE EMLAK AI: SHARED WAI PIPELINE'A ASLA GİRME
+        | WAI MANUEL MESAJ = İNSAN DEVRALMA
         |--------------------------------------------------------------------------
         |
-        | user_id=40 / bot_id=35 için e-ticaret siparişleri, finans akışı,
-        | generic CRM ve otomatik takip mantığı kesinlikle çalıştırılmaz.
-        | Dedicated controller JWT + tenant doğrulamasından sonra payload'a
-        | `_real_estate_authorized=true` ekler. Aynı instance generic endpoint
-        | üzerinden bu job'a ulaştırılırsa marker olmayacağı için istek düşürülür.
+        | WAI'nin API üzerinden kendi gönderdiği outbound mesajlar sendText()
+        | içinde kısa süreli cache anahtarıyla işaretlenir. fromMe=true mesajı
+        | geldiğinde bu işaret varsa AI'nin kendi mesajıdır ve devralma yapılmaz.
+        | İşaret yoksa mesaj WhatsApp uygulamasından personel tarafından manuel
+        | gönderilmiş kabul edilir ve yalnızca o müşteri için AI susturulur.
         |
         */
-        $instance = trim((string) ($payload['instance'] ?? ''));
+        if (
+            $instance !== ''
+            && (bool) data_get($payload, 'data.key.fromMe', false)
+        ) {
+            $waiBot = AiBot::query()
+                ->whereKey(39)
+                ->where('whatsapp_instance', $instance)
+                ->first();
+
+            if ($waiBot) {
+                $remoteJid = trim((string) data_get($payload, 'data.key.remoteJid', ''));
+                $number = preg_replace('/\D+/', '', explode('@', $remoteJid)[0] ?? '') ?? '';
+                $messagePayload = data_get($payload, 'data.message', []);
+                $text = trim((string) (
+                    data_get($messagePayload, 'conversation')
+                    ?? data_get($messagePayload, 'extendedTextMessage.text')
+                    ?? ''
+                ));
+
+                if ($number !== '' && $text !== '') {
+                    $outboundKey = 'wai_api_outbound:'.sha1(
+                        $instance.'|'.$number.'|'.$text
+                    );
+
+                    $isAiOutbound = (bool) Cache::pull($outboundKey, false);
+
+                    if (! $isAiOutbound) {
+                        ConversationControl::query()
+                            ->where('ai_bot_id', 39)
+                            ->where('whatsapp_number', $number)
+                            ->update([
+                                'human_takeover' => true,
+                                'updated_at' => now(),
+                            ]);
+
+                        Log::info('WAI conversation paused after manual WhatsApp reply', [
+                            'ai_bot_id' => 39,
+                            'phone_number' => $number,
+                        ]);
+                    }
+                }
+            }
+        }
 
         if ($instance !== '') {
             $realEstateBot = AiBot::query()
@@ -121,16 +152,6 @@ class ProcessWhatsAppWebhook implements ShouldQueue
             $payload
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | BOT BAZLI OPENAI API İZOLASYONU
-        |--------------------------------------------------------------------------
-        |
-        | WhatsApp instance'ına bağlı botun kendi OpenAI anahtarı varsa yalnızca
-        | bu job boyunca onu kullanırız. İş bitince global WAI anahtarını geri
-        | yükleriz; böylece farklı tenantlar aynı PHP process'inde anahtar sızdırmaz.
-        |
-        */
         $previousOpenAiKey = config('openai.api_key');
         $dedicatedOpenAiKey = '';
 
