@@ -31,7 +31,26 @@ class WaiSalesOutreachWebhookController extends Controller
         }
 
         $remoteJid = trim((string) data_get($payload, 'data.key.remoteJid', ''));
-        if ($remoteJid === '' || str_contains($remoteJid, '@g.us')) {
+        $remoteJidAlt = trim((string) data_get($payload, 'data.key.remoteJidAlt', ''));
+
+        // WhatsApp Business / multi-device messages may arrive with an opaque
+        // @lid address while the actual phone number is available in remoteJidAlt.
+        // Prefer the phone-based JID whenever possible so the message can be
+        // matched against OutreachLead.phone_e164 reliably.
+        if (
+            ($remoteJid === '' || str_contains($remoteJid, '@lid') || str_contains($remoteJid, '@hosted.lid'))
+            && $remoteJidAlt !== ''
+            && str_contains($remoteJidAlt, '@s.whatsapp.net')
+        ) {
+            $remoteJid = $remoteJidAlt;
+        }
+
+        if (
+            $remoteJid === ''
+            || str_contains($remoteJid, '@g.us')
+            || str_contains($remoteJid, '@lid')
+            || str_contains($remoteJid, '@hosted.lid')
+        ) {
             return response()->json(['success' => true, 'ignored' => true, 'reason' => 'unsupported_chat']);
         }
 
