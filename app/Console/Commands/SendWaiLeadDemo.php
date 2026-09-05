@@ -10,9 +10,9 @@ use Illuminate\Console\Command;
 
 class SendWaiLeadDemo extends Command
 {
-    protected $signature = 'wai:send-lead-demo {phone}';
+    protected $signature = 'wai:send-lead-demo {phone} {--preview : Create demo without sending WhatsApp message}';
 
-    protected $description = 'Create and send a sector-specific WAI demo to an outreach lead';
+    protected $description = 'Create and optionally send a sector-specific WAI demo to an outreach lead';
 
     public function handle(
         WaiLeadDemoService $demoService,
@@ -65,6 +65,13 @@ class SendWaiLeadDemo extends Command
             '',
             'Müşterinizmiş gibi birkaç farklı soru yazarak deneyebilirsiniz. Beğenirseniz 3 gün ücretsiz canlı kullanım ve kurulum desteği sağlayabiliriz.',
         ]);
+
+        if ($this->option('preview')) {
+            $this->line('Demo URL: '.$url);
+            $this->line('---');
+            $this->line($message);
+            return self::SUCCESS;
+        }
 
         $whatsAppService->sendText(
             'wai-sales-48-clean',
