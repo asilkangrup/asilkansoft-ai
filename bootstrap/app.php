@@ -38,6 +38,22 @@ return Application::configure(
         $middleware->trustProxies(
             at: '*'
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | PANEL AUTH REDIRECT
+        |--------------------------------------------------------------------------
+        |
+        | Bu uygulamada klasik `login` isimli Laravel route'u yok; panel girişi
+        | Filament tarafından sağlanıyor. Oturumu düşmüş bir panel isteğinde
+        | Authenticate middleware varsayılan `route('login')` çağrısını yaparsa
+        | 500 oluşur. Misafirleri doğrudan Filament admin girişine yönlendir.
+        |
+        */
+
+        $middleware->redirectGuestsTo(
+            fn (Request $request): string => route('filament.admin.auth.login')
+        );
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {
