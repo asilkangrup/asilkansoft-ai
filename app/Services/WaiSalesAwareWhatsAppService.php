@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -40,6 +41,13 @@ class WaiSalesAwareWhatsAppService extends WhatsAppService
             $text = rtrim($text)
                 ."\n\nSadece verdiğiniz 4 kısa cevapla ne kadar akıllı ve işletmenize uygun çalışabildiğini keşfedin. Demoyu beğenirseniz yapay zekânız işletmenizin ihtiyaçlarına, süreçlerine ve kurallarına göre çok daha detaylı şekilde tamamen size özel kurgulanacaktır.";
         }
+
+        $normalizedNumber = preg_replace('/\D+/', '', $number) ?? $number;
+        $outboundKey = 'wai_api_outbound:'.sha1(
+            trim($instanceName).'|'.$normalizedNumber.'|'.trim($text)
+        );
+
+        Cache::put($outboundKey, true, now()->addMinutes(3));
 
         return parent::sendText($instanceName, $number, $text);
     }
