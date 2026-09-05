@@ -3,6 +3,8 @@
 use App\Http\Controllers\RealEstatePrivateMediaController;
 use App\Http\Controllers\TrackedPublicDemoController;
 use App\Http\Controllers\WaiLeadDemoController;
+use App\Models\OutreachLead;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'home')
@@ -35,3 +37,24 @@ Route::get('/admin/emlak-medya/{profile}/{media}', [RealEstatePrivateMediaContro
 Route::get('/admin/emlak-whatsapp-medya/{message}', [RealEstatePrivateMediaController::class, 'showInbound'])
     ->whereNumber('message')
     ->name('real-estate.private-inbound-media');
+
+Route::get('/admin/outreach-leads/{lead}/whatsapp', function (Request $request, OutreachLead $lead) {
+    $user = $request->user();
+
+    abort_unless($user, 403);
+    abort_unless((bool) $user->is_admin || $lead->user_id === $user->id, 403);
+
+    if ($lead->contact_opened_at) {
+        return redirect('/admin/isletme-leadleri');
+    }
+
+    $lead->forceFill([
+        'contact_opened_at' => now(),
+        'status' => 'opened',
+    ])->save();
+
+    return redirect()->away($lead->whatsappUrl());
+})
+    ->middleware('auth')
+    ->whereNumber('lead')
+    ->name('outreach-leads.whatsapp');
