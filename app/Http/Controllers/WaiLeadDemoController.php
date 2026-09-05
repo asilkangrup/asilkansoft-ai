@@ -38,10 +38,7 @@ class WaiLeadDemoController extends Controller
         $lead = $demoService->get($token);
 
         if (! is_array($lead)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Demo bağlantısının süresi dolmuş.',
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'Demo bağlantısının süresi dolmuş.'], 404);
         }
 
         try {
@@ -67,7 +64,7 @@ class WaiLeadDemoController extends Controller
                     'ai_enabled' => true,
                     'subscription_status' => 'active',
                     'subscription_started_at' => now(),
-                    'subscription_ends_at' => now()->addDay(),
+                    'subscription_ends_at' => now()->addDays(3),
                     'trial_message_limit' => 100,
                     'trial_messages_used' => 0,
                     'follow_up_enabled' => false,
@@ -79,38 +76,24 @@ class WaiLeadDemoController extends Controller
 
                 $whatsAppService->createInstance($instanceName);
                 $whatsAppService->setWebhook($instanceName, url('/api/whatsapp/webhook'));
-
-                Cache::put($cacheKey, $bot->id, now()->addDay());
+                Cache::put($cacheKey, $bot->id, now()->addDays(3));
             }
 
             $demoService->markConnectStarted($token, $bot);
-
             $state = $whatsAppService->connectionState((string) $bot->whatsapp_instance);
 
             if ($state === 'open') {
                 $bot->forceFill(['whatsapp_status' => 'connected'])->save();
                 $demoService->markConnected($token, $bot);
-
-                return response()->json([
-                    'success' => true,
-                    'state' => 'open',
-                ]);
+                return response()->json(['success' => true, 'state' => 'open']);
             }
 
             $qr = $whatsAppService->getQrCode((string) $bot->whatsapp_instance);
 
-            return response()->json([
-                'success' => true,
-                'state' => $state,
-                'qr' => $qr,
-            ]);
+            return response()->json(['success' => true, 'state' => $state, 'qr' => $qr]);
         } catch (Throwable $exception) {
             report($exception);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'WhatsApp bağlantısı hazırlanamadı. Lütfen tekrar deneyin.',
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'WhatsApp bağlantısı hazırlanamadı. Lütfen tekrar deneyin.'], 500);
         }
     }
 
@@ -127,10 +110,7 @@ class WaiLeadDemoController extends Controller
         $bot = $botId ? AiBot::query()->find($botId) : null;
 
         if (! $bot) {
-            return response()->json([
-                'success' => true,
-                'state' => 'not_started',
-            ]);
+            return response()->json(['success' => true, 'state' => 'not_started']);
         }
 
         try {
@@ -140,21 +120,13 @@ class WaiLeadDemoController extends Controller
                 if ($bot->whatsapp_status !== 'connected') {
                     $bot->forceFill(['whatsapp_status' => 'connected'])->save();
                 }
-
                 $demoService->markConnected($token, $bot);
             }
 
-            return response()->json([
-                'success' => true,
-                'state' => $state,
-            ]);
+            return response()->json(['success' => true, 'state' => $state]);
         } catch (Throwable $exception) {
             report($exception);
-
-            return response()->json([
-                'success' => false,
-                'state' => 'error',
-            ], 500);
+            return response()->json(['success' => false, 'state' => 'error'], 500);
         }
     }
 }
