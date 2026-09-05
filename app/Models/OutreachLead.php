@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -12,7 +13,12 @@ class OutreachLead extends Model
         'company_name',
         'phone_e164',
         'source',
+        'source_url',
+        'source_published_at',
+        'source_checked_at',
         'status',
+        'whatsapp_status',
+        'priority_score',
         'first_message_text',
         'whatsapp_verified_at',
         'contact_opened_at',
@@ -22,6 +28,9 @@ class OutreachLead extends Model
     ];
 
     protected $casts = [
+        'source_published_at' => 'datetime',
+        'source_checked_at' => 'datetime',
+        'priority_score' => 'integer',
         'whatsapp_verified_at' => 'datetime',
         'contact_opened_at' => 'datetime',
         'replied_at' => 'datetime',
@@ -31,6 +40,20 @@ class OutreachLead extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function scopeFreshFirst(Builder $query): Builder
+    {
+        return $query
+            ->orderByRaw('CASE WHEN source_published_at >= ? THEN 0 ELSE 1 END', [now()->subYear()])
+            ->orderByDesc('source_published_at')
+            ->orderByDesc('priority_score')
+            ->orderByDesc('created_at');
+    }
+
+    public function isFreshSource(): bool
+    {
+        return (bool) $this->source_published_at?->gte(now()->subYear());
     }
 
     public function whatsappUrl(): string
