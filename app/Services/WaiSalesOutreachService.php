@@ -12,12 +12,13 @@ class WaiSalesOutreachService
         $sector = $this->sectorFor($lead);
         $normalized = Str::lower(trim($message));
 
-        if ($this->containsAny($normalized, [
-            'ilgilenmiyorum','istemiyorum','gerek yok','düşünmüyorum','dusunmuyorum',
-            'teşekkürler','tesekkurler','teşekkür ederim','tesekkur ederim',
-            'sağ olun','sag olun','sağol','sagol','istemiyoruz','ilgilenmiyoruz',
-            'rahatsız etmeyin','rahatsiz etmeyin','mesaj atmayın','mesaj atmayin',
-        ])) {
+        // İşletmelerin otomatik karşılama mesajlarını insan cevabı / ret sayma.
+        // Lead 'opened' olarak kalır; gerçek kişi cevap verdiğinde satış akışı başlar.
+        if (in_array($lead->status, ['opened', 'ready'], true) && $this->isLikelyBusinessAutoReply($normalized)) {
+            return ['action' => 'ignore', 'sector' => $sector, 'reason' => 'business_auto_reply'];
+        }
+
+        if ($this->isExplicitRejection($normalized)) {
             if ($lead->status === 'declined') {
                 return ['action' => 'ignore', 'sector' => $sector];
             }
@@ -169,6 +170,38 @@ class WaiSalesOutreachService
         };
 
         return "Ben WAI ekibinden size ulaşıyorum. Numaranızı işletmenizin internette herkese açık iletişim bilgilerinden buldum.\n\n{$sector} işletmeleri için geliştirdiğimiz bir yapay zeka sistemimiz var. {$capability}\n\nNasıl çalıştığı hakkında bilgi almak ister misiniz?";
+    }
+
+    private function isLikelyBusinessAutoReply(string $message): bool
+    {
+        return $this->containsAny($message, [
+            'ile iletişime geçtiğiniz için teşekkür',
+            'ile iletisime gectiginiz icin tesekkur',
+            'mesajınız için teşekkür ederiz',
+            'mesajiniz icin tesekkur ederiz',
+            'size nasıl yardımcı olabiliriz',
+            'size nasil yardimci olabiliriz',
+            'şu anda size cevap veremiyoruz',
+            'su anda size cevap veremiyoruz',
+            'çalışma saatlerimiz',
+            'calisma saatlerimiz',
+        ]);
+    }
+
+    private function isExplicitRejection(string $message): bool
+    {
+        if ($this->containsAny($message, [
+            'ilgilenmiyorum','istemiyorum','gerek yok','düşünmüyorum','dusunmuyorum',
+            'istemiyoruz','ilgilenmiyoruz','rahatsız etmeyin','rahatsiz etmeyin',
+            'mesaj atmayın','mesaj atmayin','aramayın','aramayin',
+        ])) {
+            return true;
+        }
+
+        return in_array(trim($message), [
+            'teşekkürler','tesekkurler','teşekkür ederim','tesekkur ederim',
+            'sağ olun','sag olun','sağol','sagol','yok teşekkürler','yok tesekkurler',
+        ], true);
     }
 
     private function containsAny(string $haystack, array $needles): bool
