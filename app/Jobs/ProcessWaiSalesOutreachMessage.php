@@ -16,6 +16,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 class ProcessWaiSalesOutreachMessage implements ShouldQueue
@@ -122,6 +123,24 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
         ])->save();
 
         try {
+            if ($this->isCallRequest($combinedMessage)) {
+                $lead->forceFill([
+                    'status' => 'hot',
+                    'replied_at' => $lead->replied_at ?: now(),
+                    'ai_activated_at' => $lead->ai_activated_at ?: now(),
+                ])->save();
+
+                $dedupeKey = 'wai-sales-call-request:'.$lead->id.':'.sha1(Str::lower(trim($combinedMessage)));
+                if (Cache::add($dedupeKey, true, now()->addDay())) {
+                    $hotLeadNotifier->notifyCallRequest(
+                        lead: $lead->fresh(),
+                        sector: $salesService->sectorFor($lead),
+                        sessionId: $sessionId,
+                        requestText: $combinedMessage,
+                    );
+                }
+            }
+
             $statusBeforeDecision = (string) $lead->status;
             $decision = $salesService->decide($lead, $combinedMessage);
             $action = (string) ($decision['action'] ?? 'ignore');
@@ -226,5 +245,41 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
         );
 
         $whatsAppService->sendText($this->instance, $phoneDigits, $answer);
+    }
+
+    private function isCallRequest(string $message): bool
+    {
+        $normalized = Str::lower(trim($message));
+
+        foreach (['aramayın', 'aramayin', 'arama istemiyorum', 'aramaya gerek yok'] as $negative) {
+            if (str_contains($normalized, $negative)) {
+                return false;
+            }
+        }
+
+        foreach ([
+            'arayın', 'arayin', 'arayabilirsiniz', 'arayabilirsin', 'beni ara', 'beni arayın',
+            'şimdi ara', 'simdi ara', 'hemen ara', 'görüşelim', 'goruselim', 'telefonla görüş',
+            'telefonla gorus', 'müsaitim', 'musaitim', 'uygunum', 'bugün ara', 'bugun ara',
+            'yarın ara', 'yarin ara', 'saatte ara', 'saatinde ara',
+        ] as $positive) {
+            if (str_contains($normalized, $positive)) {
+                return true;
+            }
+        }
+
+        return (bool) preg_match('/\b(?:0?\d|1\d|2[0-3])[:\.][0-5]\d\b/u', $normalized)
+            && $this->containsCallContext($normalized);
+    }
+
+    private function containsCallContext(string $message): bool
+    {
+        foreach (['ara', 'arama', 'telefon', 'görüş', 'gorus', 'müsait', 'musait', 'uygun'] as $needle) {
+            if (str_contains($message, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
