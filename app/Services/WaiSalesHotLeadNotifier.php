@@ -14,6 +14,38 @@ class WaiSalesHotLeadNotifier
 
     public function notify(OutreachLead $lead, string $sector, string $sessionId): void
     {
+        $this->send(
+            lead: $lead,
+            sector: $sector,
+            sessionId: $sessionId,
+            headline: '🔥 BUNU ARA',
+        );
+    }
+
+    public function notifyCallRequest(
+        OutreachLead $lead,
+        string $sector,
+        string $sessionId,
+        string $requestText,
+    ): void {
+        $this->send(
+            lead: $lead,
+            sector: $sector,
+            sessionId: $sessionId,
+            headline: '🔥 HEMEN ARA — MÜŞTERİ ARAMA İSTEDİ',
+            extraLines: [
+                'Arama talebi: '.trim($requestText),
+            ],
+        );
+    }
+
+    private function send(
+        OutreachLead $lead,
+        string $sector,
+        string $sessionId,
+        string $headline,
+        array $extraLines = [],
+    ): void {
         try {
             $recent = ChatMessage::query()
                 ->where('session_id', $sessionId)
@@ -33,16 +65,17 @@ class WaiSalesHotLeadNotifier
                 ? $recent
                 : 'Müşteri WAI demosu / fiyatı / ekip görüşmesiyle ilgileniyor.';
 
-            $groupText = implode("\n", [
-                '🔥 BUNU ARA',
+            $groupText = implode("\n", array_filter([
+                $headline,
                 '',
                 'İşletme: '.$lead->company_name,
                 'Sektör: '.$sector,
                 'Telefon: '.$lead->phone_e164,
+                ...$extraLines,
                 '',
                 'Konuşma özeti:',
                 $summary,
-            ]);
+            ], fn ($line): bool => $line !== null));
 
             app(WhatsAppService::class)->sendGroupText(
                 self::INSTANCE,
