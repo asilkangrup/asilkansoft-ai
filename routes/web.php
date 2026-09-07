@@ -18,6 +18,10 @@ Route::view('/sigorta', 'insurance-public-demo')
     ->middleware('throttle:120,1')
     ->name('insurance.public.demo');
 
+Route::view('/tekstil-demo', 'textile-demo')
+    ->middleware('throttle:120,1')
+    ->name('textile.demo');
+
 Route::get('/demo/lead/{token}', [WaiLeadDemoController::class, 'show'])
     ->where('token', '[A-Za-z0-9]{48}')
     ->middleware('throttle:60,1')
