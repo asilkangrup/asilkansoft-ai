@@ -20,7 +20,7 @@ Route::view('/sigorta', 'insurance-public-demo')
 
 Route::view('/tekstil-demo', 'textile-demo')
     ->middleware('throttle:120,1')
-    ->name('textile.demo');
+    ->name('textile.demo'); // customer-facing textile prototype
 
 Route::get('/demo/lead/{token}', [WaiLeadDemoController::class, 'show'])
     ->where('token', '[A-Za-z0-9]{48}')
