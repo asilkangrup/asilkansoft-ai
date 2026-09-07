@@ -18,7 +18,7 @@ Route::view('/sigorta', 'insurance-public-demo')
     ->middleware('throttle:120,1')
     ->name('insurance.public.demo');
 
-Route::view('/tekstil-demo', 'textile-demo')
+Route::view('/tekstil-demo', 'textile-demo-readable')
     ->middleware('throttle:120,1')
     ->name('textile.demo'); // customer-facing textile prototype
 
