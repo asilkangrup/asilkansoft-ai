@@ -1,29 +1,17 @@
 @include('textile-demo')
 <style>
-/* Readability pass for customer-facing textile demo */
-.sub{font-size:14px!important;line-height:1.7!important}
-.kpi b{font-size:30px!important}
-.kpi span{font-size:13px!important;line-height:1.5!important}
-.activityItem{padding:14px!important;align-items:flex-start!important}
-.activityItem b{font-size:14px!important;line-height:1.45!important}
-.activityItem span{font-size:12px!important;line-height:1.5!important}
-.order b{font-size:12px!important;line-height:1.4!important}
-.order small{font-size:11px!important;line-height:1.55!important}
-.tag{font-size:10px!important;padding:6px 8px!important}
-.stage h4{font-size:12px!important}
-.primary,.softbtn,.start,.tab{font-size:14px!important}
-.notice{font-size:12px!important;line-height:1.75!important;padding:16px 18px!important}
-.calcrow{font-size:13px!important}
-.field label,.control label{font-size:12px!important}
-.chip{font-size:12px!important}
-.wahead b{font-size:14px!important}.wahead small{font-size:11px!important}
-.msg{font-size:13px!important;line-height:1.55!important}
-.step strong{font-size:13px!important}.step span{font-size:11px!important}
-.dashboardGrid .card div[style*="font-size:10px"],
-.dashboardGrid .card div[style*="font-size: 10px"]{font-size:13px!important}
-@media(max-width:930px){
-  .sub{font-size:13px!important}.kpi span{font-size:12px!important}.kpi b{font-size:27px!important}
-  .activityItem b{font-size:13px!important}.activityItem span{font-size:11px!important}
-  .notice{font-size:11px!important}.primary,.softbtn,.start,.tab{font-size:13px!important}
-}
+/* Global readability pass across all textile demo tabs */
+body{font-size:16px!important}
+.brand b{font-size:17px!important}.brand span{font-size:13px!important;line-height:1.5!important}.demo{font-size:12px!important}.eyebrow{font-size:13px!important}.hero p{font-size:17px!important;line-height:1.75!important}.chip{font-size:13px!important;line-height:1.45!important}.tab{font-size:15px!important}.card h3{font-size:21px!important}.sub{font-size:14px!important;line-height:1.7!important}
+.wahead b{font-size:15px!important}.wahead small{font-size:12px!important}.msg{font-size:14px!important;line-height:1.6!important}.time{font-size:11px!important}.start,.primary,.softbtn{font-size:14px!important}
+.step strong{font-size:14px!important}.step span{font-size:12px!important;line-height:1.5!important}.dot{font-size:12px!important}
+.quote .sub{font-size:13px!important}.quote div[style*="font-size:10px"],.quote div[style*="font-size: 10px"]{font-size:13px!important;line-height:1.5!important}.quote div[style*="font-size:11px"],.quote div[style*="font-size: 11px"]{font-size:14px!important;line-height:1.6!important}
+.control label,.field label{font-size:12px!important;line-height:1.5!important}.control input,.control select,.field input,.field select{font-size:14px!important}.uploadZone{font-size:13px!important;line-height:1.6!important}.uploadZone label{font-size:14px!important}.uploadZone div{font-size:12px!important;line-height:1.5!important}.mockStatus{font-size:13px!important;line-height:1.6!important}.logoText{font-size:16px!important}
+.calcrow{font-size:14px!important;line-height:1.6!important}.calcrow.total{font-size:20px!important}.kpi b{font-size:30px!important;line-height:1.2!important}.kpi span{font-size:13px!important;line-height:1.55!important}
+.stage h4{font-size:12px!important;line-height:1.5!important}.order b{font-size:13px!important;line-height:1.45!important}.order small{font-size:12px!important;line-height:1.55!important}.tag{font-size:10px!important;padding:6px 8px!important}
+.activityItem{padding:14px!important;align-items:flex-start!important}.activityItem b{font-size:14px!important;line-height:1.45!important}.activityItem span{font-size:12px!important;line-height:1.5!important}
+.dashboardGrid .card div[style*="font-size:10px"],.dashboardGrid .card div[style*="font-size: 10px"]{font-size:13px!important;line-height:1.5!important}
+#pricingTab div[style*="font-size:10px"],#pricingTab div[style*="font-size: 10px"]{font-size:13px!important;line-height:1.5!important}#pricingTab div[style*="font-size:11px"],#pricingTab div[style*="font-size: 11px"]{font-size:14px!important;line-height:1.6!important}#pricingTab span[style*="font-size:11px"],#pricingTab span[style*="font-size: 11px"]{font-size:13px!important}#pricingTab b[style*="font-size:17px"],#pricingTab b[style*="font-size: 17px"]{font-size:20px!important}
+.notice{font-size:13px!important;line-height:1.75!important;padding:16px 18px!important}.toast{font-size:13px!important}
+@media(max-width:930px){body{font-size:15px!important}.brand b{font-size:15px!important}.brand span{font-size:12px!important}.demo{font-size:10px!important}.eyebrow{font-size:12px!important}.hero p{font-size:15px!important}.chip{font-size:11px!important}.tab{font-size:13px!important}.card h3{font-size:19px!important}.sub{font-size:13px!important}.wahead b{font-size:14px!important}.wahead small{font-size:11px!important}.msg{font-size:13px!important}.time{font-size:10px!important}.start,.primary,.softbtn{font-size:13px!important}.step strong{font-size:13px!important}.step span{font-size:11px!important}.control label,.field label{font-size:11px!important}.control input,.control select,.field input,.field select{font-size:13px!important}.calcrow{font-size:13px!important}.kpi b{font-size:27px!important}.kpi span{font-size:12px!important}.order b{font-size:12px!important}.order small{font-size:11px!important}.activityItem b{font-size:13px!important}.activityItem span{font-size:11px!important}.notice{font-size:12px!important;line-height:1.7!important}}
 </style>
