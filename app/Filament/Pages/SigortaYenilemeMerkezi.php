@@ -33,8 +33,7 @@ class SigortaYenilemeMerkezi extends Page
 
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-        return (bool) $user?->is_admin || strtolower((string) $user?->email) === 'dogustopcu@gmail.com';
+        return app(InsuranceTenantContext::class)->canUseInsurance();
     }
 
     public static function shouldRegisterNavigation(): bool { return static::canAccess(); }
