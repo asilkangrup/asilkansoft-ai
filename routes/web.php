@@ -8,7 +8,8 @@ use App\Models\OutreachLead;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'home')->name('home');
+Route::view('/', 'home')
+    ->name('home');
 
 Route::view('/sigorta-demo', 'insurance-demo')
     ->middleware('throttle:120,1')
@@ -20,7 +21,7 @@ Route::view('/sigorta', 'insurance-public-demo')
 
 Route::view('/tekstil-demo', 'textile-demo-readable')
     ->middleware('throttle:120,1')
-    ->name('textile.demo');
+    ->name('textile.demo'); // customer-facing textile prototype
 
 Route::get('/tekstil-demo/odeme', [TextileDemoPaymentController::class, 'show'])
     ->middleware(['signed', 'throttle:60,1'])
