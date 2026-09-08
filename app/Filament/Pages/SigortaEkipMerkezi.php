@@ -1,0 +1,88 @@
+<?php
+
+namespace App\Filament\Pages;
+
+use App\Models\InsuranceCase;
+use App\Models\User;
+use BackedEnum;
+use Filament\Pages\Page;
+use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Collection;
+
+class SigortaEkipMerkezi extends Page
+{
+    protected string $view = 'filament.pages.sigorta-ekip-merkezi';
+    protected static ?string $title = 'Sigorta Ekip Merkezi';
+    protected static ?string $navigationLabel = 'Ekip Merkezi';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
+    protected static string|\UnitEnum|null $navigationGroup = 'Sigorta';
+    protected static ?int $navigationSort = 22;
+    protected static ?string $slug = 'sigorta-ekip';
+
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+
+        return (bool) $user?->is_admin
+            || strtolower((string) $user?->email) === 'dogustopcu@gmail.com';
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
+    public function getMembersProperty(): Collection
+    {
+        $organizationIds = auth()->user()?->activeOrganizations()->pluck('organizations.id') ?? collect();
+
+        if ($organizationIds->isEmpty()) {
+            return collect();
+        }
+
+        $members = User::query()
+            ->whereHas('organizations', fn ($q) => $q
+                ->whereIn('organizations.id', $organizationIds)
+                ->where('organization_user.status', 'active'))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        $workload = InsuranceCase::query()
+            ->selectRaw('assigned_user_id, COUNT(*) as total')
+            ->whereNotNull('assigned_user_id')
+            ->whereNotIn('status', ['issued', 'cancelled'])
+            ->groupBy('assigned_user_id')
+            ->pluck('total', 'assigned_user_id');
+
+        $issuedToday = InsuranceCase::query()
+            ->selectRaw('assigned_user_id, COUNT(*) as total')
+            ->whereNotNull('assigned_user_id')
+            ->where('status', 'issued')
+            ->whereDate('updated_at', today())
+            ->groupBy('assigned_user_id')
+            ->pluck('total', 'assigned_user_id');
+
+        return $members->map(fn (User $member) => [
+            'id' => $member->id,
+            'name' => $member->name ?: 'Ekip Üyesi',
+            'email' => $member->email,
+            'active_cases' => (int) ($workload[$member->id] ?? 0),
+            'issued_today' => (int) ($issuedToday[$member->id] ?? 0),
+        ]);
+    }
+
+    public function getSummaryProperty(): array
+    {
+        $members = $this->members;
+
+        return [
+            'members' => $members->count(),
+            'active_cases' => $members->sum('active_cases'),
+            'issued_today' => $members->sum('issued_today'),
+            'unassigned' => InsuranceCase::query()
+                ->active()
+                ->whereNull('assigned_user_id')
+                ->count(),
+        ];
+    }
+}
