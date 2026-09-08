@@ -37,7 +37,7 @@ jobs:
           imagepng($logo);
           $bytes = ob_get_clean();
           imagedestroy($logo);
-          $service = new App\\Services\\Textile\\TextileMockupService();
+          $service = new App\Services\Textile\TextileMockupService();
           $result = base64_decode($service->create(base64_encode($bytes), "left_chest", "black"), true);
           if (!is_string($result) || strlen($result) < 10000) {
               throw new RuntimeException("Mockup output is invalid.");
@@ -46,5 +46,5 @@ jobs:
           if (($info[0] ?? 0) !== 1200 || ($info[1] ?? 0) !== 1200) {
               throw new RuntimeException("Mockup dimensions are invalid.");
           }
-          echo "Mockup OK: ".strlen($result)." bytes\\n";
+          echo "Mockup OK: ".strlen($result)." bytes\n";
           '
