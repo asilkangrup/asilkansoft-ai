@@ -287,7 +287,7 @@ class TextileWhatsAppInboundService
             $state['print_type'] = 'DTF Baskı';
         }
 
-        if (preg_match('/\b(s|m|l|xl|xxl)(?:\s*[-–/]\s*(s|m|l|xl|xxl))?/iu', $message, $sizeMatch)) {
+        if (preg_match('/\b(s|m|l|xl|xxl)(?:\s*[-–\/]\s*(s|m|l|xl|xxl))?/iu', $message, $sizeMatch)) {
             $state['sizes'] = strtoupper($sizeMatch[0]);
         }
 
