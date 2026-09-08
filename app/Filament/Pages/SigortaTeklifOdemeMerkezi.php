@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\InsuranceCase;
+use App\Services\Insurance\InsuranceTenantContext;
 use App\Services\Insurance\InsuranceWorkflowService;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -31,9 +32,14 @@ class SigortaTeklifOdemeMerkezi extends Page
 
     public static function shouldRegisterNavigation(): bool { return static::canAccess(); }
 
+    private function tenantCases()
+    {
+        return app(InsuranceTenantContext::class)->scopeCases(InsuranceCase::query());
+    }
+
     public function getSummaryProperty(): array
     {
-        $q = InsuranceCase::query();
+        $q = $this->tenantCases();
         return [
             'quoted' => (clone $q)->where('status','quoted')->count(),
             'payment' => (clone $q)->where('status','payment_ready')->count(),
@@ -44,7 +50,11 @@ class SigortaTeklifOdemeMerkezi extends Page
 
     public function getCasesProperty(): Collection
     {
-        $q = InsuranceCase::query()->with(['quotes' => fn ($qq) => $qq->orderBy('premium'), 'assignedUser'])->latest();
+        $q = app(InsuranceTenantContext::class)
+            ->scopeCases(InsuranceCase::query())
+            ->with(['quotes' => fn ($qq) => $qq->orderBy('premium'), 'assignedUser'])
+            ->latest();
+
         if ($this->filter === 'quoted') $q->where('status','quoted');
         elseif ($this->filter === 'payment') $q->where('status','payment_ready');
         elseif ($this->filter === 'issued') $q->where('status','issued');
@@ -54,22 +64,25 @@ class SigortaTeklifOdemeMerkezi extends Page
         $term = trim($this->search);
         if ($term !== '') {
             $q->where(function ($sub) use ($term): void {
-                $sub->where('customer_name','like','%'.$term.'%')->orWhere('phone','like','%'.$term.'%')->orWhere('plate','like','%'.$term.'%');
+                $sub->where('customer_name','like','%'.$term.'%')
+                    ->orWhere('phone','like','%'.$term.'%')
+                    ->orWhere('plate','like','%'.$term.'%');
             });
         }
+
         return $q->limit(100)->get();
     }
 
     public function moveToPayment(int $caseId): void
     {
-        $case = InsuranceCase::findOrFail($caseId);
+        $case = app(InsuranceTenantContext::class)->case($caseId);
         app(InsuranceWorkflowService::class)->moveToPayment($case, auth()->user());
         Notification::make()->title('Dosya ödeme aşamasına taşındı')->success()->send();
     }
 
     public function markIssued(int $caseId): void
     {
-        $case = InsuranceCase::findOrFail($caseId);
+        $case = app(InsuranceTenantContext::class)->case($caseId);
         app(InsuranceWorkflowService::class)->markIssued($case, auth()->user());
         Notification::make()->title('Poliçe tamamlandı')->success()->send();
     }
