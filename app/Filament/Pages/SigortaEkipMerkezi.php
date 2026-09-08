@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\InsuranceCase;
 use App\Models\User;
+use App\Support\InsuranceTenantContext;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -32,9 +33,14 @@ class SigortaEkipMerkezi extends Page
         return static::canAccess();
     }
 
+    private function tenant(): InsuranceTenantContext
+    {
+        return app(InsuranceTenantContext::class);
+    }
+
     public function getMembersProperty(): Collection
     {
-        $organizationIds = auth()->user()?->activeOrganizations()->pluck('organizations.id') ?? collect();
+        $organizationIds = $this->tenant()->organizationIds();
 
         if ($organizationIds->isEmpty()) {
             return collect();
@@ -47,14 +53,16 @@ class SigortaEkipMerkezi extends Page
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
-        $workload = InsuranceCase::query()
+        $workloadQuery = $this->tenant()->scope(InsuranceCase::query());
+        $workload = $workloadQuery
             ->selectRaw('assigned_user_id, COUNT(*) as total')
             ->whereNotNull('assigned_user_id')
             ->whereNotIn('status', ['issued', 'cancelled'])
             ->groupBy('assigned_user_id')
             ->pluck('total', 'assigned_user_id');
 
-        $issuedToday = InsuranceCase::query()
+        $issuedTodayQuery = $this->tenant()->scope(InsuranceCase::query());
+        $issuedToday = $issuedTodayQuery
             ->selectRaw('assigned_user_id, COUNT(*) as total')
             ->whereNotNull('assigned_user_id')
             ->where('status', 'issued')
@@ -74,15 +82,16 @@ class SigortaEkipMerkezi extends Page
     public function getSummaryProperty(): array
     {
         $members = $this->members;
+        $unassigned = $this->tenant()->scope(InsuranceCase::query())
+            ->active()
+            ->whereNull('assigned_user_id')
+            ->count();
 
         return [
             'members' => $members->count(),
             'active_cases' => $members->sum('active_cases'),
             'issued_today' => $members->sum('issued_today'),
-            'unassigned' => InsuranceCase::query()
-                ->active()
-                ->whereNull('assigned_user_id')
-                ->count(),
+            'unassigned' => $unassigned,
         ];
     }
 }
