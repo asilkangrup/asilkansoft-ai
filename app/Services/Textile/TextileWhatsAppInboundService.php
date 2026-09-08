@@ -409,11 +409,11 @@ class TextileWhatsAppInboundService
             ->all();
 
         $contextBot = clone $bot;
-        $existingInstructions = trim((string) $bot->custom_instructions);
+        $existingInstructions = trim((string) $bot->system_prompt);
         $liveContext = $this->liveConversationInstructions($state);
 
         $contextBot->setAttribute(
-            'custom_instructions',
+            'system_prompt',
             trim($existingInstructions."\n\n".$liveContext),
         );
 
