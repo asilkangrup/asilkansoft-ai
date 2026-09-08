@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\InsuranceCase;
+use App\Models\InsuranceQuoteResult;
 use App\Services\Insurance\InsuranceWorkflowService;
 use App\Support\InsuranceTenantContext;
 use BackedEnum;
@@ -23,6 +24,9 @@ class SigortaTeklifOdemeMerkezi extends Page
 
     public string $filter = 'quoted';
     public string $search = '';
+    public array $paymentMethods = [];
+    public array $paymentReferences = [];
+    public array $policyNumbers = [];
 
     public static function canAccess(): bool
     {
@@ -61,7 +65,11 @@ class SigortaTeklifOdemeMerkezi extends Page
     public function getCasesProperty(): Collection
     {
         $q = $this->tenant()->scope(InsuranceCase::query())
-            ->with(['quotes' => fn ($qq) => $qq->orderBy('premium'), 'assignedUser'])
+            ->with([
+                'quotes' => fn ($qq) => $qq->orderBy('premium'),
+                'selectedQuote',
+                'assignedUser',
+            ])
             ->latest();
 
         if ($this->filter === 'quoted') $q->where('status','quoted');
@@ -75,11 +83,24 @@ class SigortaTeklifOdemeMerkezi extends Page
             $q->where(function ($sub) use ($term): void {
                 $sub->where('customer_name','like','%'.$term.'%')
                     ->orWhere('phone','like','%'.$term.'%')
-                    ->orWhere('plate','like','%'.$term.'%');
+                    ->orWhere('plate','like','%'.$term.'%')
+                    ->orWhere('policy_number','like','%'.$term.'%')
+                    ->orWhere('payment_reference','like','%'.$term.'%');
             });
         }
 
         return $q->limit(100)->get();
+    }
+
+    public function selectQuote(int $caseId, int $quoteId): void
+    {
+        $case = $this->caseOrFail($caseId);
+        $quote = InsuranceQuoteResult::query()
+            ->where('insurance_case_id', $case->id)
+            ->findOrFail($quoteId);
+
+        app(InsuranceWorkflowService::class)->selectQuote($case, $quote, auth()->user());
+        Notification::make()->title('Teklif seçildi')->success()->send();
     }
 
     public function moveToPayment(int $caseId): void
@@ -89,10 +110,33 @@ class SigortaTeklifOdemeMerkezi extends Page
         Notification::make()->title('Dosya ödeme aşamasına taşındı')->success()->send();
     }
 
+    public function markPaymentPaid(int $caseId): void
+    {
+        $case = $this->caseOrFail($caseId);
+        $method = trim((string) ($this->paymentMethods[$caseId] ?? ''));
+        $reference = trim((string) ($this->paymentReferences[$caseId] ?? ''));
+
+        app(InsuranceWorkflowService::class)->markPaymentPaid(
+            $case,
+            $method !== '' ? $method : null,
+            $reference !== '' ? $reference : null,
+            auth()->user(),
+        );
+
+        Notification::make()->title('Ödeme tamamlandı olarak kaydedildi')->success()->send();
+    }
+
     public function markIssued(int $caseId): void
     {
         $case = $this->caseOrFail($caseId);
-        app(InsuranceWorkflowService::class)->markIssued($case, auth()->user());
+        $policyNumber = trim((string) ($this->policyNumbers[$caseId] ?? ''));
+
+        app(InsuranceWorkflowService::class)->markIssued(
+            $case,
+            auth()->user(),
+            $policyNumber !== '' ? $policyNumber : null,
+        );
+
         Notification::make()->title('Poliçe tamamlandı')->success()->send();
     }
 
