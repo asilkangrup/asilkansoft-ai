@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\RealEstatePrivateMediaController;
+use App\Http\Controllers\TextileDemoPaymentController;
 use App\Http\Controllers\TrackedPublicDemoController;
 use App\Http\Controllers\WaiLeadDemoController;
 use App\Models\OutreachLead;
@@ -21,6 +22,13 @@ Route::view('/sigorta', 'insurance-public-demo')
 Route::view('/tekstil-demo', 'textile-demo-readable')
     ->middleware('throttle:120,1')
     ->name('textile.demo'); // customer-facing textile prototype
+
+Route::get('/tekstil-demo/odeme', [TextileDemoPaymentController::class, 'show'])
+    ->middleware(['signed', 'throttle:60,1'])
+    ->name('textile.demo.payment');
+
+Route::post('/tekstil-demo/odeme', [TextileDemoPaymentController::class, 'complete'])
+    ->middleware(['signed', 'throttle:10,1']);
 
 Route::get('/demo/lead/{token}', [WaiLeadDemoController::class, 'show'])
     ->where('token', '[A-Za-z0-9]{48}')

@@ -15,6 +15,7 @@ use App\Services\OpenAIService;
 use App\Services\OrderService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateWhatsAppInboundService;
+use App\Services\Textile\TextileWhatsAppInboundService;
 use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -50,6 +51,7 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         RealEstateIsolationService $realEstateIsolation,
         RealEstateWhatsAppInboundService $realEstateInbound,
         InsuranceWhatsAppInboundService $insuranceInbound,
+        TextileWhatsAppInboundService $textileInbound,
     ): void {
         $payload = $this->payload;
 
@@ -84,6 +86,9 @@ class ProcessWhatsAppWebhook implements ShouldQueue
             $waiBot = AiBot::query()
                 ->whereKey(39)
                 ->where('whatsapp_instance', $instance)
+                ->where(fn ($query) => $query
+                    ->whereNull('business_sector')
+                    ->orWhere('business_sector', '!=', 'textile'))
                 ->first();
 
             if ($waiBot) {
@@ -133,6 +138,10 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         |
         */
         if ($instance !== '' && $insuranceInbound->processPayload($payload)) {
+            return;
+        }
+
+        if ($instance !== '' && $textileInbound->processPayload($payload)) {
             return;
         }
 
@@ -205,3 +214,4 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         }
     }
 }
+
