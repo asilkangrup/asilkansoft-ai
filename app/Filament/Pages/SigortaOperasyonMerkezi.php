@@ -3,6 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Models\InsuranceCase;
+use App\Models\InsuranceEvent;
+use App\Models\User;
 use App\Services\Insurance\InsuranceWorkflowService;
 use App\Services\Insurance\OpenHizliTeklifClient;
 use BackedEnum;
@@ -32,6 +34,7 @@ class SigortaOperasyonMerkezi extends Page
     public string $chassisNumber = '';
     public string $licenseNumber = '';
     public array $openTeklifIds = [];
+    public array $operatorIds = [];
     public ?int $selectedCaseId = null;
 
     public static function canAccess(): bool
@@ -82,6 +85,20 @@ class SigortaOperasyonMerkezi extends Page
         return $query->limit(100)->get();
     }
 
+    public function getTeamMembersProperty(): Collection
+    {
+        $organizationIds = auth()->user()?->activeOrganizations()->pluck('organizations.id') ?? collect();
+
+        if ($organizationIds->isEmpty()) return collect();
+
+        return User::query()
+            ->whereHas('organizations', fn ($q) => $q
+                ->whereIn('organizations.id', $organizationIds)
+                ->where('organization_user.status', 'active'))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+    }
+
     public function getSelectedCaseProperty(): ?InsuranceCase
     {
         if (! $this->selectedCaseId) return null;
@@ -92,6 +109,39 @@ class SigortaOperasyonMerkezi extends Page
 
     public function selectCase(int $caseId): void { $this->selectedCaseId = $caseId; }
     public function closeCaseDetail(): void { $this->selectedCaseId = null; }
+
+    public function assignOperator(int $caseId): void
+    {
+        $case = InsuranceCase::findOrFail($caseId);
+        $operatorId = $this->operatorIds[$caseId] ?? null;
+
+        if (! is_numeric($operatorId)) {
+            Notification::make()->title('Personel seçin')->warning()->send();
+            return;
+        }
+
+        $operator = $this->teamMembers->firstWhere('id', (int) $operatorId);
+        if (! $operator) {
+            Notification::make()->title('Bu kullanıcı sigorta ekibinde değil')->danger()->send();
+            return;
+        }
+
+        $case->forceFill(['assigned_user_id' => (int) $operatorId])->save();
+
+        InsuranceEvent::create([
+            'insurance_case_id' => $case->id,
+            'type' => 'operator_assigned',
+            'title' => 'Dosya personele atandı',
+            'meta' => [
+                'assigned_user_id' => (int) $operatorId,
+                'assigned_user_name' => $operator->name,
+                'assigned_by' => auth()->id(),
+            ],
+        ]);
+
+        $this->selectedCaseId = $caseId;
+        Notification::make()->title('Dosya personele atandı')->success()->send();
+    }
 
     public function createOperation(): void
     {
@@ -176,5 +226,14 @@ class SigortaOperasyonMerkezi extends Page
         $hours = (int) floor($minutes / 60);
         if ($hours < 24) return $hours.' sa '.($minutes % 60).' dk';
         return (int) floor($hours / 24).' gün '.($hours % 24).' sa';
+    }
+
+    public function slaLabel(InsuranceCase $case): string
+    {
+        $minutes = $case->created_at?->diffInMinutes(now()) ?? 0;
+        if ($case->status === 'issued') return 'Tamamlandı';
+        if ($minutes < 3) return 'Hedef içinde';
+        if ($minutes < 10) return 'Takip edilmeli';
+        return 'Gecikiyor';
     }
 }
