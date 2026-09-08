@@ -3,10 +3,12 @@
 namespace App\Filament\Pages;
 
 use App\Models\InsuranceRenewalOpportunity;
+use App\Support\InsuranceTenantContext;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class SigortaYenilemeMerkezi extends Page
@@ -37,9 +39,24 @@ class SigortaYenilemeMerkezi extends Page
 
     public static function shouldRegisterNavigation(): bool { return static::canAccess(); }
 
+    private function tenant(): InsuranceTenantContext
+    {
+        return app(InsuranceTenantContext::class);
+    }
+
+    private function renewalQuery(): Builder
+    {
+        return $this->tenant()->scope(InsuranceRenewalOpportunity::query());
+    }
+
+    private function renewalOrFail(int $id): InsuranceRenewalOpportunity
+    {
+        return $this->renewalQuery()->findOrFail($id);
+    }
+
     public function getSummaryProperty(): array
     {
-        $q = InsuranceRenewalOpportunity::query();
+        $q = $this->renewalQuery();
         return [
             'monitoring' => (clone $q)->where('status', 'monitoring')->count(),
             'detected' => (clone $q)->where('status', 'external_renewal_detected')->count(),
@@ -50,7 +67,7 @@ class SigortaYenilemeMerkezi extends Page
 
     public function getRowsProperty(): Collection
     {
-        $q = InsuranceRenewalOpportunity::query()->latest('updated_at');
+        $q = $this->renewalQuery()->latest('updated_at');
         if ($this->filter === 'active') $q->whereIn('status', ['monitoring', 'external_renewal_detected', 'assigned']);
         elseif ($this->filter !== 'all') $q->where('status', $this->filter);
 
@@ -79,7 +96,12 @@ class SigortaYenilemeMerkezi extends Page
             'expiryDate' => ['nullable','date'],
         ]);
 
-        $org = auth()->user()?->activeOrganizations()->value('organizations.id');
+        $org = $this->tenant()->primaryOrganizationId();
+        if (! auth()->user()?->is_admin && ! $org) {
+            Notification::make()->title('Sigorta organizasyonu bulunamadı')->danger()->send();
+            return;
+        }
+
         InsuranceRenewalOpportunity::create([
             'user_id' => auth()->id(),
             'organization_id' => $org,
@@ -100,7 +122,7 @@ class SigortaYenilemeMerkezi extends Page
 
     public function markDetected(int $id): void
     {
-        InsuranceRenewalOpportunity::findOrFail($id)->update([
+        $this->renewalOrFail($id)->update([
             'status' => 'external_renewal_detected',
             'external_policy_detected_at' => now(),
         ]);
@@ -109,7 +131,7 @@ class SigortaYenilemeMerkezi extends Page
 
     public function assignToSales(int $id): void
     {
-        InsuranceRenewalOpportunity::findOrFail($id)->update([
+        $this->renewalOrFail($id)->update([
             'status' => 'assigned',
             'assigned_user_id' => auth()->id(),
         ]);
@@ -118,13 +140,13 @@ class SigortaYenilemeMerkezi extends Page
 
     public function markRecovered(int $id): void
     {
-        InsuranceRenewalOpportunity::findOrFail($id)->update(['status' => 'recovered']);
+        $this->renewalOrFail($id)->update(['status' => 'recovered']);
         Notification::make()->title('Müşteri geri kazanıldı')->success()->send();
     }
 
     public function markLost(int $id): void
     {
-        InsuranceRenewalOpportunity::findOrFail($id)->update(['status' => 'lost']);
+        $this->renewalOrFail($id)->update(['status' => 'lost']);
         Notification::make()->title('Kayıt kaybedildi olarak kapatıldı')->warning()->send();
     }
 }
