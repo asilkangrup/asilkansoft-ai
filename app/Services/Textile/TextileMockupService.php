@@ -112,11 +112,11 @@ class TextileMockupService
             395, 485, 285, 555, 170, 390,
         ];
         $shadowShape = array_map(static fn (int $v, int $i): int => $i % 2 === 0 ? $v + 16 : $v + 20, $shape, array_keys($shape));
-        imagefilledpolygon($image, $shadowShape, count($shadowShape) / 2, $shadow);
-        imagefilledpolygon($image, $shape, count($shape) / 2, $base);
+        imagefilledpolygon($image, $shadowShape, $shadow);
+        imagefilledpolygon($image, $shape, $base);
 
-        imagefilledpolygon($image, [170,390,352,250,395,485,285,555], 4, $dark);
-        imagefilledpolygon($image, [848,250,1030,390,915,555,805,485], 4, $light);
+        imagefilledpolygon($image, [170,390,352,250,395,485,285,555], $dark);
+        imagefilledpolygon($image, [848,250,1030,390,915,555,805,485], $light);
 
         imagefilledellipse($image, 600, 247, 210, 145, $neck);
         imagefilledellipse($image, 600, 232, 166, 112, imagecolorallocate($image, 236, 238, 242));
