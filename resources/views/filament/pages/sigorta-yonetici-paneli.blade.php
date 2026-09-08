@@ -11,7 +11,7 @@
 @php($team=$this->team)
 @php($recent=$this->recentCases)
 <div class="tpc-shell"><div class="wrap">
-<div class="top"><div class="brand"><div class="logo">TPC</div><div><b>TPC Insurance OS</b><span>Doğuş Topçu Sigorta • Yönetici Kontrol Merkezi</span></div></div><nav class="nav"><a href="/admin/sigorta-operasyon">Operasyon</a><a href="/admin/sigorta-yenileme">Geri Kazanım</a><a href="/admin/sigorta-ekip">Ekip</a><a class="active" href="/admin/sigorta-yonetici">Yönetici</a></nav></div>
+@include('filament.partials.insurance-navigation', ['active' => 'management'])
 <section class="hero"><div class="eyebrow">Yönetici Görünümü</div><h1>Operasyonun tamamını tek bakışta yönetin.</h1><p>Günlük iş yükü, poliçeleşme, ekip performansı, dönüşüm oranı ve geciken dosyaları tek ekranda takip edin. Bu ekran, yüksek hacimli sigorta operasyonunda karar vermeyi hızlandırmak için tasarlandı.</p></section>
 <section class="kpis">
 <article class="kpi"><small>Bugün Gelen</small><strong>{{ $s['today_inbound'] }}</strong><em>Yeni sigorta işlemi</em></article>
