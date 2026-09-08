@@ -1,0 +1,47 @@
+name: Textile demo validation
+
+on:
+  push:
+    branches:
+      - codex/textile-whatsapp-live-demo
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: gd
+          coverage: none
+      - name: Validate PHP syntax
+        run: find app routes -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Render a deterministic mockup
+        run: |
+          php -r '
+          require "app/Services/Textile/TextileMockupService.php";
+          $logo = imagecreatetruecolor(180, 80);
+          $bg = imagecolorallocate($logo, 255, 255, 255);
+          $fg = imagecolorallocate($logo, 15, 23, 42);
+          imagefill($logo, 0, 0, $bg);
+          imagestring($logo, 5, 45, 30, "WAI", $fg);
+          ob_start();
+          imagepng($logo);
+          $bytes = ob_get_clean();
+          imagedestroy($logo);
+          $service = new App\\Services\\Textile\\TextileMockupService();
+          $result = base64_decode($service->create(base64_encode($bytes), "left_chest", "black"), true);
+          if (!is_string($result) || strlen($result) < 10000) {
+              throw new RuntimeException("Mockup output is invalid.");
+          }
+          $info = getimagesizefromstring($result);
+          if (($info[0] ?? 0) !== 1200 || ($info[1] ?? 0) !== 1200) {
+              throw new RuntimeException("Mockup dimensions are invalid.");
+          }
+          echo "Mockup OK: ".strlen($result)." bytes\\n";
+          '
