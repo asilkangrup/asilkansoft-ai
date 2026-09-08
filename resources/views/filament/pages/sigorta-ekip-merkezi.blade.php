@@ -8,7 +8,7 @@
 @php($summary=$this->summary)
 @php($members=$this->members)
 <div class="team-shell"><div class="team-wrap">
-<div class="top"><div class="brand"><div class="logo">TPC</div><div><b>TPC Insurance OS</b><span>Doğuş Topçu Sigorta • Kurumsal Operasyon Platformu</span></div></div><nav class="nav"><a href="/admin/sigorta-operasyon">Operasyon</a><a href="/admin/sigorta-yenileme">Geri Kazanım</a><a class="active" href="/admin/sigorta-ekip">Ekip Merkezi</a></nav></div>
+@include('filament.partials.insurance-navigation', ['active' => 'team'])
 <section class="hero"><div class="eyebrow">24/7 Operasyon Kontrolü</div><h1>Ekip yükünü tek merkezden yönetin.</h1><p>Aktif dosyaları, günlük poliçeleştirmeyi ve atanmamış işleri personel bazında görün. Sistem büyüdükçe operasyon dağılımı ve personel performansı bu merkezden yönetilecek.</p></section>
 <section class="kpis"><article class="kpi"><small>Aktif Ekip</small><strong>{{ $summary['members'] }}</strong><em>Yetkili kullanıcı</em></article><article class="kpi"><small>Aktif Dosya</small><strong>{{ $summary['active_cases'] }}</strong><em>Ekip üzerinde</em></article><article class="kpi"><small>Bugün Poliçelendi</small><strong>{{ $summary['issued_today'] }}</strong><em>Günlük kapanış</em></article><article class="kpi"><small>Atanmamış İş</small><strong>{{ $summary['unassigned'] }}</strong><em>Dağıtım bekliyor</em></article></section>
 <section class="panel"><div class="panel-head"><h2>Operasyon Ekibi</h2><p>Her personelin anlık iş yükünü ve günlük kapanışını izleyin.</p></div>
