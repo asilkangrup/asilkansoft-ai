@@ -14,7 +14,7 @@ use Throwable;
 
 class SigortaOperasyonMerkezi extends Page
 {
-    protected string $view = 'filament.pages.sigorta-operasyon-premium-v2';
+    protected string $view = 'filament.pages.sigorta-operasyon-premium-v3';
     protected static ?string $title = 'Sigorta Operasyon Merkezi';
     protected static ?string $navigationLabel = 'Sigorta Operasyon';
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
@@ -32,6 +32,7 @@ class SigortaOperasyonMerkezi extends Page
     public string $chassisNumber = '';
     public string $licenseNumber = '';
     public array $openTeklifIds = [];
+    public ?int $selectedCaseId = null;
 
     public static function canAccess(): bool
     {
@@ -49,15 +50,21 @@ class SigortaOperasyonMerkezi extends Page
             'active' => (clone $base)->active()->count(),
             'waiting' => (clone $base)->whereIn('status', ['waiting_vehicle', 'ready_for_open', 'open_pending'])->count(),
             'quoted' => (clone $base)->where('status', 'quoted')->count(),
+            'payment' => (clone $base)->where('status', 'payment_ready')->count(),
             'attention' => (clone $base)->whereIn('status', ['needs_attention', 'failed'])->count(),
+            'issued_today' => (clone $base)->where('status', 'issued')->whereDate('updated_at', today())->count(),
         ];
     }
 
     public function getCasesProperty(): Collection
     {
-        $query = InsuranceCase::query()->with(['quotes' => fn ($q) => $q->orderBy('premium'), 'assignedUser'])->latest();
+        $query = InsuranceCase::query()
+            ->with(['quotes' => fn ($q) => $q->orderBy('premium'), 'assignedUser'])
+            ->latest();
+
         if ($this->filter === 'active') $query->active();
         elseif ($this->filter === 'quoted') $query->where('status', 'quoted');
+        elseif ($this->filter === 'payment') $query->where('status', 'payment_ready');
         elseif ($this->filter === 'attention') $query->whereIn('status', ['needs_attention', 'failed']);
         elseif ($this->filter === 'issued') $query->where('status', 'issued');
 
@@ -71,8 +78,20 @@ class SigortaOperasyonMerkezi extends Page
                     ->orWhere('chassis_number', 'like', '%'.$term.'%');
             });
         }
+
         return $query->limit(100)->get();
     }
+
+    public function getSelectedCaseProperty(): ?InsuranceCase
+    {
+        if (! $this->selectedCaseId) return null;
+        return InsuranceCase::query()
+            ->with(['quotes' => fn ($q) => $q->orderBy('premium'), 'events', 'assignedUser'])
+            ->find($this->selectedCaseId);
+    }
+
+    public function selectCase(int $caseId): void { $this->selectedCaseId = $caseId; }
+    public function closeCaseDetail(): void { $this->selectedCaseId = null; }
 
     public function createOperation(): void
     {
@@ -87,7 +106,7 @@ class SigortaOperasyonMerkezi extends Page
         ]);
 
         $organizationId = auth()->user()?->activeOrganizations()->value('organizations.id');
-        app(InsuranceWorkflowService::class)->createCase([
+        $case = app(InsuranceWorkflowService::class)->createCase([
             'organization_id' => $organizationId,
             'customer_name' => trim($this->customerName) ?: null,
             'phone' => trim($this->phone) ?: null,
@@ -99,6 +118,7 @@ class SigortaOperasyonMerkezi extends Page
             'source_channel' => 'panel',
         ], auth()->user());
 
+        $this->selectedCaseId = $case->id;
         $this->reset(['customerName', 'phone', 'plate', 'motorNumber', 'chassisNumber', 'licenseNumber']);
         $this->policyType = 'TRAFIK';
         Notification::make()->title('Yeni sigorta işlemi oluşturuldu')->success()->send();
@@ -131,6 +151,7 @@ class SigortaOperasyonMerkezi extends Page
     {
         $case = InsuranceCase::findOrFail($caseId);
         app(InsuranceWorkflowService::class)->moveToPayment($case, auth()->user());
+        $this->selectedCaseId = $caseId;
         Notification::make()->title('İşlem ödeme aşamasına taşındı')->success()->send();
     }
 
@@ -138,6 +159,7 @@ class SigortaOperasyonMerkezi extends Page
     {
         $case = InsuranceCase::findOrFail($caseId);
         app(InsuranceWorkflowService::class)->markIssued($case, auth()->user());
+        $this->selectedCaseId = $caseId;
         Notification::make()->title('Poliçe tamamlandı olarak işaretlendi')->success()->send();
     }
 
@@ -145,5 +167,14 @@ class SigortaOperasyonMerkezi extends Page
     {
         $quote = $case->quotes->first(fn ($q) => $q->premium !== null);
         return $quote?->premium !== null ? (float) $quote->premium : null;
+    }
+
+    public function elapsedLabel(InsuranceCase $case): string
+    {
+        $minutes = $case->created_at?->diffInMinutes(now()) ?? 0;
+        if ($minutes < 60) return $minutes.' dk';
+        $hours = (int) floor($minutes / 60);
+        if ($hours < 24) return $hours.' sa '.($minutes % 60).' dk';
+        return (int) floor($hours / 24).' gün '.($hours % 24).' sa';
     }
 }
