@@ -14,7 +14,7 @@ use Throwable;
 
 class SigortaOperasyonMerkezi extends Page
 {
-    protected string $view = 'filament.pages.sigorta-operasyon-merkezi';
+    protected string $view = 'filament.pages.sigorta-operasyon-premium';
     protected static ?string $title = 'Sigorta Operasyon Merkezi';
     protected static ?string $navigationLabel = 'Sigorta Operasyon';
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
