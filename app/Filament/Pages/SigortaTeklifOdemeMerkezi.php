@@ -3,8 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Models\InsuranceCase;
-use App\Services\Insurance\InsuranceTenantContext;
 use App\Services\Insurance\InsuranceWorkflowService;
+use App\Support\InsuranceTenantContext;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -32,9 +32,19 @@ class SigortaTeklifOdemeMerkezi extends Page
 
     public static function shouldRegisterNavigation(): bool { return static::canAccess(); }
 
+    private function tenant(): InsuranceTenantContext
+    {
+        return app(InsuranceTenantContext::class);
+    }
+
     private function tenantCases()
     {
-        return app(InsuranceTenantContext::class)->scopeCases(InsuranceCase::query());
+        return $this->tenant()->scope(InsuranceCase::query());
+    }
+
+    private function caseOrFail(int $caseId): InsuranceCase
+    {
+        return $this->tenantCases()->findOrFail($caseId);
     }
 
     public function getSummaryProperty(): array
@@ -50,8 +60,7 @@ class SigortaTeklifOdemeMerkezi extends Page
 
     public function getCasesProperty(): Collection
     {
-        $q = app(InsuranceTenantContext::class)
-            ->scopeCases(InsuranceCase::query())
+        $q = $this->tenant()->scope(InsuranceCase::query())
             ->with(['quotes' => fn ($qq) => $qq->orderBy('premium'), 'assignedUser'])
             ->latest();
 
@@ -75,14 +84,14 @@ class SigortaTeklifOdemeMerkezi extends Page
 
     public function moveToPayment(int $caseId): void
     {
-        $case = app(InsuranceTenantContext::class)->case($caseId);
+        $case = $this->caseOrFail($caseId);
         app(InsuranceWorkflowService::class)->moveToPayment($case, auth()->user());
         Notification::make()->title('Dosya ödeme aşamasına taşındı')->success()->send();
     }
 
     public function markIssued(int $caseId): void
     {
-        $case = app(InsuranceTenantContext::class)->case($caseId);
+        $case = $this->caseOrFail($caseId);
         app(InsuranceWorkflowService::class)->markIssued($case, auth()->user());
         Notification::make()->title('Poliçe tamamlandı')->success()->send();
     }
