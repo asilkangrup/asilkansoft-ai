@@ -7,10 +7,12 @@ use App\Models\InsuranceEvent;
 use App\Models\User;
 use App\Services\Insurance\InsuranceWorkflowService;
 use App\Services\Insurance\OpenHizliTeklifClient;
+use App\Support\InsuranceTenantContext;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Throwable;
 
@@ -46,9 +48,24 @@ class SigortaOperasyonMerkezi extends Page
     public static function shouldRegisterNavigation(): bool { return static::canAccess(); }
     public function getOpenStatusProperty(): array { return app(OpenHizliTeklifClient::class)->connectionSummary(); }
 
+    private function tenant(): InsuranceTenantContext
+    {
+        return app(InsuranceTenantContext::class);
+    }
+
+    private function caseQuery(): Builder
+    {
+        return $this->tenant()->scope(InsuranceCase::query());
+    }
+
+    private function caseOrFail(int $caseId): InsuranceCase
+    {
+        return $this->caseQuery()->findOrFail($caseId);
+    }
+
     public function getSummaryProperty(): array
     {
-        $base = InsuranceCase::query();
+        $base = $this->caseQuery();
         return [
             'active' => (clone $base)->active()->count(),
             'waiting' => (clone $base)->whereIn('status', ['waiting_vehicle', 'ready_for_open', 'open_pending'])->count(),
@@ -61,7 +78,7 @@ class SigortaOperasyonMerkezi extends Page
 
     public function getCasesProperty(): Collection
     {
-        $query = InsuranceCase::query()
+        $query = $this->caseQuery()
             ->with(['quotes' => fn ($q) => $q->orderBy('premium'), 'assignedUser'])
             ->latest();
 
@@ -87,8 +104,7 @@ class SigortaOperasyonMerkezi extends Page
 
     public function getTeamMembersProperty(): Collection
     {
-        $organizationIds = auth()->user()?->activeOrganizations()->pluck('organizations.id') ?? collect();
-
+        $organizationIds = $this->tenant()->organizationIds();
         if ($organizationIds->isEmpty()) return collect();
 
         return User::query()
@@ -102,17 +118,22 @@ class SigortaOperasyonMerkezi extends Page
     public function getSelectedCaseProperty(): ?InsuranceCase
     {
         if (! $this->selectedCaseId) return null;
-        return InsuranceCase::query()
+
+        return $this->caseQuery()
             ->with(['quotes' => fn ($q) => $q->orderBy('premium'), 'events', 'assignedUser'])
             ->find($this->selectedCaseId);
     }
 
-    public function selectCase(int $caseId): void { $this->selectedCaseId = $caseId; }
+    public function selectCase(int $caseId): void
+    {
+        $this->selectedCaseId = $this->caseOrFail($caseId)->id;
+    }
+
     public function closeCaseDetail(): void { $this->selectedCaseId = null; }
 
     public function assignOperator(int $caseId): void
     {
-        $case = InsuranceCase::findOrFail($caseId);
+        $case = $this->caseOrFail($caseId);
         $operatorId = $this->operatorIds[$caseId] ?? null;
 
         if (! is_numeric($operatorId)) {
@@ -155,7 +176,12 @@ class SigortaOperasyonMerkezi extends Page
             'licenseNumber' => ['nullable', 'string', 'max:64'],
         ]);
 
-        $organizationId = auth()->user()?->activeOrganizations()->value('organizations.id');
+        $organizationId = $this->tenant()->primaryOrganizationId();
+        if (! auth()->user()?->is_admin && ! $organizationId) {
+            Notification::make()->title('Sigorta organizasyonu bulunamadı')->danger()->send();
+            return;
+        }
+
         $case = app(InsuranceWorkflowService::class)->createCase([
             'organization_id' => $organizationId,
             'customer_name' => trim($this->customerName) ?: null,
@@ -176,7 +202,7 @@ class SigortaOperasyonMerkezi extends Page
 
     public function saveOpenTeklifId(int $caseId): void
     {
-        $case = InsuranceCase::findOrFail($caseId);
+        $case = $this->caseOrFail($caseId);
         $value = $this->openTeklifIds[$caseId] ?? null;
         if (! is_numeric($value) || (int) $value <= 0) {
             Notification::make()->title('Geçerli Open Teklif ID girin')->warning()->send();
@@ -188,7 +214,7 @@ class SigortaOperasyonMerkezi extends Page
 
     public function syncOpen(int $caseId): void
     {
-        $case = InsuranceCase::findOrFail($caseId);
+        $case = $this->caseOrFail($caseId);
         try {
             app(InsuranceWorkflowService::class)->syncFromOpen($case, auth()->user());
             Notification::make()->title('Open teklif verileri güncellendi')->success()->send();
@@ -199,7 +225,7 @@ class SigortaOperasyonMerkezi extends Page
 
     public function moveToPayment(int $caseId): void
     {
-        $case = InsuranceCase::findOrFail($caseId);
+        $case = $this->caseOrFail($caseId);
         app(InsuranceWorkflowService::class)->moveToPayment($case, auth()->user());
         $this->selectedCaseId = $caseId;
         Notification::make()->title('İşlem ödeme aşamasına taşındı')->success()->send();
@@ -207,7 +233,7 @@ class SigortaOperasyonMerkezi extends Page
 
     public function markIssued(int $caseId): void
     {
-        $case = InsuranceCase::findOrFail($caseId);
+        $case = $this->caseOrFail($caseId);
         app(InsuranceWorkflowService::class)->markIssued($case, auth()->user());
         $this->selectedCaseId = $caseId;
         Notification::make()->title('Poliçe tamamlandı olarak işaretlendi')->success()->send();
