@@ -6,9 +6,12 @@ use RuntimeException;
 
 class TextileMockupService
 {
+    private const SIZE = 1200;
+
     /**
-     * Creates a premium 1200x1200 product mockup while preserving the uploaded
-     * artwork pixels. The AI never redraws the customer's logo.
+     * Creates a photographic product preview while preserving the customer's
+     * original artwork. Only light, texture and very slight fabric deformation
+     * are transferred from the garment to the print.
      */
     public function create(
         string $logoBase64,
@@ -33,37 +36,22 @@ class TextileMockupService
             throw new RuntimeException('Logo JPG, PNG veya WEBP formatında olmalıdır.');
         }
 
-        $size = 1200;
-        $canvas = imagecreatetruecolor($size, $size);
-        if ($canvas === false) {
-            imagedestroy($logo);
-            throw new RuntimeException('Mockup çalışma alanı oluşturulamadı.');
-        }
-
-        imagealphablending($canvas, true);
-        imagesavealpha($canvas, true);
-        if (function_exists('imageantialias')) {
-            imageantialias($canvas, true);
-        }
-
-        $this->drawBackground($canvas, $size);
-        $shirtRgb = $this->shirtRgb($shirtColor);
-        $this->drawShirt($canvas, $shirtRgb);
-        $this->placeLogo($canvas, $logo, $position);
-        $this->drawFooter($canvas, $position, $shirtColor);
+        $canvas = $this->loadStudioTemplate();
+        $this->recolorGarment($canvas, $shirtColor);
+        $this->placeNaturalPrint($canvas, $logo, $position);
 
         ob_start();
-        imagepng($canvas, null, 6);
-        $png = ob_get_clean();
+        imagejpeg($canvas, null, 91);
+        $jpeg = ob_get_clean();
 
         imagedestroy($logo);
         imagedestroy($canvas);
 
-        if (! is_string($png) || $png === '') {
-            throw new RuntimeException('Mockup PNG çıktısı oluşturulamadı.');
+        if (! is_string($jpeg) || $jpeg === '') {
+            throw new RuntimeException('Mockup JPEG çıktısı oluşturulamadı.');
         }
 
-        return base64_encode($png);
+        return base64_encode($jpeg);
     }
 
     private function cleanBase64(string $value): string
@@ -76,66 +64,91 @@ class TextileMockupService
         return $value;
     }
 
-    private function drawBackground(mixed $image, int $size): void
+    private function loadStudioTemplate(): mixed
     {
-        for ($y = 0; $y < $size; $y++) {
-            $ratio = $y / max(1, $size - 1);
-            $r = (int) round(247 - (15 * $ratio));
-            $g = (int) round(248 - (14 * $ratio));
-            $b = (int) round(250 - (12 * $ratio));
-            imageline($image, 0, $y, $size, $y, imagecolorallocate($image, $r, $g, $b));
+        $path = public_path('assets/textile/oversize-black-studio-v1.jpg');
+        if (! is_file($path)) {
+            throw new RuntimeException('Fotoğrafik tekstil şablonu bulunamadı.');
         }
 
-        $shadow = imagecolorallocatealpha($image, 15, 23, 42, 98);
-        for ($i = 0; $i < 32; $i++) {
-            imagefilledellipse($image, 600, 982 + $i, 650 + ($i * 4), 86 + ($i * 2), $shadow);
+        $source = @imagecreatefromjpeg($path);
+        if ($source === false) {
+            throw new RuntimeException('Fotoğrafik tekstil şablonu açılamadı.');
         }
 
-        $violet = imagecolorallocatealpha($image, 124, 58, 237, 112);
-        $cyan = imagecolorallocatealpha($image, 6, 182, 212, 116);
-        imagefilledellipse($image, 130, 120, 360, 360, $violet);
-        imagefilledellipse($image, 1090, 130, 290, 290, $cyan);
+        $canvas = imagecreatetruecolor(self::SIZE, self::SIZE);
+        if ($canvas === false) {
+            imagedestroy($source);
+            throw new RuntimeException('Mockup çalışma alanı oluşturulamadı.');
+        }
+
+        imagecopyresampled(
+            $canvas,
+            $source,
+            0,
+            0,
+            0,
+            0,
+            self::SIZE,
+            self::SIZE,
+            imagesx($source),
+            imagesy($source),
+        );
+        imagedestroy($source);
+
+        return $canvas;
     }
 
-    private function drawShirt(mixed $image, array $rgb): void
+    private function recolorGarment(mixed $canvas, string $shirtColor): void
     {
-        [$r, $g, $b] = $rgb;
-        $shadow = imagecolorallocatealpha($image, 2, 6, 23, 75);
-        $dark = imagecolorallocate($image, max(0, $r - 22), max(0, $g - 22), max(0, $b - 22));
-        $base = imagecolorallocate($image, $r, $g, $b);
-        $light = imagecolorallocate($image, min(255, $r + 13), min(255, $g + 13), min(255, $b + 13));
-        $neck = imagecolorallocate($image, max(0, $r - 35), max(0, $g - 35), max(0, $b - 35));
+        $target = match ($shirtColor) {
+            'white' => [226, 225, 218],
+            'navy' => [31, 48, 76],
+            'burgundy' => [105, 35, 48],
+            'beige' => [190, 169, 137],
+            default => null,
+        };
 
-        $shape = [
-            352, 250, 440, 205, 480, 230, 600, 265, 720, 230, 760, 205,
-            848, 250, 1030, 390, 915, 555, 805, 485, 795, 930, 405, 930,
-            395, 485, 285, 555, 170, 390,
-        ];
-        $shadowShape = array_map(static fn (int $v, int $i): int => $i % 2 === 0 ? $v + 16 : $v + 20, $shape, array_keys($shape));
-        imagefilledpolygon($image, $shadowShape, $shadow);
-        imagefilledpolygon($image, $shape, $base);
-
-        imagefilledpolygon($image, [170,390,352,250,395,485,285,555], $dark);
-        imagefilledpolygon($image, [848,250,1030,390,915,555,805,485], $light);
-
-        imagefilledellipse($image, 600, 247, 210, 145, $neck);
-        imagefilledellipse($image, 600, 232, 166, 112, imagecolorallocate($image, 236, 238, 242));
-
-        for ($x = 430; $x <= 770; $x += 18) {
-            imageline($image, $x, 350, $x + 8, 900, imagecolorallocatealpha($image, 255, 255, 255, 122));
+        if ($target === null) {
+            return;
         }
 
-        imageline($image, 410, 929, 790, 929, $dark);
-        imageline($image, 412, 934, 788, 934, imagecolorallocatealpha($image, 255, 255, 255, 105));
+        for ($y = 55; $y < 1125; $y++) {
+            for ($x = 55; $x < 1145; $x++) {
+                $pixel = imagecolorat($canvas, $x, $y);
+                $red = ($pixel >> 16) & 0xff;
+                $green = ($pixel >> 8) & 0xff;
+                $blue = $pixel & 0xff;
+                $luminance = (0.2126 * $red) + (0.7152 * $green) + (0.0722 * $blue);
+
+                // The generated base has a dark garment on a light backdrop.
+                // Keeping the threshold low preserves the studio background and shadow.
+                if ($luminance > 105) {
+                    continue;
+                }
+
+                // Preserve the naturally dark inside of the collar.
+                if ($y < 205 && $x > 470 && $x < 730 && $luminance < 28) {
+                    continue;
+                }
+
+                $shade = max(0.52, min(1.22, 0.52 + ($luminance / 72)));
+                $newRed = min(255, (int) round($target[0] * $shade));
+                $newGreen = min(255, (int) round($target[1] * $shade));
+                $newBlue = min(255, (int) round($target[2] * $shade));
+
+                imagesetpixel($canvas, $x, $y, ($newRed << 16) | ($newGreen << 8) | $newBlue);
+            }
+        }
     }
 
-    private function placeLogo(mixed $canvas, mixed $logo, string $position): void
+    private function placeNaturalPrint(mixed $canvas, mixed $logo, string $position): void
     {
         [$centerX, $centerY, $maxWidth, $maxHeight] = match ($position) {
-            'left_chest' => [515, 430, 155, 125],
-            'front_large' => [600, 540, 390, 330],
-            'back_large' => [600, 500, 410, 350],
-            default => [600, 455, 255, 210],
+            'left_chest' => [485, 375, 185, 155],
+            'front_large' => [600, 525, 430, 390],
+            'back_large' => [600, 510, 420, 380],
+            default => [600, 445, 310, 255],
         };
 
         $sourceWidth = imagesx($logo);
@@ -144,19 +157,24 @@ class TextileMockupService
             throw new RuntimeException('Logo ölçüleri okunamadı.');
         }
 
-        $scale = min($maxWidth / $sourceWidth, $maxHeight / $sourceHeight, 1.0);
+        $scale = min($maxWidth / $sourceWidth, $maxHeight / $sourceHeight);
         $targetWidth = max(1, (int) round($sourceWidth * $scale));
         $targetHeight = max(1, (int) round($sourceHeight * $scale));
-        $x = (int) round($centerX - ($targetWidth / 2));
-        $y = (int) round($centerY - ($targetHeight / 2));
 
-        imagealphablending($logo, true);
-        imagesavealpha($logo, true);
+        $artwork = imagecreatetruecolor($targetWidth, $targetHeight);
+        if ($artwork === false) {
+            throw new RuntimeException('Baskı çalışma alanı oluşturulamadı.');
+        }
+
+        imagealphablending($artwork, false);
+        imagesavealpha($artwork, true);
+        $transparent = imagecolorallocatealpha($artwork, 0, 0, 0, 127);
+        imagefill($artwork, 0, 0, $transparent);
         imagecopyresampled(
-            $canvas,
+            $artwork,
             $logo,
-            $x,
-            $y,
+            0,
+            0,
             0,
             0,
             $targetWidth,
@@ -164,38 +182,90 @@ class TextileMockupService
             $sourceWidth,
             $sourceHeight,
         );
-    }
 
-    private function drawFooter(mixed $image, string $position, string $shirtColor): void
-    {
-        $ink = imagecolorallocate($image, 30, 41, 59);
-        $muted = imagecolorallocate($image, 100, 116, 139);
-        $green = imagecolorallocate($image, 5, 150, 105);
+        $top = (int) round($centerY - ($targetHeight / 2));
 
-        imagestring($image, 5, 70, 1050, 'WAI TEXTILE  /  BASKI ONIZLEMESI', $ink);
-        imagestring($image, 3, 70, 1080, 'Logo yeniden cizilmedi; orijinal dosya kullanildi.', $muted);
-        imagestring($image, 4, 790, 1055, strtoupper($this->positionLabel($position)), $green);
-        imagestring($image, 3, 790, 1082, 'URUN RENGI: '.strtoupper($shirtColor), $muted);
-    }
+        for ($row = 0; $row < $targetHeight; $row++) {
+            // The lower part of a worn shirt is fractionally wider. A tiny
+            // scanline displacement follows the fabric instead of looking pasted on.
+            $progress = $targetHeight > 1 ? $row / ($targetHeight - 1) : 0;
+            $perspective = 0.965 + (0.035 * $progress);
+            $rowWidth = max(1, (int) round($targetWidth * $perspective));
+            $foldShift = (int) round(sin(($top + $row) / 31) * 1.15);
+            $left = (int) round($centerX - ($rowWidth / 2)) + $foldShift;
 
-    private function positionLabel(string $position): string
-    {
-        return match ($position) {
-            'left_chest' => 'Sol gogus',
-            'front_large' => 'On buyuk baski',
-            'back_large' => 'Arka buyuk baski',
-            default => 'On orta',
-        };
-    }
+            $rowLuminance = 0.0;
+            $rowSamples = 0;
+            for ($sample = 0; $sample < $rowWidth; $sample += 4) {
+                $sampleX = $left + $sample;
+                $sampleY = $top + $row;
+                if ($sampleX < 0 || $sampleX >= self::SIZE || $sampleY < 0 || $sampleY >= self::SIZE) {
+                    continue;
+                }
 
-    private function shirtRgb(string $color): array
-    {
-        return match ($color) {
-            'white' => [238, 239, 236],
-            'navy' => [31, 51, 81],
-            'burgundy' => [112, 33, 50],
-            'beige' => [210, 190, 158],
-            default => [28, 31, 38],
-        };
+                $samplePixel = imagecolorat($canvas, $sampleX, $sampleY);
+                $sampleRed = ($samplePixel >> 16) & 0xff;
+                $sampleGreen = ($samplePixel >> 8) & 0xff;
+                $sampleBlue = $samplePixel & 0xff;
+                $rowLuminance += (0.2126 * $sampleRed) + (0.7152 * $sampleGreen) + (0.0722 * $sampleBlue);
+                $rowSamples++;
+            }
+            $rowAverage = $rowLuminance / max(1, $rowSamples);
+
+            for ($column = 0; $column < $rowWidth; $column++) {
+                $sourceX = min(
+                    $targetWidth - 1,
+                    (int) floor(($column / max(1, $rowWidth - 1)) * ($targetWidth - 1)),
+                );
+                $artPixel = imagecolorat($artwork, $sourceX, $row);
+                $alpha = ($artPixel >> 24) & 0x7f;
+                if ($alpha >= 127) {
+                    continue;
+                }
+
+                $destinationX = $left + $column;
+                $destinationY = $top + $row;
+                if ($destinationX < 0 || $destinationX >= self::SIZE || $destinationY < 0 || $destinationY >= self::SIZE) {
+                    continue;
+                }
+
+                $basePixel = imagecolorat($canvas, $destinationX, $destinationY);
+                $baseRed = ($basePixel >> 16) & 0xff;
+                $baseGreen = ($basePixel >> 8) & 0xff;
+                $baseBlue = $basePixel & 0xff;
+                $fabricLuminance = (0.2126 * $baseRed) + (0.7152 * $baseGreen) + (0.0722 * $baseBlue);
+
+                $artRed = ($artPixel >> 16) & 0xff;
+                $artGreen = ($artPixel >> 8) & 0xff;
+                $artBlue = $artPixel & 0xff;
+
+                // Transfer local shirt highlights and folds into the ink. The
+                // tiny deterministic weave variation prevents a flat digital surface.
+                $shade = max(0.70, min(1.14, 0.92 + (($fabricLuminance - $rowAverage) / 48)));
+                $weave = ((($destinationX * 13) + ($destinationY * 7)) % 5 - 2) * 0.012;
+                $shade += $weave;
+
+                $edgeFade = min(
+                    1.0,
+                    ($column + 1) / 2,
+                    ($row + 1) / 2,
+                    ($rowWidth - $column) / 2,
+                    ($targetHeight - $row) / 2,
+                );
+                $opacity = ((127 - $alpha) / 127) * 0.90 * $edgeFade;
+
+                $printRed = min(255, max(0, (int) round($artRed * $shade)));
+                $printGreen = min(255, max(0, (int) round($artGreen * $shade)));
+                $printBlue = min(255, max(0, (int) round($artBlue * $shade)));
+
+                $outRed = (int) round(($printRed * $opacity) + ($baseRed * (1 - $opacity)));
+                $outGreen = (int) round(($printGreen * $opacity) + ($baseGreen * (1 - $opacity)));
+                $outBlue = (int) round(($printBlue * $opacity) + ($baseBlue * (1 - $opacity)));
+
+                imagesetpixel($canvas, $destinationX, $destinationY, ($outRed << 16) | ($outGreen << 8) | $outBlue);
+            }
+        }
+
+        imagedestroy($artwork);
     }
 }
