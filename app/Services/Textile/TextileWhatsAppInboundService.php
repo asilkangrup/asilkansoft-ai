@@ -418,6 +418,11 @@ class TextileWhatsAppInboundService
         );
 
         $answer = trim($this->openAIService->cevapVer($history, $contextBot));
+        $answer = str_replace(
+            ['\\r\\n', '\\n', '\\r'],
+            ["\n", "\n", "\n"],
+            $answer,
+        );
 
         if (
             $answer === ''
