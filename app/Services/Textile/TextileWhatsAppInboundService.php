@@ -372,17 +372,17 @@ class TextileWhatsAppInboundService
         );
     }
 
-    private function sendImage(AiBot $bot, ConversationControl $conversation, string $instance, string $phone, string $pngBase64, array $state): void
+    private function sendImage(AiBot $bot, ConversationControl $conversation, string $instance, string $phone, string $mockupBase64, array $state): void
     {
         $caption = 'Baskı önizlemeniz hazır ✓ Logo orijinal dosyanızdan otomatik yerleştirildi.';
         $this->markOutbound($instance, $phone, $caption);
         $send = $this->whatsAppService->sendImage(
             $instance,
             $phone,
-            $pngBase64,
-            'baski-onizleme.png',
+            $mockupBase64,
+            'baski-onizleme.jpg',
             $caption,
-            'image/png',
+            'image/jpeg',
         );
 
         ChatMessage::create([
@@ -394,8 +394,8 @@ class TextileWhatsAppInboundService
             'sender_type' => 'ai',
             'message' => '[Baskı önizlemesi] '.$this->positionLabel((string) $state['position']),
             'message_type' => 'image',
-            'media_mime_type' => 'image/png',
-            'media_filename' => 'baski-onizleme.png',
+            'media_mime_type' => 'image/jpeg',
+            'media_filename' => 'baski-onizleme.jpg',
             'media_caption' => $caption,
             'whatsapp_message_id' => data_get($send, 'key.id') ?? data_get($send, 'messageId') ?? data_get($send, 'id'),
             'status' => 'sent',
