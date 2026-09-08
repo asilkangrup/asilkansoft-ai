@@ -104,6 +104,11 @@ class TextileWhatsAppInboundService
 
         $stateKey = $this->stateKey($bot, $phone);
         $state = $this->state(Cache::store('database')->get($stateKey));
+
+        if (($state['approved'] ?? false) && $this->newOrderDetailsMessage($message)) {
+            $state = $this->state(null);
+        }
+
         $previousState = $state;
         $state = $this->parseText($state, trim((string) ($mediaContext['caption'] ?: $message)));
 
@@ -328,6 +333,21 @@ class TextileWhatsAppInboundService
         }
 
         return $state;
+    }
+
+    private function newOrderDetailsMessage(string $message): bool
+    {
+        $normalized = Str::lower($message);
+
+        $hasQuantity = (bool) preg_match('/\b[1-9][0-9]{1,4}\s*(?:adet|tane)\b/u', $normalized);
+        $hasProduct = str_contains($normalized, 'tişört')
+            || str_contains($normalized, 'tisort')
+            || str_contains($normalized, 'oversize')
+            || str_contains($normalized, 'polo')
+            || str_contains($normalized, 'regular')
+            || str_contains($normalized, 'heavy');
+
+        return $hasQuantity || $hasProduct;
     }
 
     private function questionMessage(string $message): bool
