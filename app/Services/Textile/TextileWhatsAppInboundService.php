@@ -339,7 +339,7 @@ class TextileWhatsAppInboundService
         }
 
         return (bool) preg_match(
-            '/\\b(ne|nedir|neden|nasıl|nasil|hangi|hangisi|kaç|kac|kim|nerede|nereye|ne zaman|olur mu|var mı|var mi|mi|mı|mu|mü)\\b/u',
+            '/\b(ne|nedir|neden|nasıl|nasil|hangi|hangisi|kaç|kac|kim|nerede|nereye|ne zaman|olur mu|var mı|var mi|mi|mı|mu|mü)\b/u',
             $normalized,
         );
     }
