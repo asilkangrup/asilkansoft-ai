@@ -53,7 +53,7 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         TextileWhatsAppInboundService $textileInbound,
     ): void {
         $payload = $this->payload;
-        $event = strtolower(trim((string) ($payload['event'] ?? ''));
+        $event = strtolower(trim((string) ($payload['event'] ?? '')));
 
         if ($event !== '') {
             $payload['event'] = str_replace(['_', '-'], '.', $event);
