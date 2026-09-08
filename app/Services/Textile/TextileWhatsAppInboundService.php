@@ -70,7 +70,7 @@ class TextileWhatsAppInboundService
         $messageId = trim((string) data_get($payload, 'data.key.id', ''));
         if ($messageId !== '') {
             $dedupeKey = 'textile_demo_inbound:'.$bot->id.':'.$messageId;
-            if (! Cache::add($dedupeKey, true, now()->addDay())) {
+            if (! Cache::store('database')->add($dedupeKey, true, now()->addDay())) {
                 return true;
             }
         }
@@ -102,7 +102,7 @@ class TextileWhatsAppInboundService
         }
 
         $stateKey = $this->stateKey($bot, $phone);
-        $state = $this->state(Cache::get($stateKey));
+        $state = $this->state(Cache::store('database')->get($stateKey));
         $state = $this->parseText($state, trim((string) ($mediaContext['caption'] ?: $message)));
 
         if (($mediaContext['type'] ?? null) === 'image') {
@@ -141,7 +141,7 @@ class TextileWhatsAppInboundService
             }
         }
 
-        Cache::put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
+        Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
 
         if (($state['logo_received'] ?? false) && ! ($state['position'] ?? null)) {
             $this->sendText($bot, $conversation, $instance, $phone,
@@ -174,7 +174,7 @@ class TextileWhatsAppInboundService
 
                 $this->sendImage($bot, $conversation, $instance, $phone, $mockup, $state);
                 $state['mockup_sent'] = true;
-                Cache::put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
+                Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
 
                 $this->sendText($bot, $conversation, $instance, $phone, $this->mockupMessage($state));
                 $this->consumeTrial($bot);
@@ -202,8 +202,8 @@ class TextileWhatsAppInboundService
             $state['conversation_id'] = $conversation->id;
             $state['session_id'] = $sessionId;
 
-            Cache::put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
-            Cache::put('textile_demo_order:'.$state['order_id'], $state, now()->addHours(2));
+            Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
+            Cache::store('database')->put('textile_demo_order:'.$state['order_id'], $state, now()->addHours(2));
 
             $paymentUrl = URL::temporarySignedRoute(
                 'textile.demo.payment',
@@ -219,7 +219,7 @@ class TextileWhatsAppInboundService
         }
 
         if ($this->restartMessage($message)) {
-            Cache::forget($stateKey);
+            Cache::store('database')->forget($stateKey);
             $this->sendText($bot, $conversation, $instance, $phone,
                 'Yeni tasarım akışını başlattım. Ürün modelini, rengi ve adedi yazın; ardından logonuzu gönderin.'
             );
@@ -516,7 +516,7 @@ class TextileWhatsAppInboundService
             return false;
         }
 
-        return (bool) Cache::pull(
+        return (bool) Cache::store('database')->pull(
             'wai_api_outbound:'.sha1($instance.'|'.$phone.'|'.$text),
             false,
         );
@@ -524,7 +524,7 @@ class TextileWhatsAppInboundService
 
     private function markOutbound(string $instance, string $phone, string $text): void
     {
-        Cache::put('wai_api_outbound:'.sha1($instance.'|'.$phone.'|'.$text), true, now()->addMinutes(5));
+        Cache::store('database')->put('wai_api_outbound:'.sha1($instance.'|'.$phone.'|'.$text), true, now()->addMinutes(5));
     }
 
     private function consumeTrial(AiBot $bot): void

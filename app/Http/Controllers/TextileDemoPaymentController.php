@@ -17,7 +17,7 @@ class TextileDemoPaymentController extends Controller
     public function show(Request $request): View
     {
         $orderId = trim((string) $request->query('order', ''));
-        $order = Cache::get('textile_demo_order:'.$orderId);
+        $order = Cache::store('database')->get('textile_demo_order:'.$orderId);
 
         abort_unless(is_array($order) && $orderId !== '', 404);
 
@@ -25,18 +25,18 @@ class TextileDemoPaymentController extends Controller
             'order' => $order,
             'orderId' => $orderId,
             'quote' => $this->quote($order),
-            'paid' => (bool) Cache::get('textile_demo_payment:'.$orderId, false),
+            'paid' => (bool) Cache::store('database')->get('textile_demo_payment:'.$orderId, false),
         ]);
     }
 
     public function complete(Request $request): RedirectResponse
     {
         $orderId = trim((string) $request->query('order', ''));
-        $order = Cache::get('textile_demo_order:'.$orderId);
+        $order = Cache::store('database')->get('textile_demo_order:'.$orderId);
 
         abort_unless(is_array($order) && $orderId !== '', 404);
 
-        if (! Cache::add('textile_demo_payment:'.$orderId, true, now()->addHours(2))) {
+        if (! Cache::store('database')->add('textile_demo_payment:'.$orderId, true, now()->addHours(2))) {
             return back()->with('success', 'Demo ödeme daha önce tamamlandı.');
         }
 
@@ -51,7 +51,7 @@ class TextileDemoPaymentController extends Controller
                     .'Sipariş No: *#'.$orderId."*\n"
                     ."Siparişiniz üretim planına aktarıldı. Gerçek sistemde bu anda ödeme kaydı, üretim görevi ve yönetici bildirimi otomatik oluşur.";
 
-                Cache::put(
+                Cache::store('database')->put(
                     'wai_api_outbound:'.sha1($instance.'|'.$phone.'|'.$answer),
                     true,
                     now()->addMinutes(5),
