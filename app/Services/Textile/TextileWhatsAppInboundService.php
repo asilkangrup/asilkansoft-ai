@@ -380,7 +380,7 @@ class TextileWhatsAppInboundService
         $send = $this->whatsAppService->sendImage(
             $instance,
             $phone,
-            'data:image/png;base64,'.$pngBase64,
+            $pngBase64,
             'baski-onizleme.png',
             $caption,
             'image/png',
