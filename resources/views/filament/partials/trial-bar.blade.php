@@ -3,7 +3,10 @@
 
     $bot = null;
 
-    if ($user) {
+    $insuranceOnly = $user
+        && app(\App\Support\InsuranceTenantContext::class)->isInsuranceOnly($user);
+
+    if ($user && ! $insuranceOnly) {
         $bot = \App\Models\AiBot::query()
             ->where('user_id', $user->id)
             ->latest('id')
