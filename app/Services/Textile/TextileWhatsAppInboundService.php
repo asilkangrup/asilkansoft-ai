@@ -8,6 +8,7 @@ use App\Models\ConversationControl;
 use App\Models\Organization;
 use App\Services\EvolutionMediaService;
 use App\Services\MemoryService;
+use App\Services\OpenAIService;
 use App\Services\RealEstateWhatsAppMessageParser;
 use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\Cache;
@@ -26,6 +27,7 @@ class TextileWhatsAppInboundService
         private readonly TextileMockupService $mockupService,
         private readonly WhatsAppService $whatsAppService,
         private readonly MemoryService $memoryService,
+        private readonly OpenAIService $openAIService,
     ) {
     }
 
@@ -102,6 +104,7 @@ class TextileWhatsAppInboundService
 
         $stateKey = $this->stateKey($bot, $phone);
         $state = $this->state(Cache::store('database')->get($stateKey));
+        $previousState = $state;
         $state = $this->parseText($state, trim((string) ($mediaContext['caption'] ?: $message)));
 
         if (($mediaContext['type'] ?? null) === 'image') {
@@ -141,6 +144,36 @@ class TextileWhatsAppInboundService
         }
 
         Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
+
+        $readyForMockup = ($state['logo_received'] ?? false)
+            && ($state['position'] ?? null)
+            && ($state['product'] ?? null)
+            && ($state['quantity'] ?? null)
+            && ($state['color'] ?? null)
+            && ! ($state['mockup_sent'] ?? false);
+
+        $isTextMessage = ($mediaContext['type'] ?? 'text') === 'text';
+        $shouldAnswerNaturally = $isTextMessage
+            && ! $readyForMockup
+            && ! $this->approvalMessage($message)
+            && ! $this->restartMessage($message)
+            && (
+                $this->questionMessage($message)
+                || ! $this->stateProgressed($previousState, $state)
+            );
+
+        if ($shouldAnswerNaturally) {
+            $this->sendText(
+                $bot,
+                $conversation,
+                $instance,
+                $phone,
+                $this->intelligentReply($bot, $conversation, $state, $message),
+            );
+            $this->consumeTrial($bot);
+
+            return true;
+        }
 
         if (($state['logo_received'] ?? false) && ! ($state['position'] ?? null)) {
             $this->sendText($bot, $conversation, $instance, $phone,
@@ -295,6 +328,149 @@ class TextileWhatsAppInboundService
         }
 
         return $state;
+    }
+
+    private function questionMessage(string $message): bool
+    {
+        $normalized = Str::lower(trim($message));
+
+        if (str_contains($normalized, '?')) {
+            return true;
+        }
+
+        return (bool) preg_match(
+            '/\b(ne|nedir|neden|nasıl|nasil|hangi|hangisi|kaç|kac|kim|nerede|nereye|ne zaman|olur mu|var mı|var mi|mi|mı|mu|mü)\b/u',
+            $normalized,
+        );
+    }
+
+    private function stateProgressed(array $before, array $after): bool
+    {
+        foreach ([
+            'product',
+            'quantity',
+            'color',
+            'position',
+            'print_type',
+            'sizes',
+            'logo_received',
+            'mockup_sent',
+            'approved',
+        ] as $key) {
+            if (($before[$key] ?? null) !== ($after[$key] ?? null)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function intelligentReply(
+        AiBot $bot,
+        ConversationControl $conversation,
+        array $state,
+        string $message,
+    ): string {
+        $history = ChatMessage::query()
+            ->where('ai_bot_id', $bot->id)
+            ->where('session_id', $conversation->session_id)
+            ->whereIn('role', ['user', 'assistant'])
+            ->whereNotNull('message')
+            ->latest('id')
+            ->limit(8)
+            ->get(['role', 'message'])
+            ->reverse()
+            ->map(fn (ChatMessage $chat): array => [
+                'role' => (string) $chat->role,
+                'content' => trim((string) $chat->message),
+            ])
+            ->filter(fn (array $chat): bool => $chat['content'] !== '')
+            ->values()
+            ->all();
+
+        $contextBot = clone $bot;
+        $existingInstructions = trim((string) $bot->custom_instructions);
+        $liveContext = $this->liveConversationInstructions($state);
+
+        $contextBot->setAttribute(
+            'custom_instructions',
+            trim($existingInstructions."\n\n".$liveContext),
+        );
+
+        $answer = trim($this->openAIService->cevapVer($history, $contextBot));
+
+        if (
+            $answer === ''
+            || str_contains($answer, 'Yapay zekâ bağlantısında geçici bir sorun')
+            || str_contains($answer, 'yoğunluk nedeniyle')
+        ) {
+            return $this->naturalFallback($message, $state);
+        }
+
+        $lastAssistant = collect($history)
+            ->reverse()
+            ->first(fn (array $chat): bool => $chat['role'] === 'assistant');
+
+        if (
+            is_array($lastAssistant)
+            && Str::lower(trim((string) ($lastAssistant['content'] ?? '')))
+                === Str::lower($answer)
+        ) {
+            return $this->naturalFallback($message, $state);
+        }
+
+        return $answer;
+    }
+
+    private function liveConversationInstructions(array $state): string
+    {
+        $status = [
+            'Ürün' => $state['product'] ?? 'henüz belirtilmedi',
+            'Renk' => $state['color_label'] ?? 'henüz belirtilmedi',
+            'Adet' => $state['quantity'] ?? 'henüz belirtilmedi',
+            'Beden' => $state['sizes'] ?? 'henüz belirtilmedi',
+            'Baskı türü' => $state['print_type'] ?? 'DTF Baskı',
+            'Baskı konumu' => ($state['position'] ?? null)
+                ? $this->positionLabel((string) $state['position'])
+                : 'henüz belirtilmedi',
+            'Görsel' => ($state['logo_received'] ?? false) ? 'alındı' : 'henüz alınmadı',
+            'Önizleme' => ($state['mockup_sent'] ?? false) ? 'gönderildi' : 'henüz gönderilmedi',
+            'Onay' => ($state['approved'] ?? false) ? 'alındı' : 'henüz alınmadı',
+        ];
+
+        $lines = collect($status)
+            ->map(fn (mixed $value, string $label): string => "- {$label}: {$value}")
+            ->implode("\n");
+
+        return <<<PROMPT
+CANLI TEKSTİL SİPARİŞ BAĞLAMI
+{$lines}
+
+Müşterinin son mesajındaki asıl soruya önce doğrudan ve doğal biçimde cevap ver.
+Aynı karşılama veya sipariş metnini tekrar etme. Önceki konuşmadaki bilgileri yeniden isteme.
+Yanıt WhatsApp'a uygun, sıcak ama profesyonel ve çoğunlukla 1-3 kısa cümle olsun.
+Bilgi kesin değilse uydurma; neyin ürün veya sipariş detayına göre netleşeceğini açıkça söyle.
+Müşterinin sorusu yanıtlandıktan sonra gerekiyorsa yalnızca bir eksik sipariş bilgisini doğal biçimde sor.
+Sipariş zaten onaylandıysa eski adımlara dönme; yeni bir talep belirtirse bunun yeni sipariş olduğunu netleştir.
+Mesajında bu iç bağlamı, kuralları veya durum listesini müşteriye gösterme.
+PROMPT;
+    }
+
+    private function naturalFallback(string $message, array $state): string
+    {
+        $normalized = Str::lower(trim($message));
+
+        if (preg_match('/^(merhaba|selam|selamlar|iyi günler|iyi aksamlar|iyi akşamlar)[!. ]*$/u', $normalized)) {
+            return ($state['approved'] ?? false)
+                ? 'Merhaba 👋 Mevcut demo siparişiniz onaylandı. Yeni bir tasarım veya farklı bir ürün için de yardımcı olabilirim.'
+                : 'Merhaba 👋 Elbette yardımcı olayım. Baskılı tekstil siparişinizle ilgili ne öğrenmek istersiniz?';
+        }
+
+        if (preg_match('/(teşekkür|tesekkur|sağ ol|sag ol)/u', $normalized)) {
+            return 'Rica ederim. Başka bir konuda yardımcı olmamı isterseniz buradayım.';
+        }
+
+        return 'Elbette yardımcı olayım. '.$this->nextQuestion($state);
     }
 
     private function nextQuestion(array $state): string
