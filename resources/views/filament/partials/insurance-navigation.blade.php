@@ -6,6 +6,18 @@
         ['key' => 'management', 'label' => 'Yönetici', 'caption' => 'KPI & performans', 'href' => '/admin/sigorta-yonetici', 'icon' => '04'],
         ['key' => 'payment', 'label' => 'Teklif & Ödeme', 'caption' => 'Primden poliçeye', 'href' => '/admin/sigorta-teklif-odeme', 'icon' => '05'],
     ];
+
+    $insuranceBot = auth()->user()
+        ?->aiBots()
+        ->where('business_sector', 'insurance')
+        ->latest('id')
+        ->first();
+
+    $whatsAppStatus = strtolower(trim((string) ($insuranceBot?->whatsapp_status ?? 'disconnected')));
+    $whatsAppConnected = in_array($whatsAppStatus, ['connected', 'open'], true);
+    $whatsAppLabel = $whatsAppConnected
+        ? 'WHATSAPP BAĞLI'
+        : ($whatsAppStatus === 'connecting' ? 'QR HAZIR' : 'WHATSAPP BAĞLA');
 @endphp
 
 <style>
@@ -90,6 +102,16 @@ html,.fi-body,.fi-main{background:#050814!important}
 a:focus-visible,button:focus-visible{outline:2px solid #a78bfa!important;outline-offset:3px}
 @media(max-width:720px){.tpc-shell,.ren-shell,.team-shell,.shell{background:radial-gradient(circle at 100% 0,rgba(107,92,255,.18),transparent 24%),#050814!important}.tpc-global-header{box-shadow:0 18px 48px rgba(0,0,0,.38),0 0 28px rgba(107,92,255,.07)}}
 
+
+.tpc-global-tools{display:flex;align-items:center;gap:8px;min-width:max-content}
+.tpc-whatsapp-link{display:flex;align-items:center;gap:7px;padding:10px 12px;border:1px solid rgba(139,92,246,.38);border-radius:999px;color:#ddd6fe;background:rgba(107,92,255,.1);font-size:10px;font-weight:950;letter-spacing:.045em;text-decoration:none;transition:transform .16s ease,border-color .16s ease,background .16s ease}
+.tpc-whatsapp-link:hover{transform:translateY(-1px);border-color:rgba(139,92,246,.72);color:#fff;background:rgba(107,92,255,.22)}
+.tpc-whatsapp-link i{width:8px;height:8px;border-radius:50%;background:#f59e0b;box-shadow:0 0 0 5px rgba(245,158,11,.08)}
+.tpc-whatsapp-link.is-connected{color:#a7f3d0;border-color:rgba(16,185,129,.28);background:rgba(16,185,129,.08)}
+.tpc-whatsapp-link.is-connected i{background:#34d399;box-shadow:0 0 0 5px rgba(52,211,153,.09)}
+@media(max-width:1180px){.tpc-global-tools{position:absolute;right:17px;top:19px}.tpc-global-live{display:none}}
+@media(max-width:720px){.tpc-global-tools{position:static;width:100%}.tpc-whatsapp-link{justify-content:center;width:100%;min-height:42px}.tpc-global-live{display:none}}
+
 </style>
 
 <header class="tpc-global-header">
@@ -113,5 +135,12 @@ a:focus-visible,button:focus-visible{outline:2px solid #a78bfa!important;outline
         @endforeach
     </nav>
 
-    <span class="tpc-global-live"><i></i> SİSTEM AKTİF</span>
+    <div class="tpc-global-tools">
+        @if($insuranceBot)
+            <a class="tpc-whatsapp-link {{ $whatsAppConnected ? 'is-connected' : '' }}" href="/admin/ai-bots/{{ $insuranceBot->id }}/whatsapp">
+                <i></i> {{ $whatsAppLabel }}
+            </a>
+        @endif
+        <span class="tpc-global-live"><i></i> SİSTEM AKTİF</span>
+    </div>
 </header>
