@@ -5,7 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\InsuranceCase;
 use App\Models\InsuranceQuoteResult;
 use App\Models\User;
-use App\Services\Insurance\InsuranceTenantContext;
+use App\Support\InsuranceTenantContext;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -29,9 +29,14 @@ class SigortaYoneticiPaneli extends Page
 
     public static function shouldRegisterNavigation(): bool { return static::canAccess(); }
 
+    private function tenant(): InsuranceTenantContext
+    {
+        return app(InsuranceTenantContext::class);
+    }
+
     private function tenantCases()
     {
-        return app(InsuranceTenantContext::class)->scopeCases(InsuranceCase::query());
+        return $this->tenant()->scope(InsuranceCase::query());
     }
 
     public function getSummaryProperty(): array
@@ -68,7 +73,7 @@ class SigortaYoneticiPaneli extends Page
 
     public function getTeamProperty(): Collection
     {
-        $organizationIds = app(InsuranceTenantContext::class)->organizationIds();
+        $organizationIds = $this->tenant()->organizationIds();
         if ($organizationIds->isEmpty()) return collect();
 
         $members = User::query()
@@ -79,7 +84,7 @@ class SigortaYoneticiPaneli extends Page
             ->get(['id','name','email']);
 
         return $members->map(function (User $member): array {
-            $base = app(InsuranceTenantContext::class)->scopeCases(InsuranceCase::query())
+            $base = $this->tenant()->scope(InsuranceCase::query())
                 ->where('assigned_user_id',$member->id);
 
             $active = (clone $base)->active()->count();
@@ -99,8 +104,7 @@ class SigortaYoneticiPaneli extends Page
 
     public function getRecentCasesProperty(): Collection
     {
-        return app(InsuranceTenantContext::class)
-            ->scopeCases(InsuranceCase::query())
+        return $this->tenant()->scope(InsuranceCase::query())
             ->with('assignedUser')
             ->latest()
             ->limit(8)
