@@ -13,20 +13,31 @@ class InsuranceCase extends Model
         'source_channel', 'source_reference', 'customer_name', 'phone',
         'status', 'priority', 'policy_type', 'plate', 'license_number',
         'motor_number', 'chassis_number', 'vehicle_brand', 'vehicle_model', 'vehicle_year',
-        'open_teklif_id', 'integration_status', 'integration_error', 'last_synced_at', 'data',
+        'open_teklif_id', 'selected_quote_id', 'integration_status', 'integration_error', 'last_synced_at',
+        'payment_status', 'payment_method', 'payment_reference', 'payment_ready_at',
+        'policy_number', 'issued_at', 'closed_by_user_id', 'data',
     ];
 
     protected $casts = [
         'data' => 'array',
         'last_synced_at' => 'datetime',
+        'payment_ready_at' => 'datetime',
+        'issued_at' => 'datetime',
         'vehicle_year' => 'integer',
         'priority' => 'integer',
         'open_teklif_id' => 'integer',
+        'selected_quote_id' => 'integer',
+        'closed_by_user_id' => 'integer',
     ];
 
     public function quotes(): HasMany
     {
         return $this->hasMany(InsuranceQuoteResult::class);
+    }
+
+    public function selectedQuote(): BelongsTo
+    {
+        return $this->belongsTo(InsuranceQuoteResult::class, 'selected_quote_id');
     }
 
     public function events(): HasMany
@@ -37,6 +48,11 @@ class InsuranceCase extends Model
     public function assignedUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_user_id');
+    }
+
+    public function closedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by_user_id');
     }
 
     public function conversation(): BelongsTo
@@ -63,6 +79,18 @@ class InsuranceCase extends Model
             'failed' => 'Hata',
             'cancelled' => 'İptal',
             default => $this->status,
+        };
+    }
+
+    public function paymentStatusLabel(): string
+    {
+        return match ($this->payment_status) {
+            'not_started' => 'Başlamadı',
+            'ready' => 'Ödemeye hazır',
+            'pending' => 'Ödeme bekleniyor',
+            'paid' => 'Ödendi',
+            'failed' => 'Ödeme başarısız',
+            default => (string) $this->payment_status,
         };
     }
 }
