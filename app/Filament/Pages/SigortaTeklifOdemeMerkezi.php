@@ -11,6 +11,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
+use Throwable;
 
 class SigortaTeklifOdemeMerkezi extends Page
 {
@@ -30,8 +31,7 @@ class SigortaTeklifOdemeMerkezi extends Page
 
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-        return (bool) $user?->is_admin || strtolower((string) $user?->email) === 'dogustopcu@gmail.com';
+        return app(InsuranceTenantContext::class)->canUseInsurance();
     }
 
     public static function shouldRegisterNavigation(): bool { return static::canAccess(); }
@@ -57,7 +57,7 @@ class SigortaTeklifOdemeMerkezi extends Page
         return [
             'quoted' => (clone $q)->where('status','quoted')->count(),
             'payment' => (clone $q)->where('status','payment_ready')->count(),
-            'issued_today' => (clone $q)->where('status','issued')->whereDate('updated_at',today())->count(),
+            'issued_today' => (clone $q)->where('status','issued')->whereDate('issued_at',today())->count(),
             'attention' => (clone $q)->whereIn('status',['needs_attention','failed'])->count(),
         ];
     }
@@ -94,54 +94,66 @@ class SigortaTeklifOdemeMerkezi extends Page
 
     public function selectQuote(int $caseId, int $quoteId): void
     {
-        $case = $this->caseOrFail($caseId);
-        $quote = InsuranceQuoteResult::query()
-            ->where('insurance_case_id', $case->id)
-            ->findOrFail($quoteId);
+        try {
+            $case = $this->caseOrFail($caseId);
+            $quote = InsuranceQuoteResult::query()
+                ->where('insurance_case_id', $case->id)
+                ->findOrFail($quoteId);
 
-        app(InsuranceWorkflowService::class)->selectQuote($case, $quote, auth()->user());
-        Notification::make()->title('Teklif seçildi')->success()->send();
+            app(InsuranceWorkflowService::class)->selectQuote($case, $quote, auth()->user());
+            Notification::make()->title('Teklif seçildi')->success()->send();
+        } catch (Throwable $e) {
+            Notification::make()->title('Teklif seçilemedi')->body($e->getMessage())->danger()->send();
+        }
     }
-
     public function moveToPayment(int $caseId): void
     {
-        $case = $this->caseOrFail($caseId);
-        app(InsuranceWorkflowService::class)->moveToPayment($case, auth()->user());
-        Notification::make()->title('Dosya ödeme aşamasına taşındı')->success()->send();
+        try {
+            $case = $this->caseOrFail($caseId);
+            app(InsuranceWorkflowService::class)->moveToPayment($case, auth()->user());
+            Notification::make()->title('Dosya ödeme aşamasına taşındı')->success()->send();
+        } catch (Throwable $e) {
+            Notification::make()->title('Ödeme aşamasına geçilemedi')->body($e->getMessage())->danger()->send();
+        }
     }
-
     public function markPaymentPaid(int $caseId): void
     {
-        $case = $this->caseOrFail($caseId);
-        $method = trim((string) ($this->paymentMethods[$caseId] ?? ''));
-        $reference = trim((string) ($this->paymentReferences[$caseId] ?? ''));
+        try {
+            $case = $this->caseOrFail($caseId);
+            $method = trim((string) ($this->paymentMethods[$caseId] ?? ''));
+            $reference = trim((string) ($this->paymentReferences[$caseId] ?? ''));
 
-        app(InsuranceWorkflowService::class)->markPaymentPaid(
-            $case,
-            $method !== '' ? $method : null,
-            $reference !== '' ? $reference : null,
-            auth()->user(),
-        );
+            app(InsuranceWorkflowService::class)->markPaymentPaid(
+                $case,
+                $method !== '' ? $method : null,
+                $reference !== '' ? $reference : null,
+                auth()->user(),
+            );
 
-        Notification::make()->title('Ödeme tamamlandı olarak kaydedildi')->success()->send();
+            Notification::make()->title('Ödeme tamamlandı olarak kaydedildi')->success()->send();
+        } catch (Throwable $e) {
+            Notification::make()->title('Ödeme kaydedilemedi')->body($e->getMessage())->danger()->send();
+        }
     }
-
     public function markIssued(int $caseId): void
     {
-        $case = $this->caseOrFail($caseId);
-        $policyNumber = trim((string) ($this->policyNumbers[$caseId] ?? ''));
+        try {
+            $case = $this->caseOrFail($caseId);
+            $policyNumber = trim((string) ($this->policyNumbers[$caseId] ?? ''));
 
-        app(InsuranceWorkflowService::class)->markIssued(
-            $case,
-            auth()->user(),
-            $policyNumber !== '' ? $policyNumber : null,
-        );
+            app(InsuranceWorkflowService::class)->markIssued(
+                $case,
+                auth()->user(),
+                $policyNumber !== '' ? $policyNumber : null,
+            );
 
-        Notification::make()->title('Poliçe tamamlandı')->success()->send();
+            Notification::make()->title('Poliçe tamamlandı')->success()->send();
+        } catch (Throwable $e) {
+            Notification::make()->title('Poliçe kapatılamadı')->body($e->getMessage())->danger()->send();
+        }
     }
-
     public function bestQuote(InsuranceCase $case)
     {
-        return $case->quotes->first(fn ($quote) => $quote->premium !== null);
+        return $case->quotes->first(fn ($quote) => $quote->premium !== null && (float) $quote->premium > 0);
     }
 }

@@ -8,6 +8,7 @@ use App\Models\InsuranceQuoteResult;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Throwable;
 
 class InsuranceWorkflowService
@@ -65,7 +66,15 @@ class InsuranceWorkflowService
     public function syncFromOpen(InsuranceCase $case, ?User $actor = null): InsuranceCase
     {
         if (! $case->open_teklif_id) {
-            throw new \RuntimeException('Open Teklif ID olmadan senkronizasyon başlatılamaz.');
+            throw new RuntimeException('Open Teklif ID olmadan senkronizasyon başlatılamaz.');
+        }
+
+        if (! $this->openClient->configured()) {
+            throw new RuntimeException('Open Hızlı Teklif bağlantısı henüz yapılandırılmadı. Acente Kodu ve Token gerekli.');
+        }
+
+        if (in_array($case->status, ['issued', 'cancelled'], true)) {
+            throw new RuntimeException('Kapanmış bir dosyada Open senkronizasyonu başlatılamaz.');
         }
 
         $case->forceFill([
@@ -78,12 +87,17 @@ class InsuranceWorkflowService
             $summary = $this->openClient->getTeklif((int) $case->open_teklif_id);
             $detail = $this->openClient->getTeklifDetay((int) $case->open_teklif_id);
             $prices = $this->openClient->getTeklifFiyatlari((int) $case->open_teklif_id);
+            $normalizedPrices = $this->normalizePrices($prices);
 
-            DB::transaction(function () use ($case, $summary, $detail, $prices, $actor): void {
+            if ($normalizedPrices === []) {
+                throw new RuntimeException('Open servisi geçerli bir prim sonucu döndürmedi.');
+            }
+
+            DB::transaction(function () use ($case, $summary, $detail, $prices, $normalizedPrices, $actor): void {
                 $case->forceFill(['selected_quote_id' => null])->save();
                 $case->quotes()->delete();
 
-                foreach ($this->normalizePrices($prices) as $price) {
+                foreach ($normalizedPrices as $price) {
                     InsuranceQuoteResult::create([
                         'insurance_case_id' => $case->id,
                         'provider' => 'open_hizli_teklif',
@@ -133,7 +147,15 @@ class InsuranceWorkflowService
     public function selectQuote(InsuranceCase $case, InsuranceQuoteResult $quote, ?User $actor = null): InsuranceCase
     {
         if ((int) $quote->insurance_case_id !== (int) $case->id) {
-            throw new \RuntimeException('Seçilen teklif bu sigorta dosyasına ait değil.');
+            throw new RuntimeException('Seçilen teklif bu sigorta dosyasına ait değil.');
+        }
+
+        if ($case->status !== 'quoted') {
+            throw new RuntimeException('Teklif yalnızca teklif hazır aşamasındaki dosyada seçilebilir.');
+        }
+
+        if ($quote->premium === null || (float) $quote->premium <= 0) {
+            throw new RuntimeException('Geçerli primi olmayan teklif seçilemez.');
         }
 
         $case->forceFill(['selected_quote_id' => $quote->id])->save();
@@ -150,11 +172,22 @@ class InsuranceWorkflowService
 
     public function moveToPayment(InsuranceCase $case, ?User $actor = null): InsuranceCase
     {
+        if ($case->status !== 'quoted') {
+            throw new RuntimeException('Dosya ödeme aşamasına yalnızca teklif hazır durumundan taşınabilir.');
+        }
+
         if (! $case->selected_quote_id) {
-            $bestQuote = $case->quotes()->whereNotNull('premium')->orderBy('premium')->first();
-            if ($bestQuote) {
-                $case->selected_quote_id = $bestQuote->id;
-            }
+            throw new RuntimeException('Ödeme aşamasına geçmeden önce bir teklif seçilmelidir.');
+        }
+
+        $selectedQuoteExists = $case->quotes()
+            ->whereKey($case->selected_quote_id)
+            ->whereNotNull('premium')
+            ->where('premium', '>', 0)
+            ->exists();
+
+        if (! $selectedQuoteExists) {
+            throw new RuntimeException('Seçili teklif geçerli değil veya bu dosyaya ait değil.');
         }
 
         $case->forceFill([
@@ -176,10 +209,25 @@ class InsuranceWorkflowService
         ?string $paymentReference = null,
         ?User $actor = null
     ): InsuranceCase {
+        if ($case->status !== 'payment_ready') {
+            throw new RuntimeException('Ödeme yalnızca ödeme aşamasındaki dosyada kaydedilebilir.');
+        }
+
+        $paymentMethod = trim((string) $paymentMethod);
+        $paymentReference = trim((string) $paymentReference);
+
+        if (! in_array($paymentMethod, ['credit_card', 'bank_transfer', 'other'], true)) {
+            throw new RuntimeException('Geçerli bir ödeme yöntemi seçilmelidir.');
+        }
+
+        if (in_array($paymentMethod, ['credit_card', 'bank_transfer'], true) && $paymentReference === '') {
+            throw new RuntimeException('Kart veya havale ödemelerinde işlem referansı zorunludur.');
+        }
+
         $case->forceFill([
             'payment_status' => 'paid',
-            'payment_method' => $paymentMethod ?: $case->payment_method,
-            'payment_reference' => $paymentReference ?: $case->payment_reference,
+            'payment_method' => $paymentMethod,
+            'payment_reference' => $paymentReference !== '' ? $paymentReference : null,
         ])->save();
 
         $this->event($case, 'payment_paid', 'Ödeme tamamlandı', null, $actor, [
@@ -195,10 +243,19 @@ class InsuranceWorkflowService
         ?User $actor = null,
         ?string $policyNumber = null
     ): InsuranceCase {
+        if ($case->status !== 'payment_ready' || $case->payment_status !== 'paid') {
+            throw new RuntimeException('Poliçe kapatılmadan önce ödeme tamamlanmalıdır.');
+        }
+
+        $policyNumber = trim((string) $policyNumber);
+
+        if ($policyNumber === '') {
+            throw new RuntimeException('Poliçe numarası zorunludur.');
+        }
+
         $case->forceFill([
             'status' => 'issued',
-            'payment_status' => $case->payment_status === 'not_started' ? 'ready' : $case->payment_status,
-            'policy_number' => $policyNumber ?: $case->policy_number,
+            'policy_number' => $policyNumber,
             'issued_at' => now(),
             'closed_by_user_id' => $actor?->id,
         ])->save();
@@ -230,6 +287,9 @@ class InsuranceWorkflowService
                     'payload' => $row,
                 ];
             })
+            ->filter(fn (array $price): bool => filled($price['company_name'])
+                && $price['premium'] !== null
+                && $price['premium'] > 0)
             ->values()
             ->all();
     }

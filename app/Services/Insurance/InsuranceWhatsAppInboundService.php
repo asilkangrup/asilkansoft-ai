@@ -5,7 +5,8 @@ namespace App\Services\Insurance;
 use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
-use App\Models\Organization;
+use App\Models\User;
+use App\Support\InsuranceTenantContext;
 use App\Services\MemoryService;
 use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\Cache;
@@ -66,9 +67,17 @@ class InsuranceWhatsAppInboundService
         }
 
         $sessionId = 'whatsapp:'.$aiBot->id.':'.$phoneNumber;
-        $organizationId = Organization::query()
-            ->where('owner_user_id', $aiBot->user_id)
-            ->value('id');
+        $organizationId = $this->resolveInsuranceOrganizationId($aiBot);
+
+        if (! $organizationId) {
+            Log::warning('INSURANCE INBOUND DROPPED WITHOUT AUTHORIZED TENANT', [
+                'ai_bot_id' => $aiBot->id,
+                'user_id' => $aiBot->user_id,
+                'instance' => $instanceName,
+            ]);
+
+            return true;
+        }
 
         $conversation = ConversationControl::firstOrCreate(
             ['ai_bot_id' => $aiBot->id, 'session_id' => $sessionId],
@@ -82,8 +91,17 @@ class InsuranceWhatsAppInboundService
             ]
         );
 
-        if ($conversation->organization_id === null && $organizationId !== null) {
+        if ($conversation->organization_id === null) {
             $conversation->forceFill(['organization_id' => $organizationId])->save();
+        } elseif ((int) $conversation->organization_id !== $organizationId) {
+            Log::critical('INSURANCE CONVERSATION TENANT MISMATCH BLOCKED', [
+                'ai_bot_id' => $aiBot->id,
+                'conversation_control_id' => $conversation->id,
+                'conversation_organization_id' => $conversation->organization_id,
+                'resolved_organization_id' => $organizationId,
+            ]);
+
+            return true;
         }
 
         $pushName = trim((string) data_get($payload, 'data.pushName', ''));
@@ -212,6 +230,19 @@ class InsuranceWhatsAppInboundService
                 'answer' => 'Ruhsatı işlerken geçici bir sorun oluştu. Lütfen fotoğrafın tamamı net görünecek şekilde tekrar gönderin.',
             ];
         }
+    }
+
+    private function resolveInsuranceOrganizationId(AiBot $aiBot): ?int
+    {
+        $user = User::query()->find($aiBot->user_id);
+
+        if (! $user) {
+            return null;
+        }
+
+        return app(InsuranceTenantContext::class)
+            ->organizationIds($user)
+            ->first();
     }
 
     private function sendAnswer(

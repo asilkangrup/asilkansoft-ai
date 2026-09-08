@@ -41,8 +41,7 @@ class SigortaOperasyonMerkezi extends Page
 
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-        return (bool) $user?->is_admin || strtolower((string) $user?->email) === 'dogustopcu@gmail.com';
+        return app(InsuranceTenantContext::class)->canUseInsurance();
     }
 
     public static function shouldRegisterNavigation(): bool { return static::canAccess(); }
@@ -72,7 +71,7 @@ class SigortaOperasyonMerkezi extends Page
             'quoted' => (clone $base)->where('status', 'quoted')->count(),
             'payment' => (clone $base)->where('status', 'payment_ready')->count(),
             'attention' => (clone $base)->whereIn('status', ['needs_attention', 'failed'])->count(),
-            'issued_today' => (clone $base)->where('status', 'issued')->whereDate('updated_at', today())->count(),
+            'issued_today' => (clone $base)->where('status', 'issued')->whereDate('issued_at', today())->count(),
         ];
     }
 
@@ -151,6 +150,7 @@ class SigortaOperasyonMerkezi extends Page
 
         InsuranceEvent::create([
             'insurance_case_id' => $case->id,
+            'actor_user_id' => auth()->id(),
             'type' => 'operator_assigned',
             'title' => 'Dosya personele atandı',
             'meta' => [
@@ -221,22 +221,6 @@ class SigortaOperasyonMerkezi extends Page
         } catch (Throwable $e) {
             Notification::make()->title('Open senkronizasyonu tamamlanamadı')->body($e->getMessage())->danger()->send();
         }
-    }
-
-    public function moveToPayment(int $caseId): void
-    {
-        $case = $this->caseOrFail($caseId);
-        app(InsuranceWorkflowService::class)->moveToPayment($case, auth()->user());
-        $this->selectedCaseId = $caseId;
-        Notification::make()->title('İşlem ödeme aşamasına taşındı')->success()->send();
-    }
-
-    public function markIssued(int $caseId): void
-    {
-        $case = $this->caseOrFail($caseId);
-        app(InsuranceWorkflowService::class)->markIssued($case, auth()->user());
-        $this->selectedCaseId = $caseId;
-        Notification::make()->title('Poliçe tamamlandı olarak işaretlendi')->success()->send();
     }
 
     public function bestPremium(InsuranceCase $case): ?float

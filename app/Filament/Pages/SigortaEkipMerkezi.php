@@ -22,10 +22,7 @@ class SigortaEkipMerkezi extends Page
 
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-
-        return (bool) $user?->is_admin
-            || strtolower((string) $user?->email) === 'dogustopcu@gmail.com';
+        return app(InsuranceTenantContext::class)->canUseInsurance();
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -66,7 +63,7 @@ class SigortaEkipMerkezi extends Page
             ->selectRaw('assigned_user_id, COUNT(*) as total')
             ->whereNotNull('assigned_user_id')
             ->where('status', 'issued')
-            ->whereDate('updated_at', today())
+            ->whereDate('issued_at', today())
             ->groupBy('assigned_user_id')
             ->pluck('total', 'assigned_user_id');
 
