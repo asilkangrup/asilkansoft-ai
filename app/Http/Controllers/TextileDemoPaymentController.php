@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\AiBot;
-use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Services\MemoryService;
 use App\Services\WhatsAppService;
@@ -59,25 +58,15 @@ class TextileDemoPaymentController extends Controller
                 );
                 $send = app(WhatsAppService::class)->sendText($instance, $phone, $answer);
 
-                ChatMessage::create([
-                    'user_id' => $bot->user_id,
-                    'organization_id' => $conversation->organization_id,
-                    'ai_bot_id' => $bot->id,
-                    'session_id' => $conversation->session_id,
-                    'role' => 'assistant',
-                    'sender_type' => 'ai',
-                    'message' => $answer,
-                    'message_type' => 'text',
-                    'whatsapp_message_id' => data_get($send, 'key.id') ?? data_get($send, 'messageId') ?? data_get($send, 'id'),
-                    'status' => 'sent',
-                ]);
-
                 app(MemoryService::class)->mesajKaydet(
                     userId: $bot->user_id,
                     aiBotId: $bot->id,
                     sessionId: $conversation->session_id,
                     role: 'assistant',
                     message: $answer,
+                    mediaContext: [
+                        'message_id' => data_get($send, 'key.id') ?? data_get($send, 'messageId') ?? data_get($send, 'id'),
+                    ],
                 );
             }
         } catch (Throwable $exception) {
