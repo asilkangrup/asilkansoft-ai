@@ -32,9 +32,8 @@ class ProcessWhatsAppWebhook implements ShouldQueue
 
     public int $timeout = 180;
 
-    public function __construct(
-        public array $payload
-    ) {
+    public function __construct(public array $payload)
+    {
         $this->onConnection('sync');
     }
 
@@ -54,38 +53,21 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         TextileWhatsAppInboundService $textileInbound,
     ): void {
         $payload = $this->payload;
-
-        $event = strtolower(trim((string) ($payload['event'] ?? '')));
+        $event = strtolower(trim((string) ($payload['event'] ?? ''));
 
         if ($event !== '') {
-            $payload['event'] = str_replace(
-                ['_', '-'],
-                '.',
-                $event
-            );
+            $payload['event'] = str_replace(['_', '-'], '.', $event);
         }
 
         $instance = trim((string) ($payload['instance'] ?? ''));
 
-        /*
-        |--------------------------------------------------------------------------
-        | WAI MANUEL MESAJ = İNSAN DEVRALMA
-        |--------------------------------------------------------------------------
-        |
-        | WAI'nin API üzerinden kendi gönderdiği outbound mesajlar sendText()
-        | içinde kısa süreli cache anahtarıyla işaretlenir. fromMe=true mesajı
-        | geldiğinde bu işaret varsa AI'nin kendi mesajıdır ve devralma yapılmaz.
-        | İşaret yoksa mesaj WhatsApp uygulamasından personel tarafından manuel
-        | gönderilmiş kabul edilir ve yalnızca o müşteri için AI susturulur.
-        |
-        */
-        if (
-            $instance !== ''
-            && (bool) data_get($payload, 'data.key.fromMe', false)
-        ) {
+        if ($instance !== '' && (bool) data_get($payload, 'data.key.fromMe', false)) {
             $waiBot = AiBot::query()
                 ->whereKey(39)
                 ->where('whatsapp_instance', $instance)
+                ->where(fn ($query) => $query
+                    ->whereNull('business_sector')
+                    ->orWhere('business_sector', '!=', 'textile'))
                 ->first();
 
             if ($waiBot) {
@@ -99,20 +81,14 @@ class ProcessWhatsAppWebhook implements ShouldQueue
                 ));
 
                 if ($number !== '' && $text !== '') {
-                    $outboundKey = 'wai_api_outbound:'.sha1(
-                        $instance.'|'.$number.'|'.$text
-                    );
-
+                    $outboundKey = 'wai_api_outbound:'.sha1($instance.'|'.$number.'|'.$text);
                     $isAiOutbound = (bool) Cache::pull($outboundKey, false);
 
                     if (! $isAiOutbound) {
                         ConversationControl::query()
                             ->where('ai_bot_id', 39)
                             ->where('whatsapp_number', $number)
-                            ->update([
-                                'human_takeover' => true,
-                                'updated_at' => now(),
-                            ]);
+                            ->update(['human_takeover' => true, 'updated_at' => now()]);
 
                         Log::info('WAI conversation paused after manual WhatsApp reply', [
                             'ai_bot_id' => 39,
@@ -123,26 +99,10 @@ class ProcessWhatsAppWebhook implements ShouldQueue
             }
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | SİGORTA OPERASYON BOTU
-        |--------------------------------------------------------------------------
-        |
-        | business_sector=insurance olan botlarda ruhsat görseli/belgesi bu
-        | noktada ayrıştırılır. Normal ürün/sipariş akışına düşmeden sigorta
-        | operasyon kaydı oluşturulur. Metin mesajları ise mevcut profesyonel
-        | WAI konuşma motorunda devam eder.
-        |
-        */
         if ($instance !== '' && $insuranceInbound->processPayload($payload)) {
             return;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | TEKSTİL CANLI SİPARİŞ / MOCKUP DEMOSU
-        |--------------------------------------------------------------------------
-        */
         if ($instance !== '' && $textileInbound->processPayload($payload)) {
             return;
         }
@@ -161,33 +121,22 @@ class ProcessWhatsAppWebhook implements ShouldQueue
                         'instance' => $instance,
                         'event' => $payload['event'] ?? null,
                     ]);
-
                     return;
                 }
 
                 unset($payload['_real_estate_authorized']);
                 $realEstateInbound->process($payload);
-
                 return;
             }
         }
 
         $payload['_wai_queued'] = true;
-
-        $request = Request::create(
-            '/api/whatsapp/webhook',
-            'POST',
-            $payload
-        );
-
+        $request = Request::create('/api/whatsapp/webhook', 'POST', $payload);
         $previousOpenAiKey = config('openai.api_key');
         $dedicatedOpenAiKey = '';
 
         if ($instance !== '') {
-            $apiBot = AiBot::query()
-                ->where('whatsapp_instance', $instance)
-                ->first();
-
+            $apiBot = AiBot::query()->where('whatsapp_instance', $instance)->first();
             $dedicatedOpenAiKey = trim((string) ($apiBot?->openai_api_key ?? ''));
         }
 
