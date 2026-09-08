@@ -37,7 +37,10 @@ class SigortaOperasyonMerkezi extends Page
 
     public static function canAccess(): bool
     {
-        return (bool) auth()->user()?->is_admin;
+        $user = auth()->user();
+
+        return (bool) $user?->is_admin
+            || strtolower((string) $user?->email) === 'dogustopcu@gmail.com';
     }
 
     public static function shouldRegisterNavigation(): bool
