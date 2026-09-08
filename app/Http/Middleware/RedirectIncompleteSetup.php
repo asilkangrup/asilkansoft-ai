@@ -54,6 +54,7 @@ class RedirectIncompleteSetup
         if (app(InsuranceTenantContext::class)->isInsuranceOnly($user)) {
             if (
                 $request->is('admin/sigorta-*')
+                || $request->is('admin/ai-bots/*/whatsapp')
                 || $request->is('admin/logout')
             ) {
                 return $next($request);
