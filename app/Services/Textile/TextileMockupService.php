@@ -191,8 +191,26 @@ class TextileMockupService
             $progress = $targetHeight > 1 ? $row / ($targetHeight - 1) : 0;
             $perspective = 0.965 + (0.035 * $progress);
             $rowWidth = max(1, (int) round($targetWidth * $perspective));
-            $foldShift = (int) round(sin(($top + $row) / 31) * 0.65);
+            $foldShift = (int) round(sin(($top + $row) / 31) * 1.15);
             $left = (int) round($centerX - ($rowWidth / 2)) + $foldShift;
+
+            $rowLuminance = 0.0;
+            $rowSamples = 0;
+            for ($sample = 0; $sample < $rowWidth; $sample += 4) {
+                $sampleX = $left + $sample;
+                $sampleY = $top + $row;
+                if ($sampleX < 0 || $sampleX >= self::SIZE || $sampleY < 0 || $sampleY >= self::SIZE) {
+                    continue;
+                }
+
+                $samplePixel = imagecolorat($canvas, $sampleX, $sampleY);
+                $sampleRed = ($samplePixel >> 16) & 0xff;
+                $sampleGreen = ($samplePixel >> 8) & 0xff;
+                $sampleBlue = $samplePixel & 0xff;
+                $rowLuminance += (0.2126 * $sampleRed) + (0.7152 * $sampleGreen) + (0.0722 * $sampleBlue);
+                $rowSamples++;
+            }
+            $rowAverage = $rowLuminance / max(1, $rowSamples);
 
             for ($column = 0; $column < $rowWidth; $column++) {
                 $sourceX = min(
@@ -223,8 +241,8 @@ class TextileMockupService
 
                 // Transfer local shirt highlights and folds into the ink. The
                 // tiny deterministic weave variation prevents a flat digital surface.
-                $shade = max(0.70, min(1.14, 0.72 + ($fabricLuminance / 105)));
-                $weave = ((($destinationX * 13) + ($destinationY * 7)) % 5 - 2) * 0.006;
+                $shade = max(0.70, min(1.14, 0.92 + (($fabricLuminance - $rowAverage) / 48)));
+                $weave = ((($destinationX * 13) + ($destinationY * 7)) % 5 - 2) * 0.012;
                 $shade += $weave;
 
                 $edgeFade = min(
@@ -234,7 +252,7 @@ class TextileMockupService
                     ($rowWidth - $column) / 2,
                     ($targetHeight - $row) / 2,
                 );
-                $opacity = ((127 - $alpha) / 127) * 0.94 * $edgeFade;
+                $opacity = ((127 - $alpha) / 127) * 0.90 * $edgeFade;
 
                 $printRed = min(255, max(0, (int) round($artRed * $shade)));
                 $printGreen = min(255, max(0, (int) round($artGreen * $shade)));
