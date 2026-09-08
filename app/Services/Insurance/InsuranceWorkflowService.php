@@ -40,6 +40,7 @@ class InsuranceWorkflowService
                 'vehicle_model' => $data['vehicle_model'] ?? null,
                 'vehicle_year' => $data['vehicle_year'] ?? null,
                 'integration_status' => $this->openClient->configured() ? 'ready' : 'credentials_pending',
+                'payment_status' => 'not_started',
                 'data' => Arr::except($data, ['organization_id', 'assigned_user_id']),
             ]);
 
@@ -79,6 +80,7 @@ class InsuranceWorkflowService
             $prices = $this->openClient->getTeklifFiyatlari((int) $case->open_teklif_id);
 
             DB::transaction(function () use ($case, $summary, $detail, $prices, $actor): void {
+                $case->forceFill(['selected_quote_id' => null])->save();
                 $case->quotes()->delete();
 
                 foreach ($this->normalizePrices($prices) as $price) {
@@ -106,6 +108,7 @@ class InsuranceWorkflowService
                     'integration_status' => 'synced',
                     'integration_error' => null,
                     'last_synced_at' => now(),
+                    'payment_status' => 'not_started',
                     'data' => $data,
                 ])->save();
 
@@ -127,17 +130,84 @@ class InsuranceWorkflowService
         return $case->refresh();
     }
 
-    public function moveToPayment(InsuranceCase $case, ?User $actor = null): InsuranceCase
+    public function selectQuote(InsuranceCase $case, InsuranceQuoteResult $quote, ?User $actor = null): InsuranceCase
     {
-        $case->forceFill(['status' => 'payment_ready'])->save();
-        $this->event($case, 'payment_ready', 'İşlem ödeme aşamasına taşındı', null, $actor);
+        if ((int) $quote->insurance_case_id !== (int) $case->id) {
+            throw new \RuntimeException('Seçilen teklif bu sigorta dosyasına ait değil.');
+        }
+
+        $case->forceFill(['selected_quote_id' => $quote->id])->save();
+
+        $this->event($case, 'quote_selected', 'Teklif seçildi', null, $actor, [
+            'quote_id' => $quote->id,
+            'company_name' => $quote->company_name,
+            'premium' => $quote->premium,
+            'currency' => $quote->currency,
+        ]);
+
         return $case->refresh();
     }
 
-    public function markIssued(InsuranceCase $case, ?User $actor = null): InsuranceCase
+    public function moveToPayment(InsuranceCase $case, ?User $actor = null): InsuranceCase
     {
-        $case->forceFill(['status' => 'issued'])->save();
-        $this->event($case, 'policy_issued', 'Poliçe tamamlandı', null, $actor);
+        if (! $case->selected_quote_id) {
+            $bestQuote = $case->quotes()->whereNotNull('premium')->orderBy('premium')->first();
+            if ($bestQuote) {
+                $case->selected_quote_id = $bestQuote->id;
+            }
+        }
+
+        $case->forceFill([
+            'status' => 'payment_ready',
+            'payment_status' => 'ready',
+            'payment_ready_at' => now(),
+        ])->save();
+
+        $this->event($case, 'payment_ready', 'İşlem ödeme aşamasına taşındı', null, $actor, [
+            'selected_quote_id' => $case->selected_quote_id,
+        ]);
+
+        return $case->refresh();
+    }
+
+    public function markPaymentPaid(
+        InsuranceCase $case,
+        ?string $paymentMethod = null,
+        ?string $paymentReference = null,
+        ?User $actor = null
+    ): InsuranceCase {
+        $case->forceFill([
+            'payment_status' => 'paid',
+            'payment_method' => $paymentMethod ?: $case->payment_method,
+            'payment_reference' => $paymentReference ?: $case->payment_reference,
+        ])->save();
+
+        $this->event($case, 'payment_paid', 'Ödeme tamamlandı', null, $actor, [
+            'payment_method' => $case->payment_method,
+            'payment_reference' => $case->payment_reference,
+        ]);
+
+        return $case->refresh();
+    }
+
+    public function markIssued(
+        InsuranceCase $case,
+        ?User $actor = null,
+        ?string $policyNumber = null
+    ): InsuranceCase {
+        $case->forceFill([
+            'status' => 'issued',
+            'payment_status' => $case->payment_status === 'not_started' ? 'ready' : $case->payment_status,
+            'policy_number' => $policyNumber ?: $case->policy_number,
+            'issued_at' => now(),
+            'closed_by_user_id' => $actor?->id,
+        ])->save();
+
+        $this->event($case, 'policy_issued', 'Poliçe tamamlandı', null, $actor, [
+            'policy_number' => $case->policy_number,
+            'selected_quote_id' => $case->selected_quote_id,
+        ]);
+
         return $case->refresh();
     }
 
