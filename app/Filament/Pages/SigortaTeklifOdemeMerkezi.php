@@ -57,7 +57,7 @@ class SigortaTeklifOdemeMerkezi extends Page
         return [
             'quoted' => (clone $q)->where('status','quoted')->count(),
             'payment' => (clone $q)->where('status','payment_ready')->count(),
-            'issued_today' => (clone $q)->where('status','issued')->whereDate('updated_at',today())->count(),
+            'issued_today' => (clone $q)->where('status','issued')->whereDate('issued_at',today())->count(),
             'attention' => (clone $q)->whereIn('status',['needs_attention','failed'])->count(),
         ];
     }
@@ -154,6 +154,6 @@ class SigortaTeklifOdemeMerkezi extends Page
     }
     public function bestQuote(InsuranceCase $case)
     {
-        return $case->quotes->first(fn ($quote) => $quote->premium !== null);
+        return $case->quotes->first(fn ($quote) => $quote->premium !== null && (float) $quote->premium > 0);
     }
 }
