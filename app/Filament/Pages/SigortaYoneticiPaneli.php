@@ -23,8 +23,7 @@ class SigortaYoneticiPaneli extends Page
 
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-        return (bool) $user?->is_admin || strtolower((string) $user?->email) === 'dogustopcu@gmail.com';
+        return app(InsuranceTenantContext::class)->canUseInsurance();
     }
 
     public static function shouldRegisterNavigation(): bool { return static::canAccess(); }
@@ -44,28 +43,39 @@ class SigortaYoneticiPaneli extends Page
         $today = today();
         $month = now()->startOfMonth();
         $all = $this->tenantCases();
-        $issuedMonth = (clone $all)->where('status','issued')->where('updated_at','>=',$month)->count();
-        $createdMonth = (clone $all)->where('created_at','>=',$month)->count();
+
+        $createdMonth = (clone $all)->where('created_at', '>=', $month)->count();
+        $cohortIssuedMonth = (clone $all)
+            ->where('created_at', '>=', $month)
+            ->where('status', 'issued')
+            ->count();
+        $issuedMonth = (clone $all)
+            ->where('status', 'issued')
+            ->where('issued_at', '>=', $month)
+            ->count();
 
         $avgMinutes = (clone $all)
-            ->where('status','issued')
-            ->where('updated_at','>=',$month)
-            ->get(['created_at','updated_at'])
-            ->avg(fn ($case) => $case->created_at && $case->updated_at ? $case->created_at->diffInMinutes($case->updated_at) : null);
+            ->where('status', 'issued')
+            ->where('issued_at', '>=', $month)
+            ->whereNotNull('issued_at')
+            ->get(['created_at', 'issued_at'])
+            ->avg(fn ($case) => $case->created_at && $case->issued_at
+                ? $case->created_at->diffInMinutes($case->issued_at)
+                : null);
 
-        $caseIds = (clone $all)->where('created_at','>=',$month)->pluck('id');
+        $caseIds = (clone $all)->where('created_at', '>=', $month)->pluck('id');
         $bestQuotedPremium = $caseIds->isEmpty()
             ? null
             : InsuranceQuoteResult::query()->whereIn('insurance_case_id', $caseIds)->min('premium');
 
         return [
-            'today_inbound' => (clone $all)->whereDate('created_at',$today)->count(),
-            'today_issued' => (clone $all)->where('status','issued')->whereDate('updated_at',$today)->count(),
+            'today_inbound' => (clone $all)->whereDate('created_at', $today)->count(),
+            'today_issued' => (clone $all)->where('status', 'issued')->whereDate('issued_at', $today)->count(),
             'active' => (clone $all)->active()->count(),
-            'attention' => (clone $all)->whereIn('status',['needs_attention','failed'])->count(),
+            'attention' => (clone $all)->whereIn('status', ['needs_attention', 'failed'])->count(),
             'month_created' => $createdMonth,
             'month_issued' => $issuedMonth,
-            'conversion' => $createdMonth > 0 ? round(($issuedMonth / $createdMonth) * 100, 1) : 0,
+            'conversion' => $createdMonth > 0 ? round(($cohortIssuedMonth / $createdMonth) * 100, 1) : 0,
             'avg_minutes' => $avgMinutes !== null ? round((float) $avgMinutes, 1) : null,
             'quoted_value' => $bestQuotedPremium !== null ? (float) $bestQuotedPremium : 0,
         ];
@@ -78,18 +88,18 @@ class SigortaYoneticiPaneli extends Page
 
         $members = User::query()
             ->whereHas('organizations', fn ($q) => $q
-                ->whereIn('organizations.id',$organizationIds)
-                ->where('organization_user.status','active'))
+                ->whereIn('organizations.id', $organizationIds)
+                ->where('organization_user.status', 'active'))
             ->orderBy('name')
-            ->get(['id','name','email']);
+            ->get(['id', 'name', 'email']);
 
         return $members->map(function (User $member): array {
             $base = $this->tenant()->scope(InsuranceCase::query())
-                ->where('assigned_user_id',$member->id);
+                ->where('assigned_user_id', $member->id);
 
             $active = (clone $base)->active()->count();
-            $issuedToday = (clone $base)->where('status','issued')->whereDate('updated_at',today())->count();
-            $issuedMonth = (clone $base)->where('status','issued')->where('updated_at','>=',now()->startOfMonth())->count();
+            $issuedToday = (clone $base)->where('status', 'issued')->whereDate('issued_at', today())->count();
+            $issuedMonth = (clone $base)->where('status', 'issued')->where('issued_at', '>=', now()->startOfMonth())->count();
 
             return [
                 'id' => $member->id,
