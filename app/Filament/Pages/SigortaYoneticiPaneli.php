@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\InsuranceCase;
 use App\Models\InsuranceQuoteResult;
 use App\Models\User;
+use App\Services\Insurance\InsuranceTenantContext;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -28,19 +29,29 @@ class SigortaYoneticiPaneli extends Page
 
     public static function shouldRegisterNavigation(): bool { return static::canAccess(); }
 
+    private function tenantCases()
+    {
+        return app(InsuranceTenantContext::class)->scopeCases(InsuranceCase::query());
+    }
+
     public function getSummaryProperty(): array
     {
         $today = today();
         $month = now()->startOfMonth();
-        $all = InsuranceCase::query();
+        $all = $this->tenantCases();
         $issuedMonth = (clone $all)->where('status','issued')->where('updated_at','>=',$month)->count();
         $createdMonth = (clone $all)->where('created_at','>=',$month)->count();
 
-        $avgMinutes = InsuranceCase::query()
+        $avgMinutes = (clone $all)
             ->where('status','issued')
             ->where('updated_at','>=',$month)
             ->get(['created_at','updated_at'])
             ->avg(fn ($case) => $case->created_at && $case->updated_at ? $case->created_at->diffInMinutes($case->updated_at) : null);
+
+        $caseIds = (clone $all)->where('created_at','>=',$month)->pluck('id');
+        $bestQuotedPremium = $caseIds->isEmpty()
+            ? null
+            : InsuranceQuoteResult::query()->whereIn('insurance_case_id', $caseIds)->min('premium');
 
         return [
             'today_inbound' => (clone $all)->whereDate('created_at',$today)->count(),
@@ -51,24 +62,30 @@ class SigortaYoneticiPaneli extends Page
             'month_issued' => $issuedMonth,
             'conversion' => $createdMonth > 0 ? round(($issuedMonth / $createdMonth) * 100, 1) : 0,
             'avg_minutes' => $avgMinutes !== null ? round((float) $avgMinutes, 1) : null,
-            'quoted_value' => (float) InsuranceQuoteResult::query()->where('created_at','>=',$month)->min('premium'),
+            'quoted_value' => $bestQuotedPremium !== null ? (float) $bestQuotedPremium : 0,
         ];
     }
 
     public function getTeamProperty(): Collection
     {
-        $organizationIds = auth()->user()?->activeOrganizations()->pluck('organizations.id') ?? collect();
+        $organizationIds = app(InsuranceTenantContext::class)->organizationIds();
         if ($organizationIds->isEmpty()) return collect();
 
         $members = User::query()
-            ->whereHas('organizations', fn ($q) => $q->whereIn('organizations.id',$organizationIds)->where('organization_user.status','active'))
+            ->whereHas('organizations', fn ($q) => $q
+                ->whereIn('organizations.id',$organizationIds)
+                ->where('organization_user.status','active'))
             ->orderBy('name')
             ->get(['id','name','email']);
 
         return $members->map(function (User $member): array {
-            $active = InsuranceCase::query()->where('assigned_user_id',$member->id)->active()->count();
-            $issuedToday = InsuranceCase::query()->where('assigned_user_id',$member->id)->where('status','issued')->whereDate('updated_at',today())->count();
-            $issuedMonth = InsuranceCase::query()->where('assigned_user_id',$member->id)->where('status','issued')->where('updated_at','>=',now()->startOfMonth())->count();
+            $base = app(InsuranceTenantContext::class)->scopeCases(InsuranceCase::query())
+                ->where('assigned_user_id',$member->id);
+
+            $active = (clone $base)->active()->count();
+            $issuedToday = (clone $base)->where('status','issued')->whereDate('updated_at',today())->count();
+            $issuedMonth = (clone $base)->where('status','issued')->where('updated_at','>=',now()->startOfMonth())->count();
+
             return [
                 'id' => $member->id,
                 'name' => $member->name ?: 'Ekip Üyesi',
@@ -82,6 +99,11 @@ class SigortaYoneticiPaneli extends Page
 
     public function getRecentCasesProperty(): Collection
     {
-        return InsuranceCase::query()->with('assignedUser')->latest()->limit(8)->get();
+        return app(InsuranceTenantContext::class)
+            ->scopeCases(InsuranceCase::query())
+            ->with('assignedUser')
+            ->latest()
+            ->limit(8)
+            ->get();
     }
 }
