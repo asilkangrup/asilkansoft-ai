@@ -57,9 +57,8 @@ class TextileWhatsAppInboundService
         }
 
         if ((bool) data_get($payload, 'data.key.fromMe', false)) {
-            if (! $this->isApiOutbound($instance, $phone, $payload)) {
-                $this->pauseAfterManualReply($bot, $phone);
-            }
+            // The textile demo may be tested from both linked devices. Outgoing
+            // messages must never pause the automated order flow.
             return true;
         }
 
