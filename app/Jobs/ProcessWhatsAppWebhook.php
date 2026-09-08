@@ -8,6 +8,7 @@ use App\Models\ConversationControl;
 use App\Services\CrmCustomerExtractorService;
 use App\Services\FinanceLeadExtractorService;
 use App\Services\FinanceLeadService;
+use App\Services\Insurance\InsuranceWhatsAppInboundService;
 use App\Services\LeadScoringService;
 use App\Services\MemoryService;
 use App\Services\OpenAIService;
@@ -48,6 +49,7 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         CrmCustomerExtractorService $crmCustomerExtractorService,
         RealEstateIsolationService $realEstateIsolation,
         RealEstateWhatsAppInboundService $realEstateInbound,
+        InsuranceWhatsAppInboundService $insuranceInbound,
     ): void {
         $payload = $this->payload;
 
@@ -117,6 +119,21 @@ class ProcessWhatsAppWebhook implements ShouldQueue
                     }
                 }
             }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | SİGORTA OPERASYON BOTU
+        |--------------------------------------------------------------------------
+        |
+        | business_sector=insurance olan botlarda ruhsat görseli/belgesi bu
+        | noktada ayrıştırılır. Normal ürün/sipariş akışına düşmeden sigorta
+        | operasyon kaydı oluşturulur. Metin mesajları ise mevcut profesyonel
+        | WAI konuşma motorunda devam eder.
+        |
+        */
+        if ($instance !== '' && $insuranceInbound->processPayload($payload)) {
+            return;
         }
 
         if ($instance !== '') {
