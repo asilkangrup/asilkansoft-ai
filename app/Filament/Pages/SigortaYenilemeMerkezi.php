@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 
 class SigortaYenilemeMerkezi extends Page
 {
-    protected string $view = 'filament.pages.sigorta-yenileme-merkezi';
+    protected string $view = 'filament.pages.sigorta-yenileme-premium';
     protected static ?string $title = 'Poliçe Yenileme & Geri Kazanım';
     protected static ?string $navigationLabel = 'Yenileme Merkezi';
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowPathRoundedSquare;
@@ -32,7 +32,10 @@ class SigortaYenilemeMerkezi extends Page
 
     public static function canAccess(): bool
     {
-        return (bool) auth()->user()?->is_admin;
+        $user = auth()->user();
+
+        return (bool) $user?->is_admin
+            || strtolower((string) $user?->email) === 'dogustopcu@gmail.com';
     }
 
     public static function shouldRegisterNavigation(): bool
