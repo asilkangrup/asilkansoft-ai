@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Filament\Pages\KurulumMerkezi;
+use App\Support\InsuranceTenantContext;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -36,6 +37,29 @@ class RedirectIncompleteSetup
 
         if ($user->is_admin) {
             return $next($request);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | BAĞIMSIZ SİGORTA ÜRÜNÜ
+        |--------------------------------------------------------------------------
+        |
+        | Yalnız sigorta ürünü kullanan tenantlar genel WAI kurulumuna veya
+        | başka ürün ekranlarına düşmez. Sigorta route'ları ve çıkış işlemi
+        | normal şekilde devam eder; diğer panel route'ları operasyon merkezine
+        | yönlendirilir.
+        |
+        */
+
+        if (app(InsuranceTenantContext::class)->isInsuranceOnly($user)) {
+            if (
+                $request->is('admin/sigorta-*')
+                || $request->is('admin/logout')
+            ) {
+                return $next($request);
+            }
+
+            return redirect()->to('/admin/sigorta-operasyon');
         }
 
         /*
