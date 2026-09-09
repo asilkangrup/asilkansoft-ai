@@ -79,7 +79,9 @@ class WaiSalesOutreachService
 
             return [
                 'action' => 'reply',
-                'answer' => 'Tamam. Şu an size özel hazırlanmış bir yapay zekayı sistemden oluşturup test linki olarak gönderebilirim. WhatsApp’ınıza bağlamadan önce test edebilirsiniz; beğenirseniz 3 gün ücretsiz kullanabilirsiniz. Hazırlayayım mı?',
+                'answer' => $this->isTextileSector($sector)
+                    ? "Size anlatmak yerine canlı gösterebiliriz. Hazır tekstil demo hattımıza müşteri gibi bir sipariş yazıp logonuzu gönderiyorsunuz; yapay zeka siparişi topluyor ve logonuzu tişört üzerinde hazırlayıp WhatsApp’tan geri sunuyor. Demo numarasını göndereyim mi?"
+                    : 'Tamam. Şu an size özel hazırlanmış bir yapay zekayı sistemden oluşturup test linki olarak gönderebilirim. WhatsApp’ınıza bağlamadan önce test edebilirsiniz; beğenirseniz 3 gün ücretsiz kullanabilirsiniz. Hazırlayayım mı?',
                 'sector' => $sector,
             ];
         }
@@ -211,7 +213,7 @@ class WaiSalesOutreachService
             'Spor / Fitness' => 'Üyelik, ders, paket ve randevu taleplerini karşılayıp kayıt sürecine ilerletebilir.',
             'Dövme / Tattoo' => 'Tasarım, bölge, ölçü ve randevu taleplerini toplayıp görüşme veya randevu aşamasına taşıyabilir.',
             'Çiçekçi' => 'Ürün, teslimat adresi, tarih ve sipariş taleplerini toplayıp sipariş aşamasına ilerletebilir.',
-            'Moda / Tekstil' => 'Ürün, beden, model, stok ve sipariş taleplerini karşılayıp satış aşamasına ilerletebilir.',
+            'Tişört Baskı / Tekstil', 'Moda / Tekstil' => 'Müşteriden ürün, renk, adet, beden ve baskı bilgisini alabilir; gönderilen logoyu tişört üzerinde görselleştirip WhatsApp’tan müşteriye sunabilir.',
             'Hediyelik / Dekorasyon' => 'Ürün, model, teslimat ve sipariş taleplerini karşılayıp satış aşamasına ilerletebilir.',
             default => 'WhatsApp’tan gelen müşterileri karşılayabilir ve taleplerini doğru ekibe yönlendirebilir.',
         };
@@ -229,6 +231,7 @@ class WaiSalesOutreachService
             'Mobilya / Ev Dekorasyon' => 'Sizin sektörde müşteriler model, ölçü, renk, fiyat ve teslim süresini aynı anda sorabiliyor. Yoğunlukta cevap gecikince müşteri başka firmadan teklif alabiliyor. Size de tanıdık geliyor mu?',
             'Teknik Servis / Tamir' => 'Sizin sektörde müşteriler arıza, konum, aciliyet, servis saati ve fiyatı aynı anda soruyor. Hızlı dönüş olmayınca özellikle acil müşteriler başka ustaya geçebiliyor. Size de tanıdık geliyor mu?',
             'Emlak' => 'Sizin sektörde müşteriler fiyat, konum, özellikler ve randevu için peş peşe yazıyor. Özellikle sıcak bir alıcıya geç dönülünce başka ilana veya danışmana kayabiliyor. Size de tanıdık geliyor mu?',
+            'Tişört Baskı / Tekstil', 'Moda / Tekstil' => 'Müşteriler genelde logo gönderip “Bu tişörtte nasıl görünür?”, ardından adet, renk, baskı türü, fiyat ve teslim süresi soruyor. Her müşteriye tek tek taslak hazırlamak ve aynı soruları cevaplamak ciddi zaman alıyor. Size de tanıdık geliyor mu?',
             default => 'WhatsApp’ta aynı anda birkaç müşteri yazdığında hepsine hızlı ve eksiksiz dönmek zor olabiliyor. Geç cevap verilen müşteriler de başka işletmeye kayabiliyor. Size de tanıdık geliyor mu?',
         };
     }
@@ -243,10 +246,16 @@ class WaiSalesOutreachService
             'Mobilya / Ev Dekorasyon' => 'ölçü, model, renk ve bütçe bilgisini toplayıp müşteriyi teklif aşamasına kadar hazırlayabilir',
             'Teknik Servis / Tamir' => 'arıza, konum ve aciliyet bilgisini alıp servis veya teklif sürecini başlatabilir',
             'Emlak' => 'müşterinin lokasyon, bütçe ve kriterlerini toplayıp uygun portföy veya görüşme aşamasına hazırlayabilir',
+            'Tişört Baskı / Tekstil', 'Moda / Tekstil' => 'ürün modeli, renk, adet, beden ve baskı detaylarını tek konuşmada toplayabilir; DTF ile serigrafiyi ihtiyaca göre ayırabilir ve müşterinin gönderdiği logoyu seçilen tişört üzerinde görselleştirerek WhatsApp’tan geri sunabilir',
             default => 'müşteriyi 7/24 karşılayabilir, sorularını işletmenizin bilgilerine göre cevaplayıp satış, teklif veya randevu aşamasına ilerletebilir',
         };
 
         return "WAI tam olarak bu noktada devreye giriyor. {$detail}. Siz meşgulken veya uyurken bile WhatsApp boş kalmıyor. Böyle bir sistem olsa işinizi ciddi anlamda rahatlatır mı sizce?";
+    }
+
+    public function isTextileSector(string $sector): bool
+    {
+        return in_array($sector, ['Tişört Baskı / Tekstil', 'Moda / Tekstil'], true);
     }
 
     private function hasHumanAffirmation(string $message): bool
