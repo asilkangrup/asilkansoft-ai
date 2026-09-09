@@ -81,22 +81,17 @@ class TextileMockupService
         }
 
         $multiple = count($artworks) > 1;
-        $width = $multiple ? 1600 : 1200;
-        $height = 1200;
-        $canvas = imagecreatetruecolor($width, $height);
-        imageantialias($canvas, true);
-        $this->paintMugStudio($canvas, $width, $height);
-
+        $canvas = $this->loadPhotoMugTemplate($multiple);
         $wrap = $this->buildMugWrap($artworks, $multiple ? 1800 : 1000, 650);
 
         if ($multiple) {
-            $this->drawMagicMug($canvas, $wrap, 65, 390, 500, 610, -0.27);
-            $this->drawMagicMug($canvas, $wrap, 550, 300, 500, 650, 0.0);
-            $this->drawMagicMug($canvas, $wrap, 1035, 390, 500, 610, 0.27);
-            $this->centeredText($canvas, 'BASKI ÖNİZLEMESİ • ÜÇ AÇI', 1045, 22, [38, 46, 43]);
+            // Coordinates match the three real mugs in the photographic table template.
+            $this->placePhotoMugPrint($canvas, $wrap, 215, 405, 235, 315, 0.17);
+            $this->placePhotoMugPrint($canvas, $wrap, 603, 405, 235, 315, 0.50);
+            $this->placePhotoMugPrint($canvas, $wrap, 995, 405, 235, 315, 0.83);
         } else {
-            $this->drawMagicMug($canvas, $wrap, 250, 250, 700, 780, 0.0);
-            $this->centeredText($canvas, 'BASKI ÖNİZLEMESİ', 1080, 22, [38, 46, 43]);
+            // Large printable face of the single real mug.
+            $this->placePhotoMugPrint($canvas, $wrap, 398, 250, 420, 490, 0.50);
         }
 
         ob_start();
@@ -114,6 +109,93 @@ class TextileMockupService
         }
 
         return base64_encode($jpeg);
+    }
+
+    private function loadPhotoMugTemplate(bool $multiple): mixed
+    {
+        $filename = $multiple ? 'magic-mug-triple-v2.jpg' : 'magic-mug-single-v2.jpg';
+        $path = public_path('assets/textile/'.$filename);
+        if (! is_file($path)) {
+            throw new RuntimeException('Fotoğrafik bardak şablonu bulunamadı.');
+        }
+
+        $canvas = @imagecreatefromjpeg($path);
+        if ($canvas === false) {
+            throw new RuntimeException('Fotoğrafik bardak şablonu açılamadı.');
+        }
+
+        return $canvas;
+    }
+
+    private function placePhotoMugPrint(
+        mixed $canvas,
+        mixed $wrap,
+        int $x,
+        int $y,
+        int $width,
+        int $height,
+        float $viewCenter,
+    ): void {
+        $sourceWidth = imagesx($wrap);
+        $sourceHeight = imagesy($wrap);
+
+        for ($dx = 0; $dx < $width; $dx++) {
+            $normal = (($dx / max(1, $width - 1)) * 2) - 1;
+            $curve = sqrt(max(0.0, 1 - ($normal * $normal)));
+            $sourceNormal = $viewCenter + ($normal * 0.285);
+            $sourceX = ((int) round($sourceNormal * $sourceWidth) % $sourceWidth + $sourceWidth) % $sourceWidth;
+            $bow = (int) round((1 - $curve) * 7);
+
+            for ($dy = 0; $dy < $height; $dy++) {
+                $destinationX = $x + $dx;
+                $destinationY = $y + $dy + $bow;
+                if (
+                    $destinationX < 0 || $destinationX >= imagesx($canvas)
+                    || $destinationY < 0 || $destinationY >= imagesy($canvas)
+                ) {
+                    continue;
+                }
+
+                $sourceY = min($sourceHeight - 1, (int) floor(($dy / max(1, $height - 1)) * ($sourceHeight - 1)));
+                $artPixel = imagecolorat($wrap, $sourceX, $sourceY);
+                $basePixel = imagecolorat($canvas, $destinationX, $destinationY);
+
+                $artRed = ($artPixel >> 16) & 0xff;
+                $artGreen = ($artPixel >> 8) & 0xff;
+                $artBlue = $artPixel & 0xff;
+                $baseRed = ($basePixel >> 16) & 0xff;
+                $baseGreen = ($basePixel >> 8) & 0xff;
+                $baseBlue = $basePixel & 0xff;
+                $baseLuminance = (0.2126 * $baseRed) + (0.7152 * $baseGreen) + (0.0722 * $baseBlue);
+
+                // The customer's artwork follows the cylinder: darker at the
+                // sides, softly bowed at top/bottom, and crossed by the real
+                // ceramic highlights already present in the photograph.
+                $cylinderShade = 0.73 + (0.27 * $curve);
+                $surfaceShade = max(0.76, min(1.13, 0.82 + ($baseLuminance / 380)));
+                $shade = $cylinderShade * $surfaceShade;
+
+                $edgeFade = min(
+                    1.0,
+                    ($dx + 1) / 12,
+                    ($width - $dx) / 12,
+                    ($dy + 1) / 10,
+                    ($height - $dy) / 10,
+                );
+                $highlightPreservation = $baseLuminance > 120 ? 0.74 : 0.93;
+                $opacity = $edgeFade * $highlightPreservation;
+
+                $printRed = min(255, max(0, (int) round($artRed * $shade)));
+                $printGreen = min(255, max(0, (int) round($artGreen * $shade)));
+                $printBlue = min(255, max(0, (int) round($artBlue * $shade)));
+
+                $outRed = (int) round(($printRed * $opacity) + ($baseRed * (1 - $opacity)));
+                $outGreen = (int) round(($printGreen * $opacity) + ($baseGreen * (1 - $opacity)));
+                $outBlue = (int) round(($printBlue * $opacity) + ($baseBlue * (1 - $opacity)));
+
+                imagesetpixel($canvas, $destinationX, $destinationY, ($outRed << 16) | ($outGreen << 8) | $outBlue);
+            }
+        }
     }
 
     private function paintMugStudio(mixed $canvas, int $width, int $height): void
