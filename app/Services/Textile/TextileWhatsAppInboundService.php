@@ -150,6 +150,48 @@ class TextileWhatsAppInboundService
 
         Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
 
+        $stateChanged = $this->stateProgressed($previousState, $state);
+        $isTextMessage = ($mediaContext['type'] ?? 'text') === 'text';
+
+        if (
+            $isTextMessage
+            && $stateChanged
+            && ($state['customer_supplied'] ?? false)
+            && ($state['quantity'] ?? null)
+            && (int) $state['quantity'] < 30
+        ) {
+            $this->sendText(
+                $bot,
+                $conversation,
+                $instance,
+                $phone,
+                'Baskı yapılacak tişörtleri sizin temin etmeniz durumunda minimum sipariş 30 adettir. Tişörtü bizden alırsanız minimum adet yok; 1 adet bile hazırlayabiliriz.',
+            );
+            $this->consumeTrial($bot);
+
+            return true;
+        }
+
+        if (
+            $isTextMessage
+            && $stateChanged
+            && ($state['color'] ?? null)
+            && ! in_array($state['color'], ['black', 'white'], true)
+            && ($state['quantity'] ?? null)
+            && (int) $state['quantity'] < 60
+        ) {
+            $this->sendText(
+                $bot,
+                $conversation,
+                $instance,
+                $phone,
+                'Siyah ve beyaz dışındaki renklerde üretim minimum 60 adettir. Adedi 60 veya üzerine çıkarabiliriz; isterseniz mevcut adette siyah ya da beyaz oversize seçeneğiyle devam edebiliriz.',
+            );
+            $this->consumeTrial($bot);
+
+            return true;
+        }
+
         $readyForMockup = ($state['logo_received'] ?? false)
             && ($state['position'] ?? null)
             && ($state['product'] ?? null)
@@ -157,7 +199,6 @@ class TextileWhatsAppInboundService
             && ($state['color'] ?? null)
             && ! ($state['mockup_sent'] ?? false);
 
-        $isTextMessage = ($mediaContext['type'] ?? 'text') === 'text';
         $shouldAnswerNaturally = $isTextMessage
             && ! $readyForMockup
             && ! $this->approvalMessage($message)
@@ -273,7 +314,7 @@ class TextileWhatsAppInboundService
     {
         $lower = Str::lower($message);
 
-        if (preg_match('/\b([1-9][0-9]{1,4})\s*(?:adet|tane)\b/u', $lower, $match)) {
+        if (preg_match('/\b([1-9][0-9]{0,4})\s*(?:adet|tane)\b/u', $lower, $match)) {
             $state['quantity'] = min(50000, (int) $match[1]);
         }
 
@@ -294,7 +335,9 @@ class TextileWhatsAppInboundService
 
         $colors = [
             'siyah' => 'black', 'beyaz' => 'white', 'lacivert' => 'navy',
-            'bordo' => 'burgundy', 'bej' => 'beige',
+            'bordo' => 'burgundy', 'bej' => 'beige', 'kırmızı' => 'red',
+            'kirmizi' => 'red', 'mavi' => 'blue', 'yeşil' => 'green',
+            'yesil' => 'green', 'gri' => 'gray', 'füme' => 'charcoal',
         ];
         foreach ($colors as $needle => $value) {
             if (str_contains($lower, $needle)) {
@@ -318,6 +361,27 @@ class TextileWhatsAppInboundService
             }
         }
 
+        $customerSuppliedPhrases = [
+            'ben getireceğim', 'ben getirecegim', 'biz getireceğiz', 'biz getirecegiz',
+            'kendim temin', 'kendimiz temin', 'ürünleri biz', 'urunleri biz',
+            'tişörtler benden', 'tisortler benden', 'müşteri temin', 'musteri temin',
+        ];
+        foreach ($customerSuppliedPhrases as $phrase) {
+            if (str_contains($lower, $phrase)) {
+                $state['customer_supplied'] = true;
+                break;
+            }
+        }
+
+        if (
+            str_contains($lower, 'tişört dahil')
+            || str_contains($lower, 'tisort dahil')
+            || str_contains($lower, 'tişört sizden')
+            || str_contains($lower, 'tisort sizden')
+        ) {
+            $state['customer_supplied'] = false;
+        }
+
         if (str_contains($lower, 'serigraf')) {
             $state['print_type'] = 'Tek Renk Serigrafi';
         } elseif (str_contains($lower, 'dtf')) {
@@ -339,7 +403,7 @@ class TextileWhatsAppInboundService
     {
         $normalized = Str::lower($message);
 
-        $hasQuantity = (bool) preg_match('/\b[1-9][0-9]{1,4}\s*(?:adet|tane)\b/u', $normalized);
+        $hasQuantity = (bool) preg_match('/\b[1-9][0-9]{0,4}\s*(?:adet|tane)\b/u', $normalized);
         $hasProduct = str_contains($normalized, 'tişört')
             || str_contains($normalized, 'tisort')
             || str_contains($normalized, 'oversize')
@@ -376,6 +440,7 @@ class TextileWhatsAppInboundService
             'logo_received',
             'mockup_sent',
             'approved',
+            'customer_supplied',
         ] as $key) {
             if (($before[$key] ?? null) !== ($after[$key] ?? null)) {
                 return true;
@@ -461,6 +526,9 @@ class TextileWhatsAppInboundService
             'Görsel' => ($state['logo_received'] ?? false) ? 'alındı' : 'henüz alınmadı',
             'Önizleme' => ($state['mockup_sent'] ?? false) ? 'gönderildi' : 'henüz gönderilmedi',
             'Onay' => ($state['approved'] ?? false) ? 'alındı' : 'henüz alınmadı',
+            'Tişört kaynağı' => ($state['customer_supplied'] ?? null) === true
+                ? 'müşteri kendi ürününü temin edecek'
+                : (($state['customer_supplied'] ?? null) === false ? 'tişört firmadan alınacak' : 'henüz belirtilmedi'),
         ];
 
         $lines = collect($status)
@@ -541,6 +609,23 @@ PROMPT;
 
     private function quote(array $state): array
     {
+        $quantity = max(1, (int) ($state['quantity'] ?? 250));
+        $position = (string) ($state['position'] ?? 'front_center');
+        $color = (string) ($state['color'] ?? 'black');
+
+        if ($quantity === 1) {
+            return [750, 750, 'Numune — kargo dahil'];
+        }
+
+        if (
+            $quantity >= 5
+            && $quantity <= 30
+            && $color === 'white'
+            && in_array($position, ['left_chest', 'front_center', 'front_large'], true)
+        ) {
+            return [300, 300 * $quantity, 'Sipariş detaylarına göre netleşir'];
+        }
+
         $product = (string) ($state['product'] ?? 'Premium Oversize Tişört');
         $base = match ($product) {
             'Regular Fit Tişört' => 135,
@@ -549,7 +634,6 @@ PROMPT;
             default => 155,
         };
         $print = ($state['print_type'] ?? 'DTF Baskı') === 'Tek Renk Serigrafi' ? 26 : 34;
-        $quantity = max(10, (int) ($state['quantity'] ?? 250));
         $discount = $quantity >= 1000 ? .14 : ($quantity >= 500 ? .10 : ($quantity >= 250 ? .06 : ($quantity >= 100 ? .03 : 0)));
         $unit = (int) round(($base + $print) * (1 - $discount));
 
@@ -643,6 +727,7 @@ PROMPT;
             'logo_received' => false,
             'mockup_sent' => false,
             'approved' => false,
+            'customer_supplied' => null,
         ];
     }
 
