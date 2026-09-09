@@ -114,7 +114,7 @@
 
         <section class="card optional-step" data-title="Ek bilgiler">
             <span class="step-tag">Asistanın ince ayarı</span><h2>Başka neyi mutlaka bilsin?</h2><p class="help">Müşterilerin sık sorduğu, diğer bölümlere girmeyen bilgileri buraya ekleyin.</p>
-            <label>Sık sorulan başka sorular ve cevapları <span class="optional">— isteğe bağlı</span></label><textarea name="frequent_questions" placeholder="Yıkamada çıkar mı? Numune var mı? Renk tonu aynı olur mu? Paketleme yapılıyor mu?">{{ old('frequent_questions',$values['frequent_questions']) }}</textarea>
+            <label>Bunların dışında eklemek istediğiniz bilgiler <span class="optional">— isteğe bağlı</span></label><textarea name="frequent_questions" placeholder="Firmanız, ürünleriniz veya çalışma şekliniz hakkında yapay zekânın bilmesini istediğiniz başka bir bilgi varsa buraya yazın. Sık sorulan soru ve cevapları da ekleyebilirsiniz.">{{ old('frequent_questions',$values['frequent_questions']) }}</textarea>
             <label>Asistanın kesinlikle söz vermemesi gerekenler</label><textarea name="forbidden_promises">{{ old('forbidden_promises',$values['forbidden_promises']) }}</textarea>
         </section>
 
