@@ -165,7 +165,7 @@ class TextileWhatsAppInboundService
                 $conversation,
                 $instance,
                 $phone,
-                'Baskı yapılacak tişörtleri sizin temin etmeniz durumunda minimum sipariş 30 adettir. Tişörtü bizden alırsanız minimum adet yok; 1 adet bile hazırlayabiliriz.',
+                "Baskı yapılacak tişörtleri sizin temin etmeniz durumunda minimum sipariş *30 adettir*.\n\nTişörtü bizden alırsanız minimum adet yok; *1 adet* bile hazırlayabiliriz.",
             );
             $this->consumeTrial($bot);
 
@@ -185,7 +185,7 @@ class TextileWhatsAppInboundService
                 $conversation,
                 $instance,
                 $phone,
-                'Siyah ve beyaz dışındaki renklerde üretim minimum 60 adettir. Adedi 60 veya üzerine çıkarabiliriz; isterseniz mevcut adette siyah ya da beyaz oversize seçeneğiyle devam edebiliriz.',
+                "Siyah ve beyaz dışındaki renklerde üretim minimum *60 adettir*.\n\nAdedi 60 veya üzerine çıkarabiliriz; isterseniz mevcut adette siyah ya da beyaz oversize seçeneğiyle devam edebiliriz.",
             );
             $this->consumeTrial($bot);
 
@@ -542,6 +542,9 @@ CANLI TEKSTİL SİPARİŞ BAĞLAMI
 Müşterinin son mesajındaki asıl soruya önce doğrudan ve doğal biçimde cevap ver.
 Aynı karşılama veya sipariş metnini tekrar etme. Önceki konuşmadaki bilgileri yeniden isteme.
 Yanıt WhatsApp'a uygun, sıcak ama profesyonel ve çoğunlukla 1-3 kısa cümle olsun.
+Yanıtı anlamlı kısa paragraflara ayır ve paragraflar arasında bir boş satır bırak.
+Önemli ifadeleri gerektiğinde WhatsApp kalın biçimi olan *metin* ile vurgula; aşırı kullanma.
+Gerçek satır sonu kullan; müşteriye \\n, \\r veya benzeri teknik kaçış ifadeleri gösterme.
 Bilgi kesin değilse uydurma; neyin ürün veya sipariş detayına göre netleşeceğini açıkça söyle.
 Müşterinin sorusu yanıtlandıktan sonra gerekiyorsa yalnızca bir eksik sipariş bilgisini doğal biçimde sor.
 Sipariş zaten onaylandıysa eski adımlara dönme; yeni bir talep belirtirse bunun yeni sipariş olduğunu netleştir.
@@ -556,7 +559,7 @@ PROMPT;
         if (preg_match('/^(merhaba|selam|selamlar|iyi günler|iyi aksamlar|iyi akşamlar)[!. ]*$/u', $normalized)) {
             return ($state['approved'] ?? false)
                 ? 'Merhaba 👋 Mevcut demo siparişiniz onaylandı. Yeni bir tasarım veya farklı bir ürün için de yardımcı olabilirim.'
-                : 'Merhaba 👋 Elbette yardımcı olayım. Baskılı tekstil siparişinizle ilgili ne öğrenmek istersiniz?';
+                : $this->nextQuestion($state);
         }
 
         if (preg_match('/(teşekkür|tesekkur|sağ ol|sag ol)/u', $normalized)) {
@@ -569,7 +572,7 @@ PROMPT;
     private function nextQuestion(array $state): string
     {
         if (! ($state['product'] ?? null) || ! ($state['quantity'] ?? null) || ! ($state['color'] ?? null)) {
-            return "Merhaba 👋 Baskılı tekstil siparişinizi birlikte hazırlayalım.\n\nÜrün modelini, rengi ve adedi tek mesajda yazabilirsiniz. Örnek: *250 adet siyah oversize tişört*.";
+            return "Merhaba 👋\n\n*Baskılı tekstil siparişinizi birlikte hazırlayalım.*\n\nÜrün modelini, rengi ve adedi tek mesajda yazabilirsiniz.\n\nÖrnek: *250 adet siyah oversize tişört.*";
         }
 
         if (! ($state['position'] ?? null)) {
@@ -642,6 +645,13 @@ PROMPT;
 
     private function sendText(AiBot $bot, ConversationControl $conversation, string $instance, string $phone, string $answer): void
     {
+        $answer = trim(str_replace(
+            ['\\r\\n', '\\n', '\\r'],
+            ["\n", "\n", "\n"],
+            $answer,
+        ));
+        $answer = preg_replace("/\\n{3,}/", "\n\n", $answer) ?? $answer;
+
         $this->markOutbound($instance, $phone, $answer);
         $send = $this->whatsAppService->sendText($instance, $phone, $answer);
 
