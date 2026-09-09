@@ -53,11 +53,10 @@ class OutreachLead extends Model
 
     public function scopeFreshFirst(Builder $query): Builder
     {
+        // Operasyon sırası: en son panele eklenen lead her zaman en üstte.
         return $query
-            ->orderByRaw('CASE WHEN source_published_at >= ? THEN 0 ELSE 1 END', [now()->subYear()])
-            ->orderByDesc('source_published_at')
-            ->orderByDesc('priority_score')
-            ->orderByDesc('created_at');
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 
     public function isFreshSource(): bool
