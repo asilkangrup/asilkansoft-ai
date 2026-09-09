@@ -106,6 +106,12 @@ class TextileWhatsAppInboundService
         $stateKey = $this->stateKey($bot, $phone);
         $state = $this->state(Cache::store('database')->get($stateKey));
 
+        // A greeting starts the temporary product-choice demo cleanly even if
+        // the same phone tested a shirt order earlier.
+        if (($mediaContext['type'] ?? 'text') === 'text' && $this->greetingMessage($message)) {
+            $state = $this->state(null);
+        }
+
         if (($state['approved'] ?? false) && $this->newOrderDetailsMessage($message)) {
             $state = $this->state(null);
         }
