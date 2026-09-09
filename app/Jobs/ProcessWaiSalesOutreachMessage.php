@@ -154,15 +154,19 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
 
                 if ($statusBeforeDecision === 'demo_offered' && $action === 'reply_hot') {
                     $sector = (string) ($decision['sector'] ?? $salesService->sectorFor($lead));
-                    $demo = $demoService->create([
-                        'company_name' => $lead->company_name,
-                        'sector' => $sector,
-                        'role' => 'sales',
-                    ]);
+                    if ($salesService->isTextileSector($sector)) {
+                        $answer = "Canlı tekstil demomuz hazır ✅\n\nWhatsApp’tan müşteri gibi “250 adet siyah oversize tişört yaptırmak istiyorum” yazın ve ardından logonuzu gönderin:\nhttps://wa.me/905364750098\n\nYapay zeka sipariş detaylarını toplayacak ve logonuzu tişört üzerinde hazırlayıp WhatsApp’tan size geri sunacak. Böylece sistemin müşterilerinize nasıl çalışacağını doğrudan kendi telefonunuzdan görebilirsiniz.";
+                    } else {
+                        $demo = $demoService->create([
+                            'company_name' => $lead->company_name,
+                            'sector' => $sector,
+                            'role' => 'sales',
+                        ]);
 
-                    if (($demo['status'] ?? null) === 'created' && filled($demo['url'] ?? null)) {
-                        $answer = "Hazır ✅ Size özel test yapay zekasını oluşturdum:\n".(string) $demo['url'].
-                            "\n\nŞu an yalnızca işletme adınızı ve sektörünüzü biliyor; buna rağmen sektörünüze uygun gerçek bir müşteri temsilcisi gibi konuşacak. Canlı kurulumda fiyatlarınızı, ürün/hizmetlerinizi, çalışma saatlerinizi, şirket kurallarınızı, kampanyalarınızı ve istediğiniz tüm yönlendirme akışlarını tamamen size özel tanımlıyoruz.\n\nTest edin; beğenirseniz 3 gün ücretsiz canlı kullanım ve kurulum desteği sağlayabiliriz.";
+                        if (($demo['status'] ?? null) === 'created' && filled($demo['url'] ?? null)) {
+                            $answer = "Hazır ✅ Size özel test yapay zekasını oluşturdum:\n".(string) $demo['url'].
+                                "\n\nŞu an yalnızca işletme adınızı ve sektörünüzü biliyor; buna rağmen sektörünüze uygun gerçek bir müşteri temsilcisi gibi konuşacak. Canlı kurulumda fiyatlarınızı, ürün/hizmetlerinizi, çalışma saatlerinizi, şirket kurallarınızı, kampanyalarınızı ve istediğiniz tüm yönlendirme akışlarını tamamen size özel tanımlıyoruz.\n\nTest edin; beğenirseniz 3 gün ücretsiz canlı kullanım ve kurulum desteği sağlayabiliriz.";
+                        }
                     }
                 }
 
