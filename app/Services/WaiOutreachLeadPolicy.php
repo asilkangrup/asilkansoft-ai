@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\OutreachLead;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -57,12 +58,20 @@ class WaiOutreachLeadPolicy
             ]);
         }
 
+        $instance = $this->connectedVerificationInstance();
+
+        if ($instance === null) {
+            throw ValidationException::withMessages([
+                'phone_e164' => 'Açık WhatsApp doğrulama bağlantısı bulunamadı; lead panele eklenmedi.',
+            ]);
+        }
+
         $response = Http::withHeaders([
             'apikey' => (string) config('evolution.api_key'),
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
         ])->timeout(30)->post(
-            rtrim((string) config('evolution.url'), '/').'/chat/whatsappNumbers/wai-sales-48-clean',
+            rtrim((string) config('evolution.url'), '/').'/chat/whatsappNumbers/'.$instance,
             ['numbers' => [$digits]],
         );
 
@@ -85,6 +94,29 @@ class WaiOutreachLeadPolicy
         $lead->whatsapp_verified_at = now();
         $lead->first_message_text = $lead->first_message_text
             ?: "Merhaba kolay gelsin, {$companyName} doğru mudur?";
+    }
+
+    private function connectedVerificationInstance(): ?string
+    {
+        return Cache::remember('wai-outreach-open-verification-instance', 60, function (): ?string {
+            try {
+                $response = Http::withHeaders([
+                    'apikey' => (string) config('evolution.api_key'),
+                    'Accept' => 'application/json',
+                ])->timeout(15)->get(
+                    rtrim((string) config('evolution.url'), '/').'/instance/fetchInstances',
+                );
+            } catch (\Throwable) {
+                return null;
+            }
+
+            if (! $response->successful() || ! is_array($response->json())) {
+                return null;
+            }
+
+            return collect($response->json())
+                ->first(fn (array $instance): bool => data_get($instance, 'connectionStatus') === 'open')['name'] ?? null;
+        });
     }
 
     private function isGenericBusinessName(string $name): bool
