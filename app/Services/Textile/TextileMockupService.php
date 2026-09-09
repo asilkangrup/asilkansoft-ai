@@ -54,6 +54,208 @@ class TextileMockupService
         return base64_encode($jpeg);
     }
 
+    /**
+     * Creates a premium dark magic-mug preview. One artwork produces one hero
+     * mug; multiple artworks are joined as a wrap and shown from three angles.
+     */
+    public function createMug(array $artworksBase64): string
+    {
+        if (! function_exists('imagecreatetruecolor') || ! function_exists('imagecreatefromstring')) {
+            throw new RuntimeException('Sunucuda GD görsel desteği etkin değil.');
+        }
+
+        $artworks = [];
+        foreach (array_slice($artworksBase64, 0, 6) as $encoded) {
+            $bytes = base64_decode($this->cleanBase64((string) $encoded), true);
+            if (! is_string($bytes) || $bytes === '' || strlen($bytes) > 8 * 1024 * 1024) {
+                continue;
+            }
+            $image = @imagecreatefromstring($bytes);
+            if ($image !== false) {
+                $artworks[] = $image;
+            }
+        }
+
+        if ($artworks === []) {
+            throw new RuntimeException('Bardak baskı görselleri açılamadı.');
+        }
+
+        $multiple = count($artworks) > 1;
+        $width = $multiple ? 1600 : 1200;
+        $height = 1200;
+        $canvas = imagecreatetruecolor($width, $height);
+        imageantialias($canvas, true);
+        $this->paintMugStudio($canvas, $width, $height);
+
+        $wrap = $this->buildMugWrap($artworks, $multiple ? 1800 : 1000, 650);
+
+        if ($multiple) {
+            $this->drawMagicMug($canvas, $wrap, 65, 390, 500, 610, -0.27);
+            $this->drawMagicMug($canvas, $wrap, 550, 300, 500, 650, 0.0);
+            $this->drawMagicMug($canvas, $wrap, 1035, 390, 500, 610, 0.27);
+            $this->centeredText($canvas, 'BASKI ÖNİZLEMESİ • ÜÇ AÇI', 1045, 22, [38, 46, 43]);
+        } else {
+            $this->drawMagicMug($canvas, $wrap, 250, 250, 700, 780, 0.0);
+            $this->centeredText($canvas, 'BASKI ÖNİZLEMESİ', 1080, 22, [38, 46, 43]);
+        }
+
+        ob_start();
+        imagejpeg($canvas, null, 93);
+        $jpeg = ob_get_clean();
+
+        foreach ($artworks as $artwork) {
+            imagedestroy($artwork);
+        }
+        imagedestroy($wrap);
+        imagedestroy($canvas);
+
+        if (! is_string($jpeg) || $jpeg === '') {
+            throw new RuntimeException('Bardak mockup çıktısı oluşturulamadı.');
+        }
+
+        return base64_encode($jpeg);
+    }
+
+    private function paintMugStudio(mixed $canvas, int $width, int $height): void
+    {
+        for ($y = 0; $y < $height; $y++) {
+            $floor = $y > 850;
+            $t = $y / max(1, $height - 1);
+            $base = $floor ? 224 - (int) (($y - 850) * 0.07) : 248 - (int) ($t * 16);
+            $color = imagecolorallocate($canvas, $base, min(255, $base + 3), min(255, $base + 1));
+            imageline($canvas, 0, $y, $width, $y, $color);
+        }
+
+        $line = imagecolorallocatealpha($canvas, 128, 142, 134, 90);
+        imageline($canvas, 0, 850, $width, 850, $line);
+    }
+
+    private function buildMugWrap(array $images, int $width, int $height): mixed
+    {
+        $wrap = imagecreatetruecolor($width, $height);
+        imagealphablending($wrap, false);
+        imagesavealpha($wrap, true);
+        imagefill($wrap, 0, 0, imagecolorallocate($wrap, 245, 245, 243));
+
+        $count = count($images);
+        $segmentWidth = (int) ceil($width / $count);
+
+        foreach ($images as $index => $source) {
+            $sourceWidth = imagesx($source);
+            $sourceHeight = imagesy($source);
+            $scale = max($segmentWidth / max(1, $sourceWidth), $height / max(1, $sourceHeight));
+            $cropWidth = max(1, (int) round($segmentWidth / $scale));
+            $cropHeight = max(1, (int) round($height / $scale));
+            $sourceX = max(0, (int) round(($sourceWidth - $cropWidth) / 2));
+            $sourceY = max(0, (int) round(($sourceHeight - $cropHeight) / 2));
+            imagecopyresampled(
+                $wrap,
+                $source,
+                $index * $segmentWidth,
+                0,
+                $sourceX,
+                $sourceY,
+                min($segmentWidth, $width - ($index * $segmentWidth)),
+                $height,
+                min($cropWidth, $sourceWidth),
+                min($cropHeight, $sourceHeight),
+            );
+        }
+
+        return $wrap;
+    }
+
+    private function drawMagicMug(
+        mixed $canvas,
+        mixed $wrap,
+        int $x,
+        int $y,
+        int $width,
+        int $height,
+        float $rotation,
+    ): void {
+        $bodyX = $x + (int) ($width * 0.15);
+        $bodyY = $y + (int) ($height * 0.10);
+        $bodyWidth = (int) ($width * 0.68);
+        $bodyHeight = (int) ($height * 0.73);
+        $handleOnRight = $rotation >= 0.12;
+        $handleX = $handleOnRight ? $bodyX + $bodyWidth - 8 : $bodyX - (int) ($width * 0.21);
+
+        $shadow = imagecolorallocatealpha($canvas, 17, 22, 20, 84);
+        imagefilledellipse($canvas, $x + (int) ($width * 0.49), $y + (int) ($height * 0.88), (int) ($width * 0.80), (int) ($height * 0.13), $shadow);
+
+        imagesetthickness($canvas, max(18, (int) ($width * 0.065)));
+        $handleDark = imagecolorallocate($canvas, 15, 17, 18);
+        imagearc(
+            $canvas,
+            $handleX + (int) ($width * 0.17),
+            $bodyY + (int) ($bodyHeight * 0.48),
+            (int) ($width * 0.33),
+            (int) ($height * 0.48),
+            $handleOnRight ? 265 : 85,
+            $handleOnRight ? 95 : 275,
+            $handleDark,
+        );
+        imagesetthickness($canvas, 1);
+
+        for ($column = 0; $column < $bodyWidth; $column++) {
+            $n = (($column / max(1, $bodyWidth - 1)) * 2) - 1;
+            $light = (int) round(33 + (24 * (1 - ($n * $n))) + (10 * exp(-pow(($n - 0.48) / 0.10, 2))));
+            $color = imagecolorallocate($canvas, $light, $light + 2, $light + 3);
+            imageline($canvas, $bodyX + $column, $bodyY + 18, $bodyX + $column, $bodyY + $bodyHeight - 18, $color);
+        }
+
+        $bottom = imagecolorallocate($canvas, 35, 38, 39);
+        imagefilledellipse($canvas, $bodyX + (int) ($bodyWidth / 2), $bodyY + $bodyHeight - 17, $bodyWidth, 45, $bottom);
+        $rim = imagecolorallocate($canvas, 22, 24, 25);
+        imagefilledellipse($canvas, $bodyX + (int) ($bodyWidth / 2), $bodyY + 18, $bodyWidth, 48, $rim);
+        $inside = imagecolorallocate($canvas, 230, 231, 228);
+        imagefilledellipse($canvas, $bodyX + (int) ($bodyWidth / 2), $bodyY + 17, (int) ($bodyWidth * 0.88), 32, $inside);
+
+        $printX = $bodyX + (int) ($bodyWidth * 0.08);
+        $printY = $bodyY + (int) ($bodyHeight * 0.18);
+        $printWidth = (int) ($bodyWidth * 0.84);
+        $printHeight = (int) ($bodyHeight * 0.62);
+        $sourceWidth = imagesx($wrap);
+        $sourceHeight = imagesy($wrap);
+        $offset = (int) round(($rotation + 0.5) * $sourceWidth);
+
+        for ($dx = 0; $dx < $printWidth; $dx++) {
+            $n = (($dx / max(1, $printWidth - 1)) * 2) - 1;
+            $curve = sqrt(max(0.0, 1 - ($n * $n)));
+            $visibleHeight = max(1, (int) round($printHeight * (0.92 + 0.08 * $curve)));
+            $top = $printY + (int) round(($printHeight - $visibleHeight) / 2);
+            $sourceX = ($offset + (int) round(($dx / max(1, $printWidth - 1)) * ($sourceWidth * 0.54))) % $sourceWidth;
+            imagecopyresampled($canvas, $wrap, $printX + $dx, $top, $sourceX, 0, 1, $visibleHeight, 1, $sourceHeight);
+
+            $edgeShade = (int) round(74 * pow(abs($n), 1.7));
+            if ($edgeShade > 0) {
+                $shade = imagecolorallocatealpha($canvas, 7, 9, 9, max(30, 127 - $edgeShade));
+                imageline($canvas, $printX + $dx, $top, $printX + $dx, $top + $visibleHeight, $shade);
+            }
+        }
+
+        $highlight = imagecolorallocatealpha($canvas, 255, 255, 255, 98);
+        imagefilledrectangle(
+            $canvas,
+            $bodyX + (int) ($bodyWidth * 0.70),
+            $bodyY + (int) ($bodyHeight * 0.16),
+            $bodyX + (int) ($bodyWidth * 0.735),
+            $bodyY + (int) ($bodyHeight * 0.73),
+            $highlight,
+        );
+    }
+
+    private function centeredText(mixed $canvas, string $text, int $y, int $size, array $rgb): void
+    {
+        $font = public_path('fonts/DejaVuSans-Bold.ttf');
+        if (function_exists('imagettftext') && is_file($font)) {
+            $box = imagettfbbox($size, 0, $font, $text);
+            $width = abs(($box[2] ?? 0) - ($box[0] ?? 0));
+            imagettftext($canvas, $size, 0, (int) ((imagesx($canvas) - $width) / 2), $y, imagecolorallocate($canvas, ...$rgb), $font, $text);
+        }
+    }
+
     private function cleanBase64(string $value): string
     {
         $value = trim($value);
