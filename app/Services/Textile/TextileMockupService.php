@@ -82,13 +82,15 @@ class TextileMockupService
 
         $multiple = count($artworks) > 1;
         $canvas = $this->loadPhotoMugTemplate($multiple);
+        $wrap = null;
+
         if ($multiple) {
-            // Each supplied photo gets a clean, realistic print panel. Cycling
-            // only happens when two photos must still produce the three-view demo.
-            $indexes = count($artworks) === 2 ? [0, 1, 0] : [0, 1, 2];
-            $this->placePhotoMugPrint($canvas, $artworks[$indexes[0]], 366, 505, 220, 270);
-            $this->placePhotoMugPrint($canvas, $artworks[$indexes[1]], 773, 505, 220, 270);
-            $this->placePhotoMugPrint($canvas, $artworks[$indexes[2]], 1189, 505, 220, 270);
+            // Build one continuous production strip and photograph the same
+            // revealed magic mug from right, centre and left viewing angles.
+            $wrap = $this->buildMugWrap($artworks, count($artworks) * 700, 700);
+            $this->placePhotoMugWrap($canvas, $wrap, 224, 386, 314, 326, 0.17);
+            $this->placePhotoMugWrap($canvas, $wrap, 626, 386, 314, 326, 0.50);
+            $this->placePhotoMugWrap($canvas, $wrap, 1024, 386, 314, 326, 0.83);
         } else {
             $this->placePhotoMugPrint($canvas, $artworks[0], 615, 635, 390, 445);
         }
@@ -99,6 +101,9 @@ class TextileMockupService
 
         foreach ($artworks as $artwork) {
             imagedestroy($artwork);
+        }
+        if ($wrap !== null) {
+            imagedestroy($wrap);
         }
         imagedestroy($canvas);
 
@@ -111,7 +116,7 @@ class TextileMockupService
 
     private function loadPhotoMugTemplate(bool $multiple): mixed
     {
-        $filename = $multiple ? 'magic-mug-triple-v3.jpg' : 'magic-mug-single-v3.jpg';
+        $filename = $multiple ? 'magic-mug-triple-revealed-v4.jpg' : 'magic-mug-single-v3.jpg';
         $path = public_path('assets/textile/'.$filename);
         if (! is_file($path)) {
             throw new RuntimeException('Fotoğrafik bardak şablonu bulunamadı.');
@@ -123,6 +128,73 @@ class TextileMockupService
         }
 
         return $canvas;
+    }
+
+    private function placePhotoMugWrap(
+        mixed $canvas,
+        mixed $wrap,
+        int $x,
+        int $y,
+        int $width,
+        int $height,
+        float $viewCenter,
+    ): void {
+        $sourceWidth = imagesx($wrap);
+        $sourceHeight = imagesy($wrap);
+
+        for ($dx = 0; $dx < $width; $dx++) {
+            $normal = (($dx / max(1, $width - 1)) * 2) - 1;
+            $curve = sqrt(max(0.0, 1 - ($normal * $normal)));
+            $angle = asin(max(-1.0, min(1.0, $normal)));
+            $sourceNormal = $viewCenter + ($angle / (2 * M_PI));
+            $sourceX = ((int) round($sourceNormal * $sourceWidth) % $sourceWidth + $sourceWidth) % $sourceWidth;
+            $topBow = (int) round((1 - $curve) * 8);
+            $bottomBow = (int) round((1 - $curve) * 7);
+            $columnHeight = max(1, $height - $topBow - $bottomBow);
+
+            for ($dy = 0; $dy < $columnHeight; $dy++) {
+                $destinationX = $x + $dx;
+                $destinationY = $y + $dy + $topBow;
+                $sourceY = min(
+                    $sourceHeight - 1,
+                    (int) floor(($dy / max(1, $columnHeight - 1)) * ($sourceHeight - 1)),
+                );
+
+                $artPixel = imagecolorat($wrap, $sourceX, $sourceY);
+                $basePixel = imagecolorat($canvas, $destinationX, $destinationY);
+                $artRed = ($artPixel >> 16) & 0xff;
+                $artGreen = ($artPixel >> 8) & 0xff;
+                $artBlue = $artPixel & 0xff;
+                $baseRed = ($basePixel >> 16) & 0xff;
+                $baseGreen = ($basePixel >> 8) & 0xff;
+                $baseBlue = $basePixel & 0xff;
+                $baseLuminance = (0.2126 * $baseRed) + (0.7152 * $baseGreen) + (0.0722 * $baseBlue);
+
+                // Sublimation ink follows the cylinder while the real white
+                // ceramic's lighting and narrow specular highlights stay visible.
+                $cylinderShade = 0.78 + (0.22 * pow($curve, 0.72));
+                $surfaceShade = max(0.90, min(1.06, $baseLuminance / 236));
+                $shade = $cylinderShade * $surfaceShade;
+                $specular = max(0.0, min(0.26, ($baseLuminance - 242) / 55));
+                $edgeFade = min(
+                    1.0,
+                    ($dx + 1) / 4,
+                    ($width - $dx) / 4,
+                    ($dy + 1) / 2,
+                    ($columnHeight - $dy) / 2,
+                );
+                $opacity = $edgeFade * (0.975 - $specular);
+
+                $printRed = min(255, max(0, (int) round($artRed * $shade)));
+                $printGreen = min(255, max(0, (int) round($artGreen * $shade)));
+                $printBlue = min(255, max(0, (int) round($artBlue * $shade)));
+                $outRed = (int) round(($printRed * $opacity) + ($baseRed * (1 - $opacity)));
+                $outGreen = (int) round(($printGreen * $opacity) + ($baseGreen * (1 - $opacity)));
+                $outBlue = (int) round(($printBlue * $opacity) + ($baseBlue * (1 - $opacity)));
+
+                imagesetpixel($canvas, $destinationX, $destinationY, ($outRed << 16) | ($outGreen << 8) | $outBlue);
+            }
+        }
     }
 
     private function placePhotoMugPrint(
