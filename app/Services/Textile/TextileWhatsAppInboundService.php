@@ -684,7 +684,33 @@ PROMPT;
         $answer = preg_replace("/\\n{3,}/", "\n\n", $answer) ?? $answer;
 
         $this->markOutbound($instance, $phone, $answer);
-        $send = $this->whatsAppService->sendText($instance, $phone, $answer);
+
+        $send = null;
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                $send = $this->whatsAppService->sendText($instance, $phone, $answer);
+                break;
+            } catch (Throwable $exception) {
+                $lastException = $exception;
+
+                Log::warning('TEXTILE WHATSAPP SEND RETRY', [
+                    'ai_bot_id' => $bot->id,
+                    'conversation_id' => $conversation->id,
+                    'attempt' => $attempt,
+                    'message' => $exception->getMessage(),
+                ]);
+
+                if ($attempt < 3) {
+                    usleep(250000 * $attempt);
+                }
+            }
+        }
+
+        if (! is_array($send)) {
+            throw $lastException ?? new \RuntimeException('WhatsApp mesajı üç denemede gönderilemedi.');
+        }
 
         $this->memoryService->mesajKaydet(
             userId: $bot->user_id,
