@@ -177,10 +177,10 @@ class TextileMockupService
 
                 $edgeFade = min(
                     1.0,
-                    ($dx + 1) / 12,
-                    ($width - $dx) / 12,
-                    ($dy + 1) / 10,
-                    ($height - $dy) / 10,
+                    ($dx + 1) / 26,
+                    ($width - $dx) / 26,
+                    ($dy + 1) / 24,
+                    ($height - $dy) / 24,
                 );
                 $highlightPreservation = $baseLuminance > 120 ? 0.74 : 0.93;
                 $opacity = $edgeFade * $highlightPreservation;
