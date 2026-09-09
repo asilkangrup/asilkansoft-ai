@@ -25,9 +25,9 @@
 <body>
 <main class="shell">
     <div class="brand"><div class="mark">İT</div><div><b>İstanbul Tişört Baskı</b><small>Yapay zekâ bilgi ayarları</small></div></div>
-    <section class="top"><span class="eyebrow">Yaklaşık 4 dakika</span><h1>Asistanınız sizi doğru anlatsın.</h1><p>Bildiklerimizi doldurduk. Yalnızca kontrol edin, eksik olanları ekleyin; emin olmadığınız soruyu geçebilirsiniz.</p></section>
+    <section class="top"><span class="eyebrow">Yaklaşık 6–8 dakika</span><h1>Asistanınız sizi doğru anlatsın.</h1><p>Bildiklerimizi doldurduk. Temel soruları kontrol edin; ayrıntılı bölümleri isterseniz doldurun veya tek dokunuşla geçin.</p></section>
     @if(session('success'))<div class="success">✓ {{ session('success') }} Artık WhatsApp yanıtlarında bu bilgiler kullanılacak.</div>@endif
-    <div class="progress-line"><i id="bar"></i></div><div class="progress-meta"><span id="stepText">1 / 8</span><span id="percent">12% tamamlandı</span></div>
+    <div class="progress-line"><i id="bar"></i></div><div class="progress-meta"><span id="stepText">1 / 13</span><span id="percent">8% tamamlandı</span></div>
 
     <form method="post" action="{{ route('textile.company-profile.store', ['token' => $token]) }}" id="wizard">
         @csrf
@@ -36,6 +36,12 @@
             <label>Firma adı</label><input name="company_name" required value="{{ old('company_name',$values['company_name']) }}">
             <label>Telefon</label><input name="company_phone" inputmode="tel" value="{{ old('company_phone',$values['company_phone']) }}">
             <label>Kısa tanıtım</label><textarea name="business_summary">{{ old('business_summary',$values['business_summary']) }}</textarea>
+        </section>
+
+        <section class="card optional-step" data-title="İletişim">
+            <span class="step-tag">İletişim kanalları</span><h2>Müşteri sizi nerede bulabilir?</h2><p class="help">Adres, web sitesi veya sosyal medya yoksa bu adımı geçebilirsiniz.</p>
+            <label>Adres ve ziyaret açıklaması <span class="optional">— isteğe bağlı</span></label><textarea name="address" placeholder="Açık adres veya yalnızca randevuyla ziyaret bilgisi…">{{ old('address',$values['address']) }}</textarea>
+            <label>Web sitesi ve sosyal medya <span class="optional">— isteğe bağlı</span></label><textarea name="website_social" placeholder="Web sitesi, Instagram kullanıcı adı ve diğer kanallar…">{{ old('website_social',$values['website_social']) }}</textarea>
         </section>
 
         <section class="card" data-title="Görüşme">
@@ -51,6 +57,13 @@
             <label>Minimum sipariş kuralları</label><textarea name="minimum_order" required>{{ old('minimum_order',$values['minimum_order']) }}</textarea>
         </section>
 
+        <section class="card optional-step" data-title="Ürün detayları">
+            <span class="step-tag">Katalog ayrıntıları</span><h2>Başka hangi ürünleriniz var?</h2><p class="help">Tişört dışında sunduğunuz ürünleri ve seçenekleri yazabilirsiniz.</p>
+            <label>Ürün çeşitleri <span class="optional">— isteğe bağlı</span></label><textarea name="product_types" placeholder="Sweatshirt, polo yaka, çocuk tişörtü, iş kıyafeti, bez çanta…">{{ old('product_types',$values['product_types']) }}</textarea>
+            <label>Beden aralığı <span class="optional">— isteğe bağlı</span></label><input name="size_range" placeholder="Örn. XS–5XL; çocuk bedenleri…" value="{{ old('size_range',$values['size_range']) }}">
+            <label>Alternatif kumaş ve gramajlar <span class="optional">— isteğe bağlı</span></label><textarea name="fabric_options" placeholder="Farklı kalite, gramaj, polyester veya karışım seçenekleri…">{{ old('fabric_options',$values['fabric_options']) }}</textarea>
+        </section>
+
         <section class="card" data-title="Baskı">
             <span class="step-tag">Baskı</span><h2>Hangi baskıları yapıyorsunuz?</h2><p class="help">Uygulanan yöntemleri seçip ölçü sınırını kontrol edin.</p>
             <div class="choices">
@@ -62,6 +75,14 @@
             <label>Tasarım desteği <span class="optional">— isteğe bağlı</span></label><textarea name="design_service" placeholder="Logosu olmayan müşteriye tasarım yapıyor musunuz?">{{ old('design_service',$values['design_service']) }}</textarea>
         </section>
 
+        <section class="card optional-step" data-title="Görsel">
+            <span class="step-tag">Baskı görseli</span><h2>Görsel gelince ne yapmalı?</h2><p class="help">Asistan, dosyayı ve baskı konumunu doğru değerlendirmek için bunları kullanır.</p>
+            <label>Hangi durumda hangi baskıyı önerirsiniz? <span class="optional">— isteğe bağlı</span></label><textarea name="print_recommendation" placeholder="Fotoğraf için dijital, tek renk yüksek adet için…">{{ old('print_recommendation',$values['print_recommendation']) }}</textarea>
+            <label>Yapılabilen baskı konumları <span class="optional">— isteğe bağlı</span></label><input name="print_positions" placeholder="Ön orta, sol göğüs, sırt, kol…" value="{{ old('print_positions',$values['print_positions']) }}">
+            <label>Kabul edilen dosya türleri</label><input name="artwork_formats" value="{{ old('artwork_formats',$values['artwork_formats']) }}">
+            <label>Görsel kalitesi ve çözünürlük <span class="optional">— isteğe bağlı</span></label><textarea name="artwork_quality" placeholder="Düşük kaliteli veya arka planlı görsellerde nasıl ilerlenir?">{{ old('artwork_quality',$values['artwork_quality']) }}</textarea>
+        </section>
+
         <section class="card" data-title="Fiyat">
             <span class="step-tag">Fiyatlandırma</span><h2>Bilinen fiyatlar doğru mu?</h2><p class="help">Asistan yalnızca burada onayladığınız fiyatları söyleyecek.</p>
             <label>Numune fiyatı</label><textarea name="sample_price" required>{{ old('sample_price',$values['sample_price']) }}</textarea>
@@ -69,17 +90,32 @@
             <label>Teklif vermek için gerekenler</label><textarea name="quote_requirements" required>{{ old('quote_requirements',$values['quote_requirements']) }}</textarea>
         </section>
 
+        <section class="card optional-step" data-title="Fiyat kuralları">
+            <span class="step-tag">Teklif ayrıntıları</span><h2>Fiyatı neler değiştirir?</h2><p class="help">Asistanın yanlış veya eksik fiyat vermesini önler.</p>
+            <label>Fiyatı etkileyen unsurlar <span class="optional">— isteğe bağlı</span></label><textarea name="price_factors" placeholder="Adet, baskı ebadı, renk sayısı, ön-arka baskı, kumaş, aciliyet…">{{ old('price_factors',$values['price_factors']) }}</textarea>
+            <label>KDV ve fatura bilgisi <span class="optional">— isteğe bağlı</span></label><textarea name="vat_invoice" placeholder="Fiyatlara KDV dahil mi, fatura kesiliyor mu?">{{ old('vat_invoice',$values['vat_invoice']) }}</textarea>
+        </section>
+
         <section class="card optional-step" data-title="Teslimat">
             <span class="step-tag">Operasyon</span><h2>Sipariş nasıl tamamlanıyor?</h2><p class="help">Bilmiyorsanız bu adımı geçebilirsiniz.</p>
             <label>Ortalama üretim süresi <span class="optional">— isteğe bağlı</span></label><input name="production_time" placeholder="Örn. Onaydan sonra 5–7 iş günü" value="{{ old('production_time',$values['production_time']) }}">
+            <label>Acil sipariş kabulü <span class="optional">— isteğe bağlı</span></label><textarea name="rush_order" placeholder="Acil üretim mümkün mü, ek ücret veya koşul var mı?">{{ old('rush_order',$values['rush_order']) }}</textarea>
+            <label>Ön izleme ve üretim onayı <span class="optional">— isteğe bağlı</span></label><textarea name="approval_process">{{ old('approval_process',$values['approval_process']) }}</textarea>
             <label>Kargo ve teslimat <span class="optional">— isteğe bağlı</span></label><textarea name="shipping_info" placeholder="Kargo firması, ücret, teslim şekli…">{{ old('shipping_info',$values['shipping_info']) }}</textarea>
             <label>Ödeme seçenekleri <span class="optional">— isteğe bağlı</span></label><textarea name="payment_info" placeholder="Havale, kart, kapora oranı…">{{ old('payment_info',$values['payment_info']) }}</textarea>
         </section>
 
         <section class="card optional-step" data-title="Destek">
             <span class="step-tag">Satış sonrası</span><h2>Ne zaman size aktarsın?</h2><p class="help">Bu bölüm isteğe bağlıdır; asistanın sınırını belirler.</p>
-            <label>Değişim ve satış sonrası <span class="optional">— isteğe bağlı</span></label><textarea name="after_sales" placeholder="Hatalı ürün, değişim ve iade yaklaşımınız…">{{ old('after_sales',$values['after_sales']) }}</textarea>
+            <label>Değişim ve satış sonrası <span class="optional">— isteğe bağlı</span></label><textarea name="after_sales" placeholder="Değişim ve iade yaklaşımınız…">{{ old('after_sales',$values['after_sales']) }}</textarea>
+            <label>Hatalı baskı veya ürün politikası <span class="optional">— isteğe bağlı</span></label><textarea name="defect_policy" placeholder="Üretim kaynaklı hata olduğunda nasıl çözülür?">{{ old('defect_policy',$values['defect_policy']) }}</textarea>
             <label>Canlı yetkiliye aktarım <span class="optional">— isteğe bağlı</span></label><textarea name="human_contact" placeholder="Hangi durumda ve hangi numaraya yönlendirsin?">{{ old('human_contact',$values['human_contact']) }}</textarea>
+        </section>
+
+        <section class="card optional-step" data-title="Ek bilgiler">
+            <span class="step-tag">Asistanın ince ayarı</span><h2>Başka neyi mutlaka bilsin?</h2><p class="help">Müşterilerin sık sorduğu, diğer bölümlere girmeyen bilgileri buraya ekleyin.</p>
+            <label>Sık sorulan başka sorular ve cevapları <span class="optional">— isteğe bağlı</span></label><textarea name="frequent_questions" placeholder="Yıkamada çıkar mı? Numune var mı? Renk tonu aynı olur mu? Paketleme yapılıyor mu?">{{ old('frequent_questions',$values['frequent_questions']) }}</textarea>
+            <label>Asistanın kesinlikle söz vermemesi gerekenler</label><textarea name="forbidden_promises">{{ old('forbidden_promises',$values['forbidden_promises']) }}</textarea>
         </section>
 
         <section class="card" data-title="Onay">
