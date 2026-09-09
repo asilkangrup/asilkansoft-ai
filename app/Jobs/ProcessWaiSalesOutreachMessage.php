@@ -99,6 +99,14 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
             return;
         }
 
+        if (! $salesService->isTextileSector($salesService->sectorFor($lead))) {
+            Log::info('WAI TEXTILE SALES IGNORED NON-TEXTILE LEAD', [
+                'lead_id' => $lead->id,
+                'sector' => $salesService->sectorFor($lead),
+            ]);
+            return;
+        }
+
         $sessionId = 'whatsapp:'.$bot->id.':'.$phoneDigits;
         $conversation = ConversationControl::query()->firstOrCreate(
             ['ai_bot_id' => $bot->id, 'session_id' => $sessionId],
