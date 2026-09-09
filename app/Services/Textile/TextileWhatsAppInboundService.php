@@ -209,13 +209,13 @@ class TextileWhatsAppInboundService
             );
 
         if ($shouldAnswerNaturally) {
-            $this->sendText(
-                $bot,
-                $conversation,
-                $instance,
-                $phone,
-                $this->intelligentReply($bot, $conversation, $state, $message),
-            );
+            $answer = $this->greetingMessage($message)
+                ? (($state['approved'] ?? false)
+                    ? 'Merhaba 👋 Mevcut demo siparişiniz onaylandı. Yeni bir tasarım veya farklı bir ürün için de yardımcı olabilirim.'
+                    : $this->nextQuestion($state))
+                : $this->intelligentReply($bot, $conversation, $state, $message);
+
+            $this->sendText($bot, $conversation, $instance, $phone, $answer);
             $this->consumeTrial($bot);
 
             return true;
@@ -414,6 +414,16 @@ class TextileWhatsAppInboundService
         return $hasQuantity || $hasProduct;
     }
 
+    private function greetingMessage(string $message): bool
+    {
+        $normalized = Str::lower(trim($message));
+
+        return (bool) preg_match(
+            '/^(merhaba|selam|selamlar|iyi günler|iyi aksamlar|iyi akşamlar)[!. ]*$/u',
+            $normalized,
+        );
+    }
+
     private function questionMessage(string $message): bool
     {
         $normalized = Str::lower(trim($message));
@@ -556,7 +566,7 @@ PROMPT;
     {
         $normalized = Str::lower(trim($message));
 
-        if (preg_match('/^(merhaba|selam|selamlar|iyi günler|iyi aksamlar|iyi akşamlar)[!. ]*$/u', $normalized)) {
+        if ($this->greetingMessage($message)) {
             return ($state['approved'] ?? false)
                 ? 'Merhaba 👋 Mevcut demo siparişiniz onaylandı. Yeni bir tasarım veya farklı bir ürün için de yardımcı olabilirim.'
                 : $this->nextQuestion($state);
