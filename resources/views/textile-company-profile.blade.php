@@ -25,9 +25,9 @@
 <body>
 <main class="shell">
     <div class="brand"><div class="mark">İT</div><div><b>İstanbul Tişört Baskı</b><small>Yapay zekâ bilgi ayarları</small></div></div>
-    <section class="top"><span class="eyebrow">Yaklaşık 6–8 dakika</span><h1>Asistanınız sizi doğru anlatsın.</h1><p>Bildiklerimizi doldurduk. Temel soruları kontrol edin; ayrıntılı bölümleri isterseniz doldurun veya tek dokunuşla geçin.</p></section>
+    <section class="top"><span class="eyebrow">Yaklaşık 10 dakika</span><h1>Asistanınız sizi doğru anlatsın.</h1><p>Bildiklerimizi doldurduk. Temel bilgiler hazır. Müşterilerin sorabileceği ayrıntıları da ekledik; bilmediğiniz bölümleri tek dokunuşla geçebilirsiniz.</p></section>
     @if(session('success'))<div class="success">✓ {{ session('success') }} Artık WhatsApp yanıtlarında bu bilgiler kullanılacak.</div>@endif
-    <div class="progress-line"><i id="bar"></i></div><div class="progress-meta"><span id="stepText">1 / 13</span><span id="percent">8% tamamlandı</span></div>
+    <div class="progress-line"><i id="bar"></i></div><div class="progress-meta"><span id="stepText">1 / 20</span><span id="percent">5% tamamlandı</span></div>
 
     <form method="post" action="{{ route('textile.company-profile.store', ['token' => $token]) }}" id="wizard">
         @csrf
@@ -116,6 +116,63 @@
             <span class="step-tag">Asistanın ince ayarı</span><h2>Başka neyi mutlaka bilsin?</h2><p class="help">Müşterilerin sık sorduğu, diğer bölümlere girmeyen bilgileri buraya ekleyin.</p>
             <label>Sık sorulan başka sorular ve cevapları <span class="optional">— isteğe bağlı</span></label><textarea name="frequent_questions" placeholder="Yıkamada çıkar mı? Numune var mı? Renk tonu aynı olur mu? Paketleme yapılıyor mu?">{{ old('frequent_questions',$values['frequent_questions']) }}</textarea>
             <label>Asistanın kesinlikle söz vermemesi gerekenler</label><textarea name="forbidden_promises">{{ old('forbidden_promises',$values['forbidden_promises']) }}</textarea>
+        </section>
+
+        <section class="card optional-step" data-title="Stok ve modeller">
+            <span class="step-tag">Ürün seçenekleri</span><h2>Stok ve modeller nasıl çalışıyor?</h2><p class="help">Beden, renk veya model sorularına net yanıt verilmesini sağlar.</p>
+            <label>Stoktan mı, siparişe özel mi üretiyorsunuz?</label><textarea name="stock_model" placeholder="Hangi ürünler hazır stok, hangileri sipariş üzerine?">{{ old('stock_model',$values['stock_model']) }}</textarea>
+            <label>Kalıp, yaka ve kol seçenekleri</label><textarea name="cuts_and_necks" placeholder="Regular, oversize, slim; bisiklet, V veya polo yaka; uzun kol…">{{ old('cuts_and_necks',$values['cuts_and_necks']) }}</textarea>
+            <label>Kadın ve çocuk modelleri</label><textarea name="kids_and_women" placeholder="Var mı, bedenleri ve minimum adetleri nedir?">{{ old('kids_and_women',$values['kids_and_women']) }}</textarea>
+            <label>Karışık beden ve renk siparişi</label><textarea name="mixed_sizes_colors" placeholder="Aynı siparişte beden ve renkler karıştırılabilir mi?">{{ old('mixed_sizes_colors',$values['mixed_sizes_colors']) }}</textarea>
+            <label>Renk kartelası ve stok teyidi</label><textarea name="color_catalog" placeholder="Kartela gönderiliyor mu, kesin stok ne zaman teyit edilir?">{{ old('color_catalog',$values['color_catalog']) }}</textarea>
+        </section>
+
+        <section class="card optional-step" data-title="Baskı bakımı">
+            <span class="step-tag">Kalıcılık ve bakım</span><h2>Baskı ne kadar dayanır?</h2><p class="help">“Yıkamada çıkar mı?” gibi en sık sorulan soruları cevaplar.</p>
+            <label>Baskının kalıcılığı</label><textarea name="print_durability" placeholder="Ortalama dayanıklılık; çatlama, soyulma veya solma hakkında bilgi…">{{ old('print_durability',$values['print_durability']) }}</textarea>
+            <label>Yıkama ve ütüleme talimatı</label><textarea name="washing_instructions" placeholder="Kaç derecede, ters çevirerek mi; kurutma ve ütüleme kuralı…">{{ old('washing_instructions',$values['washing_instructions']) }}</textarea>
+            <label>Ekran ile gerçek baskı arasındaki renk farkı</label><textarea name="color_print_tolerance" placeholder="Ton farklılığı veya baskı yerleşim toleransı olabilir mi?">{{ old('color_print_tolerance',$values['color_print_tolerance']) }}</textarea>
+        </section>
+
+        <section class="card optional-step" data-title="Tasarım işlemleri">
+            <span class="step-tag">Grafik hazırlığı</span><h2>Tasarımı nasıl hazırlıyorsunuz?</h2><p class="help">Gelen görsel baskıya hazır değilse izlenecek yolu öğretir.</p>
+            <label>Arka plan kaldırma ve görsel temizleme</label><textarea name="background_removal" placeholder="Ücretsiz mi, ücretli mi; hangi işlemler yapılabilir?">{{ old('background_removal',$values['background_removal']) }}</textarea>
+            <label>Tasarım ve ön izleme revizyonları</label><textarea name="design_revisions" placeholder="Kaç revizyon yapılır, revizyon ücretli midir?">{{ old('design_revisions',$values['design_revisions']) }}</textarea>
+            <label>Telifli marka ve görseller</label><textarea name="copyright_policy" placeholder="Marka, takım logosu veya lisanslı karakterlerde yaklaşımınız…">{{ old('copyright_policy',$values['copyright_policy']) }}</textarea>
+        </section>
+
+        <section class="card optional-step" data-title="Detaylı fiyat">
+            <span class="step-tag">Fiyat soruları</span><h2>İndirim ve ek ücretler nedir?</h2><p class="help">Asistanın fiyat konusunda yanlış söz vermesini önler.</p>
+            <label>Adede göre indirim</label><textarea name="quantity_discounts" placeholder="Hangi adet aralıklarında fiyat değişiyor?">{{ old('quantity_discounts',$values['quantity_discounts']) }}</textarea>
+            <label>Ek ücret çıkaran işlemler</label><textarea name="extra_fees" placeholder="Büyük baskı, özel renk, kol baskısı, tasarım, acil üretim…">{{ old('extra_fees',$values['extra_fees']) }}</textarea>
+            <label>Teklif kaç gün geçerli?</label><input name="quote_validity" placeholder="Örn. Teklifler 3 iş günü geçerlidir" value="{{ old('quote_validity',$values['quote_validity']) }}">
+        </section>
+
+        <section class="card optional-step" data-title="Özel sipariş">
+            <span class="step-tag">Kişiselleştirme</span><h2>Özel üretim yapıyor musunuz?</h2><p class="help">Organizasyon, ekip ve marka siparişlerinde sık sorulur.</p>
+            <label>İsim, numara veya kişiye özel baskı</label><textarea name="personalization" placeholder="Her ürüne farklı isim/numara yapılabilir mi, ek ücreti var mı?">{{ old('personalization',$values['personalization']) }}</textarea>
+            <label>Özel paketleme, etiket ve marka uygulaması</label><textarea name="packaging_labeling" placeholder="Poşetleme, beden etiketi, yaka etiketi, barkod veya özel ambalaj…">{{ old('packaging_labeling',$values['packaging_labeling']) }}</textarea>
+            <label>Tekrar siparişlerde aynı baskı</label><textarea name="repeat_order" placeholder="Dosya saklanıyor mu, renk ve yerleşim aynı tutulabilir mi?">{{ old('repeat_order',$values['repeat_order']) }}</textarea>
+            <label>Onaydan sonra değişiklik veya iptal</label><textarea name="cancellation_changes" placeholder="Üretime giren sipariş değiştirilebilir veya iptal edilebilir mi?">{{ old('cancellation_changes',$values['cancellation_changes']) }}</textarea>
+        </section>
+
+        <section class="card optional-step" data-title="Teslimat ve ödeme">
+            <span class="step-tag">Sipariş tamamlama</span><h2>Teslimat ve ödeme ayrıntıları?</h2><p class="help">Sipariş vermeye hazır müşterinin son sorularını cevaplar.</p>
+            <label>Elden teslim ve kargo takibi</label><textarea name="pickup_tracking" placeholder="Elden teslim var mı, takip kodu nasıl iletilir?">{{ old('pickup_tracking',$values['pickup_tracking']) }}</textarea>
+            <label>Kargoda hasar olursa</label><textarea name="shipping_damage" placeholder="Tutanak, fotoğraf veya bildirim şartı var mı?">{{ old('shipping_damage',$values['shipping_damage']) }}</textarea>
+            <label>Kapora ve kalan ödeme</label><textarea name="deposit_balance" placeholder="Siparişte yüzde kaç kapora, kalan ödeme ne zaman?">{{ old('deposit_balance',$values['deposit_balance']) }}</textarea>
+            <label>Kapıda ödeme</label><input name="cash_on_delivery" placeholder="Var / Yok ve varsa koşulları" value="{{ old('cash_on_delivery',$values['cash_on_delivery']) }}">
+        </section>
+
+        <section class="card optional-step" data-title="İade ve asistan">
+            <span class="step-tag">Kurallar ve konuşma</span><h2>Asistan nasıl davranmalı?</h2><p class="help">Sorunları doğru yönetir ve siparişi profesyonelce tamamlar.</p>
+            <label>Kişiye özel baskılı ürünlerde iade</label><textarea name="custom_product_returns" placeholder="İade/değişim mümkün mü, hangi durumlarda?">{{ old('custom_product_returns',$values['custom_product_returns']) }}</textarea>
+            <label>Sorun kaç gün içinde bildirilmeli?</label><input name="complaint_period" placeholder="Örn. Teslimden sonra 2 gün" value="{{ old('complaint_period',$values['complaint_period']) }}">
+            <label>Asistanın konuşma tarzı</label><textarea name="assistant_tone">{{ old('assistant_tone',$values['assistant_tone']) }}</textarea>
+            <label>Hangi dillerde cevap verebilir?</label><input name="supported_languages" value="{{ old('supported_languages',$values['supported_languages']) }}">
+            <label>Siparişi nasıl tamamlasın?</label><textarea name="order_closing_flow">{{ old('order_closing_flow',$values['order_closing_flow']) }}</textarea>
+            <label>Müşteriden hangi bilgileri toplasın?</label><textarea name="customer_info_to_collect">{{ old('customer_info_to_collect',$values['customer_info_to_collect']) }}</textarea>
+            <label>Hangi işleri kabul etmiyorsunuz?</label><textarea name="unsupported_requests" placeholder="Baskı yapmadığınız ürünler veya reddedilecek talepler…">{{ old('unsupported_requests',$values['unsupported_requests']) }}</textarea>
         </section>
 
         <section class="card" data-title="Onay">
