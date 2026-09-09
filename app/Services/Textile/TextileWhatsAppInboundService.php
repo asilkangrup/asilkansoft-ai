@@ -365,6 +365,8 @@ class TextileWhatsAppInboundService
             'ben getireceğim', 'ben getirecegim', 'biz getireceğiz', 'biz getirecegiz',
             'kendim temin', 'kendimiz temin', 'ürünleri biz', 'urunleri biz',
             'tişörtler benden', 'tisortler benden', 'müşteri temin', 'musteri temin',
+            'tişörtleri biz getirsek', 'tisortleri biz getirsek', 'biz getirsek',
+            'tişörtleri ben getirsem', 'tisortleri ben getirsem', 'ben getirsem',
         ];
         foreach ($customerSuppliedPhrases as $phrase) {
             if (str_contains($lower, $phrase)) {
@@ -433,7 +435,7 @@ class TextileWhatsAppInboundService
         }
 
         return (bool) preg_match(
-            '/\b(ne|nedir|neden|nasıl|nasil|hangi|hangisi|kaç|kac|kim|nerede|nereye|ne zaman|olur mu|var mı|var mi|mi|mı|mu|mü)\b/u',
+            '/\b(ne|nedir|neden|nasıl|nasil|hangi|hangisi|kaç|kac|kim|nerede|nereye|ne zaman|olur mu|var mı|var mi|mi|mı|mu|mü|misiniz|mısınız|musunuz|müsünüz)\b/u',
             $normalized,
         );
     }
@@ -581,8 +583,27 @@ PROMPT;
 
     private function nextQuestion(array $state): string
     {
-        if (! ($state['product'] ?? null) || ! ($state['quantity'] ?? null) || ! ($state['color'] ?? null)) {
+        $hasAnyCoreDetail = ($state['product'] ?? null)
+            || ($state['quantity'] ?? null)
+            || ($state['color'] ?? null);
+
+        if (! $hasAnyCoreDetail) {
             return "Merhaba 👋\n\n*Baskılı tekstil siparişinizi birlikte hazırlayalım.*\n\nÜrün modelini, rengi ve adedi tek mesajda yazabilirsiniz.\n\nÖrnek: *250 adet siyah oversize tişört.*";
+        }
+
+        $missing = [];
+        if (! ($state['product'] ?? null)) {
+            $missing[] = 'ürün modeli';
+        }
+        if (! ($state['color'] ?? null)) {
+            $missing[] = 'renk';
+        }
+        if (! ($state['quantity'] ?? null)) {
+            $missing[] = 'adet';
+        }
+
+        if ($missing !== []) {
+            return 'Siparişinizi netleştirelim. Lütfen *'.implode(', ', $missing).'* bilgisini paylaşır mısınız?';
         }
 
         if (! ($state['position'] ?? null)) {
