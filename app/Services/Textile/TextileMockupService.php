@@ -55,8 +55,8 @@ class TextileMockupService
     }
 
     /**
-     * Creates a premium dark magic-mug preview. One artwork produces one hero
-     * mug; multiple artworks are joined as a wrap and shown from three angles.
+     * Creates a photographic dark magic-mug preview. Artwork keeps its original
+     * aspect ratio and the ceramic remains visible around a realistic print area.
      */
     public function createMug(array $artworksBase64): string
     {
@@ -82,16 +82,15 @@ class TextileMockupService
 
         $multiple = count($artworks) > 1;
         $canvas = $this->loadPhotoMugTemplate($multiple);
-        $wrap = $this->buildMugWrap($artworks, $multiple ? 1800 : 1000, 760);
-
         if ($multiple) {
-            // Three natural viewing angles of the same continuous wrap.
-            $this->placePhotoMugPrint($canvas, $wrap, 225, 319, 282, 370, 0.17, false);
-            $this->placePhotoMugPrint($canvas, $wrap, 632, 319, 282, 370, 0.50, false);
-            $this->placePhotoMugPrint($canvas, $wrap, 1048, 319, 282, 370, 0.83, false);
+            // Each supplied photo gets a clean, realistic print panel. Cycling
+            // only happens when two photos must still produce the three-view demo.
+            $indexes = count($artworks) === 2 ? [0, 1, 0] : [0, 1, 2];
+            $this->placePhotoMugPrint($canvas, $artworks[$indexes[0]], 366, 505, 220, 270);
+            $this->placePhotoMugPrint($canvas, $artworks[$indexes[1]], 773, 505, 220, 270);
+            $this->placePhotoMugPrint($canvas, $artworks[$indexes[2]], 1189, 505, 220, 270);
         } else {
-            // A single supplied image fills the complete visible printable face.
-            $this->placePhotoMugPrint($canvas, $wrap, 365, 326, 500, 625, 0.50, true);
+            $this->placePhotoMugPrint($canvas, $artworks[0], 615, 635, 390, 445);
         }
 
         ob_start();
@@ -101,7 +100,6 @@ class TextileMockupService
         foreach ($artworks as $artwork) {
             imagedestroy($artwork);
         }
-        imagedestroy($wrap);
         imagedestroy($canvas);
 
         if (! is_string($jpeg) || $jpeg === '') {
@@ -129,32 +127,39 @@ class TextileMockupService
 
     private function placePhotoMugPrint(
         mixed $canvas,
-        mixed $wrap,
-        int $x,
-        int $y,
-        int $width,
-        int $height,
-        float $viewCenter,
-        bool $showCompleteArtwork,
+        mixed $artwork,
+        int $centerX,
+        int $centerY,
+        int $maxWidth,
+        int $maxHeight,
     ): void {
-        $sourceWidth = imagesx($wrap);
-        $sourceHeight = imagesy($wrap);
+        $sourceWidth = imagesx($artwork);
+        $sourceHeight = imagesy($artwork);
+        if ($sourceWidth < 1 || $sourceHeight < 1) {
+            return;
+        }
+
+        // Never stretch or crop customer photos. Square, portrait and landscape
+        // files are fitted into the real printable area at their original ratio.
+        $scale = min($maxWidth / $sourceWidth, $maxHeight / $sourceHeight);
+        $width = max(1, (int) round($sourceWidth * $scale));
+        $height = max(1, (int) round($sourceHeight * $scale));
+        $x = (int) round($centerX - ($width / 2));
+        $y = (int) round($centerY - ($height / 2));
 
         for ($dx = 0; $dx < $width; $dx++) {
             $normal = (($dx / max(1, $width - 1)) * 2) - 1;
             $curve = sqrt(max(0.0, 1 - ($normal * $normal)));
 
-            // asin() is the inverse cylindrical projection. It compresses the
-            // artwork progressively towards both sides exactly as a real mug
-            // turns away from the camera. A single design is fitted across the
-            // whole visible face; a multi-image wrap exposes half a revolution.
-            $angle = asin(max(-1.0, min(1.0, $normal)));
-            $sourceNormal = $showCompleteArtwork
-                ? 0.5 + ($angle / M_PI)
-                : $viewCenter + ($angle / (2 * M_PI));
-            $sourceX = ((int) round($sourceNormal * $sourceWidth) % $sourceWidth + $sourceWidth) % $sourceWidth;
-            $topBow = (int) round((1 - $curve) * 13);
-            $bottomBow = (int) round((1 - $curve) * 10);
+            // Mild inverse-cylinder mapping makes the print follow the ceramic
+            // without turning a normal photo into an edge-to-edge mug wrap.
+            $projected = asin($normal * 0.78) / asin(0.78);
+            $sourceX = min(
+                $sourceWidth - 1,
+                max(0, (int) round((0.5 + ($projected / 2)) * ($sourceWidth - 1))),
+            );
+            $topBow = (int) round((1 - $curve) * 6);
+            $bottomBow = (int) round((1 - $curve) * 5);
             $columnHeight = max(1, $height - $topBow - $bottomBow);
 
             for ($dy = 0; $dy < $columnHeight; $dy++) {
@@ -168,7 +173,11 @@ class TextileMockupService
                 }
 
                 $sourceY = min($sourceHeight - 1, (int) floor(($dy / max(1, $columnHeight - 1)) * ($sourceHeight - 1)));
-                $artPixel = imagecolorat($wrap, $sourceX, $sourceY);
+                $artPixel = imagecolorat($artwork, $sourceX, $sourceY);
+                $artAlpha = ($artPixel >> 24) & 0x7f;
+                if ($artAlpha >= 127) {
+                    continue;
+                }
                 $basePixel = imagecolorat($canvas, $destinationX, $destinationY);
 
                 $artRed = ($artPixel >> 16) & 0xff;
@@ -181,18 +190,19 @@ class TextileMockupService
 
                 // Keep the supplied pixels dominant while transferring the
                 // real mug's black side shading and specular ceramic streaks.
-                $cylinderShade = 0.68 + (0.32 * pow($curve, 0.72));
-                $shade = $cylinderShade * max(0.94, min(1.08, 0.96 + ($baseLuminance / 900)));
+                $cylinderShade = 0.80 + (0.20 * pow($curve, 0.78));
+                $shade = $cylinderShade * max(0.95, min(1.07, 0.97 + ($baseLuminance / 1050)));
 
                 $edgeFade = min(
                     1.0,
-                    ($dx + 1) / 5,
-                    ($width - $dx) / 5,
-                    ($dy + 1) / 3,
-                    ($columnHeight - $dy) / 3,
+                    ($dx + 1) / 3,
+                    ($width - $dx) / 3,
+                    ($dy + 1) / 2,
+                    ($columnHeight - $dy) / 2,
                 );
                 $specular = max(0.0, min(0.42, ($baseLuminance - 48) / 360));
-                $opacity = $edgeFade * (0.985 - $specular);
+                $sourceOpacity = (127 - $artAlpha) / 127;
+                $opacity = $sourceOpacity * $edgeFade * (0.965 - $specular);
 
                 $printRed = min(255, max(0, (int) round($artRed * $shade)));
                 $printGreen = min(255, max(0, (int) round($artGreen * $shade)));
