@@ -82,16 +82,16 @@ class TextileMockupService
 
         $multiple = count($artworks) > 1;
         $canvas = $this->loadPhotoMugTemplate($multiple);
-        $wrap = $this->buildMugWrap($artworks, $multiple ? 1800 : 1000, 650);
+        $wrap = $this->buildMugWrap($artworks, $multiple ? 1800 : 1000, 760);
 
         if ($multiple) {
-            // Coordinates match the three real mugs in the photographic table template.
-            $this->placePhotoMugPrint($canvas, $wrap, 215, 405, 235, 315, 0.17);
-            $this->placePhotoMugPrint($canvas, $wrap, 603, 405, 235, 315, 0.50);
-            $this->placePhotoMugPrint($canvas, $wrap, 995, 405, 235, 315, 0.83);
+            // Three natural viewing angles of the same continuous wrap.
+            $this->placePhotoMugPrint($canvas, $wrap, 225, 319, 282, 370, 0.17, false);
+            $this->placePhotoMugPrint($canvas, $wrap, 632, 319, 282, 370, 0.50, false);
+            $this->placePhotoMugPrint($canvas, $wrap, 1048, 319, 282, 370, 0.83, false);
         } else {
-            // Large printable face of the single real mug.
-            $this->placePhotoMugPrint($canvas, $wrap, 398, 250, 420, 490, 0.50);
+            // A single supplied image fills the complete visible printable face.
+            $this->placePhotoMugPrint($canvas, $wrap, 365, 326, 500, 625, 0.50, true);
         }
 
         ob_start();
@@ -113,7 +113,7 @@ class TextileMockupService
 
     private function loadPhotoMugTemplate(bool $multiple): mixed
     {
-        $filename = $multiple ? 'magic-mug-triple-v2.jpg' : 'magic-mug-single-v2.jpg';
+        $filename = $multiple ? 'magic-mug-triple-v3.jpg' : 'magic-mug-single-v3.jpg';
         $path = public_path('assets/textile/'.$filename);
         if (! is_file($path)) {
             throw new RuntimeException('Fotoğrafik bardak şablonu bulunamadı.');
@@ -135,6 +135,7 @@ class TextileMockupService
         int $width,
         int $height,
         float $viewCenter,
+        bool $showCompleteArtwork,
     ): void {
         $sourceWidth = imagesx($wrap);
         $sourceHeight = imagesy($wrap);
@@ -142,13 +143,23 @@ class TextileMockupService
         for ($dx = 0; $dx < $width; $dx++) {
             $normal = (($dx / max(1, $width - 1)) * 2) - 1;
             $curve = sqrt(max(0.0, 1 - ($normal * $normal)));
-            $sourceNormal = $viewCenter + ($normal * 0.285);
-            $sourceX = ((int) round($sourceNormal * $sourceWidth) % $sourceWidth + $sourceWidth) % $sourceWidth;
-            $bow = (int) round((1 - $curve) * 7);
 
-            for ($dy = 0; $dy < $height; $dy++) {
+            // asin() is the inverse cylindrical projection. It compresses the
+            // artwork progressively towards both sides exactly as a real mug
+            // turns away from the camera. A single design is fitted across the
+            // whole visible face; a multi-image wrap exposes half a revolution.
+            $angle = asin(max(-1.0, min(1.0, $normal)));
+            $sourceNormal = $showCompleteArtwork
+                ? 0.5 + ($angle / M_PI)
+                : $viewCenter + ($angle / (2 * M_PI));
+            $sourceX = ((int) round($sourceNormal * $sourceWidth) % $sourceWidth + $sourceWidth) % $sourceWidth;
+            $topBow = (int) round((1 - $curve) * 13);
+            $bottomBow = (int) round((1 - $curve) * 10);
+            $columnHeight = max(1, $height - $topBow - $bottomBow);
+
+            for ($dy = 0; $dy < $columnHeight; $dy++) {
                 $destinationX = $x + $dx;
-                $destinationY = $y + $dy + $bow;
+                $destinationY = $y + $dy + $topBow;
                 if (
                     $destinationX < 0 || $destinationX >= imagesx($canvas)
                     || $destinationY < 0 || $destinationY >= imagesy($canvas)
@@ -156,7 +167,7 @@ class TextileMockupService
                     continue;
                 }
 
-                $sourceY = min($sourceHeight - 1, (int) floor(($dy / max(1, $height - 1)) * ($sourceHeight - 1)));
+                $sourceY = min($sourceHeight - 1, (int) floor(($dy / max(1, $columnHeight - 1)) * ($sourceHeight - 1)));
                 $artPixel = imagecolorat($wrap, $sourceX, $sourceY);
                 $basePixel = imagecolorat($canvas, $destinationX, $destinationY);
 
@@ -168,22 +179,20 @@ class TextileMockupService
                 $baseBlue = $basePixel & 0xff;
                 $baseLuminance = (0.2126 * $baseRed) + (0.7152 * $baseGreen) + (0.0722 * $baseBlue);
 
-                // The customer's artwork follows the cylinder: darker at the
-                // sides, softly bowed at top/bottom, and crossed by the real
-                // ceramic highlights already present in the photograph.
-                $cylinderShade = 0.73 + (0.27 * $curve);
-                $surfaceShade = max(0.76, min(1.13, 0.82 + ($baseLuminance / 380)));
-                $shade = $cylinderShade * $surfaceShade;
+                // Keep the supplied pixels dominant while transferring the
+                // real mug's black side shading and specular ceramic streaks.
+                $cylinderShade = 0.68 + (0.32 * pow($curve, 0.72));
+                $shade = $cylinderShade * max(0.94, min(1.08, 0.96 + ($baseLuminance / 900)));
 
                 $edgeFade = min(
                     1.0,
-                    ($dx + 1) / 26,
-                    ($width - $dx) / 26,
-                    ($dy + 1) / 24,
-                    ($height - $dy) / 24,
+                    ($dx + 1) / 5,
+                    ($width - $dx) / 5,
+                    ($dy + 1) / 3,
+                    ($columnHeight - $dy) / 3,
                 );
-                $highlightPreservation = $baseLuminance > 120 ? 0.74 : 0.93;
-                $opacity = $edgeFade * $highlightPreservation;
+                $specular = max(0.0, min(0.42, ($baseLuminance - 48) / 360));
+                $opacity = $edgeFade * (0.985 - $specular);
 
                 $printRed = min(255, max(0, (int) round($artRed * $shade)));
                 $printGreen = min(255, max(0, (int) round($artGreen * $shade)));
