@@ -88,9 +88,13 @@ class TextileMockupService
             // Build one continuous production strip and photograph the same
             // revealed magic mug from right, centre and left viewing angles.
             $wrap = $this->buildMugWrap($artworks, count($artworks) * 700, 700);
-            $this->placePhotoMugWrap($canvas, $wrap, 224, 386, 314, 326, 0.17);
+            // Aim the outer views at the artwork joins. Each mug therefore
+            // shows two neighbouring photos tapering around the cylinder,
+            // making the three renders read as rotations of one continuous
+            // wrap instead of three unrelated square prints.
+            $this->placePhotoMugWrap($canvas, $wrap, 224, 386, 314, 326, 1 / 3);
             $this->placePhotoMugWrap($canvas, $wrap, 626, 386, 314, 326, 0.50);
-            $this->placePhotoMugWrap($canvas, $wrap, 1024, 386, 314, 326, 0.83);
+            $this->placePhotoMugWrap($canvas, $wrap, 1024, 386, 314, 326, 2 / 3);
         } else {
             $this->placePhotoMugPrint($canvas, $artworks[0], 615, 635, 390, 445);
         }
