@@ -23,6 +23,16 @@ Route::view('/tekstil-demo', 'textile-demo-readable')
     ->middleware('throttle:120,1')
     ->name('textile.demo'); // customer-facing textile prototype
 
+Route::get('/tekstil-firma-bilgileri/{token}', [TextileCompanyProfileController::class, 'show'])
+    ->where('token', '[A-Za-z0-9_-]{32,80}')
+    ->middleware('throttle:60,1')
+    ->name('textile.company-profile.show');
+
+Route::post('/tekstil-firma-bilgileri/{token}', [TextileCompanyProfileController::class, 'store'])
+    ->where('token', '[A-Za-z0-9_-]{32,80}')
+    ->middleware('throttle:10,1')
+    ->name('textile.company-profile.store');
+
 Route::get('/tekstil-demo/odeme', [TextileDemoPaymentController::class, 'show'])
     ->middleware(['signed', 'throttle:60,1'])
     ->name('textile.demo.payment');
