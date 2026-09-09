@@ -195,6 +195,10 @@ class AiBotsTable
                                 |--------------------------------------------------------------------------
                                 */
 
+                                $webhookPath = (int) $record->getKey() === 48
+                                    ? '/api/wai-sales/whatsapp/webhook'
+                                    : '/api/whatsapp/webhook';
+
                                 $webhookUrl =
                                     rtrim(
                                         (string) config(
@@ -202,7 +206,7 @@ class AiBotsTable
                                         ),
                                         '/'
                                     )
-                                    .'/api/whatsapp/webhook';
+                                    .$webhookPath;
 
                                 $whatsAppService->setWebhook(
                                     $instanceName,
@@ -226,6 +230,10 @@ class AiBotsTable
                                     $record->whatsapp_instance
                                 )
                             ) {
+                                $webhookPath = (int) $record->getKey() === 48
+                                    ? '/api/wai-sales/whatsapp/webhook'
+                                    : '/api/whatsapp/webhook';
+
                                 $webhookUrl =
                                     rtrim(
                                         (string) config(
@@ -233,7 +241,7 @@ class AiBotsTable
                                         ),
                                         '/'
                                     )
-                                    .'/api/whatsapp/webhook';
+                                    .$webhookPath;
 
                                 $whatsAppService->setWebhook(
                                     $record->whatsapp_instance,
