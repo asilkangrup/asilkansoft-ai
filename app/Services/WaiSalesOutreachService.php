@@ -261,7 +261,7 @@ class WaiSalesOutreachService
     private function hasHumanAffirmation(string $message): bool
     {
         return $this->containsAny($message, [
-            'evet','doğru','dogru','buyurun','buyrun','olur','olabilir','tamam',
+            'evet','ebet','ewet','evt','evett','doğru','dogru','buyurun','buyrun','olur','olabilir','tamam',
             'dinliyorum','anlatın','anlatin','bilgi alabilirim','nedir','nasıl çalışıyor','nasil calisiyor',
             'aynen','tabii','tabi','elbette','kesinlikle','yarar','rahatlatır','rahatlatir',
         ]);
