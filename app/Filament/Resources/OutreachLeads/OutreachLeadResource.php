@@ -129,6 +129,12 @@ class OutreachLeadResource extends Resource
                     ->label('Mobil')
                     ->searchable(),
 
+                TextColumn::make('sector')
+                    ->label('Sektör')
+                    ->badge()
+                    ->searchable()
+                    ->sortable(),
+
                 TextColumn::make('whatsapp_status')
                     ->label('WhatsApp')
                     ->badge()
@@ -180,6 +186,13 @@ class OutreachLeadResource extends Resource
                     ->sortable(),
             ])
             ->filters([
+                SelectFilter::make('sector')
+                    ->label('Sektör')
+                    ->options([
+                        'Sigorta Acentesi' => 'Sigortacılar',
+                        'Tişört Baskı / Tekstil' => 'Tişört Baskı / Tekstil',
+                        'Kredi / Finansman Danışmanlığı' => 'Kredi / Finansman',
+                    ]),
                 SelectFilter::make('whatsapp_status')
                     ->label('WhatsApp')
                     ->options([
