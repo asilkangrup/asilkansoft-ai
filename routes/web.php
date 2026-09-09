@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\RealEstatePrivateMediaController;
+use App\Http\Controllers\TextileCompanyProfileController;
 use App\Http\Controllers\TextileDemoPaymentController;
 use App\Http\Controllers\TrackedPublicDemoController;
 use App\Http\Controllers\WaiLeadDemoController;
