@@ -470,10 +470,16 @@ class TextileMockupService
                 : 'oversize-black-studio.jpg';
         } elseif (str_contains($normalized, 'kapüşon') || str_contains($normalized, 'kapuson') || str_contains($normalized, 'sweat')) {
             $kind = 'hoodie';
-            $filename = 'hoodie-black-studio.jpg';
+            $templateColor = $shirtColor === 'white' ? 'white' : 'black';
+            $filename = $templateColor === 'white'
+                ? 'hoodie-white-studio.jpg'
+                : 'hoodie-black-studio.jpg';
         } elseif (str_contains($normalized, 'polo')) {
             $kind = 'polo';
-            $filename = 'polo-black-studio.jpg';
+            $templateColor = $shirtColor === 'white' ? 'white' : 'black';
+            $filename = $templateColor === 'white'
+                ? 'polo-white-studio.jpg'
+                : 'polo-black-studio.jpg';
         } elseif (str_contains($normalized, 'polyester') && (str_contains($normalized, 'şapka') || str_contains($normalized, 'sapka'))) {
             $kind = 'cap';
             $templateColor = $shirtColor === 'white' ? 'white' : 'black';
@@ -482,7 +488,10 @@ class TextileMockupService
                 : 'cap-polyester-black-studio.jpg';
         } elseif (str_contains($normalized, 'şapka') || str_contains($normalized, 'sapka')) {
             $kind = 'cap';
-            $filename = 'cap-cotton-black-studio.jpg';
+            $templateColor = $shirtColor === 'white' ? 'white' : 'black';
+            $filename = $templateColor === 'white'
+                ? 'cap-cotton-white-studio.jpg'
+                : 'cap-cotton-black-studio.jpg';
         }
 
         $path = public_path('assets/textile/catalog/'.$filename);
