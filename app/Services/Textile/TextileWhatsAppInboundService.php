@@ -2,7 +2,6 @@
 
 namespace App\Services\Textile;
 
-use App\Jobs\GenerateTextileMugMockup;
 use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
@@ -106,7 +105,13 @@ class TextileWhatsAppInboundService
         $stateKey = $this->stateKey($bot, $phone);
         $state = $this->state(Cache::store('database')->get($stateKey));
 
-        // A greeting starts the temporary product-choice demo cleanly even if
+        // Legacy mug sessions belong to the future standalone mug bot and
+        // must never continue inside the textile-only assistant.
+        if (($state['product_category'] ?? null) === 'mug') {
+            $state = $this->state(null);
+        }
+
+        // A greeting starts the textile order flow cleanly even if
         // the same phone tested a shirt order earlier.
         if (($mediaContext['type'] ?? 'text') === 'text' && $this->greetingMessage($message)) {
             $state = $this->state(null);
@@ -135,16 +140,9 @@ class TextileWhatsAppInboundService
 
                 $mime = strtolower(trim((string) ($mediaContext['mime_type'] ?? 'image/jpeg')));
 
-                if (($state['product_category'] ?? null) === 'mug') {
-                    $state['artworks'] = array_slice(array_values((array) ($state['artworks'] ?? [])), -5);
-                    $state['artworks'][] = $logo;
-                    $state['mug_batch_token'] = (string) Str::uuid();
-                    $state['mockup_sent'] = false;
-                } else {
-                    $state['logo_base64'] = $logo;
-                    $state['logo_mime'] = $mime;
-                    $state['logo_received'] = true;
-                }
+                $state['logo_base64'] = $logo;
+                $state['logo_mime'] = $mime;
+                $state['logo_received'] = true;
 
                 $inbound->forceFill([
                     'media_mime_type' => $mime,
@@ -165,18 +163,6 @@ class TextileWhatsAppInboundService
         }
 
         Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
-
-        if (($mediaContext['type'] ?? null) === 'image' && ($state['product_category'] ?? null) === 'mug') {
-            GenerateTextileMugMockup::dispatch(
-                $bot->id,
-                $conversation->id,
-                $instance,
-                $phone,
-                (string) $state['mug_batch_token'],
-            )->delay(now()->addSeconds(8));
-
-            return true;
-        }
 
         $stateChanged = $this->stateProgressed($previousState, $state);
         $isTextMessage = ($mediaContext['type'] ?? 'text') === 'text';
@@ -305,19 +291,6 @@ class TextileWhatsAppInboundService
         if ($this->approvalMessage($message) && ($state['mockup_sent'] ?? false)) {
             $state['approved'] = true;
 
-            if (($state['product_category'] ?? null) === 'mug') {
-                Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
-                $this->sendText(
-                    $bot,
-                    $conversation,
-                    $instance,
-                    $phone,
-                    "✅ Bardak tasarımı onaylandı.\n\nNet teklif ve sipariş kaydı için kaç adet istediğinizi yazabilirsiniz.",
-                );
-                $this->consumeTrial($bot);
-
-                return true;
-            }
             $state['order_id'] ??= 'TX-'.now()->format('ymd').'-'.strtoupper(Str::random(4));
             $state['instance'] = $instance;
             $state['phone'] = $phone;
@@ -344,7 +317,7 @@ class TextileWhatsAppInboundService
         if ($this->restartMessage($message)) {
             Cache::store('database')->forget($stateKey);
             $this->sendText($bot, $conversation, $instance, $phone,
-                'Yeni tasarım akışını başlattım. Tişört veya bardak baskısından hangisini istediğinizi yazabilirsiniz.'
+                'Yeni tekstil siparişi akışını başlattım. Ürün modelini, rengi ve adedi tek mesajda yazabilirsiniz.'
             );
             return true;
         }
@@ -353,54 +326,6 @@ class TextileWhatsAppInboundService
         $this->consumeTrial($bot);
 
         return true;
-    }
-
-    public function completeMugBatch(
-        int $botId,
-        int $conversationId,
-        string $instance,
-        string $phone,
-        string $batchToken,
-    ): void {
-        $bot = AiBot::query()->find($botId);
-        $conversation = ConversationControl::query()->find($conversationId);
-        if (! $bot || ! $conversation) {
-            return;
-        }
-
-        $stateKey = $this->stateKey($bot, $phone);
-        $state = $this->state(Cache::store('database')->get($stateKey));
-        if (
-            ($state['product_category'] ?? null) !== 'mug'
-            || ($state['mug_batch_token'] ?? null) !== $batchToken
-            || ($state['mockup_sent'] ?? false)
-            || empty($state['artworks'])
-        ) {
-            return;
-        }
-
-        try {
-            $mockup = $this->mockupService->createMug((array) $state['artworks']);
-            $this->sendImage($bot, $conversation, $instance, $phone, $mockup, $state);
-            $state['mockup_sent'] = true;
-            Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
-            $this->sendText($bot, $conversation, $instance, $phone, $this->mockupMessage($state));
-            $this->consumeTrial($bot);
-        } catch (Throwable $exception) {
-            Log::error('TEXTILE MUG MOCKUP FAILED', [
-                'ai_bot_id' => $bot->id,
-                'conversation_id' => $conversation->id,
-                'message' => $exception->getMessage(),
-            ]);
-
-            $this->sendText(
-                $bot,
-                $conversation,
-                $instance,
-                $phone,
-                'Bardak görsellerinizi aldım ancak önizleme hazırlanırken geçici bir sorun oluştu. Lütfen “önizlemeyi tekrar hazırla” yazın.',
-            );
-        }
     }
 
     private function parseText(array $state, string $message): array
@@ -412,7 +337,6 @@ class TextileWhatsAppInboundService
         }
 
         $products = [
-            'sihirli bardak' => ['Sihirli Siyah Kulplu Kupa Bardak', 'mug'],
             'polyester şapka' => ['Polyester Şapka', 'cap'],
             'polyester sapka' => ['Polyester Şapka', 'cap'],
             'pamuklu şapka' => ['Pamuklu Şapka', 'cap'],
@@ -434,17 +358,11 @@ class TextileWhatsAppInboundService
             'sapka' => ['Pamuklu Şapka', 'cap'],
             'tişört' => ['Premium Oversize Tişört', 'shirt'],
             'tisort' => ['Premium Oversize Tişört', 'shirt'],
-            'kupa' => ['Sihirli Siyah Kulplu Kupa Bardak', 'mug'],
-            'bardak' => ['Sihirli Siyah Kulplu Kupa Bardak', 'mug'],
         ];
         foreach ($products as $needle => [$label, $category]) {
             if (str_contains($lower, $needle)) {
                 $state['product'] = $label;
                 $state['product_category'] = $category;
-                if ($category === 'mug') {
-                    $state['color'] = 'black';
-                    $state['color_label'] = 'Siyah';
-                }
                 break;
             }
         }
@@ -530,8 +448,9 @@ class TextileWhatsAppInboundService
             || str_contains($normalized, 'polo')
             || str_contains($normalized, 'regular')
             || str_contains($normalized, 'heavy')
-            || str_contains($normalized, 'bardak')
-            || str_contains($normalized, 'kupa');
+            || str_contains($normalized, 'şapka')
+            || str_contains($normalized, 'sapka')
+            || str_contains($normalized, 'sweat');
 
         return $hasQuantity || $hasProduct;
     }
@@ -604,7 +523,6 @@ class TextileWhatsAppInboundService
         foreach ([
             'product',
             'product_category',
-            'artworks',
             'quantity',
             'color',
             'position',
@@ -720,6 +638,7 @@ Müşteri belirli bir konu sorarsa yalnızca o konuya cevap ver; ilgisiz fiyat, 
 Güncel ürün kataloğu: kapüşonlu sweatshirt, regular/bisiklet yaka tişört, siyah ve beyaz oversize tişört, polo yaka tişört, pamuklu şapka ve polyester şapka.
 Baskı örnekleri arasında beyaz ve siyah tişört üzerine DTG baskı bulunur. Müşteri ürün çeşidi sorarsa yalnızca bu katalogdaki ürünleri kısa ve düzenli biçimde söyle.
 Müşterinin seçtiği ürün modelini değiştirme; baskı önizlemesi seçilen gerçek ürünün stüdyo/manken şablonunda hazırlanır.
+Bu bot yalnızca tekstil ürünleri içindir. Bardak veya kupa baskısı sunma; müşteri sorarsa bu hattın şu anda yalnız tekstil siparişleri için hizmet verdiğini kısa ve nazik biçimde söyle.
 Aynı karşılama veya sipariş metnini tekrar etme. Önceki konuşmadaki bilgileri yeniden isteme.
 Yanıt WhatsApp'a uygun, sıcak ama profesyonel ve çoğunlukla 1-3 kısa cümle olsun.
 Yanıtı anlamlı kısa paragraflara ayır ve paragraflar arasında bir boş satır bırak.
@@ -753,14 +672,6 @@ PROMPT;
     {
         if (! ($state['product_category'] ?? null)) {
             return $this->welcomeMessage();
-        }
-
-        if (($state['product_category'] ?? null) === 'mug') {
-            if (empty($state['artworks'])) {
-                return "Harika, *bardak baskısı* hazırlayalım ☕\n\nBardağa basılmasını istediğiniz fotoğrafı veya görselleri gönderin. Birden fazla görseli art arda gönderebilirsiniz; sistem hepsini toplayıp bardağı *sağ, orta ve sol açıdan* gösterecek.";
-            }
-
-            return 'Görsellerinizi aldım ✓ Kısa süre içinde profesyonel bardak önizlemesini hazırlıyorum.';
         }
 
         $hasAnyCoreDetail = ($state['product'] ?? null)
@@ -799,15 +710,6 @@ PROMPT;
 
     private function mockupMessage(array $state): string
     {
-        if (($state['product_category'] ?? null) === 'mug') {
-            $count = count((array) ($state['artworks'] ?? []));
-            $view = $count > 1 ? 'sağ, orta ve sol açılardan' : 'tek ürün görünümüyle';
-
-            return "Bardak baskı önizlemeniz hazırlandı ✓\n\n"
-                ."Gönderdiğiniz ".($count > 1 ? "{$count} görsel" : 'görsel')." bardağın doğal yüzey kıvrımı, ışığı ve parlaklığı korunarak yerleştirildi. Tasarım *{$view}* sunuldu.\n\n"
-                .'Görsel uygunsa *Onaylıyorum* yazabilirsiniz. Fiyatlandırma için adet bilgisini ayrıca paylaşmanız yeterli.';
-        }
-
         [$unit, $total, $term] = $this->quote($state);
 
         return "Baskı önizlemeniz hazırlandı ✓\n\n"
@@ -915,11 +817,8 @@ PROMPT;
 
     private function sendImage(AiBot $bot, ConversationControl $conversation, string $instance, string $phone, string $mockupBase64, array $state): void
     {
-        $isMug = ($state['product_category'] ?? null) === 'mug';
-        $caption = $isMug
-            ? 'Bardak baskı önizlemeniz hazır ✓ Görselleriniz bardak yüzeyine doğal biçimde uygulandı.'
-            : 'Baskı önizlemeniz hazır ✓ Logo orijinal dosyanızdan otomatik yerleştirildi.';
-        $filename = $isMug ? 'bardak-baski-onizleme.jpg' : 'baski-onizleme.jpg';
+        $caption = 'Baskı önizlemeniz hazır ✓ Logo orijinal dosyanızdan otomatik yerleştirildi.';
+        $filename = 'baski-onizleme.jpg';
         $this->markOutbound($instance, $phone, $caption);
         $send = $this->whatsAppService->sendImage(
             $instance,
@@ -937,7 +836,7 @@ PROMPT;
             'session_id' => $conversation->session_id,
             'role' => 'assistant',
             'sender_type' => 'ai',
-            'message' => $isMug ? '[Bardak baskı önizlemesi]' : '[Baskı önizlemesi] '.$this->positionLabel((string) $state['position']),
+            'message' => '[Baskı önizlemesi] '.$this->positionLabel((string) $state['position']),
             'message_type' => 'image',
             'media_mime_type' => 'image/jpeg',
             'media_filename' => $filename,
@@ -979,8 +878,6 @@ PROMPT;
         return is_array($value) ? $value : [
             'product' => null,
             'product_category' => null,
-            'artworks' => [],
-            'mug_batch_token' => null,
             'quantity' => null,
             'color' => null,
             'color_label' => null,
