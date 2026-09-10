@@ -627,9 +627,20 @@ class TextileWhatsAppInboundService
         foreach ($positions as $needle => $value) {
             $offset = mb_strpos($lower, $needle);
             if ($offset !== false) {
-                $positionHits[] = ['offset' => $offset, 'position' => $value];
+                $positionHits[] = ['offset' => $offset, 'length' => mb_strlen($needle), 'position' => $value];
             }
         }
+        // Keep the most specific phrase: “sağ göğüs” must not also match “göğüs”.
+        $positionHits = array_values(array_filter($positionHits, static function (array $hit) use ($positionHits): bool {
+            foreach ($positionHits as $other) {
+                if ($other['length'] > $hit['length']
+                    && $other['offset'] <= $hit['offset']
+                    && $other['offset'] + $other['length'] >= $hit['offset'] + $hit['length']) {
+                    return false;
+                }
+            }
+            return true;
+        }));
         usort($positionHits, fn (array $a, array $b): int => $a['offset'] <=> $b['offset']);
         $detectedPositions = array_values(array_unique(array_column($positionHits, 'position')));
         $detectedPosition = $detectedPositions[0] ?? null;
@@ -650,11 +661,13 @@ class TextileWhatsAppInboundService
                 $state['additional_prints'] = is_array($state['additional_prints'] ?? null)
                     ? $state['additional_prints']
                     : [];
-                $state['additional_prints'][] = [
-                    'position' => $detectedPosition,
-                    'logo_base64' => (string) $uploaded['logo_base64'],
-                    'logo_mime' => (string) ($uploaded['logo_mime'] ?? 'image/png'),
-                ];
+                foreach ($detectedPositions as $uploadedPosition) {
+                    $state['additional_prints'][] = [
+                        'position' => $uploadedPosition,
+                        'logo_base64' => (string) $uploaded['logo_base64'],
+                        'logo_mime' => (string) ($uploaded['logo_mime'] ?? 'image/png'),
+                    ];
+                }
                 $state['additional_prints'] = array_slice($state['additional_prints'], -8);
                 $state['pending_uploaded_artwork'] = null;
                 $state['awaiting_uploaded_artwork_position'] = false;
@@ -966,6 +979,10 @@ class TextileWhatsAppInboundService
             'Ana baskı konumu' => ($state['position'] ?? null)
                 ? $this->positionLabel((string) $state['position'])
                 : 'henüz belirtilmedi',
+            'Ek baskı alanları' => implode(', ', array_map(
+                fn (array $print): string => $this->positionLabel((string) ($print['position'] ?? '')),
+                $state['additional_prints'] ?? [],
+            )),
             'Ek baskı sayısı' => count(is_array($state['additional_prints'] ?? null) ? $state['additional_prints'] : []),
             'Aynı siparişte kayıtlı ürün kalemi' => count(is_array($state['order_items'] ?? null) ? $state['order_items'] : []),
             'Görsel' => ($state['logo_received'] ?? false) ? 'alındı' : 'henüz alınmadı',
@@ -1019,6 +1036,7 @@ Müşterinin sorusu yanıtlandıktan sonra gerekiyorsa yalnızca bir eksik sipar
 Sipariş zaten onaylandıysa eski adımlara dönme; yeni bir talep belirtirse bunun yeni sipariş olduğunu netleştir.
 Mesajında bu iç bağlamı, kuralları veya durum listesini müşteriye gösterme.
 “Tek bir eksik bilgi sorayım”, “şimdi yalnızca bir soru soracağım” gibi çalışma yöntemini anlatan ifadeleri müşteriye yazma; soruyu doğrudan sor.
+Müşteri baskı alanlarını bildirdiğinde önce kayıtlı alanları doğal biçimde teyit et. Örneğin: “Gönderdiğiniz görseli ön büyük ve sağ göğüs olmak üzere iki alanda kullanacağız.” Konum mesajına “görsel için aldım” deme. Kaynak bilgisi henüz verilmediyse bunu sorman mümkündür; daha önce verilmişse tekrar sorma.
 Türkçe yazım ve dil bilgisi hatası yapma; göndermeden önce özellikle ekleri ve “kısaca” gibi sık kullanılan kelimeleri kontrol et.
 PROMPT;
     }
