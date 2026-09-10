@@ -595,14 +595,16 @@ class TextileMockupService
         }
 
         if (in_array($kind, ['hoodie', 'polo'], true)) {
-            if ($y < 205 && $x > 455 && $x < 745) {
+            if ($this->isMannequinNeckPixel($x, $y)) {
                 return false;
             }
 
-            return $y >= 130 && $x >= 75 && $x <= 1125;
+            $bottom = $kind === 'hoodie' ? 1100 : 1135;
+
+            return $y >= 115 && $y <= $bottom && $x >= 75 && $x <= 1125;
         }
 
-        if ($y < 235 && $x > 455 && $x < 745) {
+        if ($this->isMannequinNeckPixel($x, $y)) {
             return false;
         }
 
@@ -611,6 +613,26 @@ class TextileMockupService
         }
 
         return $x >= 245 && $x <= 955;
+    }
+
+    /**
+     * Protects the mannequin with a tapered, rounded mask. A rectangular
+     * exclusion leaves an artificial dark block around collars and hoods.
+     */
+    private function isMannequinNeckPixel(int $x, int $y): bool
+    {
+        if ($y < 18 || $y > 225) {
+            return false;
+        }
+
+        $distance = abs($x - 600);
+        if ($y <= 165) {
+            return $distance <= 92;
+        }
+
+        $halfWidth = max(18, (int) round(92 - (($y - 165) * 1.22)));
+
+        return $distance <= $halfWidth;
     }
 
     private function placeNaturalPrint(
