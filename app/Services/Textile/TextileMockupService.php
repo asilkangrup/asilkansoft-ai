@@ -667,9 +667,20 @@ class TextileMockupService
         string $position,
         string $kind,
     ): void {
+        // Customers name the wearer's side. A front-facing product photo is
+        // mirrored from the viewer's perspective, so render left on the
+        // viewer's right and right on the viewer's left.
+        $visualPosition = match ($visualPosition) {
+            'left_chest' => 'right_chest',
+            'right_chest' => 'left_chest',
+            'left_sleeve' => 'right_sleeve',
+            'right_sleeve' => 'left_sleeve',
+            default => $position,
+        };
+
         [$centerX, $centerY, $maxWidth, $maxHeight] = match ($kind) {
             'cap' => [600, 385, 340, 185],
-            'hoodie' => match ($position) {
+            'hoodie' => match ($visualPosition) {
                 'left_chest' => [430, 430, 185, 150],
                 'right_chest' => [770, 430, 185, 150],
                 'left_sleeve' => [245, 430, 140, 120],
@@ -677,7 +688,7 @@ class TextileMockupService
                 'front_large', 'back_large' => [600, 515, 410, 330],
                 default => [600, 450, 315, 245],
             },
-            'polo' => match ($position) {
+            'polo' => match ($visualPosition) {
                 'left_chest' => [435, 410, 175, 145],
                 'right_chest' => [765, 410, 175, 145],
                 'left_sleeve' => [250, 410, 135, 115],
@@ -685,7 +696,7 @@ class TextileMockupService
                 'front_large', 'back_large' => [600, 540, 390, 345],
                 default => [600, 500, 300, 240],
             },
-            default => match ($position) {
+            default => match ($visualPosition) {
                 'left_chest' => [455, 385, 185, 155],
                 'right_chest' => [745, 385, 185, 155],
                 'left_sleeve' => [245, 405, 145, 125],
