@@ -31,7 +31,7 @@ class TextileWhatsAppInboundService
     ) {
     }
 
-    public function processPayload(array $payload): bool
+    public function processPayload(array $payload, bool $buffered = false): bool
     {
         $instance = trim((string) ($payload['instance'] ?? ''));
         if ($instance === '') {
@@ -65,6 +65,30 @@ class TextileWhatsAppInboundService
         }
 
         if (! $bot->whatsappAiKullanilabilirMi()) {
+            return true;
+        }
+
+        // Buffer plain text only; keep original attachment envelopes intact.
+        $text = trim((string) (data_get($payload, 'data.message.conversation')
+            ?? data_get($payload, 'data.message.extendedTextMessage.text') ?? ''));
+        if (! $buffered && $text !== '') {
+            $key = 'textile_text_burst:'.$bot->id.':'.$phone;
+            $cache = Cache::store('database');
+            $cache->lock($key.':lock', 15)->block(5, function () use ($cache, $key, $payload, $text) {
+                $messageId = trim((string) data_get($payload, 'data.key.id', ''));
+                if ($messageId !== '' && ! $cache->add($key.':seen:'.$messageId, true, now()->addDay())) {
+                    return;
+                }
+                $batch = $cache->get($key);
+                $new = ! is_array($batch);
+                $batch = $new ? ['id' => (string) Str::uuid(), 'texts' => [], 'payload' => $payload] : $batch;
+                $batch['texts'][] = $text;
+                $batch['updated_at'] = microtime(true);
+                $cache->put($key, $batch, now()->addDay());
+                if ($new) {
+                    \App\Jobs\ProcessTextileTextBurst::dispatch($key)->delay(now()->addSeconds(10));
+                }
+            });
             return true;
         }
 
