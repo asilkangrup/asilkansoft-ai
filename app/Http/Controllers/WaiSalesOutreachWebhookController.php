@@ -12,6 +12,10 @@ class WaiSalesOutreachWebhookController extends Controller
 {
     public const INSTANCE = 'wai-sales-48-clean';
 
+    private const BLOCKED_PHONE_DIGITS = [
+        '905317803722',
+    ];
+
     public function handle(Request $request): JsonResponse
     {
         $payload = $request->all();
@@ -52,6 +56,11 @@ class WaiSalesOutreachWebhookController extends Controller
             || str_contains($remoteJid, '@hosted.lid')
         ) {
             return response()->json(['success' => true, 'ignored' => true, 'reason' => 'unsupported_chat']);
+        }
+
+        $phoneDigits = preg_replace('/\\D+/', '', explode('@', $remoteJid)[0] ?? '') ?: '';
+        if (in_array($phoneDigits, self::BLOCKED_PHONE_DIGITS, true)) {
+            return response()->json(['success' => true, 'ignored' => true, 'reason' => 'blocked_phone']);
         }
 
         $messagePayload = data_get($payload, 'data.message', []);
