@@ -163,6 +163,9 @@ class TextileWhatsAppInboundService
                         is_array($state['order_items'] ?? null) ? $state['order_items'] : [],
                         $documentItems,
                     ), -20);
+                    if (count($documentItems) > 1) {
+                        $state['awaiting_order_item_selection'] = true;
+                    }
                 }
 
                 $hasPrintableArtwork = (bool) ($analysis['contains_printable_artwork'] ?? false);
@@ -172,7 +175,11 @@ class TextileWhatsAppInboundService
                     if ($summary !== '') {
                         $attachmentReply .= "\n\n".$summary;
                     }
-                    $attachmentReply .= "\n\n".$this->nextQuestion($state);
+                    if ($state['awaiting_order_item_selection'] ?? false) {
+                        $attachmentReply .= "\n\nBelgede *".count($documentItems)." ayrı ürün kalemi* buldum. Hepsini aynı sipariş altında tutacağım. Önce hangi ürünün baskı önizlemesini hazırlayalım?";
+                    } else {
+                        $attachmentReply .= "\n\n".$this->nextQuestion($state);
+                    }
                 } else {
                     $artwork = trim((string) ($analysis['artwork_base64'] ?? $encodedFile));
                     $pendingPosition = trim((string) ($state['awaiting_additional_image_position'] ?? ''));
@@ -512,7 +519,10 @@ class TextileWhatsAppInboundService
         }
 
         if ($detectedProduct !== null && ($state['product'] ?? null) !== $detectedProduct[0]) {
-            if (($state['product'] ?? null) && ($state['mockup_sent'] ?? false)) {
+            if (
+                ($state['product'] ?? null)
+                && (($state['quantity'] ?? null) || ($state['mockup_sent'] ?? false))
+            ) {
                 $state['order_items'] = is_array($state['order_items'] ?? null)
                     ? $state['order_items']
                     : [];
@@ -522,6 +532,7 @@ class TextileWhatsAppInboundService
 
             $state['product'] = $detectedProduct[0];
             $state['product_category'] = $detectedProduct[1];
+            $state['awaiting_order_item_selection'] = false;
             $state['position'] = null;
             $state['logo_base64'] = null;
             $state['logo_mime'] = null;
@@ -821,6 +832,7 @@ class TextileWhatsAppInboundService
             'pending_uploaded_artwork',
             'awaiting_uploaded_artwork_position',
             'order_items',
+            'awaiting_order_item_selection',
         ] as $key) {
             if (($before[$key] ?? null) !== ($after[$key] ?? null)) {
                 return true;
@@ -959,6 +971,10 @@ PROMPT;
 
     private function nextQuestion(array $state): string
     {
+        if ($state['awaiting_order_item_selection'] ?? false) {
+            return 'Belgedeki ürünleri aynı sipariş altında kaydettim. Önce hangi ürünün baskı önizlemesini hazırlayalım?';
+        }
+
         if ($state['awaiting_additional_artwork_choice'] ?? false) {
             return 'Ek baskıda mevcut görseli mi kullanalım, yoksa farklı bir görsel mi göndereceksiniz? *Aynı görsel* veya *farklı görsel* yazabilirsiniz.';
         }
@@ -1218,6 +1234,7 @@ PROMPT;
             'pending_uploaded_artwork' => null,
             'awaiting_uploaded_artwork_position' => false,
             'order_items' => [],
+            'awaiting_order_item_selection' => false,
         ];
     }
 
