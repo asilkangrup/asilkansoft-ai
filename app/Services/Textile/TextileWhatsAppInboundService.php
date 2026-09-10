@@ -278,6 +278,7 @@ class TextileWhatsAppInboundService
                     logoBase64: (string) $state['logo_base64'],
                     position: (string) $state['position'],
                     shirtColor: (string) ($state['color'] ?? 'black'),
+                    product: (string) ($state['product'] ?? 'Premium Oversize Tişört'),
                 );
 
                 $this->sendImage($bot, $conversation, $instance, $phone, $mockup, $state);
@@ -411,21 +412,36 @@ class TextileWhatsAppInboundService
         }
 
         $products = [
-            'oversize' => 'Premium Oversize Tişört',
-            'polo' => 'Polo Yaka Tişört',
-            'regular' => 'Regular Fit Tişört',
-            'heavy' => 'Heavy Cotton Tişört',
-            'tişört' => 'Premium Oversize Tişört',
-            'tisort' => 'Premium Oversize Tişört',
-            'sihirli bardak' => 'Sihirli Siyah Kulplu Kupa Bardak',
-            'kupa' => 'Sihirli Siyah Kulplu Kupa Bardak',
-            'bardak' => 'Sihirli Siyah Kulplu Kupa Bardak',
+            'sihirli bardak' => ['Sihirli Siyah Kulplu Kupa Bardak', 'mug'],
+            'polyester şapka' => ['Polyester Şapka', 'cap'],
+            'polyester sapka' => ['Polyester Şapka', 'cap'],
+            'pamuklu şapka' => ['Pamuklu Şapka', 'cap'],
+            'pamuklu sapka' => ['Pamuklu Şapka', 'cap'],
+            'kapüşonlu sweatshirt' => ['Kapüşonlu Sweatshirt', 'hoodie'],
+            'kapusonlu sweatshirt' => ['Kapüşonlu Sweatshirt', 'hoodie'],
+            'kapüşonlu sweat' => ['Kapüşonlu Sweatshirt', 'hoodie'],
+            'kapusonlu sweat' => ['Kapüşonlu Sweatshirt', 'hoodie'],
+            'sweatshirt' => ['Kapüşonlu Sweatshirt', 'hoodie'],
+            'sweatşört' => ['Kapüşonlu Sweatshirt', 'hoodie'],
+            'polo yaka' => ['Polo Yaka Tişört', 'shirt'],
+            'poloyaka' => ['Polo Yaka Tişört', 'shirt'],
+            'polo' => ['Polo Yaka Tişört', 'shirt'],
+            'oversize' => ['Premium Oversize Tişört', 'shirt'],
+            'regular' => ['Regular Fit Tişört', 'shirt'],
+            'bisiklet yaka' => ['Regular Fit Tişört', 'shirt'],
+            'heavy' => ['Heavy Cotton Tişört', 'shirt'],
+            'şapka' => ['Pamuklu Şapka', 'cap'],
+            'sapka' => ['Pamuklu Şapka', 'cap'],
+            'tişört' => ['Premium Oversize Tişört', 'shirt'],
+            'tisort' => ['Premium Oversize Tişört', 'shirt'],
+            'kupa' => ['Sihirli Siyah Kulplu Kupa Bardak', 'mug'],
+            'bardak' => ['Sihirli Siyah Kulplu Kupa Bardak', 'mug'],
         ];
-        foreach ($products as $needle => $label) {
+        foreach ($products as $needle => [$label, $category]) {
             if (str_contains($lower, $needle)) {
                 $state['product'] = $label;
-                $state['product_category'] = in_array($needle, ['sihirli bardak', 'kupa', 'bardak'], true) ? 'mug' : 'shirt';
-                if ($state['product_category'] === 'mug') {
+                $state['product_category'] = $category;
+                if ($category === 'mug') {
                     $state['color'] = 'black';
                     $state['color_label'] = 'Siyah';
                 }
@@ -436,8 +452,10 @@ class TextileWhatsAppInboundService
         $colors = [
             'siyah' => 'black', 'beyaz' => 'white', 'lacivert' => 'navy',
             'bordo' => 'burgundy', 'bej' => 'beige', 'kırmızı' => 'red',
-            'kirmizi' => 'red', 'mavi' => 'blue', 'yeşil' => 'green',
-            'yesil' => 'green', 'gri' => 'gray', 'füme' => 'charcoal',
+            'kirmizi' => 'red', 'mavi' => 'blue', 'turkuaz' => 'turquoise',
+            'yeşil' => 'green', 'yesil' => 'green', 'sarı' => 'yellow',
+            'sari' => 'yellow', 'turuncu' => 'orange', 'pembe' => 'pink',
+            'kahverengi' => 'brown', 'gri' => 'gray', 'füme' => 'charcoal',
         ];
         foreach ($colors as $needle => $value) {
             if (str_contains($lower, $needle)) {
@@ -671,6 +689,7 @@ class TextileWhatsAppInboundService
     {
         $status = [
             'Ürün' => $state['product'] ?? 'henüz belirtilmedi',
+            'Ürün kategorisi' => $state['product_category'] ?? 'henüz belirtilmedi',
             'Renk' => $state['color_label'] ?? 'henüz belirtilmedi',
             'Adet' => $state['quantity'] ?? 'henüz belirtilmedi',
             'Beden' => $state['sizes'] ?? 'henüz belirtilmedi',
@@ -698,6 +717,9 @@ Müşterinin son mesajındaki asıl soruya önce doğrudan ve doğal biçimde ce
 Şirket profilindeki bütün bilgileri hiçbir zaman tek mesajda sıralama veya özetleme.
 Müşteri genel bilgi isterse önce hangi konuyu merak ettiğini sor ve yalnızca şu kısa seçenekleri sun: ürün çeşitleri, kumaş ve kaliteler, baskı yöntemleri, fiyatlandırma, minimum adet, teslimat.
 Müşteri belirli bir konu sorarsa yalnızca o konuya cevap ver; ilgisiz fiyat, ürün, kargo, ödeme veya iade bilgilerini ekleme.
+Güncel ürün kataloğu: kapüşonlu sweatshirt, regular/bisiklet yaka tişört, siyah ve beyaz oversize tişört, polo yaka tişört, pamuklu şapka ve polyester şapka.
+Baskı örnekleri arasında beyaz ve siyah tişört üzerine DTG baskı bulunur. Müşteri ürün çeşidi sorarsa yalnızca bu katalogdaki ürünleri kısa ve düzenli biçimde söyle.
+Müşterinin seçtiği ürün modelini değiştirme; baskı önizlemesi seçilen gerçek ürünün stüdyo/manken şablonunda hazırlanır.
 Aynı karşılama veya sipariş metnini tekrar etme. Önceki konuşmadaki bilgileri yeniden isteme.
 Yanıt WhatsApp'a uygun, sıcak ama profesyonel ve çoğunlukla 1-3 kısa cümle olsun.
 Yanıtı anlamlı kısa paragraflara ayır ve paragraflar arasında bir boş satır bırak.
