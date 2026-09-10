@@ -55,6 +55,7 @@
         ],
         "post-autoload-dump": [
             "@php scripts/patch_textile_pilot.php",
+            "@php scripts/patch_textile_multi_preview.php",
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi",
             "@php artisan filament:upgrade"
