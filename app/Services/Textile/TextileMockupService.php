@@ -647,16 +647,15 @@ class TextileMockupService
      */
     private function isMannequinNeckPixel(int $x, int $y): bool
     {
-        if ($y < 18 || $y > 225) {
+        // Protect only the mannequin's actual neck. Extending this mask into
+        // the collar leaves a black rectangular patch when a black template is
+        // recoloured to blue, red or another catalogue colour.
+        if ($y < 18 || $y > 158) {
             return false;
         }
 
         $distance = abs($x - 600);
-        if ($y <= 165) {
-            return $distance <= 92;
-        }
-
-        $halfWidth = max(18, (int) round(92 - (($y - 165) * 1.22)));
+        $halfWidth = max(52, (int) round(92 - (($y - 18) * 0.27)));
 
         return $distance <= $halfWidth;
     }
@@ -701,7 +700,7 @@ class TextileMockupService
                 'right_chest' => [745, 385, 185, 155],
                 'left_sleeve' => [245, 405, 145, 125],
                 'right_sleeve' => [955, 405, 145, 125],
-                'front_large' => [600, 545, 430, 390],
+                'front_large' => [600, 535, 520, 470],
                 'back_large' => [600, 530, 420, 380],
                 default => [600, 470, 310, 255],
             },
