@@ -18,6 +18,7 @@ class TextileMockupService
         string $position = 'front_center',
         string $shirtColor = 'black',
         string $product = 'Premium Oversize Tişört',
+        array $additionalPrints = [],
     ): string {
         if (! function_exists('imagecreatetruecolor') || ! function_exists('imagecreatefromstring')) {
             throw new RuntimeException('Sunucuda GD görsel desteği etkin değil.');
@@ -42,6 +43,31 @@ class TextileMockupService
             $this->recolorGarment($canvas, $shirtColor, $templateKind);
         }
         $this->placeNaturalPrint($canvas, $logo, $position, $templateKind);
+
+        foreach (array_slice($additionalPrints, 0, 8) as $additionalPrint) {
+            if (! is_array($additionalPrint)) {
+                continue;
+            }
+
+            $encoded = trim((string) ($additionalPrint['logo_base64'] ?? ''));
+            $extraPosition = trim((string) ($additionalPrint['position'] ?? ''));
+            if ($encoded === '' || $extraPosition === '') {
+                continue;
+            }
+
+            $extraBytes = base64_decode($this->cleanBase64($encoded), true);
+            if (! is_string($extraBytes) || $extraBytes === '' || strlen($extraBytes) > 8 * 1024 * 1024) {
+                continue;
+            }
+
+            $extraLogo = @imagecreatefromstring($extraBytes);
+            if ($extraLogo === false) {
+                continue;
+            }
+
+            $this->placeNaturalPrint($canvas, $extraLogo, $extraPosition, $templateKind);
+            imagedestroy($extraLogo);
+        }
 
         ob_start();
         imagejpeg($canvas, null, 91);
@@ -645,16 +671,25 @@ class TextileMockupService
             'cap' => [600, 385, 340, 185],
             'hoodie' => match ($position) {
                 'left_chest' => [430, 430, 185, 150],
+                'right_chest' => [770, 430, 185, 150],
+                'left_sleeve' => [245, 430, 140, 120],
+                'right_sleeve' => [955, 430, 140, 120],
                 'front_large', 'back_large' => [600, 515, 410, 330],
                 default => [600, 450, 315, 245],
             },
             'polo' => match ($position) {
                 'left_chest' => [435, 410, 175, 145],
+                'right_chest' => [765, 410, 175, 145],
+                'left_sleeve' => [250, 410, 135, 115],
+                'right_sleeve' => [950, 410, 135, 115],
                 'front_large', 'back_large' => [600, 540, 390, 345],
                 default => [600, 500, 300, 240],
             },
             default => match ($position) {
                 'left_chest' => [455, 385, 185, 155],
+                'right_chest' => [745, 385, 185, 155],
+                'left_sleeve' => [245, 405, 145, 125],
+                'right_sleeve' => [955, 405, 145, 125],
                 'front_large' => [600, 545, 430, 390],
                 'back_large' => [600, 530, 420, 380],
                 default => [600, 470, 310, 255],
