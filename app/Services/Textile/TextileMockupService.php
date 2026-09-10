@@ -670,7 +670,7 @@ class TextileMockupService
         // Customers name the wearer's side. A front-facing product photo is
         // mirrored from the viewer's perspective, so render left on the
         // viewer's right and right on the viewer's left.
-        $visualPosition = match ($visualPosition) {
+        $visualPosition = match ($position) {
             'left_chest' => 'right_chest',
             'right_chest' => 'left_chest',
             'left_sleeve' => 'right_sleeve',
