@@ -28,6 +28,9 @@ jobs:
       - name: Render a deterministic mockup
         run: |
           php -r '
+          function public_path(string $path = ""): string {
+              return getcwd()."/public".($path !== "" ? "/".$path : "");
+          }
           require "app/Services/Textile/TextileMockupService.php";
           $logo = imagecreatetruecolor(180, 80);
           $bg = imagecolorallocate($logo, 255, 255, 255);
