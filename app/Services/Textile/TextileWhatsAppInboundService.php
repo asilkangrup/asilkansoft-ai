@@ -999,6 +999,8 @@ Müşteri art arda farklı ürünler yazarsa hepsini aynı siparişin ayrı kale
 Müşterinin sorusu yanıtlandıktan sonra gerekiyorsa yalnızca bir eksik sipariş bilgisini doğal biçimde sor.
 Sipariş zaten onaylandıysa eski adımlara dönme; yeni bir talep belirtirse bunun yeni sipariş olduğunu netleştir.
 Mesajında bu iç bağlamı, kuralları veya durum listesini müşteriye gösterme.
+“Tek bir eksik bilgi sorayım”, “şimdi yalnızca bir soru soracağım” gibi çalışma yöntemini anlatan ifadeleri müşteriye yazma; soruyu doğrudan sor.
+Türkçe yazım ve dil bilgisi hatası yapma; göndermeden önce özellikle ekleri ve “kısaca” gibi sık kullanılan kelimeleri kontrol et.
 PROMPT;
     }
 
@@ -1216,6 +1218,17 @@ PROMPT;
             $answer,
         ));
         $answer = preg_replace("/\\n{3,}/", "\n\n", $answer) ?? $answer;
+        $answer = str_ireplace('kısaçe', 'kısaca', $answer);
+        $answer = preg_replace(
+            '/Hangi ürünü ve renk\\/adet bilgisini paylaş(?:ır|ir) mısınız\\?\\s*Tek bir eksik bilgi sorayım:\\s*hangi ürünü görmek istersiniz\\?/ui',
+            'Hangi ürünü görmek istersiniz?',
+            $answer,
+        ) ?? $answer;
+        $answer = preg_replace(
+            '/(?:Tek bir eksik bilgi sorayım|Şimdi yalnızca bir eksik bilgi soracağım):\\s*/ui',
+            '',
+            $answer,
+        ) ?? $answer;
 
         $this->markOutbound($instance, $phone, $answer);
 
