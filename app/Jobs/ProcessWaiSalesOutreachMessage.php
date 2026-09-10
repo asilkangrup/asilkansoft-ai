@@ -163,7 +163,7 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
                 if ($statusBeforeDecision === 'demo_offered' && $action === 'reply_hot') {
                     $sector = (string) ($decision['sector'] ?? $salesService->sectorFor($lead));
                     if ($salesService->isTextileSector($sector)) {
-                        $answer = "Canlı tekstil demomuz hazır ✅\n\nWhatsApp’tan müşteri gibi “250 adet siyah oversize tişört yaptırmak istiyorum” yazın ve ardından logonuzu gönderin:\nhttps://wa.me/905364750098\n\nYapay zeka sipariş detaylarını toplayacak ve logonuzu tişört üzerinde hazırlayıp WhatsApp’tan size geri sunacak. Böylece sistemin müşterilerinize nasıl çalışacağını doğrudan kendi telefonunuzdan görebilirsiniz.";
+                        $answer = "Tabii. İsterseniz hazır kurulu WhatsApp demo hattımızdan sistemi doğrudan deneyebilirsiniz.\n\nDemo WhatsApp numarasına müşteri gibi “Merhaba” yazın, baskı yaptırmak istediğiniz ürünü belirtin ve logonuzu gönderin. Yapay zeka yaklaşık 5 saniye içinde logonuzu ürün üzerine profesyonel şekilde uygulayıp baskı ön izlemesini size WhatsApp’tan geri gönderecektir.\n\nAynı sistem 7/24 müşterilerinizi karşılar, sorularını cevaplar, sipariş bilgilerini toplar ve müşteriyi satış aşamasına kadar ilerletir. Böylece gelen talepler cevapsız kalmaz.\n\nDemo WhatsApp: +90 536 475 00 98\nhttps://wa.me/905364750098";
                     } else {
                         $demo = $demoService->create([
                             'company_name' => $lead->company_name,
