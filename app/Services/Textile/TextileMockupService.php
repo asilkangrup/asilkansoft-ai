@@ -17,6 +17,7 @@ class TextileMockupService
         string $logoBase64,
         string $position = 'front_center',
         string $shirtColor = 'black',
+        string $product = 'Premium Oversize Tişört',
     ): string {
         if (! function_exists('imagecreatetruecolor') || ! function_exists('imagecreatefromstring')) {
             throw new RuntimeException('Sunucuda GD görsel desteği etkin değil.');
@@ -36,9 +37,11 @@ class TextileMockupService
             throw new RuntimeException('Logo JPG, PNG veya WEBP formatında olmalıdır.');
         }
 
-        $canvas = $this->loadStudioTemplate();
-        $this->recolorGarment($canvas, $shirtColor);
-        $this->placeNaturalPrint($canvas, $logo, $position);
+        [$canvas, $templateKind, $templateColor] = $this->loadStudioTemplate($product, $shirtColor);
+        if ($shirtColor !== $templateColor) {
+            $this->recolorGarment($canvas, $shirtColor, $templateKind);
+        }
+        $this->placeNaturalPrint($canvas, $logo, $position, $templateKind);
 
         ob_start();
         imagejpeg($canvas, null, 91);
@@ -443,16 +446,53 @@ class TextileMockupService
         return $value;
     }
 
-    private function loadStudioTemplate(): mixed
+    /**
+     * @return array{0: mixed, 1: string, 2: string}
+     */
+    private function loadStudioTemplate(string $product, string $shirtColor): array
     {
-        $path = public_path('assets/textile/oversize-black-studio-v1.jpg');
+        $normalized = mb_strtolower($product, 'UTF-8');
+        $kind = 'oversize';
+        $templateColor = 'black';
+        $filename = 'oversize-black-studio.jpg';
+
+        if (str_contains($normalized, 'regular') || str_contains($normalized, 'bisiklet')) {
+            $kind = 'regular';
+            $templateColor = $shirtColor === 'white' ? 'white' : 'black';
+            $filename = $templateColor === 'white'
+                ? 'regular-white-studio.jpg'
+                : 'regular-black-studio.jpg';
+        } elseif (str_contains($normalized, 'oversize')) {
+            $kind = 'oversize';
+            $templateColor = $shirtColor === 'white' ? 'white' : 'black';
+            $filename = $templateColor === 'white'
+                ? 'oversize-white-studio.jpg'
+                : 'oversize-black-studio.jpg';
+        } elseif (str_contains($normalized, 'kapüşon') || str_contains($normalized, 'kapuson') || str_contains($normalized, 'sweat')) {
+            $kind = 'hoodie';
+            $filename = 'hoodie-black-studio.jpg';
+        } elseif (str_contains($normalized, 'polo')) {
+            $kind = 'polo';
+            $filename = 'polo-black-studio.jpg';
+        } elseif (str_contains($normalized, 'polyester') && (str_contains($normalized, 'şapka') || str_contains($normalized, 'sapka'))) {
+            $kind = 'cap';
+            $templateColor = $shirtColor === 'white' ? 'white' : 'black';
+            $filename = $templateColor === 'white'
+                ? 'cap-polyester-white-studio.jpg'
+                : 'cap-polyester-black-studio.jpg';
+        } elseif (str_contains($normalized, 'şapka') || str_contains($normalized, 'sapka')) {
+            $kind = 'cap';
+            $filename = 'cap-cotton-black-studio.jpg';
+        }
+
+        $path = public_path('assets/textile/catalog/'.$filename);
         if (! is_file($path)) {
-            throw new RuntimeException('Fotoğrafik tekstil şablonu bulunamadı.');
+            throw new RuntimeException('Seçilen ürünün fotoğrafik şablonu bulunamadı.');
         }
 
         $source = @imagecreatefromjpeg($path);
         if ($source === false) {
-            throw new RuntimeException('Fotoğrafik tekstil şablonu açılamadı.');
+            throw new RuntimeException('Seçilen ürünün fotoğrafik şablonu açılamadı.');
         }
 
         $canvas = imagecreatetruecolor(self::SIZE, self::SIZE);
@@ -461,30 +501,51 @@ class TextileMockupService
             throw new RuntimeException('Mockup çalışma alanı oluşturulamadı.');
         }
 
+        $background = imagecolorallocate($canvas, 239, 239, 239);
+        imagefill($canvas, 0, 0, $background);
+
+        $sourceWidth = imagesx($source);
+        $sourceHeight = imagesy($source);
+        $scale = min(self::SIZE / max(1, $sourceWidth), self::SIZE / max(1, $sourceHeight));
+        $targetWidth = max(1, (int) round($sourceWidth * $scale));
+        $targetHeight = max(1, (int) round($sourceHeight * $scale));
+        $left = (int) round((self::SIZE - $targetWidth) / 2);
+        $top = (int) round((self::SIZE - $targetHeight) / 2);
+
         imagecopyresampled(
             $canvas,
             $source,
+            $left,
+            $top,
             0,
             0,
-            0,
-            0,
-            self::SIZE,
-            self::SIZE,
-            imagesx($source),
-            imagesy($source),
+            $targetWidth,
+            $targetHeight,
+            $sourceWidth,
+            $sourceHeight,
         );
         imagedestroy($source);
 
-        return $canvas;
+        return [$canvas, $kind, $templateColor];
     }
 
-    private function recolorGarment(mixed $canvas, string $shirtColor): void
+    private function recolorGarment(mixed $canvas, string $shirtColor, string $kind): void
     {
         $target = match ($shirtColor) {
             'white' => [226, 225, 218],
             'navy' => [31, 48, 76],
             'burgundy' => [105, 35, 48],
             'beige' => [190, 169, 137],
+            'red' => [185, 35, 42],
+            'blue' => [34, 91, 170],
+            'turquoise' => [33, 164, 178],
+            'green' => [38, 117, 69],
+            'yellow' => [222, 188, 34],
+            'orange' => [218, 104, 30],
+            'pink' => [219, 145, 166],
+            'brown' => [113, 70, 48],
+            'gray' => [122, 126, 132],
+            'charcoal' => [60, 64, 70],
             default => null,
         };
 
@@ -492,26 +553,19 @@ class TextileMockupService
             return;
         }
 
-        for ($y = 55; $y < 1125; $y++) {
-            for ($x = 55; $x < 1145; $x++) {
+        for ($y = 35; $y < 1165; $y++) {
+            for ($x = 35; $x < 1165; $x++) {
                 $pixel = imagecolorat($canvas, $x, $y);
                 $red = ($pixel >> 16) & 0xff;
                 $green = ($pixel >> 8) & 0xff;
                 $blue = $pixel & 0xff;
                 $luminance = (0.2126 * $red) + (0.7152 * $green) + (0.0722 * $blue);
 
-                // The generated base has a dark garment on a light backdrop.
-                // Keeping the threshold low preserves the studio background and shadow.
-                if ($luminance > 105) {
+                if (! $this->isGarmentPixel($x, $y, $luminance, $kind)) {
                     continue;
                 }
 
-                // Preserve the naturally dark inside of the collar.
-                if ($y < 205 && $x > 470 && $x < 730 && $luminance < 28) {
-                    continue;
-                }
-
-                $shade = max(0.52, min(1.22, 0.52 + ($luminance / 72)));
+                $shade = max(0.48, min(1.24, 0.50 + ($luminance / 72)));
                 $newRed = min(255, (int) round($target[0] * $shade));
                 $newGreen = min(255, (int) round($target[1] * $shade));
                 $newBlue = min(255, (int) round($target[2] * $shade));
@@ -521,13 +575,59 @@ class TextileMockupService
         }
     }
 
-    private function placeNaturalPrint(mixed $canvas, mixed $logo, string $position): void
+    private function isGarmentPixel(int $x, int $y, float $luminance, string $kind): bool
     {
-        [$centerX, $centerY, $maxWidth, $maxHeight] = match ($position) {
-            'left_chest' => [485, 375, 185, 155],
-            'front_large' => [600, 525, 430, 390],
-            'back_large' => [600, 510, 420, 380],
-            default => [600, 445, 310, 255],
+        if ($luminance > 125) {
+            return false;
+        }
+
+        if ($kind === 'cap') {
+            return $y >= 35 && $y <= 690 && $x >= 190 && $x <= 1010;
+        }
+
+        if (in_array($kind, ['hoodie', 'polo'], true)) {
+            if ($y < 205 && $x > 455 && $x < 745) {
+                return false;
+            }
+
+            return $y >= 130 && $x >= 75 && $x <= 1125;
+        }
+
+        if ($y < 235 && $x > 455 && $x < 745) {
+            return false;
+        }
+
+        if ($y < 500) {
+            return $x >= 70 && $x <= 1130;
+        }
+
+        return $x >= 245 && $x <= 955;
+    }
+
+    private function placeNaturalPrint(
+        mixed $canvas,
+        mixed $logo,
+        string $position,
+        string $kind,
+    ): void {
+        [$centerX, $centerY, $maxWidth, $maxHeight] = match ($kind) {
+            'cap' => [600, 385, 340, 185],
+            'hoodie' => match ($position) {
+                'left_chest' => [430, 430, 185, 150],
+                'front_large', 'back_large' => [600, 515, 410, 330],
+                default => [600, 450, 315, 245],
+            },
+            'polo' => match ($position) {
+                'left_chest' => [435, 410, 175, 145],
+                'front_large', 'back_large' => [600, 540, 390, 345],
+                default => [600, 500, 300, 240],
+            },
+            default => match ($position) {
+                'left_chest' => [455, 385, 185, 155],
+                'front_large' => [600, 545, 430, 390],
+                'back_large' => [600, 530, 420, 380],
+                default => [600, 470, 310, 255],
+            },
         };
 
         $sourceWidth = imagesx($logo);
