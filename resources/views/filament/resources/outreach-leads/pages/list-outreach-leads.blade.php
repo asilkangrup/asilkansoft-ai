@@ -1,6 +1,8 @@
 <x-filament-panels::page>
     @php
-        $mobileLeads = $this->getMobileLeads();
+        $selectedSector = $this->getSelectedSector();
+        $sectors = $this->getSectorSummaries();
+        $mobileLeads = $selectedSector ? $this->getMobileLeads() : null;
         $stats = $this->getMobileStats();
     @endphp
 
@@ -24,13 +26,46 @@
             <div><strong>{{ $stats['replied'] }}</strong><span>Cevap/WAI</span></div>
         </div>
 
-        <div class="wai-mobile-toolbar">
+        @if (! $selectedSector)
+            <div class="wai-sector-heading">
+                <div>
+                    <strong>Sektörler</strong>
+                    <span>Bir sektöre dokunarak kayıtları aç</span>
+                </div>
+                <span>{{ $sectors->count() }} sektör</span>
+            </div>
+            <div class="wai-sector-grid">
+                @foreach ($sectors as $sector)
+                    <a class="wai-sector-card" href="{{ request()->fullUrlWithQuery(['sector' => $sector->sector_name, 'ready' => 1, 'page' => null]) }}">
+                        <div class="wai-sector-icon">{{ mb_strtoupper(mb_substr($sector->sector_name, 0, 1)) }}</div>
+                        <div class="wai-sector-copy">
+                            <strong>{{ $sector->sector_name }}</strong>
+                            <span>{{ number_format($sector->ready, 0, ',', '.') }} hazır · {{ number_format($sector->verified, 0, ',', '.') }} WhatsApp</span>
+                        </div>
+                        <b>{{ number_format($sector->total, 0, ',', '.') }}</b>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </a>
+                @endforeach
+            </div>
+        @else
+            <div class="wai-sector-bar">
+                <a href="{{ request()->url() }}" aria-label="Sektörlere dön">
+                    <svg viewBox="0 0 24 24"><path d="M19 12H5m6-6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
+                <div><small>Seçili sektör</small><strong>{{ $selectedSector }}</strong></div>
+                <span>{{ number_format($mobileLeads->total(), 0, ',', '.') }} kayıt</span>
+            </div>
+
+        <form class="wai-mobile-toolbar" method="get">
+            <input type="hidden" name="sector" value="{{ $selectedSector }}">
             <div class="wai-mobile-search-wrap">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                <input id="waiLeadSearch" type="search" placeholder="İşletme veya numara ara">
+                <input name="q" value="{{ request('q') }}" type="search" placeholder="İşletme veya numara ara">
             </div>
-            <button type="button" id="waiShowReady" class="wai-mobile-filter is-active">Sıradakiler</button>
-        </div>
+            <button type="submit" name="ready" value="{{ request()->boolean('ready', true) ? '0' : '1' }}" class="wai-mobile-filter {{ request()->boolean('ready', true) ? 'is-active' : '' }}">
+                {{ request()->boolean('ready', true) ? 'Sıradakiler' : 'Tümü' }}
+            </button>
+        </form>
 
         <div id="waiLeadCards" class="wai-mobile-card-list">
             @forelse ($mobileLeads as $lead)
@@ -112,6 +147,13 @@
                 </div>
             @endforelse
         </div>
+
+        @if ($mobileLeads->hasPages())
+            <div class="wai-mobile-pagination">
+                {{ $mobileLeads->onEachSide(1)->links() }}
+            </div>
+        @endif
+        @endif
     </div>
 
     <div class="wai-desktop-table">
@@ -139,6 +181,10 @@
             .wai-mobile-stats>div{background:white;border:1px solid #e5e7eb;border-radius:16px;padding:12px 8px;text-align:center;box-shadow:0 5px 16px rgba(15,23,42,.04)}
             .dark .wai-mobile-stats>div{background:#111827;border-color:#263244}
             .wai-mobile-stats strong{font-size:18px;display:block;line-height:1.1}.wai-mobile-stats span{font-size:9px;color:#64748b;display:block;margin-top:4px}
+            .wai-sector-heading{display:flex;align-items:end;justify-content:space-between;margin:20px 2px 10px}.wai-sector-heading strong{display:block;font-size:17px}.wai-sector-heading span{font-size:10px;color:#64748b}.wai-sector-heading>span{font-weight:700;background:#eef2f7;padding:6px 9px;border-radius:999px}
+            .wai-sector-grid{display:flex;flex-direction:column;gap:9px}.wai-sector-card{display:flex;align-items:center;gap:11px;padding:13px;background:white;border:1px solid #e5e7eb;border-radius:18px;text-decoration:none!important;color:inherit!important;box-shadow:0 5px 18px rgba(15,23,42,.045)}.dark .wai-sector-card{background:#111827;border-color:#263244}.wai-sector-icon{width:42px;height:42px;border-radius:13px;background:#111827;color:#fbbf24;display:flex;align-items:center;justify-content:center;font-weight:900;flex:none}.wai-sector-copy{min-width:0;flex:1}.wai-sector-copy strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wai-sector-copy span{display:block;font-size:9px;color:#64748b;margin-top:3px}.wai-sector-card>b{font-size:14px}.wai-sector-card>svg{width:16px;color:#94a3b8}
+            .wai-sector-bar{display:flex;align-items:center;gap:10px;margin:18px 0 10px;padding:11px 12px;background:white;border:1px solid #e5e7eb;border-radius:17px}.dark .wai-sector-bar{background:#111827;border-color:#263244}.wai-sector-bar>a{width:38px;height:38px;border-radius:12px;background:#111827;color:white;display:flex;align-items:center;justify-content:center}.wai-sector-bar svg{width:19px}.wai-sector-bar>div{min-width:0;flex:1}.wai-sector-bar small{font-size:8px;color:#64748b;display:block}.wai-sector-bar strong{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wai-sector-bar>span{font-size:9px;font-weight:800;background:#eff6ff;color:#2563eb;padding:6px 8px;border-radius:999px;white-space:nowrap}
+            .wai-mobile-pagination{margin-top:16px}.wai-mobile-pagination nav>div:first-child{display:flex!important}.wai-mobile-pagination nav>div:last-child{display:none!important}
             .wai-mobile-toolbar{display:flex;gap:8px;position:sticky;top:8px;z-index:20;padding:6px 0 10px;background:linear-gradient(to bottom,var(--fi-body-bg,#f9fafb) 72%,transparent)}
             .wai-mobile-search-wrap{height:46px;flex:1;background:white;border:1px solid #dfe3e8;border-radius:15px;display:flex;align-items:center;padding:0 13px;box-shadow:0 4px 16px rgba(15,23,42,.04)}
             .dark .wai-mobile-search-wrap{background:#111827;border-color:#263244}.wai-mobile-search-wrap svg{width:18px;color:#94a3b8;flex:none}.wai-mobile-search-wrap input{border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;width:100%;font-size:13px;padding-left:9px;color:inherit}
@@ -156,28 +202,5 @@
         }
     </style>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const search = document.getElementById('waiLeadSearch');
-            const ready = document.getElementById('waiShowReady');
-            const cards = [...document.querySelectorAll('.wai-lead-card')];
-            let onlyReady = true;
-            const apply = () => {
-                const q = (search?.value || '').toLocaleLowerCase('tr-TR').trim();
-                cards.forEach(card => {
-                    const matchSearch = !q || (card.dataset.search || '').includes(q);
-                    const matchReady = !onlyReady || card.dataset.ready === '1';
-                    card.style.display = matchSearch && matchReady ? '' : 'none';
-                });
-            };
-            search?.addEventListener('input', apply);
-            ready?.addEventListener('click', () => {
-                onlyReady = !onlyReady;
-                ready.classList.toggle('is-active', onlyReady);
-                ready.textContent = onlyReady ? 'Sıradakiler' : 'Tümü';
-                apply();
-            });
-            apply();
-        });
-    </script>
+
 </x-filament-panels::page>
