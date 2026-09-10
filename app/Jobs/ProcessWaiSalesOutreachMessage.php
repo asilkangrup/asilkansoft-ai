@@ -149,6 +149,30 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
                 }
             }
 
+            if (
+                in_array((string) $lead->status, ['replied', 'ready', 'pain_asked', 'solution_asked'], true)
+                && $this->isPositiveInterest($combinedMessage)
+            ) {
+                $lead->forceFill([
+                    'status' => 'demo_offered',
+                    'replied_at' => $lead->replied_at ?: now(),
+                    'ai_activated_at' => $lead->ai_activated_at ?: now(),
+                ])->save();
+
+                $answer = "Tabii. Sistem işletmenizin çalışma şekline göre hazırlanıyor. WhatsApp’tan gelen müşterileri 7/24 karşılıyor; ürün, adet, renk, beden ve baskı detaylarını topluyor, sık sorulan soruları yanıtlıyor ve müşteriyi sipariş/satış aşamasına kadar yönlendiriyor.\n\nMüşteri logosunu veya baskı tasarımını gönderdiğinde, yapay zeka bunu seçilen ürün üzerine uygulayıp yaklaşık 5 saniye içinde profesyonel bir baskı ön izlemesi hazırlayarak WhatsApp’tan geri sunabiliyor.\n\nİsterseniz hazır kurulu WhatsApp demo hattımızdan müşteri gibi yazarak doğrudan deneyebilirsiniz. Demo hattını göndereyim mi?";
+
+                $this->sendAnswer(
+                    memoryService: $memoryService,
+                    whatsAppService: $whatsAppService,
+                    bot: $bot,
+                    sessionId: $sessionId,
+                    phoneDigits: $phoneDigits,
+                    answer: $answer,
+                );
+
+                return;
+            }
+
             $statusBeforeDecision = (string) $lead->status;
             $decision = $salesService->decide($lead, $combinedMessage);
             $action = (string) ($decision['action'] ?? 'ignore');
@@ -163,7 +187,7 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
                 if ($statusBeforeDecision === 'demo_offered' && $action === 'reply_hot') {
                     $sector = (string) ($decision['sector'] ?? $salesService->sectorFor($lead));
                     if ($salesService->isTextileSector($sector)) {
-                        $answer = "Tabii. İsterseniz hazır kurulu WhatsApp demo hattımızdan sistemi doğrudan deneyebilirsiniz.\n\nDemo WhatsApp numarasına müşteri gibi “Merhaba” yazın, baskı yaptırmak istediğiniz ürünü belirtin ve logonuzu gönderin. Yapay zeka yaklaşık 5 saniye içinde logonuzu ürün üzerine profesyonel şekilde uygulayıp baskı ön izlemesini size WhatsApp’tan geri gönderecektir.\n\nAynı sistem 7/24 müşterilerinizi karşılar, sorularını cevaplar, sipariş bilgilerini toplar ve müşteriyi satış aşamasına kadar ilerletir. Böylece gelen talepler cevapsız kalmaz.\n\nDemo WhatsApp: +90 536 475 00 98\nhttps://wa.me/905364750098";
+                        $answer = "Tabii. Hazır kurulu WhatsApp demo hattımıza müşteri gibi “Merhaba” yazın, baskı yaptırmak istediğiniz ürünü belirtin ve logonuzu gönderin.\n\nYapay zeka logonuzu ürün üzerine uygulayıp yaklaşık 5 saniye içinde baskı ön izlemesini WhatsApp’tan size geri sunacaktır. Aynı sistem 7/24 müşterilerinize cevap verir, gerekli bilgileri toplar ve müşteriyi satış aşamasına kadar yönlendirir; böylece gelen talepler cevapsız kalmaz.\n\nDemo WhatsApp: +90 536 475 00 98\nhttps://wa.me/905364750098";
                     } else {
                         $demo = $demoService->create([
                             'company_name' => $lead->company_name,
@@ -257,6 +281,24 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
         );
 
         $whatsAppService->sendText($this->instance, $phoneDigits, $answer);
+    }
+
+    private function isPositiveInterest(string $message): bool
+    {
+        $normalized = Str::lower(trim($message));
+
+        foreach ([
+            'evet', 'ebet', 'ewet', 'evt', 'evett', 'buyurun', 'buyrun', 'olur', 'olabilir',
+            'tamam', 'dinliyorum', 'anlatın', 'anlatin', 'bilgi alabilirim', 'bilgi almak',
+            'isterim', 'istiyorum', 'demo', 'deneyelim', 'nasıl çalışıyor', 'nasil calisiyor',
+            'tabii', 'tabi', 'elbette', 'gönder', 'gonder',
+        ] as $positive) {
+            if (str_contains($normalized, $positive)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isCallRequest(string $message): bool
