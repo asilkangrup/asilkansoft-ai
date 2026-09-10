@@ -373,6 +373,8 @@ class TextileWhatsAppInboundService
                 $answer = $this->welcomeMessage();
             } elseif ($this->generalInformationRequest($message)) {
                 $answer = $this->informationTopicQuestion();
+            } elseif ($this->productRecommendationRequest($message)) {
+                $answer = "Markanız daha rahat ve sokak giyim çizgisindeyse *oversize*, daha klasik ve geniş kullanım içinse *regular/bisiklet yaka* iyi bir başlangıç olur.\n\nTasarım çizginiz daha çok sokak stili mi, yoksa sade ve klasik mi?";
             } else {
                 $answer = $this->intelligentReply($bot, $conversation, $state, $message);
             }
@@ -908,6 +910,16 @@ class TextileWhatsAppInboundService
         );
     }
 
+    private function productRecommendationRequest(string $message): bool
+    {
+        $message = Str::lower(str_replace(['İ', 'I'], ['i', 'ı'], $message));
+
+        return preg_match(
+            '/(?:hangi|nasıl|nasil).{0,35}(?:tişört|tisort|model).{0,25}(?:seç|sec|uygun|öner)|(?:kararsızım|kararsizim).{0,30}(?:tişört|tisort|model)/u',
+            $message,
+        ) === 1;
+    }
+
     private function generalInformationRequest(string $message): bool
     {
         $normalized = Str::lower(trim($message));
@@ -1101,6 +1113,7 @@ Müşteri yalnızca bilgi almak, seçenekleri görmek, fikir danışmak veya soh
 Müşteri genel bilgi isterse önce hangi konuyu merak ettiğini sor ve yalnızca şu kısa seçenekleri sun: ürün çeşitleri, kumaş ve kaliteler, baskı yöntemleri, fiyatlandırma, minimum adet, teslimat.
 Müşteri belirli bir konu sorarsa yalnızca o konuya cevap ver; ilgisiz fiyat, ürün, kargo, ödeme veya iade bilgilerini ekleme.
 Güncel ürün kataloğu: kapüşonlu sweatshirt, regular/bisiklet yaka tişört, siyah ve beyaz oversize tişört, polo yaka tişört, pamuklu şapka ve polyester şapka.
+Şirket profilinde açıkça doğrulanmayan kumaş, kalıp, iç yüzey, gramaj, stok, renk, teknik özellik veya ürün niteliği uydurma. Özellikle kapüşonlunun şardonlu olduğunu, regular ürünün ince kesim olduğunu veya katalogda olmayan bir özelliği söyleme.
 Baskı örnekleri arasında beyaz ve siyah tişört üzerine DTG baskı bulunur. Müşteri ürün çeşidi sorarsa yalnızca bu katalogdaki ürünleri kısa ve düzenli biçimde söyle.
 Müşterinin seçtiği ürün modelini değiştirme; baskı önizlemesi seçilen gerçek ürünün stüdyo/manken şablonunda hazırlanır.
 Bu bot yalnızca tekstil ürünleri içindir. Bardak veya kupa baskısı sunma; müşteri sorarsa bu hattın şu anda yalnız tekstil siparişleri için hizmet verdiğini kısa ve nazik biçimde söyle.
