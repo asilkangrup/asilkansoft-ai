@@ -190,6 +190,15 @@ class TextileWhatsAppInboundService
                         $state['pending_position'] = null;
                         $state['mockup_sent'] = false;
                         $state['approved'] = false;
+                    } elseif ($state['logo_received'] ?? false) {
+                        $state['pending_uploaded_artwork'] = [
+                            'logo_base64' => $artwork,
+                            'logo_mime' => $mime,
+                        ];
+                        $state['awaiting_uploaded_artwork_position'] = true;
+                        $state['mockup_sent'] = false;
+                        $state['approved'] = false;
+                        $attachmentReply = "Yeni baskı görselinizi de aldım ✓\n\nBu görseli hangi alanda kullanalım? Örneğin: *ön orta, ön sol göğüs, arka büyük, sağ kol veya sol kol*.";
                     } else {
                         $state['logo_base64'] = $artwork;
                         $state['logo_mime'] = $mime;
@@ -520,6 +529,8 @@ class TextileWhatsAppInboundService
             $state['pending_position'] = null;
             $state['awaiting_additional_artwork_choice'] = false;
             $state['awaiting_additional_image_position'] = null;
+            $state['pending_uploaded_artwork'] = null;
+            $state['awaiting_uploaded_artwork_position'] = false;
             $state['mockup_sent'] = false;
             $state['approved'] = false;
             if (! $hasExplicitQuantity) {
@@ -567,6 +578,28 @@ class TextileWhatsAppInboundService
             if (str_contains($lower, $needle)) {
                 $detectedPosition = $value;
                 break;
+            }
+        }
+
+        if ($detectedPosition !== null && ($state['awaiting_uploaded_artwork_position'] ?? false)) {
+            $uploaded = is_array($state['pending_uploaded_artwork'] ?? null)
+                ? $state['pending_uploaded_artwork']
+                : [];
+            if (($uploaded['logo_base64'] ?? null)) {
+                $state['additional_prints'] = is_array($state['additional_prints'] ?? null)
+                    ? $state['additional_prints']
+                    : [];
+                $state['additional_prints'][] = [
+                    'position' => $detectedPosition,
+                    'logo_base64' => (string) $uploaded['logo_base64'],
+                    'logo_mime' => (string) ($uploaded['logo_mime'] ?? 'image/png'),
+                ];
+                $state['additional_prints'] = array_slice($state['additional_prints'], -8);
+                $state['pending_uploaded_artwork'] = null;
+                $state['awaiting_uploaded_artwork_position'] = false;
+                $state['mockup_sent'] = false;
+                $state['approved'] = false;
+                $detectedPosition = null;
             }
         }
 
@@ -784,6 +817,8 @@ class TextileWhatsAppInboundService
             'pending_position',
             'awaiting_additional_artwork_choice',
             'awaiting_additional_image_position',
+            'pending_uploaded_artwork',
+            'awaiting_uploaded_artwork_position',
             'order_items',
         ] as $key) {
             if (($before[$key] ?? null) !== ($after[$key] ?? null)) {
@@ -929,6 +964,10 @@ PROMPT;
 
         if ($state['awaiting_additional_image_position'] ?? null) {
             return 'Ek baskıda kullanılacak farklı görseli JPG, PNG veya WEBP olarak gönderin.';
+        }
+
+        if ($state['awaiting_uploaded_artwork_position'] ?? false) {
+            return 'Yeni gönderdiğiniz görsel hangi baskı alanında kullanılacak? Ön orta, ön sol göğüs, arka büyük, sağ kol veya sol kol yazabilirsiniz.';
         }
 
         if (! ($state['product_category'] ?? null)) {
@@ -1175,6 +1214,8 @@ PROMPT;
             'pending_position' => null,
             'awaiting_additional_artwork_choice' => false,
             'awaiting_additional_image_position' => null,
+            'pending_uploaded_artwork' => null,
+            'awaiting_uploaded_artwork_position' => false,
             'order_items' => [],
         ];
     }
