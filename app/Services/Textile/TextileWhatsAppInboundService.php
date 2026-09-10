@@ -429,14 +429,8 @@ class TextileWhatsAppInboundService
                 return true;
             }
 
-            $paymentUrl = URL::temporarySignedRoute(
-                'textile.demo.payment',
-                now()->addHours(2),
-                ['order' => $state['order_id']],
-            );
-
             $this->sendText($bot, $conversation, $instance, $phone,
-                $this->paymentMessage($state, $paymentUrl)
+                $this->paymentMessage($state)
             );
             $this->consumeTrial($bot);
             return true;
@@ -991,6 +985,8 @@ Yanıtı anlamlı kısa paragraflara ayır ve paragraflar arasında bir boş sat
 Önemli ifadeleri gerektiğinde WhatsApp kalın biçimi olan *metin* ile vurgula; aşırı kullanma.
 Gerçek satır sonu kullan; müşteriye \\n, \\r veya benzeri teknik kaçış ifadeleri gösterme.
 Bilgi kesin değilse uydurma; neyin ürün veya sipariş detayına göre netleşeceğini açıkça söyle.
+Ödeme bilgisi sorulursa yalnızca şu doğrulanmış bilgiyi paylaş: Alıcı Fatih Uzunkaya, IBAN TR18 0020 5000 0922 9541 6000 01.
+Müşteriye ödeme bağlantısı gönderme. Sipariş onaylandığında, siparişi hakkında çok kısa süre içinde aranacağını söyle.
 Fiyat uydurmak kesinlikle yasaktır. Yalnızca şu doğrulanmış fiyatlar söylenebilir: 1 adet yüzde 100 pamuklu tişört + dijital/transfer baskı + kargo 750 TL; 5-30 adet beyaz tişört yalnız ön baskı 300 TL/adet; 5-30 adet beyaz tişört ön ve arka baskı 385 TL/adet. Bunların dışındaki ürün, renk, adet veya baskı alanlarında net teklif için satış ekibinin kontrol edeceğini söyle.
 İndirim hesabını yalnızca şirket profilinde doğrulanmış bir normal birim fiyat varsa uygula: 30-99 adet siparişte normal birim fiyattan yalnızca 10 TL, 100 adet ve üzerindeyse yalnızca 15 TL indir. İndirimler birikimli değildir. Örneğin 75 adet için 10 TL indirim uygulanır; 100 adet indirimi kesinlikle uygulanmaz.
 Müşteriye indirim eşiklerini, adet aralıklarını veya iç fiyatlandırma kuralını açıklama. Yalnızca kendisine ait sipariş için hesaplanan net birim fiyatı ve istenirse toplamı söyle.
@@ -1156,18 +1152,20 @@ PROMPT;
             .'Görsel ve bilgiler uygunsa *Onaylıyorum* yazabilirsiniz.';
     }
 
-    private function paymentMessage(array $state, string $url): string
+    private function paymentMessage(array $state): string
     {
         $quote = $this->quote($state);
         if ($quote === null) {
-            throw new \LogicException('Tanımsız fiyat için ödeme bağlantısı üretilemez.');
+            throw new \LogicException('Tanımsız fiyat için sipariş onayı üretilemez.');
         }
 
-        return "✅ Tasarım ve sipariş onaylandı.\n\n"
+        return "✅ Tasarım ve siparişiniz onaylandı.\n\n"
             .'Sipariş No: *#'.$state['order_id']."*\n"
-            .'Demo toplam: *'.number_format($quote[1], 0, ',', '.')." TL*\n\n"
-            ."Ödeme adımını güvenli demo ekranında tamamlayabilirsiniz:\n{$url}\n\n"
-            .'Bu bağlantı 2 saat geçerlidir ve gerçek para çekmez.';
+            .'Toplam: *'.number_format($quote[1], 0, ',', '.')." TL*\n\n"
+            ."Ödeme bilgileri:\n"
+            ."Alıcı: *Fatih Uzunkaya*\n"
+            ."IBAN: *TR18 0020 5000 0922 9541 6000 01*\n\n"
+            .'Siparişiniz hakkında sizi çok kısa süre içinde arayacağız.';
     }
 
     private function quote(array $state): ?array
