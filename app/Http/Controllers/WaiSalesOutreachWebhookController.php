@@ -14,6 +14,7 @@ class WaiSalesOutreachWebhookController extends Controller
 
     private const BLOCKED_PHONE_DIGITS = [
         '905317803722',
+        '905348919842',
     ];
 
     public function handle(Request $request): JsonResponse
