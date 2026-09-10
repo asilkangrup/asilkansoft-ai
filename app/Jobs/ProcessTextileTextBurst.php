@@ -11,7 +11,7 @@ class ProcessTextileTextBurst implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 1;
+    public int $tries = 0;
     public int $timeout = 180;
 
     public function __construct(public string $bufferKey)
