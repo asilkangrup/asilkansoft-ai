@@ -1,7 +1,9 @@
 <x-filament-panels::page>
     @php
         $selectedSector = $this->getSelectedSector();
+        $selectedCity = $this->getSelectedCity();
         $sectors = $this->getSectorSummaries();
+        $cities = $selectedSector ? $this->getCityOptions() : collect();
         $mobileLeads = $selectedSector ? $this->getMobileLeads() : null;
         $stats = $this->getMobileStats();
     @endphp
@@ -65,6 +67,12 @@
             <button type="submit" name="ready" value="{{ request()->boolean('ready', true) ? '0' : '1' }}" class="wai-mobile-filter {{ request()->boolean('ready', true) ? 'is-active' : '' }}">
                 {{ request()->boolean('ready', true) ? 'Sıradakiler' : 'Tümü' }}
             </button>
+            <select name="city" class="wai-city-select" onchange="this.form.submit()" aria-label="İle göre filtrele">
+                <option value="">Tüm iller</option>
+                @foreach ($cities as $cityValue => $cityLabel)
+                    <option value="{{ $cityValue }}" @selected($selectedCity === $cityValue)>{{ $cityLabel }}</option>
+                @endforeach
+            </select>
         </form>
 
         <div id="waiLeadCards" class="wai-mobile-card-list">
@@ -87,6 +95,10 @@
                         default => 'WhatsApp bilinmiyor',
                     };
                     $canOpen = ! $lead->contact_opened_at && $lead->whatsapp_status !== 'unavailable';
+                    $leadCity = null;
+                    if (preg_match('/Şehir:\s*([^|]+)\s*$/u', (string) $lead->notes, $cityMatch)) {
+                        $leadCity = trim($cityMatch[1]);
+                    }
                 @endphp
                 <article class="wai-lead-card" data-ready="{{ $lead->status === 'ready' ? '1' : '0' }}" data-search="{{ mb_strtolower($lead->company_name.' '.$lead->phone_e164.' '.$lead->source) }}">
                     <div class="wai-lead-card-top">
@@ -102,6 +114,9 @@
                         <span class="{{ $lead->whatsapp_status === 'verified' ? 'is-green' : ($lead->whatsapp_status === 'unavailable' ? 'is-red' : '') }}">{{ $waText }}</span>
                         @if ($lead->isFreshSource())
                             <span class="is-purple">Yeni kaynak</span>
+                        @endif
+                        @if ($leadCity && mb_strtolower($leadCity) !== 'belirlenemedi')
+                            <span class="is-blue">{{ $leadCity }}</span>
                         @endif
                         @if ($lead->source)
                             <span>{{ $lead->source }}</span>
@@ -185,16 +200,17 @@
             .wai-sector-grid{display:flex;flex-direction:column;gap:9px}.wai-sector-card{display:flex;align-items:center;gap:11px;padding:13px;background:white;border:1px solid #e5e7eb;border-radius:18px;text-decoration:none!important;color:inherit!important;box-shadow:0 5px 18px rgba(15,23,42,.045)}.dark .wai-sector-card{background:#111827;border-color:#263244}.wai-sector-icon{width:42px;height:42px;border-radius:13px;background:#111827;color:#fbbf24;display:flex;align-items:center;justify-content:center;font-weight:900;flex:none}.wai-sector-copy{min-width:0;flex:1}.wai-sector-copy strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wai-sector-copy span{display:block;font-size:9px;color:#64748b;margin-top:3px}.wai-sector-card>b{font-size:14px}.wai-sector-card>svg{width:16px;color:#94a3b8}
             .wai-sector-bar{display:flex;align-items:center;gap:10px;margin:18px 0 10px;padding:11px 12px;background:white;border:1px solid #e5e7eb;border-radius:17px}.dark .wai-sector-bar{background:#111827;border-color:#263244}.wai-sector-bar>a{width:38px;height:38px;border-radius:12px;background:#111827;color:white;display:flex;align-items:center;justify-content:center}.wai-sector-bar svg{width:19px}.wai-sector-bar>div{min-width:0;flex:1}.wai-sector-bar small{font-size:8px;color:#64748b;display:block}.wai-sector-bar strong{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wai-sector-bar>span{font-size:9px;font-weight:800;background:#eff6ff;color:#2563eb;padding:6px 8px;border-radius:999px;white-space:nowrap}
             .wai-mobile-pagination{margin-top:16px}.wai-mobile-pagination nav>div:first-child{display:flex!important}.wai-mobile-pagination nav>div:last-child{display:none!important}
-            .wai-mobile-toolbar{display:flex;gap:8px;position:sticky;top:8px;z-index:20;padding:6px 0 10px;background:linear-gradient(to bottom,var(--fi-body-bg,#f9fafb) 72%,transparent)}
-            .wai-mobile-search-wrap{height:46px;flex:1;background:white;border:1px solid #dfe3e8;border-radius:15px;display:flex;align-items:center;padding:0 13px;box-shadow:0 4px 16px rgba(15,23,42,.04)}
+            .wai-mobile-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;position:sticky;top:8px;z-index:20;padding:6px 0 10px;background:linear-gradient(to bottom,var(--fi-body-bg,#f9fafb) 72%,transparent)}
+            .wai-mobile-search-wrap{height:46px;min-width:0;background:white;border:1px solid #dfe3e8;border-radius:15px;display:flex;align-items:center;padding:0 13px;box-shadow:0 4px 16px rgba(15,23,42,.04)}
             .dark .wai-mobile-search-wrap{background:#111827;border-color:#263244}.wai-mobile-search-wrap svg{width:18px;color:#94a3b8;flex:none}.wai-mobile-search-wrap input{border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;width:100%;font-size:13px;padding-left:9px;color:inherit}
             .wai-mobile-filter{height:46px;border-radius:15px;border:1px solid #dfe3e8;background:white;padding:0 14px;font-size:11px;font-weight:700;white-space:nowrap}.wai-mobile-filter.is-active{background:#111827;color:white;border-color:#111827}
+            .wai-city-select{grid-column:1/-1;height:44px;border:1px solid #dfe3e8;border-radius:14px;background:white;padding:0 13px;font-size:12px;font-weight:700;color:inherit;box-shadow:0 4px 16px rgba(15,23,42,.04)}.dark .wai-city-select{background:#111827;border-color:#263244}
             .wai-mobile-card-list{display:flex;flex-direction:column;gap:10px}
             .wai-lead-card{background:white;border:1px solid #e6e9ed;border-radius:21px;padding:15px;box-shadow:0 7px 24px rgba(15,23,42,.055)}
             .dark .wai-lead-card{background:#111827;border-color:#263244}
             .wai-lead-card-top{display:flex;align-items:center;gap:10px}.wai-lead-avatar{width:43px;height:43px;border-radius:14px;background:#111827;color:#fbbf24;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;flex:none}.wai-lead-title{min-width:0;flex:1}.wai-lead-title h3{font-size:15px;font-weight:800;line-height:1.2;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wai-lead-title a{display:inline-block;margin-top:4px;color:#64748b;font-size:12px}
             .wai-status{font-size:9px;font-weight:800;border-radius:999px;padding:6px 8px;background:#eff6ff;color:#2563eb;white-space:nowrap}.wai-status.is-opened{background:#fff7ed;color:#ea580c}.wai-status.is-success{background:#ecfdf5;color:#059669}
-            .wai-lead-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}.wai-lead-chips span{font-size:9px;font-weight:700;padding:5px 8px;border-radius:999px;background:#f1f5f9;color:#475569}.wai-lead-chips .is-green{background:#ecfdf5;color:#047857}.wai-lead-chips .is-red{background:#fef2f2;color:#b91c1c}.wai-lead-chips .is-purple{background:#f5f3ff;color:#7c3aed}
+            .wai-lead-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}.wai-lead-chips span{font-size:9px;font-weight:700;padding:5px 8px;border-radius:999px;background:#f1f5f9;color:#475569}.wai-lead-chips .is-green{background:#ecfdf5;color:#047857}.wai-lead-chips .is-red{background:#fef2f2;color:#b91c1c}.wai-lead-chips .is-purple{background:#f5f3ff;color:#7c3aed}.wai-lead-chips .is-blue{background:#eff6ff;color:#2563eb}
             .wai-message-preview{margin-top:12px;background:#f8fafc;border-radius:14px;padding:11px 12px}.dark .wai-message-preview{background:#0b1220}.wai-message-preview span{font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:800;color:#94a3b8}.wai-message-preview p{font-size:12px;line-height:1.45;margin:4px 0 0;color:#334155}.dark .wai-message-preview p{color:#d1d5db}
             .wai-lead-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.wai-lead-meta>div{border:1px solid #eef0f3;border-radius:12px;padding:9px}.dark .wai-lead-meta>div{border-color:#263244}.wai-lead-meta small{font-size:8px;color:#94a3b8;display:block}.wai-lead-meta strong{font-size:10px;display:block;margin-top:3px}
             .wai-card-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}.wai-whatsapp-button{min-height:49px;border-radius:15px;background:#16a34a;color:white!important;display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:800;text-decoration:none;box-shadow:0 8px 18px rgba(22,163,74,.2)}.wai-whatsapp-button svg{width:17px}.wai-whatsapp-button.is-disabled{background:#e5e7eb;color:#94a3b8!important;box-shadow:none;border:0;width:100%}.wai-source-button{min-height:49px;padding:0 14px;border-radius:15px;border:1px solid #dfe3e8;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:inherit;text-decoration:none;background:white}.dark .wai-source-button{background:#111827;border-color:#334155}

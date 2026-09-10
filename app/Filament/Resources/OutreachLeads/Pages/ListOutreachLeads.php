@@ -36,6 +36,32 @@ class ListOutreachLeads extends ListRecords
         return $sector !== '' ? $sector : null;
     }
 
+    public function getSelectedCity(): ?string
+    {
+        $city = trim((string) request()->query('city', ''));
+
+        return $city !== '' ? $city : null;
+    }
+
+    public function getCityOptions(): Collection
+    {
+        $sector = $this->getSelectedSector();
+        $cityExpression = "TRIM(SUBSTRING(notes FROM 'Şehir:\\s*(.*)$'))";
+
+        return $this->mobileQuery()
+            ->selectRaw($cityExpression.' AS city_name')
+            ->whereNotNull('notes')
+            ->whereRaw($cityExpression." <> ''")
+            ->whereRaw('LOWER('.$cityExpression.") <> 'belirlenemedi'")
+            ->when($sector === 'Diğer', fn (Builder $query) => $query->where(fn (Builder $nested) => $nested
+                ->whereNull('sector')
+                ->orWhereRaw("TRIM(sector) = ''")))
+            ->when($sector && $sector !== 'Diğer', fn (Builder $query) => $query->where('sector', $sector))
+            ->groupByRaw($cityExpression)
+            ->orderBy('city_name')
+            ->pluck('city_name', 'city_name');
+    }
+
     public function getSectorSummaries(): Collection
     {
         return $this->mobileQuery()
@@ -51,14 +77,17 @@ class ListOutreachLeads extends ListRecords
     public function getMobileLeads(): LengthAwarePaginator
     {
         $sector = $this->getSelectedSector();
+        $city = $this->getSelectedCity();
         $search = trim((string) request()->query('q', ''));
         $onlyReady = request()->boolean('ready', true);
+        $cityExpression = "TRIM(SUBSTRING(notes FROM 'Şehir:\\s*(.*)$'))";
 
         return $this->mobileQuery()
             ->when($sector === 'Diğer', fn (Builder $query) => $query->where(fn (Builder $nested) => $nested
                 ->whereNull('sector')
                 ->orWhereRaw("TRIM(sector) = ''")))
             ->when($sector && $sector !== 'Diğer', fn (Builder $query) => $query->where('sector', $sector))
+            ->when($city, fn (Builder $query) => $query->whereRaw($cityExpression.' = ?', [$city]))
             ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $nested) => $nested
                 ->where('company_name', 'ilike', '%'.$search.'%')
                 ->orWhere('phone_e164', 'like', '%'.$search.'%')))

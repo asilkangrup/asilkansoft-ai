@@ -135,6 +135,18 @@ class OutreachLeadResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('notes')
+                    ->label('İl')
+                    ->formatStateUsing(function (?string $state): string {
+                        if (preg_match('/Şehir:\\s*([^|]+)\\s*$/u', (string) $state, $matches)) {
+                            return trim($matches[1]);
+                        }
+
+                        return 'Belirlenemedi';
+                    })
+                    ->badge()
+                    ->toggleable(),
+
                 TextColumn::make('whatsapp_status')
                     ->label('WhatsApp')
                     ->badge()
@@ -188,11 +200,39 @@ class OutreachLeadResource extends Resource
             ->filters([
                 SelectFilter::make('sector')
                     ->label('Sektör')
-                    ->options([
-                        'Sigorta Acentesi' => 'Sigortacılar',
-                        'Tişört Baskı / Tekstil' => 'Tişört Baskı / Tekstil',
-                        'Kredi / Finansman Danışmanlığı' => 'Kredi / Finansman',
-                    ]),
+                    ->options(fn (): array => static::getEloquentQuery()
+                        ->reorder()
+                        ->whereNotNull('sector')
+                        ->whereRaw("TRIM(sector) <> ''")
+                        ->distinct()
+                        ->orderBy('sector')
+                        ->pluck('sector', 'sector')
+                        ->all()),
+                SelectFilter::make('city')
+                    ->label('İl')
+                    ->options(function (): array {
+                        $cityExpression = "TRIM(SUBSTRING(notes FROM 'Şehir:\\s*(.*)$'))";
+
+                        return static::getEloquentQuery()
+                            ->reorder()
+                            ->selectRaw($cityExpression.' AS city_name')
+                            ->whereNotNull('notes')
+                            ->whereRaw($cityExpression." <> ''")
+                            ->whereRaw('LOWER('.$cityExpression.") <> 'belirlenemedi'")
+                            ->groupByRaw($cityExpression)
+                            ->orderBy('city_name')
+                            ->pluck('city_name', 'city_name')
+                            ->all();
+                    })
+                    ->query(function (Builder $query, array $data): Builder {
+                        $city = trim((string) ($data['value'] ?? ''));
+                        $cityExpression = "TRIM(SUBSTRING(notes FROM 'Şehir:\\s*(.*)$'))";
+
+                        return $query->when(
+                            $city !== '',
+                            fn (Builder $filteredQuery): Builder => $filteredQuery->whereRaw($cityExpression.' = ?', [$city]),
+                        );
+                    }),
                 SelectFilter::make('whatsapp_status')
                     ->label('WhatsApp')
                     ->options([
