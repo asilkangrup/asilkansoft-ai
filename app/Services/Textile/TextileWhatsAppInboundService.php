@@ -560,7 +560,11 @@ class TextileWhatsAppInboundService
         }
 
         $hasExplicitQuantity = (bool) preg_match('/\\b([1-9][0-9]{0,4})\\s*(?:adet|tane)\\b/u', $lower, $quantityMatch);
-        if (! $hasExplicitQuantity && preg_match('/(?<![\\pL\\pN])(?:tek\\s+bir|tek|bir)\\s+(?:adet|tane|tişört|tisort)(?![\\pL\\pN])/u', $lower)) {
+        if (
+            ! $hasExplicitQuantity
+            && $detectedProduct !== null
+            && preg_match('/(?<![\\pL\\pN])(?:tek\\s+bir|tek\\s+adet|bir\\s+adet)(?![\\pL\\pN])/u', $lower)
+        ) {
             $hasExplicitQuantity = true;
             $quantityMatch = [null, 1];
         }
