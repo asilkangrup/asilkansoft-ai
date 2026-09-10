@@ -25,6 +25,7 @@ class TextileWhatsAppInboundService
         private readonly RealEstateWhatsAppMessageParser $messageParser,
         private readonly EvolutionMediaService $mediaService,
         private readonly TextileMockupService $mockupService,
+        private readonly TextileAttachmentService $attachmentService,
         private readonly WhatsAppService $whatsAppService,
         private readonly MemoryService $memoryService,
         private readonly OpenAIService $openAIService,
@@ -124,39 +125,107 @@ class TextileWhatsAppInboundService
         $previousState = $state;
         $state = $this->parseText($state, trim((string) ($mediaContext['caption'] ?: $message)));
 
-        if (($mediaContext['type'] ?? null) === 'image') {
+        $attachmentReply = null;
+        $mediaType = (string) ($mediaContext['type'] ?? 'text');
+        if (in_array($mediaType, ['image', 'document'], true)) {
             try {
-                $logo = $this->mediaService->downloadBase64(
+                $encodedFile = $this->mediaService->downloadBase64(
                     instanceName: $instance,
                     messageEnvelope: is_array($mediaContext['message_envelope'] ?? null)
                         ? $mediaContext['message_envelope']
                         : [],
                 );
 
-                $bytes = base64_decode($logo, true);
-                if (! is_string($bytes) || $bytes === '' || strlen($bytes) > 8 * 1024 * 1024) {
-                    throw new \RuntimeException('Logo dosyası güvenli demo sınırını aşıyor veya çözülemedi.');
+                $bytes = base64_decode($encodedFile, true);
+                if (! is_string($bytes) || $bytes === '' || strlen($bytes) > 15 * 1024 * 1024) {
+                    throw new \RuntimeException('Dosya güvenli sınırı aşıyor veya çözülemedi.');
                 }
 
-                $mime = strtolower(trim((string) ($mediaContext['mime_type'] ?? 'image/jpeg')));
+                $mime = strtolower(trim((string) ($mediaContext['mime_type'] ?? 'application/octet-stream')));
+                $filename = trim((string) ($mediaContext['filename'] ?? 'dosya'));
+                $analysis = $this->attachmentService->inspect(
+                    base64: $encodedFile,
+                    mime: $mime,
+                    filename: $filename,
+                    bot: $bot,
+                );
 
-                $state['logo_base64'] = $logo;
-                $state['logo_mime'] = $mime;
-                $state['logo_received'] = true;
+                $documentText = trim((string) ($analysis['order_text'] ?? ''));
+                if ($documentText !== '') {
+                    $state = $this->parseText($state, $documentText);
+                }
+
+                $documentItems = is_array($analysis['order_items'] ?? null)
+                    ? $analysis['order_items']
+                    : [];
+                if ($documentItems !== []) {
+                    $state['order_items'] = array_slice(array_merge(
+                        is_array($state['order_items'] ?? null) ? $state['order_items'] : [],
+                        $documentItems,
+                    ), -20);
+                }
+
+                $hasPrintableArtwork = (bool) ($analysis['contains_printable_artwork'] ?? false);
+                if (($analysis['kind'] ?? null) === 'order_document' && ! $hasPrintableArtwork) {
+                    $summary = trim((string) ($analysis['summary'] ?? ''));
+                    $attachmentReply = "Belgenizi okudum ✓";
+                    if ($summary !== '') {
+                        $attachmentReply .= "\n\n".$summary;
+                    }
+                    $attachmentReply .= "\n\n".$this->nextQuestion($state);
+                } else {
+                    $artwork = trim((string) ($analysis['artwork_base64'] ?? $encodedFile));
+                    $pendingPosition = trim((string) ($state['awaiting_additional_image_position'] ?? ''));
+
+                    if ($pendingPosition !== '') {
+                        $state['additional_prints'] = is_array($state['additional_prints'] ?? null)
+                            ? $state['additional_prints']
+                            : [];
+                        $state['additional_prints'][] = [
+                            'position' => $pendingPosition,
+                            'logo_base64' => $artwork,
+                            'logo_mime' => 'image/png',
+                        ];
+                        $state['additional_prints'] = array_slice($state['additional_prints'], -8);
+                        $state['awaiting_additional_image_position'] = null;
+                        $state['pending_position'] = null;
+                        $state['mockup_sent'] = false;
+                        $state['approved'] = false;
+                    } elseif ($state['logo_received'] ?? false) {
+                        $state['pending_uploaded_artwork'] = [
+                            'logo_base64' => $artwork,
+                            'logo_mime' => $mime,
+                        ];
+                        $state['awaiting_uploaded_artwork_position'] = true;
+                        $state['mockup_sent'] = false;
+                        $state['approved'] = false;
+                        $attachmentReply = "Yeni baskı görselinizi de aldım ✓\n\nBu görseli hangi alanda kullanalım? Örneğin: *ön orta, ön sol göğüs, arka büyük, sağ kol veya sol kol*.";
+                    } else {
+                        $state['logo_base64'] = $artwork;
+                        $state['logo_mime'] = $mime;
+                        $state['logo_received'] = true;
+                        $state['mockup_sent'] = false;
+                        $state['approved'] = false;
+                    }
+                }
 
                 $inbound->forceFill([
                     'media_mime_type' => $mime,
                     'media_size' => strlen($bytes),
                 ])->saveQuietly();
             } catch (Throwable $exception) {
-                Log::warning('TEXTILE LOGO DOWNLOAD FAILED', [
+                Log::warning('TEXTILE ATTACHMENT FAILED', [
                     'ai_bot_id' => $bot->id,
                     'conversation_id' => $conversation->id,
                     'message' => $exception->getMessage(),
                 ]);
 
-                $this->sendText($bot, $conversation, $instance, $phone,
-                    'Görseli aldım ancak baskı dosyasını güvenli şekilde açamadım. Logoyu JPG, PNG veya WEBP olarak tekrar gönderebilir misiniz?'
+                $this->sendText(
+                    $bot,
+                    $conversation,
+                    $instance,
+                    $phone,
+                    'Dosyanızı aldım ancak güvenli şekilde okuyamadım. JPG, PNG, WEBP, PDF veya Word dosyası olarak tekrar gönderebilir misiniz?'
                 );
                 return true;
             }
@@ -164,8 +233,14 @@ class TextileWhatsAppInboundService
 
         Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
 
+        if ($attachmentReply !== null) {
+            $this->sendText($bot, $conversation, $instance, $phone, $attachmentReply);
+            $this->consumeTrial($bot);
+            return true;
+        }
+
         $stateChanged = $this->stateProgressed($previousState, $state);
-        $isTextMessage = ($mediaContext['type'] ?? 'text') === 'text';
+        $isTextMessage = $mediaType === 'text';
 
         if (
             $isTextMessage
@@ -265,6 +340,9 @@ class TextileWhatsAppInboundService
                     position: (string) $state['position'],
                     shirtColor: (string) ($state['color'] ?? 'black'),
                     product: (string) ($state['product'] ?? 'Premium Oversize Tişört'),
+                    additionalPrints: is_array($state['additional_prints'] ?? null)
+                        ? $state['additional_prints']
+                        : [],
                 );
 
                 $this->sendImage($bot, $conversation, $instance, $phone, $mockup, $state);
@@ -288,9 +366,19 @@ class TextileWhatsAppInboundService
             }
         }
 
-        if ($this->approvalMessage($message) && ($state['mockup_sent'] ?? false)) {
-            $state['approved'] = true;
+        if ($this->approvalMessage($message)) {
+            if (! ($state['mockup_sent'] ?? false)) {
+                $this->sendText(
+                    $bot,
+                    $conversation,
+                    $instance,
+                    $phone,
+                    "Siparişi onaylamadan önce güncel baskı önizlemesini hazırlamamız gerekiyor.\n\n".$this->nextQuestion($state),
+                );
+                return true;
+            }
 
+            $state['approved'] = true;
             $state['order_id'] ??= 'TX-'.now()->format('ymd').'-'.strtoupper(Str::random(4));
             $state['instance'] = $instance;
             $state['phone'] = $phone;
@@ -300,6 +388,20 @@ class TextileWhatsAppInboundService
 
             Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
             Cache::store('database')->put('textile_demo_order:'.$state['order_id'], $state, now()->addHours(2));
+
+            $quote = $this->quote($state);
+            if ($quote === null) {
+                $conversation->forceFill(['human_takeover' => true])->save();
+                $this->sendText(
+                    $bot,
+                    $conversation,
+                    $instance,
+                    $phone,
+                    "✅ Tasarım ve sipariş talebiniz alındı.\n\nSipariş No: *#{$state['order_id']}*\n\nÜrün, adet ve baskı alanlarınıza göre net fiyatı satış ekibimiz kontrol edip size iletecek. Tanımlı olmayan bir fiyatı otomatik olarak tahmin etmiyoruz.",
+                );
+                $this->consumeTrial($bot);
+                return true;
+            }
 
             $paymentUrl = URL::temporarySignedRoute(
                 'textile.demo.payment',
@@ -332,11 +434,35 @@ class TextileWhatsAppInboundService
     {
         $lower = Str::lower($message);
 
-        if (preg_match('/\b([1-9][0-9]{0,4})\s*(?:adet|tane)\b/u', $lower, $match)) {
-            $state['quantity'] = min(50000, (int) $match[1]);
+        if (($state['awaiting_additional_artwork_choice'] ?? false) && $this->sameArtworkMessage($lower)) {
+            $pending = trim((string) ($state['pending_position'] ?? ''));
+            if ($pending !== '' && ($state['logo_received'] ?? false)) {
+                $state['additional_prints'] = is_array($state['additional_prints'] ?? null)
+                    ? $state['additional_prints']
+                    : [];
+                $state['additional_prints'][] = [
+                    'position' => $pending,
+                    'logo_base64' => (string) $state['logo_base64'],
+                    'logo_mime' => (string) ($state['logo_mime'] ?? 'image/png'),
+                ];
+                $state['additional_prints'] = array_slice($state['additional_prints'], -8);
+                $state['pending_position'] = null;
+                $state['awaiting_additional_artwork_choice'] = false;
+                $state['mockup_sent'] = false;
+                $state['approved'] = false;
+            }
+            return $state;
+        }
+
+        if (($state['awaiting_additional_artwork_choice'] ?? false) && $this->differentArtworkMessage($lower)) {
+            $state['awaiting_additional_image_position'] = $state['pending_position'] ?? null;
+            $state['awaiting_additional_artwork_choice'] = false;
+            return $state;
         }
 
         $products = [
+            'uzun kollu tişört' => ['Uzun Kollu Tişört', 'shirt'],
+            'uzun kollu tisort' => ['Uzun Kollu Tişört', 'shirt'],
             'polyester şapka' => ['Polyester Şapka', 'cap'],
             'polyester sapka' => ['Polyester Şapka', 'cap'],
             'pamuklu şapka' => ['Pamuklu Şapka', 'cap'],
@@ -359,14 +485,16 @@ class TextileWhatsAppInboundService
             'tişört' => ['Premium Oversize Tişört', 'shirt'],
             'tisort' => ['Premium Oversize Tişört', 'shirt'],
         ];
+
+        $detectedProduct = null;
         foreach ($products as $needle => [$label, $category]) {
             if (str_contains($lower, $needle)) {
-                $state['product'] = $label;
-                $state['product_category'] = $category;
+                $detectedProduct = [$label, $category];
                 break;
             }
         }
 
+        $hasExplicitQuantity = (bool) preg_match('/\b([1-9][0-9]{0,4})\s*(?:adet|tane)\b/u', $lower, $quantityMatch);
         $colors = [
             'siyah' => 'black', 'beyaz' => 'white', 'lacivert' => 'navy',
             'bordo' => 'burgundy', 'bej' => 'beige', 'kırmızı' => 'red',
@@ -375,25 +503,123 @@ class TextileWhatsAppInboundService
             'sari' => 'yellow', 'turuncu' => 'orange', 'pembe' => 'pink',
             'kahverengi' => 'brown', 'gri' => 'gray', 'füme' => 'charcoal',
         ];
+        $detectedColor = null;
         foreach ($colors as $needle => $value) {
             if (str_contains($lower, $needle)) {
-                $state['color'] = $value;
-                $state['color_label'] = ucfirst($needle);
+                $detectedColor = [$value, ucfirst($needle)];
                 break;
             }
         }
 
+        if ($detectedProduct !== null && ($state['product'] ?? null) !== $detectedProduct[0]) {
+            if (($state['product'] ?? null) && ($state['mockup_sent'] ?? false)) {
+                $state['order_items'] = is_array($state['order_items'] ?? null)
+                    ? $state['order_items']
+                    : [];
+                $state['order_items'][] = $this->currentOrderItem($state);
+                $state['order_items'] = array_slice($state['order_items'], -20);
+            }
+
+            $state['product'] = $detectedProduct[0];
+            $state['product_category'] = $detectedProduct[1];
+            $state['position'] = null;
+            $state['logo_base64'] = null;
+            $state['logo_mime'] = null;
+            $state['logo_received'] = false;
+            $state['additional_prints'] = [];
+            $state['pending_position'] = null;
+            $state['awaiting_additional_artwork_choice'] = false;
+            $state['awaiting_additional_image_position'] = null;
+            $state['pending_uploaded_artwork'] = null;
+            $state['awaiting_uploaded_artwork_position'] = false;
+            $state['mockup_sent'] = false;
+            $state['approved'] = false;
+            if (! $hasExplicitQuantity) {
+                $state['quantity'] = null;
+            }
+            if ($detectedColor === null) {
+                $state['color'] = null;
+                $state['color_label'] = null;
+            }
+        }
+
+        if ($hasExplicitQuantity) {
+            $quantity = min(50000, (int) $quantityMatch[1]);
+            if (($state['quantity'] ?? null) !== $quantity) {
+                $state['mockup_sent'] = false;
+                $state['approved'] = false;
+            }
+            $state['quantity'] = $quantity;
+        }
+
+        if ($detectedColor !== null) {
+            if (($state['color'] ?? null) !== $detectedColor[0]) {
+                $state['mockup_sent'] = false;
+                $state['approved'] = false;
+            }
+            $state['color'] = $detectedColor[0];
+            $state['color_label'] = $detectedColor[1];
+        }
+
         $positions = [
+            'ön sol göğüs' => 'left_chest', 'on sol gogus' => 'left_chest',
+            'ön sola' => 'left_chest', 'on sola' => 'left_chest',
             'sol göğüs' => 'left_chest', 'sol gogus' => 'left_chest',
+            'ön sağ göğüs' => 'right_chest', 'on sag gogus' => 'right_chest',
+            'sağ göğüs' => 'right_chest', 'sag gogus' => 'right_chest',
+            'sol kol' => 'left_sleeve', 'sağ kol' => 'right_sleeve', 'sag kol' => 'right_sleeve',
             'ön büyük' => 'front_large', 'on buyuk' => 'front_large',
             'arka büyük' => 'back_large', 'arka buyuk' => 'back_large',
+            'arka' => 'back_large',
             'ön orta' => 'front_center', 'on orta' => 'front_center',
             'göğüs' => 'front_center', 'gogus' => 'front_center',
         ];
+        $detectedPosition = null;
         foreach ($positions as $needle => $value) {
             if (str_contains($lower, $needle)) {
-                $state['position'] = $value;
+                $detectedPosition = $value;
                 break;
+            }
+        }
+
+        if ($detectedPosition !== null && ($state['awaiting_uploaded_artwork_position'] ?? false)) {
+            $uploaded = is_array($state['pending_uploaded_artwork'] ?? null)
+                ? $state['pending_uploaded_artwork']
+                : [];
+            if (($uploaded['logo_base64'] ?? null)) {
+                $state['additional_prints'] = is_array($state['additional_prints'] ?? null)
+                    ? $state['additional_prints']
+                    : [];
+                $state['additional_prints'][] = [
+                    'position' => $detectedPosition,
+                    'logo_base64' => (string) $uploaded['logo_base64'],
+                    'logo_mime' => (string) ($uploaded['logo_mime'] ?? 'image/png'),
+                ];
+                $state['additional_prints'] = array_slice($state['additional_prints'], -8);
+                $state['pending_uploaded_artwork'] = null;
+                $state['awaiting_uploaded_artwork_position'] = false;
+                $state['mockup_sent'] = false;
+                $state['approved'] = false;
+                $detectedPosition = null;
+            }
+        }
+
+        if ($detectedPosition !== null) {
+            $isAdditional = $this->additionalPrintMessage($lower)
+                && ($state['logo_received'] ?? false)
+                && ($state['position'] ?? null)
+                && $detectedPosition !== ($state['position'] ?? null);
+
+            if ($isAdditional) {
+                $state['pending_position'] = $detectedPosition;
+                $state['awaiting_additional_artwork_choice'] = true;
+                $state['approved'] = false;
+            } else {
+                if (($state['position'] ?? null) !== $detectedPosition) {
+                    $state['mockup_sent'] = false;
+                    $state['approved'] = false;
+                }
+                $state['position'] = $detectedPosition;
             }
         }
 
@@ -422,19 +648,75 @@ class TextileWhatsAppInboundService
 
         if (str_contains($lower, 'serigraf')) {
             $state['print_type'] = 'Tek Renk Serigrafi';
-        } elseif (str_contains($lower, 'dtf')) {
+        } elseif (str_contains($lower, 'dtg')) {
+            $state['print_type'] = 'DTG Baskı';
+        } elseif (str_contains($lower, 'dtf') || str_contains($lower, 'transfer')) {
             $state['print_type'] = 'DTF Baskı';
         }
 
-        if (preg_match('/\b(s|m|l|xl|xxl)(?:\s*[-–\/]\s*(s|m|l|xl|xxl))?\b/iu', $message, $sizeMatch)) {
+        if (preg_match('/\b(s|m|l|xl|xxl|3xl|4xl)(?:\s*[-–\/]\s*(s|m|l|xl|xxl|3xl|4xl))?\b/iu', $message, $sizeMatch)) {
             $state['sizes'] = strtoupper($sizeMatch[0]);
         }
 
-        if (str_contains($lower, 'önizlemeyi tekrar') || str_contains($lower, 'onizlemeyi tekrar')) {
+        if (
+            str_contains($lower, 'önizlemeyi tekrar')
+            || str_contains($lower, 'onizlemeyi tekrar')
+            || (trim($lower) === 'hazırla')
+            || (trim($lower) === 'hazirla')
+        ) {
             $state['mockup_sent'] = false;
+            $state['approved'] = false;
         }
 
         return $state;
+    }
+
+    private function sameArtworkMessage(string $message): bool
+    {
+        return str_contains($message, 'aynı görsel')
+            || str_contains($message, 'ayni gorsel')
+            || str_contains($message, 'aynı logo')
+            || str_contains($message, 'ayni logo')
+            || trim($message) === 'aynı'
+            || trim($message) === 'ayni';
+    }
+
+    private function differentArtworkMessage(string $message): bool
+    {
+        return str_contains($message, 'farklı görsel')
+            || str_contains($message, 'farkli gorsel')
+            || str_contains($message, 'başka görsel')
+            || str_contains($message, 'baska gorsel')
+            || str_contains($message, 'farklı logo')
+            || str_contains($message, 'farkli logo');
+    }
+
+    private function additionalPrintMessage(string $message): bool
+    {
+        foreach (['bir de', 'birde', 'ayrıca', 'ayrica', 'ek olarak', 'hem ', 'da basalım', 'de basalım', 'da basalim', 'de basalim'] as $phrase) {
+            if (str_contains($message, $phrase)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function currentOrderItem(array $state): array
+    {
+        return [
+            'product' => $state['product'] ?? null,
+            'quantity' => $state['quantity'] ?? null,
+            'color' => $state['color_label'] ?? null,
+            'sizes' => $state['sizes'] ?? null,
+            'print_positions' => array_values(array_filter(array_merge(
+                [($state['position'] ?? null) ? $this->positionLabel((string) $state['position']) : null],
+                collect($state['additional_prints'] ?? [])
+                    ->map(fn (mixed $print): ?string => is_array($print) && ($print['position'] ?? null)
+                        ? $this->positionLabel((string) $print['position'])
+                        : null)
+                    ->all(),
+            ))),
+        ];
     }
 
     private function newOrderDetailsMessage(string $message): bool
@@ -532,6 +814,13 @@ class TextileWhatsAppInboundService
             'mockup_sent',
             'approved',
             'customer_supplied',
+            'additional_prints',
+            'pending_position',
+            'awaiting_additional_artwork_choice',
+            'awaiting_additional_image_position',
+            'pending_uploaded_artwork',
+            'awaiting_uploaded_artwork_position',
+            'order_items',
         ] as $key) {
             if (($before[$key] ?? null) !== ($after[$key] ?? null)) {
                 return true;
@@ -670,6 +959,18 @@ PROMPT;
 
     private function nextQuestion(array $state): string
     {
+        if ($state['awaiting_additional_artwork_choice'] ?? false) {
+            return 'Ek baskıda mevcut görseli mi kullanalım, yoksa farklı bir görsel mi göndereceksiniz? *Aynı görsel* veya *farklı görsel* yazabilirsiniz.';
+        }
+
+        if ($state['awaiting_additional_image_position'] ?? null) {
+            return 'Ek baskıda kullanılacak farklı görseli JPG, PNG veya WEBP olarak gönderin.';
+        }
+
+        if ($state['awaiting_uploaded_artwork_position'] ?? false) {
+            return 'Yeni gönderdiğiniz görsel hangi baskı alanında kullanılacak? Ön orta, ön sol göğüs, arka büyük, sağ kol veya sol kol yazabilirsiniz.';
+        }
+
         if (! ($state['product_category'] ?? null)) {
             return $this->welcomeMessage();
         }
@@ -710,35 +1011,54 @@ PROMPT;
 
     private function mockupMessage(array $state): string
     {
-        [$unit, $total, $term] = $this->quote($state);
+        $positions = array_merge(
+            [$this->positionLabel((string) $state['position'])],
+            collect($state['additional_prints'] ?? [])
+                ->map(fn (mixed $print): ?string => is_array($print) && ($print['position'] ?? null)
+                    ? $this->positionLabel((string) $print['position'])
+                    : null)
+                ->filter()
+                ->all(),
+        );
+        $quote = $this->quote($state);
+        $pricing = $quote === null
+            ? "Fiyat: *Sipariş detaylarına göre satış ekibi tarafından netleştirilecek*\n\n"
+            : "Birim fiyat: *{$quote[0]} TL*\nToplam: *".number_format($quote[1], 0, ',', '.')." TL*\nTermin: *{$quote[2]}*\n\n";
 
         return "Baskı önizlemeniz hazırlandı ✓\n\n"
             .'Ürün: '.($state['product'] ?? 'Premium Oversize Tişört')."\n"
             .'Renk: '.($state['color_label'] ?? 'Siyah')."\n"
-            .'Baskı: '.$this->positionLabel((string) $state['position'])."\n"
-            .'Adet: '.($state['quantity'] ?? 250)."\n\n"
-            ."Demo teklif:\nBirim fiyat: *{$unit} TL*\nToplam: *".number_format($total, 0, ',', '.')." TL*\nTermin: *{$term}*\n\n"
-            .'Görsel ve bilgiler uygunsa *Onaylıyorum* yazın; güvenli demo ödeme adımına geçelim.';
+            .'Baskı alanları: '.implode(', ', $positions)."\n"
+            .'Adet: '.($state['quantity'] ?? 1)."\n\n"
+            .$pricing
+            .'Görsel ve bilgiler uygunsa *Onaylıyorum* yazabilirsiniz.';
     }
 
     private function paymentMessage(array $state, string $url): string
     {
-        [, $total] = $this->quote($state);
+        $quote = $this->quote($state);
+        if ($quote === null) {
+            throw new \LogicException('Tanımsız fiyat için ödeme bağlantısı üretilemez.');
+        }
 
         return "✅ Tasarım ve sipariş onaylandı.\n\n"
             .'Sipariş No: *#'.$state['order_id']."*\n"
-            .'Demo toplam: *'.number_format($total, 0, ',', '.')." TL*\n\n"
+            .'Demo toplam: *'.number_format($quote[1], 0, ',', '.')." TL*\n\n"
             ."Ödeme adımını güvenli demo ekranında tamamlayabilirsiniz:\n{$url}\n\n"
             .'Bu bağlantı 2 saat geçerlidir ve gerçek para çekmez.';
     }
 
-    private function quote(array $state): array
+    private function quote(array $state): ?array
     {
-        $quantity = max(1, (int) ($state['quantity'] ?? 250));
+        $quantity = max(1, (int) ($state['quantity'] ?? 1));
         $position = (string) ($state['position'] ?? 'front_center');
         $color = (string) ($state['color'] ?? 'black');
+        $product = (string) ($state['product'] ?? '');
+        $additional = is_array($state['additional_prints'] ?? null)
+            ? $state['additional_prints']
+            : [];
 
-        if ($quantity === 1) {
+        if ($quantity === 1 && str_contains($product, 'Tişört')) {
             return [750, 750, 'Numune — kargo dahil'];
         }
 
@@ -746,23 +1066,26 @@ PROMPT;
             $quantity >= 5
             && $quantity <= 30
             && $color === 'white'
+            && str_contains($product, 'Tişört')
+            && $additional === []
             && in_array($position, ['left_chest', 'front_center', 'front_large'], true)
         ) {
             return [300, 300 * $quantity, 'Sipariş detaylarına göre netleşir'];
         }
 
-        $product = (string) ($state['product'] ?? 'Premium Oversize Tişört');
-        $base = match ($product) {
-            'Regular Fit Tişört' => 135,
-            'Polo Yaka Tişört' => 185,
-            'Heavy Cotton Tişört' => 205,
-            default => 155,
-        };
-        $print = ($state['print_type'] ?? 'DTF Baskı') === 'Tek Renk Serigrafi' ? 26 : 34;
-        $discount = $quantity >= 1000 ? .14 : ($quantity >= 500 ? .10 : ($quantity >= 250 ? .06 : ($quantity >= 100 ? .03 : 0)));
-        $unit = (int) round(($base + $print) * (1 - $discount));
+        if (
+            $quantity >= 5
+            && $quantity <= 30
+            && $color === 'white'
+            && str_contains($product, 'Tişört')
+            && count($additional) === 1
+            && in_array($position, ['left_chest', 'front_center', 'front_large'], true)
+            && ($additional[0]['position'] ?? null) === 'back_large'
+        ) {
+            return [385, 385 * $quantity, 'Sipariş detaylarına göre netleşir'];
+        }
 
-        return [$unit, $unit * $quantity, '7–9 iş günü'];
+        return null;
     }
 
     private function sendText(AiBot $bot, ConversationControl $conversation, string $instance, string $phone, string $answer): void
@@ -888,6 +1211,13 @@ PROMPT;
             'mockup_sent' => false,
             'approved' => false,
             'customer_supplied' => null,
+            'additional_prints' => [],
+            'pending_position' => null,
+            'awaiting_additional_artwork_choice' => false,
+            'awaiting_additional_image_position' => null,
+            'pending_uploaded_artwork' => null,
+            'awaiting_uploaded_artwork_position' => false,
+            'order_items' => [],
         ];
     }
 
@@ -931,7 +1261,10 @@ PROMPT;
     private function positionLabel(string $position): string
     {
         return match ($position) {
-            'left_chest' => 'Sol göğüs',
+            'left_chest' => 'Ön sol göğüs',
+            'right_chest' => 'Ön sağ göğüs',
+            'left_sleeve' => 'Sol kol',
+            'right_sleeve' => 'Sağ kol',
             'front_large' => 'Ön büyük baskı',
             'back_large' => 'Arka büyük baskı',
             default => 'Ön orta',
