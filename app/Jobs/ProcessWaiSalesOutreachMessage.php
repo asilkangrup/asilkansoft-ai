@@ -150,6 +150,30 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
             }
 
             if (
+                in_array((string) $lead->status, ['opened', 'ready'], true)
+                && $this->isPositiveInterest($combinedMessage)
+            ) {
+                $lead->forceFill([
+                    'status' => 'replied',
+                    'replied_at' => $lead->replied_at ?: now(),
+                    'ai_activated_at' => $lead->ai_activated_at ?: now(),
+                ])->save();
+
+                $answer = "Ben WAI ekibinden size ulaşıyorum. Numaranızı işletmenizin internette herkese açık iletişim bilgilerinden buldum.\n\nBaskı ve tekstil işletmeleri için geliştirdiğimiz bir yapay zeka sistemimiz var. WhatsApp’tan gelen müşterileri 7/24 karşılayabilir, ürün ve baskı taleplerini anlayabilir, sık sorulan soruları cevaplayabilir ve müşteriyi sipariş/satış aşamasına kadar yönlendirebilir.\n\nMüşteri logosunu veya baskı tasarımını WhatsApp’tan gönderdiğinde yapay zeka, tasarımı seçilen ürün üzerine profesyonel şekilde uygulayıp yaklaşık 5 saniye içinde gerçekçi baskı ön izlemesini müşteriye geri sunabilir. Nasıl çalıştığı hakkında bilgi almak ister misiniz?";
+
+                $this->sendAnswer(
+                    memoryService: $memoryService,
+                    whatsAppService: $whatsAppService,
+                    bot: $bot,
+                    sessionId: $sessionId,
+                    phoneDigits: $phoneDigits,
+                    answer: $answer,
+                );
+
+                return;
+            }
+
+            if (
                 in_array((string) $lead->status, ['replied', 'ready', 'pain_asked', 'solution_asked'], true)
                 && $this->isPositiveInterest($combinedMessage)
             ) {
