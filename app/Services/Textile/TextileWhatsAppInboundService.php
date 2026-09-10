@@ -1301,7 +1301,8 @@ PROMPT;
 
     private function pricingReply(string $message, array $state): ?string
     {
-        if (! preg_match('/(?:fiyat|kaç\\s*para|ne\\s*kadar|tutar|indirim|iskonto|son\\s*fiyat)/iu', $message)) {
+        $normalizedMessage = Str::lower(str_replace(['İ', 'I'], ['i', 'ı'], $message));
+        if (! preg_match('/(?:fiyat|kaç\\s*para|ne\\s*kadar|tutar|indirim|iskonto|son\\s*fiyat)/u', $normalizedMessage)) {
             return null;
         }
 
