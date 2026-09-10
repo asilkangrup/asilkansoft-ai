@@ -213,6 +213,24 @@ class TextileWhatsAppInboundService
                         $state['logo_received'] = true;
                         $state['mockup_sent'] = false;
                         $state['approved'] = false;
+
+                        // Positions mentioned together before the artwork (for
+                        // example “sırt ve ön sol”) use this same first artwork.
+                        foreach ((array) ($state['pending_same_artwork_positions'] ?? []) as $pendingPosition) {
+                            if ($pendingPosition === ($state['position'] ?? null)) {
+                                continue;
+                            }
+                            $state['additional_prints'][] = [
+                                'position' => $pendingPosition,
+                                'logo_base64' => $artwork,
+                                'logo_mime' => $mime,
+                            ];
+                        }
+                        $state['additional_prints'] = array_slice(
+                            array_values($state['additional_prints'] ?? []),
+                            -8,
+                        );
+                        $state['pending_same_artwork_positions'] = [];
                     }
                 }
 
@@ -574,22 +592,35 @@ class TextileWhatsAppInboundService
         $positions = [
             'ön sol göğüs' => 'left_chest', 'on sol gogus' => 'left_chest',
             'ön sola' => 'left_chest', 'on sola' => 'left_chest',
+            'ön sol' => 'left_chest', 'on sol' => 'left_chest',
             'sol göğüs' => 'left_chest', 'sol gogus' => 'left_chest',
             'ön sağ göğüs' => 'right_chest', 'on sag gogus' => 'right_chest',
+            'ön sağ' => 'right_chest', 'on sag' => 'right_chest',
             'sağ göğüs' => 'right_chest', 'sag gogus' => 'right_chest',
             'sol kol' => 'left_sleeve', 'sağ kol' => 'right_sleeve', 'sag kol' => 'right_sleeve',
             'ön büyük' => 'front_large', 'on buyuk' => 'front_large',
             'arka büyük' => 'back_large', 'arka buyuk' => 'back_large',
-            'arka' => 'back_large',
+            'sırt' => 'back_large', 'sirt' => 'back_large', 'arka' => 'back_large',
             'ön orta' => 'front_center', 'on orta' => 'front_center',
             'göğüs' => 'front_center', 'gogus' => 'front_center',
         ];
-        $detectedPosition = null;
+        $positionHits = [];
         foreach ($positions as $needle => $value) {
-            if (str_contains($lower, $needle)) {
-                $detectedPosition = $value;
-                break;
+            $offset = mb_strpos($lower, $needle);
+            if ($offset !== false) {
+                $positionHits[] = ['offset' => $offset, 'position' => $value];
             }
+        }
+        usort($positionHits, fn (array $a, array $b): int => $a['offset'] <=> $b['offset']);
+        $detectedPositions = array_values(array_unique(array_column($positionHits, 'position')));
+        $detectedPosition = $detectedPositions[0] ?? null;
+
+        if (count($detectedPositions) > 1 && ! ($state['logo_received'] ?? false)) {
+            $state['position'] = $detectedPositions[0];
+            $state['pending_same_artwork_positions'] = array_slice($detectedPositions, 1);
+            $state['mockup_sent'] = false;
+            $state['approved'] = false;
+            $detectedPosition = null;
         }
 
         if ($detectedPosition !== null && ($state['awaiting_uploaded_artwork_position'] ?? false)) {
@@ -826,6 +857,7 @@ class TextileWhatsAppInboundService
             'customer_supplied',
             'additional_prints',
             'pending_position',
+            'pending_same_artwork_positions',
             'awaiting_additional_artwork_choice',
             'awaiting_additional_image_position',
             'pending_uploaded_artwork',
@@ -1242,6 +1274,7 @@ PROMPT;
             'customer_supplied' => null,
             'additional_prints' => [],
             'pending_position' => null,
+            'pending_same_artwork_positions' => [],
             'awaiting_additional_artwork_choice' => false,
             'awaiting_additional_image_position' => null,
             'pending_uploaded_artwork' => null,
