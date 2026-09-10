@@ -3,6 +3,7 @@ name: Textile demo validation
 on:
   push:
     branches:
+      - main
       - codex/textile-whatsapp-live-demo
   pull_request:
     branches:
