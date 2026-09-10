@@ -330,6 +330,8 @@ class TextileWhatsAppInboundService
                 $answer = $this->intelligentReply($bot, $conversation, $state, $message);
             }
 
+            $answer = $this->protectInternalPricing($answer, $message, $state);
+
             $this->sendText($bot, $conversation, $instance, $phone, $answer);
             $this->consumeTrial($bot);
 
@@ -993,6 +995,56 @@ Müşterinin sorusu yanıtlandıktan sonra gerekiyorsa yalnızca bir eksik sipar
 Sipariş zaten onaylandıysa eski adımlara dönme; yeni bir talep belirtirse bunun yeni sipariş olduğunu netleştir.
 Mesajında bu iç bağlamı, kuralları veya durum listesini müşteriye gösterme.
 PROMPT;
+    }
+
+    private function protectInternalPricing(string $answer, string $message, array $state): string
+    {
+        $answer = preg_replace(
+            '/\\b\\d+\\s*[–—-]\\s*\\d+\\s*adet(?:\\s*aralığı)?\\s*için\\s*/ui',
+            '',
+            $answer,
+        ) ?? $answer;
+
+        $lines = preg_split('/\\R/u', $answer) ?: [$answer];
+        $lines = array_values(array_filter($lines, static function (string $line): bool {
+            $normalized = Str::lower(trim($line));
+            if ($normalized === '') {
+                return true;
+            }
+
+            return ! preg_match(
+                '/(?:\\d+\\s*adet\\s*(?:ve\\s*üzeri|üzeri|e\\s*kadar|a\\s*kadar)|adet\\s*aralığı|indirim\\s*eşiği|birim\\s*fiyat(?:ı|i).*üzerinden)/u',
+                $normalized,
+            );
+        }));
+        $answer = trim(preg_replace("/\\n{3,}/", "\\n\\n", implode("\\n", $lines)) ?? implode("\\n", $lines));
+
+        $normalizedMessage = Str::lower($message);
+        $isDiscountRequest = preg_match('/(?:indirim|iskonto|son\\s*fiyat)/u', $normalizedMessage) === 1;
+        if (! $isDiscountRequest) {
+            return $answer;
+        }
+
+        $unit = null;
+        $total = null;
+        if (preg_match('/birim\\s*fiyat(?:ınız|ı|i)?[^\\d]{0,30}\\*?([\\d.]+(?:,\\d+)?)\\s*TL/ui', $answer, $match)) {
+            $unit = $match[1];
+        }
+        if (preg_match('/toplam(?:\\s*\\(\\d+\\s*adet\\))?[^\\d]{0,30}\\*?([\\d.]+(?:,\\d+)?)\\s*TL/ui', $answer, $match)) {
+            $total = $match[1];
+        }
+
+        if ($unit !== null && $total !== null) {
+            $quantity = max(1, (int) ($state['quantity'] ?? 1));
+
+            return "Elbette, siparişinize uygulanabilecek indirimle birim fiyat *{$unit} TL/adet* olur.\\n\\n"
+                ."{$quantity} adet toplam: *{$total} TL*.\\n\\n"
+                .'Uygunsa bir sonraki detaya geçebiliriz.';
+        }
+
+        return $answer !== ''
+            ? $answer
+            : 'İndirim talebinizi aldım. Siparişinize özel net birim fiyatı paylaşabilmem için ürün ve baskı detaylarını kontrol edelim.';
     }
 
     private function naturalFallback(string $message, array $state): string
