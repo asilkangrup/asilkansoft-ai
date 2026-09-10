@@ -336,6 +336,36 @@ class TextileWhatsAppInboundService
             && ($state['color'] ?? null)
             && ! ($state['mockup_sent'] ?? false);
 
+        if (
+            $isTextMessage
+            && ($previousState['awaiting_uploaded_artwork_position'] ?? false)
+            && ! ($state['awaiting_uploaded_artwork_position'] ?? false)
+            && count((array) ($state['additional_prints'] ?? [])) > count((array) ($previousState['additional_prints'] ?? []))
+        ) {
+            $newPrints = array_slice(
+                (array) $state['additional_prints'],
+                count((array) ($previousState['additional_prints'] ?? [])),
+            );
+            $labels = array_values(array_unique(array_map(
+                fn (array $print): string => $this->positionLabel((string) ($print['position'] ?? 'front_center')),
+                $newPrints,
+            )));
+            $answer = 'Tamam, yeni gönderdiğiniz görseli *'.implode('* ve *', $labels).'* alanlarında kullanacağım.';
+            $next = $this->nextQuestion($state);
+            if ($next !== '') {
+                $answer .= "\n\n".$next;
+            }
+            $this->sendText($bot, $conversation, $instance, $phone, $answer);
+            $this->consumeTrial($bot);
+            return true;
+        }
+
+        if ($isTextMessage && ($pricingAnswer = $this->pricingReply($message, $state)) !== null) {
+            $this->sendText($bot, $conversation, $instance, $phone, $pricingAnswer);
+            $this->consumeTrial($bot);
+            return true;
+        }
+
         // Let the assistant lead every ordinary text exchange naturally.
         // Parsing still records useful details, but mentioning a product alone must
         // never force the customer into a rigid checkout questionnaire.
@@ -721,10 +751,14 @@ class TextileWhatsAppInboundService
 
         if (str_contains($lower, 'serigraf')) {
             $state['print_type'] = 'Tek Renk Serigrafi';
-        } elseif (str_contains($lower, 'dtg')) {
+        } elseif (str_contains($lower, 'dtg') || str_contains($lower, 'dijital')) {
             $state['print_type'] = 'DTG Baskı';
         } elseif (str_contains($lower, 'dtf') || str_contains($lower, 'transfer')) {
             $state['print_type'] = 'DTF Baskı';
+        }
+
+        if (preg_match('/(?:indirim|iskonto|son\\s*fiyat)/u', $lower)) {
+            $state['discount_requested'] = true;
         }
 
         if (preg_match('/\b(s|m|l|xl|xxl|3xl|4xl)(?:\s*[-–\/]\s*(s|m|l|xl|xxl|3xl|4xl))?\b/iu', $message, $sizeMatch)) {
@@ -887,6 +921,7 @@ class TextileWhatsAppInboundService
             'mockup_sent',
             'approved',
             'customer_supplied',
+            'discount_requested',
             'additional_prints',
             'pending_position',
             'pending_same_artwork_positions',
@@ -975,7 +1010,7 @@ class TextileWhatsAppInboundService
             'Renk' => $state['color_label'] ?? 'henüz belirtilmedi',
             'Adet' => $state['quantity'] ?? 'henüz belirtilmedi',
             'Beden' => $state['sizes'] ?? 'henüz belirtilmedi',
-            'Baskı türü' => $state['print_type'] ?? 'DTF Baskı',
+            'Baskı türü' => $state['print_type'] ?? 'ürün ve görsele göre belirlenecek',
             'Ana baskı konumu' => ($state['position'] ?? null)
                 ? $this->positionLabel((string) $state['position'])
                 : 'henüz belirtilmedi',
@@ -1002,6 +1037,7 @@ CANLI TEKSTİL SİPARİŞ BAĞLAMI
 {$lines}
 
 Müşterinin son mesajındaki asıl soruya önce doğrudan ve doğal biçimde cevap ver.
+Fiyatı veya indirimi tahmin etme; adet aralıklarını, iç fiyat tablosunu ve indirim eşiklerini müşteriye hiçbir zaman açıklama. Sistem net fiyat verdiyse yalnızca o müşterinin birim fiyatını ve toplamını kullan.
 Müşteriyi hemen siparişe, fiyat teklifine, ödeme veya onaya götürmeye çalışma. Önce ne istediğini anlamaya ve yardımcı olmaya odaklan.
 “Bastırmak istiyorum”, “tişört düşünüyorum” gibi genel niyet cümlelerini kesin sipariş başlangıcı sayma. Böyle durumlarda sıcak bir karşılık verip model, kullanım amacı veya nasıl yardımcı olabileceğin hakkında yalnızca bir kolay soru sor.
 Renk, adet, baskı konumu ve görsel gibi bütün eksikleri aynı anda isteme. Müşteri konuşmayı ilerlettikçe gerektiğinde tek tek ve doğal biçimde öğren.
@@ -1209,44 +1245,95 @@ PROMPT;
             .'Siparişiniz hakkında sizi çok kısa süre içinde arayacağız.';
     }
 
+    private function pricingReply(string $message, array $state): ?string
+    {
+        if (! preg_match('/(?:fiyat|kaç\\s*para|ne\\s*kadar|tutar|indirim|iskonto|son\\s*fiyat)/u', Str::lower($message))) {
+            return null;
+        }
+
+        $quote = $this->quote($state);
+        if ($quote === null) {
+            return null;
+        }
+
+        $quantity = max(1, (int) ($state['quantity'] ?? 1));
+        $prefix = ($state['discount_requested'] ?? false)
+            ? 'Siparişinize uygulanabilecek indirimle'
+            : 'Bu sipariş için';
+
+        return "{$prefix} birim fiyat *{$quote[0]} TL/adet* olur.\n\n"
+            .$quantity.' adet toplam: *'.number_format($quote[1], 0, ',', '.')." TL*.\n\n"
+            .'Baskı ölçüsü ve beden dağılımı netleştiğinde üretim planını da kesinleştirebiliriz.';
+    }
+
     private function quote(array $state): ?array
     {
         $quantity = max(1, (int) ($state['quantity'] ?? 1));
-        $position = (string) ($state['position'] ?? 'front_center');
-        $color = (string) ($state['color'] ?? 'black');
+        $color = (string) ($state['color'] ?? '');
         $product = (string) ($state['product'] ?? '');
-        $additional = is_array($state['additional_prints'] ?? null)
-            ? $state['additional_prints']
-            : [];
 
         if ($quantity === 1 && str_contains($product, 'Tişört')) {
             return [750, 750, 'Numune — kargo dahil'];
         }
 
         if (
-            $quantity >= 5
-            && $quantity <= 30
-            && $color === 'white'
-            && str_contains($product, 'Tişört')
-            && $additional === []
-            && in_array($position, ['left_chest', 'front_center', 'front_large'], true)
+            $quantity < 5
+            || $color !== 'white'
+            || ! str_contains($product, 'Tişört')
         ) {
-            return [300, 300 * $quantity, 'Sipariş detaylarına göre netleşir'];
+            return null;
         }
 
-        if (
-            $quantity >= 5
-            && $quantity <= 30
-            && $color === 'white'
-            && str_contains($product, 'Tişört')
-            && count($additional) === 1
-            && in_array($position, ['left_chest', 'front_center', 'front_large'], true)
-            && ($additional[0]['position'] ?? null) === 'back_large'
-        ) {
-            return [385, 385 * $quantity, 'Sipariş detaylarına göre netleşir'];
+        $positions = array_merge(
+            [(string) ($state['position'] ?? '')],
+            array_map(
+                fn (array $print): string => (string) ($print['position'] ?? ''),
+                is_array($state['additional_prints'] ?? null) ? $state['additional_prints'] : [],
+            ),
+        );
+        $hasFront = count(array_intersect($positions, [
+            'left_chest', 'right_chest', 'front_center', 'front_large',
+        ])) > 0;
+        $hasBack = in_array('back_large', $positions, true);
+
+        if (! $hasFront || count(array_filter($positions)) > ($hasBack ? 2 : 1)) {
+            return null;
         }
 
-        return null;
+        $layout = $hasBack ? 'front_back' : 'front';
+        $method = str_contains((string) ($state['print_type'] ?? ''), 'DTF')
+            ? 'transfer'
+            : 'digital';
+
+        if ($quantity <= 30) {
+            $band = 0;
+        } elseif ($quantity < 100) {
+            $band = 1;
+        } else {
+            $band = 2;
+        }
+
+        $prices = [
+            'digital' => [
+                'front' => [300, 285, 275],
+                'front_back' => [395, 375, 355],
+            ],
+            'transfer' => [
+                'front' => [250, 255, 230],
+                'front_back' => [375, 345, 310],
+            ],
+        ];
+
+        $unit = $prices[$method][$layout][$band];
+        if ($state['discount_requested'] ?? false) {
+            if ($quantity >= 100) {
+                $unit -= 15;
+            } elseif ($quantity >= 30) {
+                $unit -= 10;
+            }
+        }
+
+        return [$unit, $unit * $quantity, 'Sipariş detaylarına göre netleşir'];
     }
 
     private function sendText(AiBot $bot, ConversationControl $conversation, string $instance, string $phone, string $answer): void
@@ -1370,19 +1457,20 @@ PROMPT;
 
     private function state(mixed $value): array
     {
-        return is_array($value) ? $value : [
+        $defaults = [
             'product' => null,
             'product_category' => null,
             'quantity' => null,
             'color' => null,
             'color_label' => null,
             'position' => null,
-            'print_type' => 'DTF Baskı',
+            'print_type' => null,
             'sizes' => null,
             'logo_received' => false,
             'mockup_sent' => false,
             'approved' => false,
             'customer_supplied' => null,
+            'discount_requested' => false,
             'additional_prints' => [],
             'pending_position' => null,
             'pending_same_artwork_positions' => [],
@@ -1393,6 +1481,8 @@ PROMPT;
             'order_items' => [],
             'awaiting_order_item_selection' => false,
         ];
+
+        return array_replace($defaults, is_array($value) ? $value : []);
     }
 
     private function phoneNumber(array $payload): string
