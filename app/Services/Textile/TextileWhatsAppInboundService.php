@@ -295,14 +295,13 @@ class TextileWhatsAppInboundService
             && ($state['color'] ?? null)
             && ! ($state['mockup_sent'] ?? false);
 
+        // Let the assistant lead every ordinary text exchange naturally.
+        // Parsing still records useful details, but mentioning a product alone must
+        // never force the customer into a rigid checkout questionnaire.
         $shouldAnswerNaturally = $isTextMessage
             && ! $readyForMockup
             && ! $this->approvalMessage($message)
-            && ! $this->restartMessage($message)
-            && (
-                $this->questionMessage($message)
-                || ! $this->stateProgressed($previousState, $state)
-            );
+            && ! $this->restartMessage($message);
 
         if ($shouldAnswerNaturally) {
             if ($this->greetingMessage($message)) {
@@ -935,6 +934,11 @@ CANLI TEKSTİL SİPARİŞ BAĞLAMI
 {$lines}
 
 Müşterinin son mesajındaki asıl soruya önce doğrudan ve doğal biçimde cevap ver.
+Müşteriyi hemen siparişe, fiyat teklifine, ödeme veya onaya götürmeye çalışma. Önce ne istediğini anlamaya ve yardımcı olmaya odaklan.
+“Bastırmak istiyorum”, “tişört düşünüyorum” gibi genel niyet cümlelerini kesin sipariş başlangıcı sayma. Böyle durumlarda sıcak bir karşılık verip model, kullanım amacı veya nasıl yardımcı olabileceğin hakkında yalnızca bir kolay soru sor.
+Renk, adet, baskı konumu ve görsel gibi bütün eksikleri aynı anda isteme. Müşteri konuşmayı ilerlettikçe gerektiğinde tek tek ve doğal biçimde öğren.
+“Siparişinizi netleştirelim”, “lütfen renk ve adet paylaşın” gibi form veya robot hissi veren kalıp cümleleri kullanma.
+Müşteri yalnızca bilgi almak, seçenekleri görmek, fikir danışmak veya sohbet etmek isteyebilir; bunu sipariş vermeye zorlamadan karşıla.
 Şirket profilindeki bütün bilgileri hiçbir zaman tek mesajda sıralama veya özetleme.
 Müşteri genel bilgi isterse önce hangi konuyu merak ettiğini sor ve yalnızca şu kısa seçenekleri sun: ürün çeşitleri, kumaş ve kaliteler, baskı yöntemleri, fiyatlandırma, minimum adet, teslimat.
 Müşteri belirli bir konu sorarsa yalnızca o konuya cevap ver; ilgisiz fiyat, ürün, kargo, ödeme veya iade bilgilerini ekleme.
@@ -971,7 +975,11 @@ PROMPT;
             return 'Rica ederim. Başka bir konuda yardımcı olmamı isterseniz buradayım.';
         }
 
-        return 'Elbette yardımcı olayım. '.$this->nextQuestion($state);
+        if (preg_match('/(tişört|tisort).*(bastır|bastir|baskı|baski)|(bastır|bastir|baskı|baski).*(tişört|tisort)/u', $normalized)) {
+            return 'Memnuniyetle yardımcı oluruz. Nasıl bir tişört düşünüyorsunuz; *regular, oversize veya polo yaka* mı?';
+        }
+
+        return 'Tabii, sizi dinliyorum. Nasıl yardımcı olabilirim?';
     }
 
     private function nextQuestion(array $state): string
