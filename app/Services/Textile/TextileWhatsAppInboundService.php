@@ -150,22 +150,23 @@ class TextileWhatsAppInboundService
                     bot: $bot,
                 );
 
-                if (($analysis['kind'] ?? null) === 'order_document') {
-                    $documentText = trim((string) ($analysis['order_text'] ?? ''));
-                    if ($documentText !== '') {
-                        $state = $this->parseText($state, $documentText);
-                    }
+                $documentText = trim((string) ($analysis['order_text'] ?? ''));
+                if ($documentText !== '') {
+                    $state = $this->parseText($state, $documentText);
+                }
 
-                    $documentItems = is_array($analysis['order_items'] ?? null)
-                        ? $analysis['order_items']
-                        : [];
-                    if ($documentItems !== []) {
-                        $state['order_items'] = array_slice(array_merge(
-                            is_array($state['order_items'] ?? null) ? $state['order_items'] : [],
-                            $documentItems,
-                        ), -20);
-                    }
+                $documentItems = is_array($analysis['order_items'] ?? null)
+                    ? $analysis['order_items']
+                    : [];
+                if ($documentItems !== []) {
+                    $state['order_items'] = array_slice(array_merge(
+                        is_array($state['order_items'] ?? null) ? $state['order_items'] : [],
+                        $documentItems,
+                    ), -20);
+                }
 
+                $hasPrintableArtwork = (bool) ($analysis['contains_printable_artwork'] ?? false);
+                if (($analysis['kind'] ?? null) === 'order_document' && ! $hasPrintableArtwork) {
                     $summary = trim((string) ($analysis['summary'] ?? ''));
                     $attachmentReply = "Belgenizi okudum ✓";
                     if ($summary !== '') {
