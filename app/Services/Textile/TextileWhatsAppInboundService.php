@@ -499,7 +499,7 @@ class TextileWhatsAppInboundService
 
     private function parseText(array $state, string $message): array
     {
-        $lower = Str::lower($message);
+        $lower = Str::lower(str_replace(['İ', 'I'], ['i', 'ı'], $message));
 
         if (($state['awaiting_additional_artwork_choice'] ?? false) && $this->sameArtworkMessage($lower)) {
             $pending = trim((string) ($state['pending_position'] ?? ''));
@@ -1153,7 +1153,7 @@ PROMPT;
         }));
         $answer = trim(preg_replace("/\\n{3,}/", "\\n\\n", implode("\\n", $lines)) ?? implode("\\n", $lines));
 
-        $normalizedMessage = Str::lower($message);
+        $normalizedMessage = Str::lower(str_replace(['İ', 'I'], ['i', 'ı'], $message));
         $isDiscountRequest = preg_match('/(?:indirim|iskonto|son\\s*fiyat)/u', $normalizedMessage) === 1;
         if (! $isDiscountRequest) {
             return $answer;
@@ -1301,7 +1301,7 @@ PROMPT;
 
     private function pricingReply(string $message, array $state): ?string
     {
-        if (! preg_match('/(?:fiyat|kaç\\s*para|ne\\s*kadar|tutar|indirim|iskonto|son\\s*fiyat)/u', Str::lower($message))) {
+        if (! preg_match('/(?:fiyat|kaç\\s*para|ne\\s*kadar|tutar|indirim|iskonto|son\\s*fiyat)/iu', $message)) {
             return null;
         }
 
