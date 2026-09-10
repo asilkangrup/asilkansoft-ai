@@ -13,7 +13,6 @@ use App\Services\RealEstateWhatsAppMessageParser;
 use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Throwable;
 
