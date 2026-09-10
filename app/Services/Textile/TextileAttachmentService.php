@@ -87,7 +87,10 @@ class TextileAttachmentService
 
         if ($isImage) {
             $result['artwork_base64'] = $base64;
-            if ($result['kind'] === 'printed_product') {
+            if (
+                $result['kind'] === 'printed_product'
+                || (($result['contains_printable_artwork'] ?? false) && is_array($result['artwork_bbox'] ?? null))
+            ) {
                 $bbox = is_array($result['artwork_bbox'] ?? null)
                     ? $result['artwork_bbox']
                     : [];
@@ -105,10 +108,10 @@ Bu dosyayı baskılı tekstil siparişi için incele.
 
 Amaç:
 1. Dosya doğrudan baskıya hazır logo/görselse kind="artwork".
-2. Fotoğrafta üzerinde baskı bulunan tişört, sweatshirt, şapka veya başka bir ürün varsa kind="printed_product". artwork_bbox yalnızca üründeki basılı tasarımın sınırlarını yüzde 0-100 koordinatlarıyla ver: {"x":...,"y":...,"width":...,"height":...}. Ürünün tamamını değil, basılı tasarımı seç.
+2. Görselin herhangi bir bölümünde üzerinde baskı bulunan tişört, sweatshirt, şapka veya başka bir ürün varsa, görsel WhatsApp ekran görüntüsü olsa bile her zaman kind="printed_product". artwork_bbox yalnızca üründeki basılı tasarımın sınırlarını yüzde 0-100 koordinatlarıyla ver: {"x":...,"y":...,"width":...,"height":...}. Ürünün tamamını veya sohbet ekranını değil, basılı tasarımı seç.
 3. Dosyada sipariş bilgileri, proforma talebi, adet, ürün, renk, beden, baskı konumu gibi yazılar varsa kind="order_document". Metni order_text alanına eksiksiz ve kısa aktar.
 4. Birden fazla ürün/satır varsa order_items dizisine ayrı nesneler olarak koy. Her nesne mümkünse product, quantity, color, sizes, print_positions, note alanlarını içersin.
-5. Hem sipariş bilgisi hem baskı görseli varsa en baskın amaca göre kind seç; order_text ve order_items alanlarını yine doldur.
+5. Hem sipariş bilgisi hem baskılı ürün görseli varsa kind mutlaka "printed_product" olsun; ayrıca order_text ve order_items alanlarını da doldur.
 6. İnsan yüzünü veya kişisel fotoğrafı logo olarak yeniden üretme. Sadece müşterinin istediği mevcut baskıyı tespit et.
 7. Emin olmadığın bilgiyi uydurma; null veya boş bırak.
 
