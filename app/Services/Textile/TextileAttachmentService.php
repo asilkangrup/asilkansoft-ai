@@ -47,16 +47,21 @@ class TextileAttachmentService
             ];
 
         try {
-            $response = OpenAI::responses()->create([
-                'model' => trim((string) ($bot?->openai_model ?: 'gpt-5-mini')),
+            $model = trim((string) ($bot?->openai_model ?: 'gpt-5-mini'));
+            $request = [
+                'model' => $model,
                 'instructions' => 'Yalnızca geçerli JSON döndür. Açıklama veya markdown ekleme.',
                 'input' => [[
                     'role' => 'user',
                     'content' => $input,
                 ]],
                 'max_output_tokens' => 1000,
-                'reasoning' => ['effort' => 'low'],
-            ]);
+            ];
+            if (str_starts_with($model, 'gpt-5') || preg_match('/^o\d/i', $model)) {
+                $request['reasoning'] = ['effort' => 'low'];
+            }
+
+            $response = OpenAI::responses()->create($request);
 
             app(AiUsageService::class)->record(
                 response: $response,
