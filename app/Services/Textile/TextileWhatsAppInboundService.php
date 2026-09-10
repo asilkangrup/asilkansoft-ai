@@ -350,14 +350,8 @@ class TextileWhatsAppInboundService
                 fn (array $print): string => $this->positionLabel((string) ($print['position'] ?? 'front_center')),
                 $newPrints,
             )));
-            $answer = 'Tamam, yeni gönderdiğiniz görseli *'.implode('* ve *', $labels).'* alanlarında kullanacağım.';
-            $next = $this->nextQuestion($state);
-            if ($next !== '') {
-                $answer .= "\n\n".$next;
-            }
+            $answer = 'Tamam, yeni gönderdiğiniz görseli *'.implode('* ve *', $labels).'* alanlarında kullanacağım. Önizlemeyi buna göre güncelliyorum.';
             $this->sendText($bot, $conversation, $instance, $phone, $answer);
-            $this->consumeTrial($bot);
-            return true;
         }
 
         if ($isTextMessage && ($pricingAnswer = $this->pricingReply($message, $state)) !== null) {
@@ -1276,10 +1270,14 @@ PROMPT;
             return [750, 750, 'Numune — kargo dahil'];
         }
 
+        $method = str_contains((string) ($state['print_type'] ?? ''), 'DTF')
+            ? 'transfer'
+            : 'digital';
+
         if (
             $quantity < 5
-            || $color !== 'white'
             || ! str_contains($product, 'Tişört')
+            || ($method === 'digital' && $color !== 'white')
         ) {
             return null;
         }
@@ -1301,9 +1299,6 @@ PROMPT;
         }
 
         $layout = $hasBack ? 'front_back' : 'front';
-        $method = str_contains((string) ($state['print_type'] ?? ''), 'DTF')
-            ? 'transfer'
-            : 'digital';
 
         if ($quantity <= 30) {
             $band = 0;
