@@ -639,19 +639,28 @@ class TextileWhatsAppInboundService
         }
 
         $positions = [
+            'ön sol göğse' => 'left_chest', 'on sol goguse' => 'left_chest',
             'ön sol göğüs' => 'left_chest', 'on sol gogus' => 'left_chest',
             'ön sola' => 'left_chest', 'on sola' => 'left_chest',
             'ön sol' => 'left_chest', 'on sol' => 'left_chest',
+            'sol göğse' => 'left_chest', 'sol goguse' => 'left_chest',
             'sol göğüs' => 'left_chest', 'sol gogus' => 'left_chest',
+            'ön sağ göğse' => 'right_chest', 'on sag goguse' => 'right_chest',
             'ön sağ göğüs' => 'right_chest', 'on sag gogus' => 'right_chest',
+            'ön sağa' => 'right_chest', 'on saga' => 'right_chest',
             'ön sağ' => 'right_chest', 'on sag' => 'right_chest',
+            'sağ göğse' => 'right_chest', 'sag goguse' => 'right_chest',
             'sağ göğüs' => 'right_chest', 'sag gogus' => 'right_chest',
+            'sol kola' => 'left_sleeve', 'sağ kola' => 'right_sleeve', 'sag kola' => 'right_sleeve',
             'sol kol' => 'left_sleeve', 'sağ kol' => 'right_sleeve', 'sag kol' => 'right_sleeve',
             'ön büyük' => 'front_large', 'on buyuk' => 'front_large',
             'arka büyük' => 'back_large', 'arka buyuk' => 'back_large',
-            'sırt' => 'back_large', 'sirt' => 'back_large', 'arka' => 'back_large',
+            'sırta' => 'back_large', 'sirta' => 'back_large',
+            'arkaya' => 'back_large', 'sırt' => 'back_large', 'sirt' => 'back_large', 'arka' => 'back_large',
             'ön orta' => 'front_center', 'on orta' => 'front_center',
+            'göğse' => 'front_center', 'goguse' => 'front_center',
             'göğüs' => 'front_center', 'gogus' => 'front_center',
+            'öne' => 'front_center', 'one' => 'front_center',
             'ön' => 'front_center', 'on' => 'front_center',
         ];
         $positionHits = [];
