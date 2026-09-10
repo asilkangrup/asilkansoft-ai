@@ -131,6 +131,32 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
         ])->save();
 
         try {
+            // Explicit rejection always gets one polite closing, no matter which stage.
+            if ($this->isExplicitRejection($combinedMessage)) {
+                if ((string) $lead->status !== 'declined') {
+                    $lead->forceFill([
+                        'status' => 'declined',
+                        'replied_at' => $lead->replied_at ?: now(),
+                    ])->save();
+
+                    $this->sendAnswer(
+                        memoryService: $memoryService,
+                        whatsAppService: $whatsAppService,
+                        bot: $bot,
+                        sessionId: $sessionId,
+                        phoneDigits: $phoneDigits,
+                        answer: 'Teşekkür ederim, iyi günler dilerim.',
+                    );
+                }
+
+                return;
+            }
+
+            // After the demo is sent, the sales AI stays completely silent.
+            if (in_array((string) $lead->status, ['demo_sent', 'declined'], true)) {
+                return;
+            }
+
             if ($this->isCallRequest($combinedMessage)) {
                 $lead->forceFill([
                     'status' => 'hot',
@@ -149,6 +175,7 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
                 }
             }
 
+            // First positive response: introduce WAI and mention the 5-second print preview.
             if (
                 in_array((string) $lead->status, ['opened', 'ready'], true)
                 && $this->isPositiveInterest($combinedMessage)
@@ -173,17 +200,18 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
                 return;
             }
 
+            // Second positive response: send the demo immediately, then permanently stop AI replies.
             if (
-                in_array((string) $lead->status, ['replied', 'ready', 'pain_asked', 'solution_asked'], true)
+                in_array((string) $lead->status, ['replied', 'ready', 'pain_asked', 'solution_asked', 'demo_offered'], true)
                 && $this->isPositiveInterest($combinedMessage)
             ) {
                 $lead->forceFill([
-                    'status' => 'demo_offered',
+                    'status' => 'demo_sent',
                     'replied_at' => $lead->replied_at ?: now(),
                     'ai_activated_at' => $lead->ai_activated_at ?: now(),
                 ])->save();
 
-                $answer = "Tabii. Sistem işletmenizin çalışma şekline göre hazırlanıyor. WhatsApp’tan gelen müşterileri 7/24 karşılıyor; ürün, adet, renk, beden ve baskı detaylarını topluyor, sık sorulan soruları yanıtlıyor ve müşteriyi sipariş/satış aşamasına kadar yönlendiriyor.\n\nMüşteri logosunu veya baskı tasarımını gönderdiğinde, yapay zeka bunu seçilen ürün üzerine uygulayıp yaklaşık 5 saniye içinde profesyonel bir baskı ön izlemesi hazırlayarak WhatsApp’tan geri sunabiliyor.\n\nİsterseniz hazır kurulu WhatsApp demo hattımızdan müşteri gibi yazarak doğrudan deneyebilirsiniz. Demo hattını göndereyim mi?";
+                $answer = "Hazır kurulu WhatsApp demo hattımıza müşteri gibi “Merhaba” yazın, baskı yaptırmak istediğiniz ürünü belirtin ve logonuzu gönderin.\n\nYapay zeka logonuzu ürün üzerine uygulayıp yaklaşık 5 saniye içinde baskı ön izlemesini WhatsApp’tan size geri sunacaktır. Aynı sistem 7/24 müşterilerinize cevap verir, gerekli bilgileri toplar ve müşteriyi satış aşamasına kadar yönlendirir; böylece gelen talepler cevapsız kalmaz.\n\nDemo WhatsApp: +90 536 475 00 98\nhttps://wa.me/905364750098";
 
                 $this->sendAnswer(
                     memoryService: $memoryService,
@@ -207,24 +235,6 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
 
             if (in_array($action, ['reply', 'reply_hot'], true)) {
                 $answer = trim((string) ($decision['answer'] ?? ''));
-
-                if ($statusBeforeDecision === 'demo_offered' && $action === 'reply_hot') {
-                    $sector = (string) ($decision['sector'] ?? $salesService->sectorFor($lead));
-                    if ($salesService->isTextileSector($sector)) {
-                        $answer = "Tabii. Hazır kurulu WhatsApp demo hattımıza müşteri gibi “Merhaba” yazın, baskı yaptırmak istediğiniz ürünü belirtin ve logonuzu gönderin.\n\nYapay zeka logonuzu ürün üzerine uygulayıp yaklaşık 5 saniye içinde baskı ön izlemesini WhatsApp’tan size geri sunacaktır. Aynı sistem 7/24 müşterilerinize cevap verir, gerekli bilgileri toplar ve müşteriyi satış aşamasına kadar yönlendirir; böylece gelen talepler cevapsız kalmaz.\n\nDemo WhatsApp: +90 536 475 00 98\nhttps://wa.me/905364750098";
-                    } else {
-                        $demo = $demoService->create([
-                            'company_name' => $lead->company_name,
-                            'sector' => $sector,
-                            'role' => 'sales',
-                        ]);
-
-                        if (($demo['status'] ?? null) === 'created' && filled($demo['url'] ?? null)) {
-                            $answer = "Hazır ✅ Size özel test yapay zekasını oluşturdum:\n".(string) $demo['url'].
-                                "\n\nŞu an yalnızca işletme adınızı ve sektörünüzü biliyor; buna rağmen sektörünüze uygun gerçek bir müşteri temsilcisi gibi konuşacak. Canlı kurulumda fiyatlarınızı, ürün/hizmetlerinizi, çalışma saatlerinizi, şirket kurallarınızı, kampanyalarınızı ve istediğiniz tüm yönlendirme akışlarını tamamen size özel tanımlıyoruz.\n\nTest edin; beğenirseniz 3 gün ücretsiz canlı kullanım ve kurulum desteği sağlayabiliriz.";
-                        }
-                    }
-                }
 
                 if ($answer === '') {
                     return;
@@ -323,6 +333,27 @@ class ProcessWaiSalesOutreachMessage implements ShouldQueue
         }
 
         return false;
+    }
+
+    private function isExplicitRejection(string $message): bool
+    {
+        $normalized = Str::lower(trim($message));
+
+        foreach ([
+            'ilgilenmiyorum', 'ilgilenmiyoruz', 'istemiyorum', 'istemiyoruz', 'gerek yok',
+            'düşünmüyorum', 'dusunmuyorum', 'düşünmüyoruz', 'dusunmuyoruz', 'istemem',
+            'rahatsız etmeyin', 'rahatsiz etmeyin', 'mesaj atmayın', 'mesaj atmayin',
+            'aramayın', 'aramayin', 'hayır', 'hayir', 'yok teşekkürler', 'yok tesekkurler',
+        ] as $negative) {
+            if (str_contains($normalized, $negative)) {
+                return true;
+            }
+        }
+
+        return in_array($normalized, [
+            'teşekkürler', 'tesekkurler', 'teşekkür ederim', 'tesekkur ederim',
+            'sağ olun', 'sag olun', 'sağol', 'sagol',
+        ], true);
     }
 
     private function isCallRequest(string $message): bool
