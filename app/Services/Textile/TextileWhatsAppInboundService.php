@@ -549,19 +549,21 @@ class TextileWhatsAppInboundService
             'heavy' => ['Heavy Cotton Tişört', 'shirt'],
             'şapka' => ['Pamuklu Şapka', 'cap'],
             'sapka' => ['Pamuklu Şapka', 'cap'],
-            'tişört' => ['Premium Oversize Tişört', 'shirt'],
-            'tisort' => ['Premium Oversize Tişört', 'shirt'],
         ];
 
         $detectedProduct = null;
         foreach ($products as $needle => [$label, $category]) {
-            if (str_contains($lower, $needle)) {
+            if (preg_match('/(?<![\\pL\\pN])'.preg_quote($needle, '/').'(?![\\pL\\pN])/u', $lower)) {
                 $detectedProduct = [$label, $category];
                 break;
             }
         }
 
-        $hasExplicitQuantity = (bool) preg_match('/\b([1-9][0-9]{0,4})\s*(?:adet|tane)\b/u', $lower, $quantityMatch);
+        $hasExplicitQuantity = (bool) preg_match('/\\b([1-9][0-9]{0,4})\\s*(?:adet|tane)\\b/u', $lower, $quantityMatch);
+        if (! $hasExplicitQuantity && preg_match('/(?<![\\pL\\pN])(?:tek\\s+bir|tek|bir)\\s+(?:adet|tane|tişört|tisort)(?![\\pL\\pN])/u', $lower)) {
+            $hasExplicitQuantity = true;
+            $quantityMatch = [null, 1];
+        }
         $colors = [
             'siyah' => 'black', 'beyaz' => 'white', 'lacivert' => 'navy',
             'bordo' => 'burgundy', 'bej' => 'beige', 'kırmızı' => 'red',
@@ -646,12 +648,21 @@ class TextileWhatsAppInboundService
             'sırt' => 'back_large', 'sirt' => 'back_large', 'arka' => 'back_large',
             'ön orta' => 'front_center', 'on orta' => 'front_center',
             'göğüs' => 'front_center', 'gogus' => 'front_center',
+            'ön' => 'front_center', 'on' => 'front_center',
         ];
         $positionHits = [];
         foreach ($positions as $needle => $value) {
-            $offset = mb_strpos($lower, $needle);
-            if ($offset !== false) {
-                $positionHits[] = ['offset' => $offset, 'length' => mb_strlen($needle), 'position' => $value];
+            if (preg_match(
+                '/(?<![\\pL\\pN])'.preg_quote($needle, '/').'(?![\\pL\\pN])/u',
+                $lower,
+                $match,
+                PREG_OFFSET_CAPTURE,
+            )) {
+                $positionHits[] = [
+                    'offset' => $match[0][1],
+                    'length' => strlen($match[0][0]),
+                    'position' => $value,
+                ];
             }
         }
         // Keep the most specific phrase: “sağ göğüs” must not also match “göğüs”.
@@ -668,6 +679,42 @@ class TextileWhatsAppInboundService
         usort($positionHits, fn (array $a, array $b): int => $a['offset'] <=> $b['offset']);
         $detectedPositions = array_values(array_unique(array_column($positionHits, 'position')));
         $detectedPosition = $detectedPositions[0] ?? null;
+
+        if (
+            count($detectedPositions) > 1
+            && ($state['logo_received'] ?? false)
+            && ! ($state['awaiting_uploaded_artwork_position'] ?? false)
+            && (! ($state['position'] ?? null) || $this->sameArtworkMessage($lower))
+        ) {
+            $state['additional_prints'] = is_array($state['additional_prints'] ?? null)
+                ? $state['additional_prints']
+                : [];
+
+            if (! ($state['position'] ?? null)) {
+                $state['position'] = array_shift($detectedPositions);
+            }
+
+            foreach ($detectedPositions as $sameArtworkPosition) {
+                if ($sameArtworkPosition === ($state['position'] ?? null)) {
+                    continue;
+                }
+                $alreadyAdded = collect($state['additional_prints'])
+                    ->contains(fn (mixed $print): bool => is_array($print)
+                        && ($print['position'] ?? null) === $sameArtworkPosition);
+                if (! $alreadyAdded) {
+                    $state['additional_prints'][] = [
+                        'position' => $sameArtworkPosition,
+                        'logo_base64' => (string) ($state['logo_base64'] ?? ''),
+                        'logo_mime' => (string) ($state['logo_mime'] ?? 'image/png'),
+                    ];
+                }
+            }
+
+            $state['additional_prints'] = array_slice($state['additional_prints'], -8);
+            $state['mockup_sent'] = false;
+            $state['approved'] = false;
+            $detectedPosition = null;
+        }
 
         if (count($detectedPositions) > 1 && ! ($state['logo_received'] ?? false)) {
             $state['position'] = $detectedPositions[0];
@@ -1048,7 +1095,7 @@ Aynı karşılama veya sipariş metnini tekrar etme. Önceki konuşmadaki bilgil
 Yanıt WhatsApp'a uygun, sıcak ama profesyonel ve çoğunlukla 1-3 kısa cümle olsun.
 Her mesajı deneyimli bir satış danışmanı gibi bağlama özel yaz: müşterinin kullandığı kelimeleri, asıl sorusunu ve konuşmanın tonunu dikkate al; ezberlenmiş şablon hissi verme.
 Önce müşterinin son sorusuna net cevap ver, ardından gerçekten gerekiyorsa konuşmayı ilerleten tek ve kolay bir soru sor.
-Müşterinin niyetini tahmin ederken acele etme; bilgi isteyen kişiye bilgi ver, kararsız kişiye seçenekleri sadeleştir, satın almaya hazır kişiye ise güven veren net bir sonraki adım sun.
+Müşterinin niyetini tahmin ederken acele etme; bilgi isteyen kişiye bilgi ver, kararsız kişiye uzun seçenek listesi sunmak yerine ihtiyacına göre kısa bir öneri yap ve en fazla bir kolay soru sor, satın almaya hazır kişiye ise güven veren net bir sonraki adım sun.
 Gereksiz teknik terim, uzun liste, aynı bilgiyi tekrar etme ve peş peşe soru sorma. “Harika”, “siparişinizi netleştirelim” gibi otomatik kalıpları her cevapta kullanma.
 Müşteri itiraz ederse savunmaya geçme; önce itirazı anladığını göster, sonra kısa ve somut çözüm sun.
 Yanıtı anlamlı kısa paragraflara ayır ve paragraflar arasında bir boş satır bırak.
