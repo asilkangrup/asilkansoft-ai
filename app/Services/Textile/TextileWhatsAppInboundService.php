@@ -237,11 +237,13 @@ class TextileWhatsAppInboundService
             );
 
         if ($shouldAnswerNaturally) {
-            $answer = $this->greetingMessage($message)
-                ? (($state['approved'] ?? false)
-                    ? 'Merhaba 👋 Mevcut demo siparişiniz onaylandı. Yeni bir tasarım veya farklı bir ürün için de yardımcı olabilirim.'
-                    : $this->nextQuestion($state))
-                : $this->intelligentReply($bot, $conversation, $state, $message);
+            if ($this->greetingMessage($message)) {
+                $answer = $this->welcomeMessage();
+            } elseif ($this->generalInformationRequest($message)) {
+                $answer = $this->informationTopicQuestion();
+            } else {
+                $answer = $this->intelligentReply($bot, $conversation, $state, $message);
+            }
 
             $this->sendText($bot, $conversation, $instance, $phone, $answer);
             $this->consumeTrial($bot);
@@ -521,9 +523,48 @@ class TextileWhatsAppInboundService
         $normalized = Str::lower(trim($message));
 
         return (bool) preg_match(
-            '/^(merhaba|selam|selamlar|iyi günler|iyi aksamlar|iyi akşamlar)[!. ]*$/u',
+            '/^(merhaba|merhabalar|selam|selamlar|günaydın|gunaydin|iyi günler|iyi aksamlar|iyi akşamlar|iyi geceler)[!. ]*$/u',
             $normalized,
         );
+    }
+
+    private function generalInformationRequest(string $message): bool
+    {
+        $normalized = Str::lower(trim($message));
+
+        foreach ([
+            'ürünleriniz hakkında bilgi',
+            'urunleriniz hakkinda bilgi',
+            'ürünler hakkında bilgi',
+            'urunler hakkinda bilgi',
+            'firmanız hakkında bilgi',
+            'firmaniz hakkinda bilgi',
+            'şirketiniz hakkında bilgi',
+            'sirketiniz hakkinda bilgi',
+            'hizmetleriniz hakkında bilgi',
+            'hizmetleriniz hakkinda bilgi',
+            'genel bilgi almak',
+            'bilgi almak istiyorum',
+            'neler yapıyorsunuz',
+            'neler yapiyorsunuz',
+            'ne hizmet veriyorsunuz',
+        ] as $phrase) {
+            if (str_contains($normalized, $phrase)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function informationTopicQuestion(): string
+    {
+        return "Elbette, memnuniyetle yardımcı olayım. Hangi konuda bilgi almak istersiniz?\n\n*Ürün çeşitleri, kumaş ve kaliteler, baskı yöntemleri, fiyatlandırma, minimum adet veya teslimat* konularından birini yazabilirsiniz.";
+    }
+
+    private function welcomeMessage(): string
+    {
+        return "Merhaba 👋\n\n*Baskılı tekstil siparişinizi birlikte hazırlayalım.*\n\nÜrün modelini, rengi ve adedi tek mesajda yazabilirsiniz.\nÖrnek: *250 adet siyah oversize tişört.*";
     }
 
     private function questionMessage(string $message): bool
@@ -654,6 +695,9 @@ CANLI TEKSTİL SİPARİŞ BAĞLAMI
 {$lines}
 
 Müşterinin son mesajındaki asıl soruya önce doğrudan ve doğal biçimde cevap ver.
+Şirket profilindeki bütün bilgileri hiçbir zaman tek mesajda sıralama veya özetleme.
+Müşteri genel bilgi isterse önce hangi konuyu merak ettiğini sor ve yalnızca şu kısa seçenekleri sun: ürün çeşitleri, kumaş ve kaliteler, baskı yöntemleri, fiyatlandırma, minimum adet, teslimat.
+Müşteri belirli bir konu sorarsa yalnızca o konuya cevap ver; ilgisiz fiyat, ürün, kargo, ödeme veya iade bilgilerini ekleme.
 Aynı karşılama veya sipariş metnini tekrar etme. Önceki konuşmadaki bilgileri yeniden isteme.
 Yanıt WhatsApp'a uygun, sıcak ama profesyonel ve çoğunlukla 1-3 kısa cümle olsun.
 Yanıtı anlamlı kısa paragraflara ayır ve paragraflar arasında bir boş satır bırak.
@@ -686,7 +730,7 @@ PROMPT;
     private function nextQuestion(array $state): string
     {
         if (! ($state['product_category'] ?? null)) {
-            return "Merhaba 👋\n\n*Hangi baskıyı hazırlayalım?*\n\n1️⃣ Tişört baskısı\n2️⃣ Bardak baskısı\n\n*Tişört* veya *bardak* yazarak seçim yapabilirsiniz.";
+            return $this->welcomeMessage();
         }
 
         if (($state['product_category'] ?? null) === 'mug') {
