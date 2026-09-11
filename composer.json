@@ -57,6 +57,7 @@
             "@php scripts/patch_textile_pilot.php",
             "@php scripts/patch_textile_multi_preview.php",
             "@php scripts/patch_textile_manual_takeover.php",
+            "@php scripts/patch_textile_casper_notify.php",
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi",
             "@php artisan filament:upgrade"
