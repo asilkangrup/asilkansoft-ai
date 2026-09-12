@@ -1698,6 +1698,12 @@ PROMPT;
             }
         }
 
+        // Bekir: username-only WhatsApp contacts may have no phone-number JID.
+        $jid = trim((string) data_get($payload, 'data.key.remoteJid', ''));
+        if (($payload['instance'] ?? '') === 'bekir-tekstil-53' && preg_match('/^[0-9]+@lid$/', $jid)) {
+            return $jid;
+        }
+
         return '';
     }
 
