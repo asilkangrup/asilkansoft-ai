@@ -152,6 +152,23 @@ class TextileWhatsAppInboundService
         $previousState = $state;
         $state = $this->parseText($state, trim((string) ($mediaContext['caption'] ?: $message)));
 
+
+        // BEKIR_ARTWORK_LAYOUT_V1: turn visual corrections into actual render state.
+        if ((int) $bot->id === 53 && (int) $bot->user_id === 47
+            && ($mediaContext['type'] ?? 'text') === 'text'
+            && app(BekirArtworkLayoutService::class)->applies($previousState, $message)) {
+            try {
+                $layoutState = array_replace($previousState, array_intersect_key($state,
+                    array_flip(['product', 'product_category', 'color', 'color_label', 'quantity'])));
+                $state = app(BekirArtworkLayoutService::class)->revise($bot, $layoutState, $message);
+            } catch (Throwable $exception) {
+                Log::warning('BEKIR LAYOUT REVISION FAILED', ['ai_bot_id' => $bot->id, 'message' => $exception->getMessage()]);
+                $this->sendText($bot, $conversation, $instance, $phone,
+                    'Yeni yerleşimin önizlemesini oluşturamadım. Her logonun hangi alana geleceğini ayrı ayrı yazar mısınız?');
+                return true;
+            }
+        }
+
         // Bekir Tekstil: müşteriler adet sorusuna çoğu zaman yalnızca "100" gibi
         // yalın bir sayı ile cevap veriyor. Bu cevabı sipariş adedi olarak kaydet.
         if (
@@ -691,6 +708,8 @@ class TextileWhatsAppInboundService
             $state['awaiting_order_item_selection'] = false;
             $state['position'] = null;
             $state['logo_base64'] = null;
+            $state['artwork_source_base64'] = null;
+            $state['artwork_layout'] = [];
             $state['logo_mime'] = null;
             $state['logo_received'] = false;
             $state['additional_prints'] = [];

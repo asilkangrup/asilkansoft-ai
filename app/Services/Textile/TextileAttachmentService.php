@@ -160,7 +160,7 @@ PROMPT;
         return $decoded;
     }
 
-    private function extractArtwork(string $bytes, array $bbox): string
+    public function extractArtwork(string $bytes, array $bbox, bool $robustBackground = false): string
     {
         $source = @imagecreatefromstring($bytes);
         if ($source === false) {
@@ -191,7 +191,7 @@ PROMPT;
             return base64_encode($bytes);
         }
 
-        $this->removeFlatGarmentBackground($crop);
+        $this->removeFlatGarmentBackground($crop, $robustBackground);
 
         ob_start();
         imagepng($crop, null, 6);
@@ -201,7 +201,7 @@ PROMPT;
         return is_string($png) && $png !== '' ? base64_encode($png) : base64_encode($bytes);
     }
 
-    private function removeFlatGarmentBackground(mixed $image): void
+    private function removeFlatGarmentBackground(mixed $image, bool $robustBackground = false): void
     {
         $width = imagesx($image);
         $height = imagesy($image);
@@ -227,6 +227,17 @@ PROMPT;
         $red = (int) round($red / count($samples));
         $green = (int) round($green / count($samples));
         $blue = (int) round($blue / count($samples));
+
+        if ($robustBackground) {
+            $rs = $gs = $bs = [];
+            foreach ($samples as $pixel) {
+                $rs[] = ($pixel >> 16) & 0xff;
+                $gs[] = ($pixel >> 8) & 0xff;
+                $bs[] = $pixel & 0xff;
+            }
+            sort($rs); sort($gs); sort($bs);
+            $red = $rs[1]; $green = $gs[1]; $blue = $bs[1];
+        }
 
         for ($py = 0; $py < $height; $py++) {
             for ($px = 0; $px < $width; $px++) {
