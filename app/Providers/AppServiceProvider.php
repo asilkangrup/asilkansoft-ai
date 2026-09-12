@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\AiBot;
 use App\Models\ChatMessage;
 use App\Models\ConversationControl;
 use App\Observers\ChatMessageObserver;
@@ -22,6 +23,9 @@ use App\Services\WaiPricingOpenAIService;
 use App\Services\WaiResetAwareMemoryService;
 use App\Services\WhatsAppService;
 use App\Services\WaiSalesAwareWhatsAppService;
+use Closure;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -73,5 +77,65 @@ class AppServiceProvider extends ServiceProvider
     {
         ChatMessage::observe(ChatMessageObserver::class);
         ConversationControl::observe(ConversationControlObserver::class);
+
+        $this->app['router']->pushMiddlewareToGroup(
+            'api',
+            TextileHumanTakeoverMiddleware::class
+        );
+    }
+}
+
+class TextileHumanTakeoverMiddleware
+{
+    public function handle(Request $request, Closure $next)
+    {
+        if (
+            $request->is('api/whatsapp/webhook')
+            && (bool) data_get($request->all(), 'data.key.fromMe', false)
+        ) {
+            $instance = trim((string) data_get($request->all(), 'instance', ''));
+            $remoteJid = trim((string) data_get($request->all(), 'data.key.remoteJid', ''));
+            $phone = preg_replace('/\D+/', '', explode('@', $remoteJid)[0] ?? '') ?? '';
+
+            if ($instance !== '' && $phone !== '' && ! str_ends_with($remoteJid, '@g.us')) {
+                $bot = AiBot::query()
+                    ->whereKey(51)
+                    ->where('whatsapp_instance', $instance)
+                    ->first();
+
+                if ($bot) {
+                    $message = data_get($request->all(), 'data.message', []);
+                    $text = trim((string) (
+                        data_get($message, 'conversation')
+                        ?? data_get($message, 'extendedTextMessage.text')
+                        ?? data_get($message, 'imageMessage.caption')
+                        ?? data_get($message, 'documentMessage.caption')
+                        ?? ''
+                    ));
+
+                    $isApiOutbound = false;
+                    if ($text !== '') {
+                        $isApiOutbound = (bool) Cache::store('database')->pull(
+                            'wai_api_outbound:'.sha1($instance.'|'.$phone.'|'.$text),
+                            false,
+                        );
+                    }
+
+                    if (! $isApiOutbound) {
+                        ConversationControl::query()
+                            ->where('ai_bot_id', 51)
+                            ->where('whatsapp_number', $phone)
+                            ->update([
+                                'human_takeover' => true,
+                                'taken_over_at' => now(),
+                                'released_at' => null,
+                                'updated_at' => now(),
+                            ]);
+                    }
+                }
+            }
+        }
+
+        return $next($request);
     }
 }
