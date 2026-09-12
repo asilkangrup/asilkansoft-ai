@@ -41,7 +41,7 @@ class TextileMockupService
 
         [$canvas, $templateKind, $templateColor] = $this->loadStudioTemplate($product, $shirtColor, $view);
         if ($shirtColor !== $templateColor) {
-            $this->recolorGarment($canvas, $shirtColor, $templateKind);
+            $this->recolorGarment($canvas, $shirtColor, $view === 'back' ? $templateKind.'-back' : $templateKind);
         }
         $this->placeNaturalPrint($canvas, $logo, $position, $templateKind);
 
@@ -549,8 +549,8 @@ class TextileMockupService
             if (! in_array($kind, ['regular', 'polo'], true)) {
                 throw new RuntimeException('Bu ürünün arka görünüm şablonu tanımlı değil.');
             }
-            $templateColor = 'black';
-            $filename = $kind.'-black-back-studio.jpg';
+            $templateColor = $shirtColor === 'white' ? 'white' : 'black';
+            $filename = $kind.'-'.$templateColor.'-back-studio.jpg';
         } elseif ($view !== 'front') {
             throw new RuntimeException('Geçersiz ürün görünümü.');
         }
@@ -649,6 +649,11 @@ class TextileMockupService
     {
         if ($luminance > 125) {
             return false;
+        }
+
+        if (str_ends_with($kind, '-back')) {
+            $neckBottom = $kind === 'polo-back' ? 86 : 132;
+            return $y >= $neckBottom && $y <= 1165 && $x >= 70 && $x <= 1125;
         }
 
         if ($kind === 'cap') {
