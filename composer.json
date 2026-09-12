@@ -58,6 +58,7 @@
             "@php scripts/patch_textile_multi_preview.php",
             "@php scripts/patch_textile_manual_takeover.php",
             "@php scripts/patch_textile_casper_notify.php",
+            "@php scripts/patch_textile_multi_preview_casper.php",
             "@php scripts/patch_textile_natural_intake.php",
             "@php scripts/patch_inbox_owner_takeover.php",
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
@@ -69,6 +70,7 @@
             "@php scripts/patch_textile_multi_preview.php",
             "@php scripts/patch_textile_manual_takeover.php",
             "@php scripts/patch_textile_casper_notify.php",
+            "@php scripts/patch_textile_multi_preview_casper.php",
             "@php scripts/patch_textile_natural_intake.php",
             "@php scripts/patch_inbox_owner_takeover.php"
         ],
