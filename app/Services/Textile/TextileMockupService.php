@@ -482,7 +482,9 @@ class TextileMockupService
         $templateColor = 'black';
         $filename = 'oversize-black-studio.jpg';
 
-        if (str_contains($normalized, 'regular') || str_contains($normalized, 'bisiklet')) {
+        if (str_contains($normalized, 'regular')
+            || str_contains($normalized, 'sıfır yaka')
+            || str_contains($normalized, 'sifir yaka') || str_contains($normalized, 'bisiklet')) {
             $kind = 'regular';
             $templateColor = $shirtColor === 'white' ? 'white' : 'black';
             $filename = $templateColor === 'white'
