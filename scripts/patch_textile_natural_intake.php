@@ -25,6 +25,38 @@ if (! is_string($source) || $source === '') {
 
 $original = $source;
 
+if (! str_contains($source, 'TEXTILE_ATTACHMENT_STATE_GUARD_V1')) {
+    $attachmentAnchor = <<<'PHP'
+                $documentText = trim((string) ($analysis['order_text'] ?? ''));
+                if ($documentText !== '') {
+                    $state = $this->parseText($state, $documentText);
+                }
+PHP;
+
+    $attachmentReplacement = <<<'PHP'
+                $documentText = trim((string) ($analysis['order_text'] ?? ''));
+                if ($documentText !== '') {
+                    // TEXTILE_ATTACHMENT_STATE_GUARD_V1
+                    $attachmentStateBeforeParse = $state;
+                    $state = $this->parseText($state, $documentText);
+                    foreach (['product', 'product_category', 'quantity', 'color', 'color_label', 'sizes', 'fabric_preference', 'customer_supplied', 'print_type'] as $stickyKey) {
+                        if (array_key_exists($stickyKey, $attachmentStateBeforeParse)
+                            && $attachmentStateBeforeParse[$stickyKey] !== null
+                            && $attachmentStateBeforeParse[$stickyKey] !== '') {
+                            $state[$stickyKey] = $attachmentStateBeforeParse[$stickyKey];
+                        }
+                    }
+                }
+PHP;
+
+    if (str_contains($source, $attachmentAnchor)) {
+        $source = str_replace($attachmentAnchor, $attachmentReplacement, $source, $attachmentCount);
+        echo "[textile-natural-intake] attachment state guard added.\n";
+    } else {
+        fwrite(STDERR, "[textile-natural-intake] attachment state anchor missing.\n");
+    }
+}
+
 $oldWelcome = <<<'PHP'
     private function welcomeMessage(): string
     {
