@@ -471,6 +471,19 @@ class TextileWhatsAppInboundService
 
         if (($state['logo_received'] ?? false) && ($state['position'] ?? null) && ! ($state['mockup_sent'] ?? false)) {
             try {
+                if ((int) $bot->id === 53 && (int) $bot->user_id === 47) {
+                    $views = $this->mockupService->createViews(
+                        logoBase64: (string) $state['logo_base64'],
+                        position: (string) $state['position'],
+                        shirtColor: (string) $state['color'],
+                        product: (string) $state['product'],
+                        additionalPrints: (array) ($state['additional_prints'] ?? []),
+                    );
+                    foreach ($views as $preview) {
+                        $viewState = array_replace($state, ['position' => $preview['position']]);
+                        $this->sendImage($bot, $conversation, $instance, $phone, $preview['image'], $viewState, $preview['view']);
+                    }
+                } else {
                 $mockup = $this->mockupService->create(
                     logoBase64: (string) $state['logo_base64'],
                     position: (string) $state['position'],
@@ -482,6 +495,7 @@ class TextileWhatsAppInboundService
                 );
 
                 $this->sendImage($bot, $conversation, $instance, $phone, $mockup, $state);
+                }
                 $state['mockup_sent'] = true;
                 Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
 
@@ -1574,10 +1588,15 @@ PROMPT;
         );
     }
 
-    private function sendImage(AiBot $bot, ConversationControl $conversation, string $instance, string $phone, string $mockupBase64, array $state): void
+    private function sendImage(AiBot $bot, ConversationControl $conversation, string $instance, string $phone, string $mockupBase64, array $state, ?string $view = null): void
     {
         $caption = 'Baskı önizlemeniz hazır ✓ Logo orijinal dosyanızdan otomatik yerleştirildi.';
         $filename = 'baski-onizleme.jpg';
+        if ($view !== null) {
+            $viewLabel = $view === 'back' ? 'Arka görünüm' : 'Ön görünüm';
+            $caption = $viewLabel.' — '.$this->positionLabel((string) $state['position']).' baskı önizlemesi ✓';
+            $filename = $view === 'back' ? 'baski-arka-gorunum.jpg' : 'baski-on-gorunum.jpg';
+        }
         $this->markOutbound($instance, $phone, $caption);
         $send = $this->whatsAppService->sendImage(
             $instance,
