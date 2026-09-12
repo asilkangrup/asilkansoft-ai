@@ -39,6 +39,7 @@ class TextileMockupService
         if ($logo === false) {
             throw new RuntimeException('Logo JPG, PNG veya WEBP formatında olmalıdır.');
         }
+        $logo = $this->normalizePrintableArtwork($logo);
 
         [$canvas, $templateKind, $templateColor] = $this->loadStudioTemplate($product, $shirtColor, $view, $readyTemplateOnly);
         if (! $readyTemplateOnly && $shirtColor !== $templateColor) {
@@ -66,13 +67,14 @@ class TextileMockupService
             if ($extraLogo === false) {
                 continue;
             }
+            $extraLogo = $this->normalizePrintableArtwork($extraLogo);
 
             $this->placeNaturalPrint($canvas, $extraLogo, $extraPosition, $templateKind);
             imagedestroy($extraLogo);
         }
 
         ob_start();
-        imagejpeg($canvas, null, 91);
+        imagejpeg($canvas, null, 95);
         $jpeg = ob_get_clean();
 
         imagedestroy($logo);
@@ -497,6 +499,106 @@ class TextileMockupService
     }
 
     /**
+     * Removes a flat scanner/screenshot background and trims empty margins.
+     * Photos and genuinely multi-colour artwork are left untouched: automatic
+     * removal is enabled only when almost the whole outer edge is one colour.
+     */
+    private function normalizePrintableArtwork(mixed $source): mixed
+    {
+        $width = imagesx($source);
+        $height = imagesy($source);
+        if ($width < 2 || $height < 2) {
+            return $source;
+        }
+
+        $samples = [];
+        $stepX = max(1, (int) floor($width / 80));
+        $stepY = max(1, (int) floor($height / 80));
+        for ($x = 0; $x < $width; $x += $stepX) {
+            $samples[] = imagecolorat($source, $x, 0);
+            $samples[] = imagecolorat($source, $x, $height - 1);
+        }
+        for ($y = 0; $y < $height; $y += $stepY) {
+            $samples[] = imagecolorat($source, 0, $y);
+            $samples[] = imagecolorat($source, $width - 1, $y);
+        }
+
+        $red = $green = $blue = 0;
+        foreach ($samples as $pixel) {
+            $red += ($pixel >> 16) & 0xff;
+            $green += ($pixel >> 8) & 0xff;
+            $blue += $pixel & 0xff;
+        }
+        $count = max(1, count($samples));
+        $background = [$red / $count, $green / $count, $blue / $count];
+        $matchingEdge = 0;
+        foreach ($samples as $pixel) {
+            $distance = sqrt(
+                pow((($pixel >> 16) & 0xff) - $background[0], 2)
+                + pow((($pixel >> 8) & 0xff) - $background[1], 2)
+                + pow(($pixel & 0xff) - $background[2], 2)
+            );
+            if ($distance <= 24) $matchingEdge++;
+        }
+
+        // A varied edge normally means a photograph or intentional artwork.
+        if (($matchingEdge / $count) < 0.88) {
+            return $source;
+        }
+
+        $clean = imagecreatetruecolor($width, $height);
+        imagealphablending($clean, false);
+        imagesavealpha($clean, true);
+        imagefill($clean, 0, 0, imagecolorallocatealpha($clean, 0, 0, 0, 127));
+        $minX = $width;
+        $minY = $height;
+        $maxX = -1;
+        $maxY = -1;
+
+        for ($y = 0; $y < $height; $y++) {
+            for ($x = 0; $x < $width; $x++) {
+                $pixel = imagecolorat($source, $x, $y);
+                $alpha = ($pixel >> 24) & 0x7f;
+                $r = ($pixel >> 16) & 0xff;
+                $g = ($pixel >> 8) & 0xff;
+                $b = $pixel & 0xff;
+                $distance = sqrt(pow($r - $background[0], 2) + pow($g - $background[1], 2) + pow($b - $background[2], 2));
+                if ($alpha >= 127 || $distance <= 18) continue;
+
+                // Feather anti-aliased edge pixels instead of leaving a halo.
+                $newAlpha = $distance < 54
+                    ? max($alpha, (int) round(127 * (1 - (($distance - 18) / 36))))
+                    : $alpha;
+                if ($newAlpha >= 127) continue;
+                imagesetpixel($clean, $x, $y, imagecolorallocatealpha($clean, $r, $g, $b, $newAlpha));
+                $minX = min($minX, $x);
+                $minY = min($minY, $y);
+                $maxX = max($maxX, $x);
+                $maxY = max($maxY, $y);
+            }
+        }
+
+        if ($maxX < $minX || $maxY < $minY) {
+            imagedestroy($clean);
+            return $source;
+        }
+
+        $padding = max(2, (int) round(max($maxX - $minX + 1, $maxY - $minY + 1) * 0.025));
+        $left = max(0, $minX - $padding);
+        $top = max(0, $minY - $padding);
+        $cropWidth = min($width - $left, $maxX - $minX + 1 + ($padding * 2));
+        $cropHeight = min($height - $top, $maxY - $minY + 1 + ($padding * 2));
+        $cropped = imagecrop($clean, ['x' => $left, 'y' => $top, 'width' => $cropWidth, 'height' => $cropHeight]);
+        imagedestroy($clean);
+        if ($cropped === false) {
+            return $source;
+        }
+        imagedestroy($source);
+
+        return $cropped;
+    }
+
+    /**
      * @return array{0: mixed, 1: string, 2: string}
      */
     private function loadStudioTemplate(string $product, string $shirtColor, string $view = 'front', bool $readyTemplateOnly = false): array
@@ -579,12 +681,6 @@ class TextileMockupService
             }
             $templateColor = $shirtColor;
             $filename = 'ready/'.$readyProducts[$product].'-'.$shirtColor.'-'.$view.'.jpg';
-            // Prefer original full-resolution photographs; never repaint them.
-            if (in_array($shirtColor, ['black', 'white'], true)
-                || ($readyProducts[$product] === 'regular' && $shirtColor === 'red')) {
-                $filename = $readyProducts[$product].'-'.$shirtColor
-                    .($view === 'back' ? '-back' : '').'-studio.jpg';
-            }
         }
 
         $path = public_path('assets/textile/catalog/'.$filename);
