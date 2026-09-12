@@ -546,7 +546,7 @@ class TextileMockupService
         }
 
         if ($view === 'back') {
-            if (! in_array($kind, ['regular', 'polo'], true)) {
+            if (! in_array($kind, ['regular', 'polo', 'oversize'], true)) {
                 throw new RuntimeException('Bu ürünün arka görünüm şablonu tanımlı değil.');
             }
             $templateColor = $shirtColor === 'white' ? 'white' : 'black';
@@ -649,6 +649,12 @@ class TextileMockupService
     {
         if ($luminance > 125) {
             return false;
+        }
+
+        if ($kind === 'oversize-back') {
+            if ($y < 70 || $y > 1125) return false;
+            // Below the sleeves protect the mannequin arms and legs.
+            return $y < 645 ? ($x >= 95 && $x <= 1105) : ($x >= 330 && $x <= 870);
         }
 
         if (str_ends_with($kind, '-back')) {

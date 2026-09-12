@@ -301,13 +301,13 @@ class TextileWhatsAppInboundService
             if (($state['product'] ?? null) === 'Regular Fit Tişört') {
                 $state['product'] = 'Sıfır Yaka Tişört';
             }
-            if (($state['product'] ?? null) && ! in_array($state['product'], ['Sıfır Yaka Tişört', 'Polo Yaka Tişört'], true)) {
+            if (($state['product'] ?? null) && ! in_array($state['product'], ['Sıfır Yaka Tişört', 'Polo Yaka Tişört', 'Premium Oversize Tişört'], true)) {
                 $state['product'] = null;
                 $state['product_category'] = null;
                 $state['mockup_sent'] = false;
                 Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
                 $this->sendText($bot, $conversation, $instance, $phone,
-                    'Bekir Tekstil’de sıfır yaka ve polo yaka tişörtle ilerliyoruz. Hangisini tercih edersiniz?');
+                    'Bekir Tekstil’de sıfır yaka, polo yaka ve oversize tişörtle ilerliyoruz. Hangisini tercih edersiniz?');
                 $this->consumeTrial($bot);
                 return true;
             }
@@ -1239,12 +1239,12 @@ PROMPT;
                     && ! str_contains($line, '30-99 adet')
             ));
             $instructions = preg_replace('/^Güncel ürün kataloğu:.*$/m',
-                'Güncel ürün kataloğu: yalnızca sıfır yaka tişört ve polo yaka tişört.', $instructions);
+                'Güncel ürün kataloğu: sıfır yaka tişört, polo yaka tişört ve oversize tişört.', $instructions);
             $instructions = str_replace('model, kullanım amacı veya nasıl yardımcı olabileceğin hakkında',
-                'sıfır yaka mı polo yaka mı istediği hakkında', $instructions);
+                'sıfır yaka, polo yaka veya oversize istediği hakkında', $instructions);
             $instructions .= "\nBEKİR TEKSTİL\n"
-                ."Kullanım amacı ASLA sorulmaz. Oversize, sweatshirt, şapka veya başka ürün sunulmaz.\n"
-                ."Sıfır yaka ve polo yaka dışında ürün/model/kalite seçeneği uydurma; yedi çeşit ürün akışı yoktur.\n"
+                ."Kullanım amacı ASLA sorulmaz. Sweatshirt, şapka veya başka ürün sunulmaz.\n"
+                ."Sıfır yaka, polo yaka ve oversize dışında ürün/model/kalite seçeneği uydurma; yedi çeşit ürün akışı yoktur.\n"
                 ."Model, renk, logo ve baskı konumu hazırsa önizleme otomatik oluşturulur ve gönderilir; ek onay, ölçü, kullanım amacı veya adet bekleyerek geciktirme.\n"
                 ."Görsel henüz gönderilmedi olarak kayıtlıysa hazır/gönderdim deme. Görsel oluşturamıyorum deme.\n"
                 ."Yalnız Bekir Tekstil'in doğrulanmış firma ve ödeme bilgileri geçerlidir; başka firmanın fiyatını, IBAN'ını, adresini, stok veya minimum adetini kullanma.\n";
@@ -1330,7 +1330,7 @@ PROMPT;
             && ! ($state['awaiting_additional_artwork_choice'] ?? false)
             && ! ($state['awaiting_additional_image_position'] ?? false)
             && ! ($state['awaiting_uploaded_artwork_position'] ?? false)) {
-            if (! ($state['product'] ?? null)) return 'Sıfır yaka mı, polo yaka mı düşünüyorsunuz?';
+            if (! ($state['product'] ?? null)) return 'Sıfır yaka, polo yaka veya oversize mı düşünüyorsunuz?';
             if (! ($state['quantity'] ?? null) && ! ($state['logo_received'] ?? false)) return 'Kaç adet düşünüyorsunuz?';
             if (! ($state['color'] ?? null)) return 'Tişört hangi renk olsun?';
             if (! ($state['logo_received'] ?? false)) return 'Baskıda kullanacağınız logo veya görseli gönderebilir misiniz?';
