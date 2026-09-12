@@ -301,13 +301,13 @@ class TextileWhatsAppInboundService
             if (($state['product'] ?? null) === 'Regular Fit Tişört') {
                 $state['product'] = 'Sıfır Yaka Tişört';
             }
-            if (($state['product'] ?? null) && ! in_array($state['product'], ['Sıfır Yaka Tişört', 'Polo Yaka Tişört', 'Premium Oversize Tişört'], true)) {
+            if (($state['product'] ?? null) && ! in_array($state['product'], ['Sıfır Yaka Tişört', 'Polo Yaka Tişört', 'Premium Oversize Tişört', 'Pamuklu Şapka', 'Polyester Şapka'], true)) {
                 $state['product'] = null;
                 $state['product_category'] = null;
                 $state['mockup_sent'] = false;
                 Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
                 $this->sendText($bot, $conversation, $instance, $phone,
-                    'Bekir Tekstil’de sıfır yaka, polo yaka ve oversize tişörtle ilerliyoruz. Hangisini tercih edersiniz?');
+                    'Bekir Tekstil’de sıfır yaka, polo yaka, oversize tişört ve şapkayla ilerliyoruz. Hangisini tercih edersiniz?');
                 $this->consumeTrial($bot);
                 return true;
             }
@@ -1239,12 +1239,12 @@ PROMPT;
                     && ! str_contains($line, '30-99 adet')
             ));
             $instructions = preg_replace('/^Güncel ürün kataloğu:.*$/m',
-                'Güncel ürün kataloğu: sıfır yaka tişört, polo yaka tişört ve oversize tişört.', $instructions);
+                'Güncel ürün kataloğu: sıfır yaka tişört, polo yaka tişört, oversize tişört ve şapka.', $instructions);
             $instructions = str_replace('model, kullanım amacı veya nasıl yardımcı olabileceğin hakkında',
-                'sıfır yaka, polo yaka veya oversize istediği hakkında', $instructions);
+                'sıfır yaka, polo yaka, oversize veya şapka istediği hakkında', $instructions);
             $instructions .= "\nBEKİR TEKSTİL\n"
-                ."Kullanım amacı ASLA sorulmaz. Sweatshirt, şapka veya başka ürün sunulmaz.\n"
-                ."Sıfır yaka, polo yaka ve oversize dışında ürün/model/kalite seçeneği uydurma; yedi çeşit ürün akışı yoktur.\n"
+                ."Kullanım amacı ASLA sorulmaz. Sweatshirt veya katalog dışı ürün sunulmaz.\n"
+                ."Sıfır yaka, polo yaka, oversize ve şapka dışında ürün/model/kalite seçeneği uydurma; yedi çeşit ürün akışı yoktur.\n"
                 ."Model, renk, logo ve baskı konumu hazırsa önizleme otomatik oluşturulur ve gönderilir; ek onay, ölçü, kullanım amacı veya adet bekleyerek geciktirme.\n"
                 ."Görsel henüz gönderilmedi olarak kayıtlıysa hazır/gönderdim deme. Görsel oluşturamıyorum deme.\n"
                 ."Yalnız Bekir Tekstil'in doğrulanmış firma ve ödeme bilgileri geçerlidir; başka firmanın fiyatını, IBAN'ını, adresini, stok veya minimum adetini kullanma.\n";
@@ -1330,11 +1330,11 @@ PROMPT;
             && ! ($state['awaiting_additional_artwork_choice'] ?? false)
             && ! ($state['awaiting_additional_image_position'] ?? false)
             && ! ($state['awaiting_uploaded_artwork_position'] ?? false)) {
-            if (! ($state['product'] ?? null)) return 'Sıfır yaka, polo yaka veya oversize mı düşünüyorsunuz?';
+            if (! ($state['product'] ?? null)) return 'Sıfır yaka, polo yaka, oversize tişört veya şapka mı düşünüyorsunuz?';
             if (! ($state['quantity'] ?? null) && ! ($state['logo_received'] ?? false)) return 'Kaç adet düşünüyorsunuz?';
-            if (! ($state['color'] ?? null)) return 'Tişört hangi renk olsun?';
+            if (! ($state['color'] ?? null)) return ($state['product_category'] ?? null) === 'cap' ? 'Şapka hangi renk olsun?' : 'Tişört hangi renk olsun?';
             if (! ($state['logo_received'] ?? false)) return 'Baskıda kullanacağınız logo veya görseli gönderebilir misiniz?';
-            if (! ($state['position'] ?? null)) return 'Logoyu nereye basalım? Örneğin sol göğüs, ön orta veya sırt.';
+            if (! ($state['position'] ?? null)) return ($state['product_category'] ?? null) === 'cap' ? 'Logoyu şapkanın ön ortasına yerleştirelim mi?' : 'Logoyu nereye basalım? Örneğin sol göğüs, ön orta veya sırt.';
         }
 
         if ($state['awaiting_order_item_selection'] ?? false) {
