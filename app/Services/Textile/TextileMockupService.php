@@ -19,6 +19,7 @@ class TextileMockupService
         string $shirtColor = 'black',
         string $product = 'Premium Oversize Tişört',
         array $additionalPrints = [],
+        string $view = 'front',
     ): string {
         if (! function_exists('imagecreatetruecolor') || ! function_exists('imagecreatefromstring')) {
             throw new RuntimeException('Sunucuda GD görsel desteği etkin değil.');
@@ -38,7 +39,7 @@ class TextileMockupService
             throw new RuntimeException('Logo JPG, PNG veya WEBP formatında olmalıdır.');
         }
 
-        [$canvas, $templateKind, $templateColor] = $this->loadStudioTemplate($product, $shirtColor);
+        [$canvas, $templateKind, $templateColor] = $this->loadStudioTemplate($product, $shirtColor, $view);
         if ($shirtColor !== $templateColor) {
             $this->recolorGarment($canvas, $shirtColor, $templateKind);
         }
@@ -81,6 +82,28 @@ class TextileMockupService
         }
 
         return base64_encode($jpeg);
+    }
+
+    /** Render each requested print location as a separate photo of the correct garment face. */
+    public function createViews(
+        string $logoBase64,
+        string $position,
+        string $shirtColor,
+        string $product,
+        array $additionalPrints = [],
+    ): array {
+        $prints = array_merge([['position' => $position, 'logo_base64' => $logoBase64]], $additionalPrints);
+        $views = [];
+        foreach ($prints as $print) {
+            if (! is_array($print) || empty($print['position']) || empty($print['logo_base64'])) continue;
+            $view = str_starts_with($print['position'], 'back') ? 'back' : 'front';
+            $views[] = [
+                'view' => $view,
+                'position' => $print['position'],
+                'image' => $this->create($print['logo_base64'], $print['position'], $shirtColor, $product, [], $view),
+            ];
+        }
+        return $views;
     }
 
     /**
@@ -475,7 +498,7 @@ class TextileMockupService
     /**
      * @return array{0: mixed, 1: string, 2: string}
      */
-    private function loadStudioTemplate(string $product, string $shirtColor): array
+    private function loadStudioTemplate(string $product, string $shirtColor, string $view = 'front'): array
     {
         $normalized = mb_strtolower($product, 'UTF-8');
         $kind = 'oversize';
@@ -520,6 +543,16 @@ class TextileMockupService
             $filename = $templateColor === 'white'
                 ? 'cap-cotton-white-studio.jpg'
                 : 'cap-cotton-black-studio.jpg';
+        }
+
+        if ($view === 'back') {
+            if (! in_array($kind, ['regular', 'polo'], true)) {
+                throw new RuntimeException('Bu ürünün arka görünüm şablonu tanımlı değil.');
+            }
+            $templateColor = 'black';
+            $filename = $kind.'-black-back-studio.jpg';
+        } elseif ($view !== 'front') {
+            throw new RuntimeException('Geçersiz ürün görünümü.');
         }
 
         $path = public_path('assets/textile/catalog/'.$filename);
