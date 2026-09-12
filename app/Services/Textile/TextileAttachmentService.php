@@ -119,6 +119,61 @@ class TextileAttachmentService
         return $result;
     }
 
+
+    public function renderPdfFirstPage(string $base64): string
+    {
+        $bytes = base64_decode($this->cleanBase64($base64), true);
+        if (! is_string($bytes) || $bytes === '' || strlen($bytes) > self::MAX_BYTES) {
+            throw new RuntimeException('PDF açılamadı veya güvenli sınırı aşıyor.');
+        }
+
+        $binary = is_executable('/usr/bin/pdftoppm') ? '/usr/bin/pdftoppm'
+            : (is_executable('/bin/pdftoppm') ? '/bin/pdftoppm' : null);
+        if ($binary === null || ! function_exists('proc_open')) {
+            throw new RuntimeException('PDF görsel dönüştürücüsü sunucuda hazır değil.');
+        }
+
+        $directory = sys_get_temp_dir().'/wai-textile-pdf-'.bin2hex(random_bytes(8));
+        if (! mkdir($directory, 0700, true) && ! is_dir($directory)) {
+            throw new RuntimeException('PDF çalışma alanı oluşturulamadı.');
+        }
+        $input = $directory.'/input.pdf';
+        $output = $directory.'/page';
+
+        try {
+            if (file_put_contents($input, $bytes, LOCK_EX) !== strlen($bytes)) {
+                throw new RuntimeException('PDF geçici olarak kaydedilemedi.');
+            }
+            $process = proc_open(
+                [$binary, '-f', '1', '-singlefile', '-png', '-r', '180', $input, $output],
+                [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes,
+            );
+            if (! is_resource($process)) {
+                throw new RuntimeException('PDF dönüşümü başlatılamadı.');
+            }
+            stream_get_contents($pipes[1]);
+            $error = trim(stream_get_contents($pipes[2]));
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $exitCode = proc_close($process);
+            $pngPath = $output.'.png';
+            if ($exitCode !== 0 || ! is_file($pngPath)) {
+                throw new RuntimeException('PDF görsele çevrilemedi'.($error !== '' ? ': '.$error : '.'));
+            }
+            $png = file_get_contents($pngPath);
+            if (! is_string($png) || $png === '' || strlen($png) > self::MAX_BYTES || @imagecreatefromstring($png) === false) {
+                throw new RuntimeException('PDF geçerli bir baskı görseli üretmedi.');
+            }
+            return base64_encode($png);
+        } finally {
+            foreach (glob($directory.'/*') ?: [] as $file) {
+                if (is_file($file)) @unlink($file);
+            }
+            @rmdir($directory);
+        }
+    }
+
     private function analysisPrompt(): string
     {
         return <<<'PROMPT'

@@ -239,6 +239,11 @@ class TextileWhatsAppInboundService
                     }
                 } else {
                     $artwork = trim((string) ($analysis['artwork_base64'] ?? $encodedFile));
+                    $artworkMime = $mime;
+                    if ($mime === 'application/pdf') {
+                        $artwork = $this->attachmentService->renderPdfFirstPage($encodedFile);
+                        $artworkMime = 'image/png';
+                    }
                     $pendingPosition = trim((string) ($state['awaiting_additional_image_position'] ?? ''));
 
                     if ($pendingPosition !== '') {
@@ -258,7 +263,7 @@ class TextileWhatsAppInboundService
                     } elseif ($state['logo_received'] ?? false) {
                         $state['pending_uploaded_artwork'] = [
                             'logo_base64' => $artwork,
-                            'logo_mime' => $mime,
+                            'logo_mime' => $artworkMime,
                         ];
                         $state['awaiting_uploaded_artwork_position'] = true;
                         $state['mockup_sent'] = false;
@@ -266,7 +271,7 @@ class TextileWhatsAppInboundService
                         $attachmentReply = "Yeni baskı görselinizi de aldım ✓\n\nBu görseli hangi alanda kullanalım? Örneğin: *ön orta, ön sol göğüs, arka büyük, sağ kol veya sol kol*.";
                     } else {
                         $state['logo_base64'] = $artwork;
-                        $state['logo_mime'] = $mime;
+                        $state['logo_mime'] = $artworkMime;
                         $state['logo_received'] = true;
                         $state['mockup_sent'] = false;
                         $state['approved'] = false;
@@ -280,7 +285,7 @@ class TextileWhatsAppInboundService
                             $state['additional_prints'][] = [
                                 'position' => $pendingPosition,
                                 'logo_base64' => $artwork,
-                                'logo_mime' => $mime,
+                                'logo_mime' => $artworkMime,
                             ];
                         }
                         $state['additional_prints'] = array_slice(
