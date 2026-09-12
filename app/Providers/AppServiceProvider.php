@@ -115,22 +115,29 @@ class TextileHumanTakeoverMiddleware
 
                     $isApiOutbound = false;
                     if ($text !== '') {
-                        $isApiOutbound = (bool) Cache::store('database')->pull(
+                        $isApiOutbound = (bool) Cache::store('database')->get(
                             'wai_api_outbound:'.sha1($instance.'|'.$phone.'|'.$text),
                             false,
                         );
                     }
 
                     if (! $isApiOutbound) {
-                        ConversationControl::query()
-                            ->where('ai_bot_id', 51)
-                            ->where('whatsapp_number', $phone)
-                            ->update([
+                        $sessionId = 'whatsapp:'.$bot->id.':'.$phone;
+
+                        ConversationControl::query()->updateOrCreate(
+                            [
+                                'ai_bot_id' => $bot->id,
+                                'session_id' => $sessionId,
+                            ],
+                            [
+                                'user_id' => $bot->user_id,
+                                'whatsapp_number' => $phone,
                                 'human_takeover' => true,
                                 'taken_over_at' => now(),
                                 'released_at' => null,
                                 'updated_at' => now(),
-                            ]);
+                            ],
+                        );
                     }
                 }
             }
