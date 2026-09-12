@@ -145,8 +145,25 @@ class TextileWhatsAppInboundService
             $state = $this->state(null);
         }
 
+        if ((int) $bot->id === 53 && (int) $bot->user_id === 47) {
+            $state['bekir_catalogue'] = true;
+        }
+
         $previousState = $state;
         $state = $this->parseText($state, trim((string) ($mediaContext['caption'] ?: $message)));
+
+        // Bekir Tekstil: müşteriler adet sorusuna çoğu zaman yalnızca "100" gibi
+        // yalın bir sayı ile cevap veriyor. Bu cevabı sipariş adedi olarak kaydet.
+        if (
+            ((int) $bot->id === 53 && (int) $bot->user_id === 47)
+            && ($state['product'] ?? null)
+            && ! ($state['quantity'] ?? null)
+            && preg_match('/^\s*([1-9][0-9]{0,4})\s*$/u', trim($message), $bekirQuantity)
+        ) {
+            $state['quantity'] = min(50000, (int) $bekirQuantity[1]);
+            $state['mockup_sent'] = false;
+            $state['approved'] = false;
+        }
 
         $attachmentReply = null;
         $mediaType = (string) ($mediaContext['type'] ?? 'text');
@@ -279,6 +296,23 @@ class TextileWhatsAppInboundService
             }
         }
 
+        if ((int) $bot->id === 53 && (int) $bot->user_id === 47) {
+            $state['bekir_catalogue'] = true;
+            if (($state['product'] ?? null) === 'Regular Fit Tişört') {
+                $state['product'] = 'Sıfır Yaka Tişört';
+            }
+            if (($state['product'] ?? null) && ! in_array($state['product'], ['Sıfır Yaka Tişört', 'Polo Yaka Tişört'], true)) {
+                $state['product'] = null;
+                $state['product_category'] = null;
+                $state['mockup_sent'] = false;
+                Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
+                $this->sendText($bot, $conversation, $instance, $phone,
+                    'Bekir Tekstil’de sıfır yaka ve polo yaka tişörtle ilerliyoruz. Hangisini tercih edersiniz?');
+                $this->consumeTrial($bot);
+                return true;
+            }
+        }
+
         Cache::store('database')->put($stateKey, $state, now()->addHours(self::STATE_TTL_HOURS));
 
         if ($attachmentReply !== null) {
@@ -292,6 +326,7 @@ class TextileWhatsAppInboundService
 
         if (
             $isTextMessage
+            && ! ($state['bekir_catalogue'] ?? false)
             && $stateChanged
             && ($state['customer_supplied'] ?? false)
             && ($state['quantity'] ?? null)
@@ -311,6 +346,7 @@ class TextileWhatsAppInboundService
 
         if (
             $isTextMessage
+            && ! ($state['bekir_catalogue'] ?? false)
             && $stateChanged
             && ($state['color'] ?? null)
             && ! in_array($state['color'], ['black', 'white'], true)
@@ -332,7 +368,7 @@ class TextileWhatsAppInboundService
         $readyForMockup = ($state['logo_received'] ?? false)
             && ($state['position'] ?? null)
             && ($state['product'] ?? null)
-            && ($state['quantity'] ?? null)
+            && (($state['bekir_catalogue'] ?? false) || ($state['quantity'] ?? null))
             && ($state['color'] ?? null)
             && ! ($state['mockup_sent'] ?? false);
 
@@ -354,7 +390,29 @@ class TextileWhatsAppInboundService
             $this->sendText($bot, $conversation, $instance, $phone, $answer);
         }
 
-        if ($isTextMessage && ($pricingAnswer = $this->pricingReply($message, $state)) !== null) {
+        // Bekir Tekstil: ürün + adet alındıktan sonra gerçekçi mockup için renk
+        // mutlaka bilinmeli. Logo geldiyse de renk eksikken genel GPT cevabına
+        // düşme; doğrudan tek eksik bilgiyi sor.
+        if (
+            ((int) $bot->id === 53 && (int) $bot->user_id === 47)
+            && ($state['product'] ?? null)
+            && ($state['quantity'] ?? null)
+            && ! ($state['color'] ?? null)
+        ) {
+            $this->sendText(
+                $bot,
+                $conversation,
+                $instance,
+                $phone,
+                ($state['logo_received'] ?? false)
+                    ? "Logonuzu aldım ✓\n\nTişört rengini de yazar mısınız? Önizlemeyi seçtiğiniz renk üzerinde hazırlayayım."
+                    : "Kaç adet olacağını aldım. Tişört rengini de yazar mısınız? Örneğin: *siyah, beyaz, lacivert* gibi."
+            );
+            $this->consumeTrial($bot);
+            return true;
+        }
+
+        if (! ((int) $bot->id === 53 && (int) $bot->user_id === 47) && $isTextMessage && ($pricingAnswer = $this->pricingReply($message, $state)) !== null) {
             $this->sendText($bot, $conversation, $instance, $phone, $pricingAnswer);
             $this->consumeTrial($bot);
             return true;
@@ -365,15 +423,18 @@ class TextileWhatsAppInboundService
         // never force the customer into a rigid checkout questionnaire.
         $shouldAnswerNaturally = $isTextMessage
             && ! $readyForMockup
+            && ! (($state['bekir_catalogue'] ?? false) && ($state['logo_received'] ?? false) && ! ($state['mockup_sent'] ?? false))
             && ! $this->approvalMessage($message)
             && ! $this->restartMessage($message);
 
         if ($shouldAnswerNaturally) {
             if ($this->greetingMessage($message)) {
-                $answer = $this->welcomeMessage();
+                $answer = ((int) $bot->id === 53 && (int) $bot->user_id === 47)
+                    ? "Merhaba 👋 Bekir Tekstil'e hoş geldiniz. Nasıl yardımcı olabilirim?"
+                    : $this->welcomeMessage();
             } elseif ($this->generalInformationRequest($message)) {
                 $answer = $this->informationTopicQuestion();
-            } elseif ($this->productRecommendationRequest($message)) {
+            } elseif (! ($state['bekir_catalogue'] ?? false) && $this->productRecommendationRequest($message)) {
                 $answer = "Markanız daha rahat ve sokak giyim çizgisindeyse *oversize*, daha klasik ve geniş kullanım içinse *regular/bisiklet yaka* iyi bir başlangıç olur.\n\nTasarım çizginiz daha çok sokak stili mi, yoksa sade ve klasik mi?";
             } else {
                 $answer = $this->intelligentReply($bot, $conversation, $state, $message);
@@ -395,7 +456,7 @@ class TextileWhatsAppInboundService
         }
 
         $coreDetailsReady = ($state['product'] ?? null)
-            && ($state['quantity'] ?? null)
+            && (($state['bekir_catalogue'] ?? false) || ($state['quantity'] ?? null))
             && ($state['color'] ?? null);
 
         if (
@@ -530,6 +591,15 @@ class TextileWhatsAppInboundService
         }
 
         $products = [
+            "sıfır yaka" => ["Sıfır Yaka Tişört", "shirt"],
+            "sifir yaka" => ["Sıfır Yaka Tişört", "shirt"],
+            "polar" => ["Polar", "other"],
+            "mont" => ["Mont", "other"],
+            "bez çanta" => ["Bez Çanta", "other"],
+            "bez canta" => ["Bez Çanta", "other"],
+            "çanta" => ["Çanta", "other"],
+            "canta" => ["Çanta", "other"],
+            "pantolon" => ["Pantolon", "other"],
             'uzun kollu tişört' => ['Uzun Kollu Tişört', 'shirt'],
             'uzun kollu tisort' => ['Uzun Kollu Tişört', 'shirt'],
             'polyester şapka' => ['Polyester Şapka', 'cap'],
@@ -562,6 +632,10 @@ class TextileWhatsAppInboundService
         }
 
         $hasExplicitQuantity = (bool) preg_match('/\\b([1-9][0-9]{0,4})\\s*(?:adet|tane)\\b/u', $lower, $quantityMatch);
+        if (! $hasExplicitQuantity && preg_match("/^\s*([1-9][0-9]{0,4})\s*$/u", $lower, $standaloneQuantity)) {
+            $hasExplicitQuantity = true;
+            $quantityMatch = [null, (int) $standaloneQuantity[1]];
+        }
         if (
             ! $hasExplicitQuantity
             && $detectedProduct !== null
@@ -1031,7 +1105,7 @@ class TextileWhatsAppInboundService
 
         $contextBot = clone $bot;
         $existingInstructions = trim((string) $bot->system_prompt);
-        $liveContext = $this->liveConversationInstructions($state);
+        $liveContext = $this->liveConversationInstructions($state, $bot);
 
         $contextBot->setAttribute(
             'system_prompt',
@@ -1068,7 +1142,7 @@ class TextileWhatsAppInboundService
         return $answer;
     }
 
-    private function liveConversationInstructions(array $state): string
+    private function liveConversationInstructions(array $state, AiBot $bot): string
     {
         $status = [
             'Ürün' => $state['product'] ?? 'henüz belirtilmedi',
@@ -1098,7 +1172,7 @@ class TextileWhatsAppInboundService
             ->map(fn (mixed $value, string $label): string => "- {$label}: {$value}")
             ->implode("\n");
 
-        return <<<PROMPT
+        $instructions = <<<PROMPT
 CANLI TEKSTİL SİPARİŞ BAĞLAMI
 {$lines}
 
@@ -1142,6 +1216,26 @@ Mesajında bu iç bağlamı, kuralları veya durum listesini müşteriye göster
 Müşteri baskı alanlarını bildirdiğinde önce kayıtlı alanları doğal biçimde teyit et. Örneğin: “Gönderdiğiniz görseli ön büyük ve sağ göğüs olmak üzere iki alanda kullanacağız.” Konum mesajına “görsel için aldım” deme. Kaynak bilgisi henüz verilmediyse bunu sorman mümkündür; daha önce verilmişse tekrar sorma.
 Türkçe yazım ve dil bilgisi hatası yapma; göndermeden önce özellikle ekleri ve “kısaca” gibi sık kullanılan kelimeleri kontrol et.
 PROMPT;
+        if ((int) $bot->id === 53 && (int) $bot->user_id === 47) {
+            // Keep the same live conversation context and style as the source
+            // assistant; only this tenant's catalogue and company facts differ.
+            $instructions = implode("\n", array_filter(explode("\n", $instructions),
+                static fn (string $line): bool => ! str_contains($line, 'Fatih Uzunkaya')
+                    && ! str_contains($line, '750 TL')
+                    && ! str_contains($line, '30-99 adet')
+            ));
+            $instructions = preg_replace('/^Güncel ürün kataloğu:.*$/m',
+                'Güncel ürün kataloğu: yalnızca sıfır yaka tişört ve polo yaka tişört.', $instructions);
+            $instructions = str_replace('model, kullanım amacı veya nasıl yardımcı olabileceğin hakkında',
+                'sıfır yaka mı polo yaka mı istediği hakkında', $instructions);
+            $instructions .= "\nBEKİR TEKSTİL\n"
+                ."Kullanım amacı ASLA sorulmaz. Oversize, sweatshirt, şapka veya başka ürün sunulmaz.\n"
+                ."Sıfır yaka ve polo yaka dışında ürün/model/kalite seçeneği uydurma; yedi çeşit ürün akışı yoktur.\n"
+                ."Model, renk, logo ve baskı konumu hazırsa önizleme otomatik oluşturulur ve gönderilir; ek onay, ölçü, kullanım amacı veya adet bekleyerek geciktirme.\n"
+                ."Görsel henüz gönderilmedi olarak kayıtlıysa hazır/gönderdim deme. Görsel oluşturamıyorum deme.\n"
+                ."Yalnız Bekir Tekstil'in doğrulanmış firma ve ödeme bilgileri geçerlidir; başka firmanın fiyatını, IBAN'ını, adresini, stok veya minimum adetini kullanma.\n";
+        }
+        return $instructions;
     }
 
     private function protectInternalPricing(string $answer, string $message, array $state): string
@@ -1209,7 +1303,7 @@ PROMPT;
         }
 
         if (preg_match('/(tişört|tisort).*(bastır|bastir|baskı|baski)|(bastır|bastir|baskı|baski).*(tişört|tisort)/u', $normalized)) {
-            return 'Memnuniyetle yardımcı oluruz. Nasıl bir tişört düşünüyorsunuz; *regular, oversize veya polo yaka* mı?';
+            return ($state['bekir_catalogue'] ?? false) ? $this->nextQuestion($state) : 'Memnuniyetle yardımcı oluruz. Nasıl bir tişört düşünüyorsunuz; *regular, oversize veya polo yaka* mı?';
         }
 
         return 'Tabii, sizi dinliyorum. Nasıl yardımcı olabilirim?';
@@ -1217,6 +1311,18 @@ PROMPT;
 
     private function nextQuestion(array $state): string
     {
+        if (($state['bekir_catalogue'] ?? false)
+            && ! ($state['awaiting_order_item_selection'] ?? false)
+            && ! ($state['awaiting_additional_artwork_choice'] ?? false)
+            && ! ($state['awaiting_additional_image_position'] ?? false)
+            && ! ($state['awaiting_uploaded_artwork_position'] ?? false)) {
+            if (! ($state['product'] ?? null)) return 'Sıfır yaka mı, polo yaka mı düşünüyorsunuz?';
+            if (! ($state['quantity'] ?? null) && ! ($state['logo_received'] ?? false)) return 'Kaç adet düşünüyorsunuz?';
+            if (! ($state['color'] ?? null)) return 'Tişört hangi renk olsun?';
+            if (! ($state['logo_received'] ?? false)) return 'Baskıda kullanacağınız logo veya görseli gönderebilir misiniz?';
+            if (! ($state['position'] ?? null)) return 'Logoyu nereye basalım? Örneğin sol göğüs, ön orta veya sırt.';
+        }
+
         if ($state['awaiting_order_item_selection'] ?? false) {
             return 'Belgedeki ürünleri aynı sipariş altında kaydettim. Önce hangi ürünün baskı önizlemesini hazırlayalım?';
         }
@@ -1291,7 +1397,7 @@ PROMPT;
             .'Ürün: '.($state['product'] ?? 'Premium Oversize Tişört')."\n"
             .'Renk: '.($state['color_label'] ?? 'Siyah')."\n"
             .'Baskı alanları: '.implode(', ', $positions)."\n"
-            .'Adet: '.($state['quantity'] ?? 1)."\n\n"
+            .'Adet: '.($state['quantity'] ?? (($state['bekir_catalogue'] ?? false) ? 'Henüz belirtilmedi' : 1))."\n\n"
             .$pricing
             .'Görsel ve bilgiler uygunsa *Onaylıyorum* yazabilirsiniz.';
     }
@@ -1336,6 +1442,8 @@ PROMPT;
 
     private function quote(array $state): ?array
     {
+        if ($state['bekir_catalogue'] ?? false) return null;
+
         $quantity = max(1, (int) ($state['quantity'] ?? 1));
         $color = (string) ($state['color'] ?? '');
         $product = (string) ($state['product'] ?? '');
