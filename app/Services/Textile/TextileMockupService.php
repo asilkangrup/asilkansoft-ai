@@ -579,6 +579,12 @@ class TextileMockupService
             }
             $templateColor = $shirtColor;
             $filename = 'ready/'.$readyProducts[$product].'-'.$shirtColor.'-'.$view.'.jpg';
+            // Prefer original full-resolution photographs; never repaint them.
+            if (in_array($shirtColor, ['black', 'white'], true)
+                || ($readyProducts[$product] === 'regular' && $shirtColor === 'red')) {
+                $filename = $readyProducts[$product].'-'.$shirtColor
+                    .($view === 'back' ? '-back' : '').'-studio.jpg';
+            }
         }
 
         $path = public_path('assets/textile/catalog/'.$filename);
