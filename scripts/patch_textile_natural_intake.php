@@ -5,6 +5,11 @@ if (is_file($referenceImagePatch)) {
     require $referenceImagePatch;
 }
 
+$catalogMemoryPatch = __DIR__.'/patch_textile_catalog_memory.php';
+if (is_file($catalogMemoryPatch)) {
+    require $catalogMemoryPatch;
+}
+
 $path = dirname(__DIR__).'/app/Services/Textile/TextileWhatsAppInboundService.php';
 
 if (! is_file($path)) {
