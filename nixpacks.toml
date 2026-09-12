@@ -1,3 +1,6 @@
+[phases.setup]
+aptPkgs = ["poppler-utils"]
+
 [variables]
 # Dedicated isolated real-estate workload model policy.
 # These variables only affect the user 40 / org 37 / bot 35 services that
