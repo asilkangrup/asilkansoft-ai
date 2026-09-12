@@ -20,6 +20,7 @@ class TextileMockupService
         string $product = 'Premium Oversize Tişört',
         array $additionalPrints = [],
         string $view = 'front',
+        bool $readyTemplateOnly = false,
     ): string {
         if (! function_exists('imagecreatetruecolor') || ! function_exists('imagecreatefromstring')) {
             throw new RuntimeException('Sunucuda GD görsel desteği etkin değil.');
@@ -39,8 +40,8 @@ class TextileMockupService
             throw new RuntimeException('Logo JPG, PNG veya WEBP formatında olmalıdır.');
         }
 
-        [$canvas, $templateKind, $templateColor] = $this->loadStudioTemplate($product, $shirtColor, $view);
-        if ($shirtColor !== $templateColor) {
+        [$canvas, $templateKind, $templateColor] = $this->loadStudioTemplate($product, $shirtColor, $view, $readyTemplateOnly);
+        if (! $readyTemplateOnly && $shirtColor !== $templateColor) {
             $this->recolorGarment($canvas, $shirtColor, $view === 'back' ? $templateKind.'-back' : $templateKind);
         }
         $this->placeNaturalPrint($canvas, $logo, $position, $templateKind);
@@ -100,7 +101,7 @@ class TextileMockupService
             $views[] = [
                 'view' => $view,
                 'position' => $print['position'],
-                'image' => $this->create($print['logo_base64'], $print['position'], $shirtColor, $product, [], $view),
+                'image' => $this->create($print['logo_base64'], $print['position'], $shirtColor, $product, [], $view, true),
             ];
         }
         return $views;
@@ -498,7 +499,7 @@ class TextileMockupService
     /**
      * @return array{0: mixed, 1: string, 2: string}
      */
-    private function loadStudioTemplate(string $product, string $shirtColor, string $view = 'front'): array
+    private function loadStudioTemplate(string $product, string $shirtColor, string $view = 'front', bool $readyTemplateOnly = false): array
     {
         $normalized = mb_strtolower($product, 'UTF-8');
         $kind = 'oversize';
@@ -559,6 +560,25 @@ class TextileMockupService
         if ($product === 'Sıfır Yaka Tişört' && $shirtColor === 'red') {
             $templateColor = 'red';
             $filename = $view === 'back' ? 'regular-red-back-studio.jpg' : 'regular-red-studio.jpg';
+        }
+
+        // Bekir's separate-view flow uses prebuilt colour photos exclusively.
+        // Keep the legacy create() path unchanged for the Istanbul pilot.
+        if ($readyTemplateOnly) {
+            $readyProducts = [
+                'Sıfır Yaka Tişört' => 'regular',
+                'Polo Yaka Tişört' => 'polo',
+                'Premium Oversize Tişört' => 'oversize',
+                'Pamuklu Şapka' => 'cap-cotton',
+                'Polyester Şapka' => 'cap-polyester',
+            ];
+            $readyColors = ['black', 'white', 'navy', 'burgundy', 'beige', 'red', 'blue',
+                'turquoise', 'green', 'yellow', 'orange', 'pink', 'brown', 'gray', 'charcoal'];
+            if (! isset($readyProducts[$product]) || ! in_array($shirtColor, $readyColors, true)) {
+                throw new RuntimeException('Bu ürün ve renk için hazır baskı şablonu tanımlı değil.');
+            }
+            $templateColor = $shirtColor;
+            $filename = 'ready/'.$readyProducts[$product].'-'.$shirtColor.'-'.$view.'.jpg';
         }
 
         $path = public_path('assets/textile/catalog/'.$filename);
