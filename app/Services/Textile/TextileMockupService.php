@@ -555,6 +555,12 @@ class TextileMockupService
             throw new RuntimeException('Geçersiz ürün görünümü.');
         }
 
+        // Dedicated red crew-neck photos preserve collar and mannequin boundaries.
+        if ($product === 'Sıfır Yaka Tişört' && $shirtColor === 'red') {
+            $templateColor = 'red';
+            $filename = $view === 'back' ? 'regular-red-back-studio.jpg' : 'regular-red-studio.jpg';
+        }
+
         $path = public_path('assets/textile/catalog/'.$filename);
         if (! is_file($path)) {
             throw new RuntimeException('Seçilen ürünün fotoğrafik şablonu bulunamadı.');
