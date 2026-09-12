@@ -162,10 +162,24 @@ class TextileAttachmentService
                 throw new RuntimeException('PDF görsele çevrilemedi'.($error !== '' ? ': '.$error : '.'));
             }
             $png = file_get_contents($pngPath);
-            if (! is_string($png) || $png === '' || strlen($png) > self::MAX_BYTES || @imagecreatefromstring($png) === false) {
+            $image = is_string($png) && $png !== '' && strlen($png) <= self::MAX_BYTES
+                ? @imagecreatefromstring($png)
+                : false;
+            if ($image === false) {
                 throw new RuntimeException('PDF geçerli bir baskı görseli üretmedi.');
             }
-            return base64_encode($png);
+
+            // PDF logo sheets commonly have a flat black or white rectangle.
+            // Remove the dominant edge colour before placing the artwork.
+            $this->removeFlatGarmentBackground($image, true);
+            ob_start();
+            imagepng($image, null, 6);
+            $transparentPng = ob_get_clean();
+            imagedestroy($image);
+            if (! is_string($transparentPng) || $transparentPng === '') {
+                throw new RuntimeException('PDF arka planı temizlenemedi.');
+            }
+            return base64_encode($transparentPng);
         } finally {
             foreach (glob($directory.'/*') ?: [] as $file) {
                 if (is_file($file)) @unlink($file);
@@ -284,14 +298,33 @@ PROMPT;
         $blue = (int) round($blue / count($samples));
 
         if ($robustBackground) {
-            $rs = $gs = $bs = [];
-            foreach ($samples as $pixel) {
-                $rs[] = ($pixel >> 16) & 0xff;
-                $gs[] = ($pixel >> 8) & 0xff;
-                $bs[] = $pixel & 0xff;
+            // Rounded PDF cards can have a narrow page-colour border.
+            // Sample the whole artwork and select its most frequent colour bin.
+            $histogram = [];
+            $step = max(1, (int) floor(min($width, $height) / 180));
+            for ($py = 0; $py < $height; $py += $step) {
+                for ($px = 0; $px < $width; $px += $step) {
+                    $pixel = imagecolorat($image, $px, $py);
+                    $pr = ($pixel >> 16) & 0xff;
+                    $pg = ($pixel >> 8) & 0xff;
+                    $pb = $pixel & 0xff;
+                    $key = intdiv($pr, 16).':'.intdiv($pg, 16).':'.intdiv($pb, 16);
+                    if (! isset($histogram[$key])) {
+                        $histogram[$key] = ['count' => 0, 'red' => 0, 'green' => 0, 'blue' => 0];
+                    }
+                    $histogram[$key]['count']++;
+                    $histogram[$key]['red'] += $pr;
+                    $histogram[$key]['green'] += $pg;
+                    $histogram[$key]['blue'] += $pb;
+                }
             }
-            sort($rs); sort($gs); sort($bs);
-            $red = $rs[1]; $green = $gs[1]; $blue = $bs[1];
+            uasort($histogram, fn (array $a, array $b): int => $b['count'] <=> $a['count']);
+            $dominant = reset($histogram);
+            if (is_array($dominant) && $dominant['count'] > 0) {
+                $red = (int) round($dominant['red'] / $dominant['count']);
+                $green = (int) round($dominant['green'] / $dominant['count']);
+                $blue = (int) round($dominant['blue'] / $dominant['count']);
+            }
         }
 
         for ($py = 0; $py < $height; $py++) {
