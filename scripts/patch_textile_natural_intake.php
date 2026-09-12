@@ -1,5 +1,10 @@
 <?php
 
+$disableImageAiPatch = __DIR__.'/patch_textile_disable_image_ai.php';
+if (is_file($disableImageAiPatch)) {
+    require $disableImageAiPatch;
+}
+
 $referenceImagePatch = __DIR__.'/patch_textile_reference_image_understanding.php';
 if (is_file($referenceImagePatch)) {
     require $referenceImagePatch;
