@@ -1,5 +1,10 @@
 <?php
 
+$referenceImagePatch = __DIR__.'/patch_textile_reference_image_understanding.php';
+if (is_file($referenceImagePatch)) {
+    require $referenceImagePatch;
+}
+
 $path = dirname(__DIR__).'/app/Services/Textile/TextileWhatsAppInboundService.php';
 
 if (! is_file($path)) {
