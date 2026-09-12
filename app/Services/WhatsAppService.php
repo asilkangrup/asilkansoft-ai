@@ -33,6 +33,7 @@ class WhatsAppService
         if (
             str_ends_with($number, '@s.whatsapp.net')
             || str_ends_with($number, '@g.us')
+            || preg_match('/^[0-9]+@lid$/', $number)
         ) {
             return $number;
         }
