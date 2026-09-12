@@ -90,6 +90,19 @@ class TextileAttachmentService
             ? array_slice($result['order_items'], 0, 20)
             : [];
 
+        // Hazır mockup / basılı ürün görsellerinde model çoğu zaman ürün,
+        // renk ve baskı konumlarını summary alanında doğru görüyor ancak
+        // order_text boş kalıyordu. Bu görsel bilgileri mevcut sipariş
+        // parser'ına aktar ki fiyat akışı yalnız eksik bilgiyi sorsun.
+        if (
+            $isImage
+            && $result['kind'] === 'printed_product'
+            && $result['order_text'] === ''
+            && $result['summary'] !== ''
+        ) {
+            $result['order_text'] = $result['summary'];
+        }
+
         if ($isImage) {
             $result['artwork_base64'] = $base64;
             if (
@@ -113,18 +126,19 @@ Bu dosyayı baskılı tekstil siparişi için incele.
 
 Amaç:
 1. Dosyada tişört, sweatshirt, şapka veya başka bir fiziksel ürün görünmüyorsa; logo, amblem, yazı ve renkli/düz arka plan içeren görselin tamamı kind="artwork" sayılır. Arka planı veya yazının herhangi bir bölümünü kırpma. artwork_bbox bu durumda tüm görseli kapsasın.
-2. Yalnızca görselde gerçekten fiziksel bir tişört, sweatshirt, şapka veya başka bir tekstil ürünü görünüyorsa kind="printed_product". Görsel WhatsApp ekran görüntüsü olsa bile artwork_bbox yalnızca üründeki basılı tasarımın tümünü; simge, yazı ve tasarıma ait arka planla birlikte yüzde 0-100 koordinatlarıyla ver: {"x":...,"y":...,"width":...,"height":...}. Ürünün tamamını veya sohbet ekranını değil, basılı tasarımı seç.
+2. Yalnızca görselde gerçekten fiziksel bir tişört, sweatshirt, şapka veya başka bir tekstil ürünü görünüyorsa kind="printed_product". Görsel WhatsApp ekran görüntüsü veya hazırlanmış ön/arka ürün mockup'ı olsa bile ürünü, ürün rengini ve görünen baskı konumlarını tespit et. summary alanını sipariş parser'ının anlayacağı net Türkçe ile yaz; örneğin: "Siyah tişört, ön sol göğüste küçük baskı ve sırtta büyük baskı." Birden fazla ürün/renk varsa order_items dizisine ayrı ayrı yaz. artwork_bbox yalnızca üründeki basılı tasarımın tümünü; simge, yazı ve tasarıma ait arka planla birlikte yüzde 0-100 koordinatlarıyla ver: {"x":...,"y":...,"width":...,"height":...}. Ürünün tamamını veya sohbet ekranını değil, basılı tasarımı seç.
 3. Dosyada sipariş bilgileri, proforma talebi, adet, ürün, renk, beden, baskı konumu gibi yazılar varsa kind="order_document". Metni order_text alanına eksiksiz ve kısa aktar.
 4. Birden fazla ürün/satır varsa order_items dizisine ayrı nesneler olarak koy. Her nesne mümkünse product, quantity, color, sizes, print_positions, note alanlarını içersin.
-5. Hem sipariş bilgisi hem baskılı ürün görseli varsa kind mutlaka "printed_product" olsun; ayrıca order_text ve order_items alanlarını da doldur.
-6. İnsan yüzünü veya kişisel fotoğrafı logo olarak yeniden üretme. Sadece müşterinin istediği mevcut baskıyı tespit et.
-7. Emin olmadığın bilgiyi uydurma; null veya boş bırak.
+5. Hem sipariş bilgisi hem baskılı ürün görseli varsa kind mutlaka "printed_product" olsun; ayrıca order_text ve order_items alanlarını da doldur. Görselden açıkça görülen ürün, renk ve baskı konumlarını order_text içine de ekle. Yazılı olmayan santimetre ölçüsünü uydurma; ölçü görünmüyorsa boş bırak.
+6. Hazır tasarım/mockup üzerinde ön ve arka görünüm birlikte varsa bunu iki ayrı baskı konumu olarak belirt. Küçük göğüs baskısını "ön sol göğüs" veya "ön sağ göğüs", büyük ön baskıyı "ön büyük", büyük arka baskıyı "sırtta büyük" şeklinde yaz. Emin olmadığın sağ/sol tarafı uydurma; yalnız "ön göğüs" diye belirt.
+7. İnsan yüzünü veya kişisel fotoğrafı logo olarak yeniden üretme. Sadece müşterinin istediği mevcut baskıyı tespit et.
+8. Emin olmadığın bilgiyi uydurma; null veya boş bırak.
 
 Şu JSON şemasına uy:
 {
   "kind":"artwork|printed_product|order_document|other",
   "summary":"Türkçe kısa özet",
-  "order_text":"okunan sipariş metni",
+  "order_text":"okunan veya görselden güvenle çıkarılan sipariş bilgisi",
   "order_items":[],
   "artwork_bbox":{"x":0,"y":0,"width":100,"height":100},
   "contains_printable_artwork":true,
