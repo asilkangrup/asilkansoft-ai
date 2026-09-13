@@ -14,6 +14,33 @@ if (str_contains($inbound, $oldReady)) {
     $inbound = str_replace($oldReady, $newReady, $inbound, $count);
 }
 
+$stateProgressAnchor = <<<'PHP'
+        if (! ((int) $bot->id === 53 && (int) $bot->user_id === 47) && $isTextMessage && ($pricingAnswer = $this->pricingReply($message, $state)) !== null) {
+PHP;
+
+$stateProgressInsert = <<<'PHP'
+        // ISTANBUL_STATE_PROGRESS_V1: once a clear order detail changes state,
+        // never fall back to generic conversation. Ask only the next missing detail.
+        if (
+            (int) $bot->id === 51
+            && (int) $bot->user_id === 46
+            && $isTextMessage
+            && $stateChanged
+            && ! $readyForMockup
+            && ! $this->approvalMessage($message)
+            && ! $this->restartMessage($message)
+        ) {
+            $this->sendText($bot, $conversation, $instance, $phone, $this->nextQuestion($state));
+            $this->consumeTrial($bot);
+            return true;
+        }
+
+PHP;
+
+if (! str_contains($inbound, 'ISTANBUL_STATE_PROGRESS_V1') && str_contains($inbound, $stateProgressAnchor)) {
+    $inbound = str_replace($stateProgressAnchor, $stateProgressInsert.$stateProgressAnchor, $inbound, $count3);
+}
+
 $oldOversize = <<<'PHP'
         } elseif (str_contains($normalized, 'oversize')) {
             $kind = 'oversize';
