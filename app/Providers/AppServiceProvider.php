@@ -32,45 +32,14 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(
-            OpenAIService::class,
-            WaiPricingOpenAIService::class
-        );
-
-        $this->app->bind(
-            MemoryService::class,
-            WaiResetAwareMemoryService::class
-        );
-
-        $this->app->bind(
-            WhatsAppService::class,
-            WaiSalesAwareWhatsAppService::class
-        );
-
-        $this->app->bind(
-            CrmConversationSummaryService::class,
-            RealEstateAwareCrmConversationSummaryService::class
-        );
-
-        $this->app->bind(
-            CrmManagerSummaryService::class,
-            RealEstateAwareCrmManagerSummaryService::class
-        );
-
-        $this->app->bind(
-            FinanceLeadExtractorService::class,
-            RealEstateAwareFinanceLeadExtractorService::class
-        );
-
-        $this->app->bind(
-            RealEstateMediaAnalysisService::class,
-            RealEstateGuardedMediaAnalysisService::class
-        );
-
-        $this->app->bind(
-            RealEstateReadinessService::class,
-            RealEstateLiveReadinessService::class
-        );
+        $this->app->bind(OpenAIService::class, WaiPricingOpenAIService::class);
+        $this->app->bind(MemoryService::class, WaiResetAwareMemoryService::class);
+        $this->app->bind(WhatsAppService::class, WaiSalesAwareWhatsAppService::class);
+        $this->app->bind(CrmConversationSummaryService::class, RealEstateAwareCrmConversationSummaryService::class);
+        $this->app->bind(CrmManagerSummaryService::class, RealEstateAwareCrmManagerSummaryService::class);
+        $this->app->bind(FinanceLeadExtractorService::class, RealEstateAwareFinanceLeadExtractorService::class);
+        $this->app->bind(RealEstateMediaAnalysisService::class, RealEstateGuardedMediaAnalysisService::class);
+        $this->app->bind(RealEstateReadinessService::class, RealEstateLiveReadinessService::class);
     }
 
     public function boot(): void
@@ -78,10 +47,7 @@ class AppServiceProvider extends ServiceProvider
         ChatMessage::observe(ChatMessageObserver::class);
         ConversationControl::observe(ConversationControlObserver::class);
 
-        $this->app['router']->pushMiddlewareToGroup(
-            'api',
-            TextileHumanTakeoverMiddleware::class
-        );
+        $this->app['router']->pushMiddlewareToGroup('api', TextileHumanTakeoverMiddleware::class);
     }
 }
 
@@ -89,13 +55,18 @@ class TextileHumanTakeoverMiddleware
 {
     public function handle(Request $request, Closure $next)
     {
-        if (
-            $request->is('api/whatsapp/webhook')
-            && (bool) data_get($request->all(), 'data.key.fromMe', false)
-        ) {
+        if ($request->is('api/whatsapp/webhook') && (bool) data_get($request->all(), 'data.key.fromMe', false)) {
             $instance = trim((string) data_get($request->all(), 'instance', ''));
             $remoteJid = trim((string) data_get($request->all(), 'data.key.remoteJid', ''));
-            $phone = preg_replace('/\D+/', '', explode('@', $remoteJid)[0] ?? '') ?? '';
+            $remoteJidAlt = trim((string) data_get($request->all(), 'data.key.remoteJidAlt', ''));
+
+            if ($remoteJidAlt !== '' && ! str_ends_with($remoteJidAlt, '@lid')) {
+                $phone = preg_replace('/\D+/', '', explode('@', $remoteJidAlt)[0] ?? '') ?? '';
+            } elseif (preg_match('/^[0-9]+@lid$/', $remoteJid)) {
+                $phone = $remoteJid;
+            } else {
+                $phone = preg_replace('/\D+/', '', explode('@', $remoteJid)[0] ?? '') ?? '';
+            }
 
             if ($instance !== '' && $phone !== '' && ! str_ends_with($remoteJid, '@g.us')) {
                 $bot = AiBot::query()
@@ -122,13 +93,12 @@ class TextileHumanTakeoverMiddleware
                     }
 
                     if (! $isApiOutbound) {
-                        $sessionId = 'whatsapp:'.$bot->id.':'.$phone;
+                        $sessionId = $instance === 'istanbul-tisort-51'
+                            ? 'whatsapp:'.$bot->id.':'.$instance.':'.$phone
+                            : 'whatsapp:'.$bot->id.':'.$phone;
 
                         ConversationControl::query()->updateOrCreate(
-                            [
-                                'ai_bot_id' => $bot->id,
-                                'session_id' => $sessionId,
-                            ],
+                            ['ai_bot_id' => $bot->id, 'session_id' => $sessionId],
                             [
                                 'user_id' => $bot->user_id,
                                 'whatsapp_number' => $phone,
