@@ -1,5 +1,10 @@
 <?php
 
+$istanbulPatch = __DIR__.'/patch_istanbul_white_base_mockup.php';
+if (is_file($istanbulPatch)) {
+    require $istanbulPatch;
+}
+
 $path = dirname(__DIR__).'/app/Services/Textile/TextileAttachmentService.php';
 
 if (! is_file($path)) {
