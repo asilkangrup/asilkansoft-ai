@@ -5,11 +5,6 @@ if (is_file($disableImageAiPatch)) {
     require $disableImageAiPatch;
 }
 
-$referenceImagePatch = __DIR__.'/patch_textile_reference_image_understanding.php';
-if (is_file($referenceImagePatch)) {
-    require $referenceImagePatch;
-}
-
 $catalogMemoryPatch = __DIR__.'/patch_textile_catalog_memory.php';
 if (is_file($catalogMemoryPatch)) {
     require $catalogMemoryPatch;
