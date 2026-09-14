@@ -13,6 +13,7 @@ use App\Services\LeadScoringService;
 use App\Services\MemoryService;
 use App\Services\OpenAIService;
 use App\Services\OrderService;
+use App\Services\Printing\PrintingWhatsAppInboundService;
 use App\Services\RealEstateIsolationService;
 use App\Services\RealEstateWhatsAppInboundService;
 use App\Services\Textile\TextileWhatsAppInboundService;
@@ -52,6 +53,7 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         RealEstateWhatsAppInboundService $realEstateInbound,
         InsuranceWhatsAppInboundService $insuranceInbound,
         TextileWhatsAppInboundService $textileInbound,
+        PrintingWhatsAppInboundService $printingInbound,
     ): void {
         $payload = $this->payload;
 
@@ -128,13 +130,12 @@ class ProcessWhatsAppWebhook implements ShouldQueue
 
         /*
         |--------------------------------------------------------------------------
-        | SİGORTA OPERASYON BOTU
+        | ÖZEL SEKTÖR WHATSAPP MOTORLARI
         |--------------------------------------------------------------------------
         |
-        | business_sector=insurance olan botlarda ruhsat görseli/belgesi bu
-        | noktada ayrıştırılır. Normal ürün/sipariş akışına düşmeden sigorta
-        | operasyon kaydı oluşturulur. Metin mesajları ise mevcut profesyonel
-        | WAI konuşma motorunda devam eder.
+        | Her sektör yalnızca kendi business_sector değerindeki AiBot'u kabul eder.
+        | Böylece matbaa, tekstil, sigorta ve diğer WAI botlarının state/hafıza/API
+        | akışları birbirine karışmaz.
         |
         */
         if ($instance !== '' && $insuranceInbound->processPayload($payload)) {
@@ -142,6 +143,10 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         }
 
         if ($instance !== '' && $textileInbound->processPayload($payload)) {
+            return;
+        }
+
+        if ($instance !== '' && $printingInbound->processPayload($payload)) {
             return;
         }
 
@@ -214,4 +219,3 @@ class ProcessWhatsAppWebhook implements ShouldQueue
         }
     }
 }
-
