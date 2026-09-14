@@ -61,9 +61,10 @@ class TextileV2WhatsAppInboundService
         $mediaType=$this->mediaType($payload);
         if(in_array($mediaType,['image','document'],true)){
             try{
+                $envelope=data_get($payload,'data',[]);
                 $encoded=$this->media->downloadBase64(
                     instanceName:self::INSTANCE,
-                    messageEnvelope:is_array(data_get($payload,'data.message'))?data_get($payload,'data.message'):[],
+                    messageEnvelope:is_array($envelope)?$envelope:[],
                 );
                 if(trim($encoded)!==''){
                     $state['logo_base64']=trim($encoded);
@@ -71,7 +72,7 @@ class TextileV2WhatsAppInboundService
                     $state['mockup_sent']=false;
                 }
             }catch(Throwable $e){
-                Log::warning('TEXTILE V2 MEDIA FAILED',['phone'=>$phone,'message'=>$e->getMessage()]);
+                Log::warning('TEXTILE V2 MEDIA FAILED',['phone'=>$phone,'message'=>$e->getMessage(),'message_id'=>$mid]);
                 $this->send($phone,'Görseli okuyamadım. Logoyu JPG, PNG veya WEBP olarak tekrar gönderebilir misiniz?');
                 return true;
             }
