@@ -8,8 +8,13 @@ class TextileV2StateService {
   $l=Str::lower(trim($text));
   foreach(['oversize'=>['oversize','Premium Oversize Tişört'],'regular'=>['regular','Regular Fit Tişört'],'polo yaka'=>['polo','Polo Yaka Tişört'],'polo'=>['polo','Polo Yaka Tişört']] as $n=>[$c,$label]) if(str_contains($l,$n)){ $s['product']=$c;$s['product_label']=$label;$s['mockup_sent']=false;break; }
   foreach(['siyah'=>['black','Siyah'],'beyaz'=>['white','Beyaz'],'lacivert'=>['navy','Lacivert'],'bordo'=>['burgundy','Bordo'],'bej'=>['beige','Bej'],'kırmızı'=>['red','Kırmızı'],'kirmizi'=>['red','Kırmızı'],'mavi'=>['blue','Mavi'],'turkuaz'=>['turquoise','Turkuaz'],'yeşil'=>['green','Yeşil'],'yesil'=>['green','Yeşil'],'sarı'=>['yellow','Sarı'],'sari'=>['yellow','Sarı'],'turuncu'=>['orange','Turuncu'],'gri'=>['gray','Gri']] as $n=>[$c,$label]) if(str_contains($l,$n)){ $s['color']=$c;$s['color_label']=$label;$s['mockup_sent']=false;break; }
-  if(preg_match('/\b([1-9][0-9]{0,4})\s*(?:adet|tane)\b/u',$l,$m)){ $s['quantity']=min(50000,(int)$m[1]);$s['mockup_sent']=false; }
-  elseif(($s['product']??null)&&!($s['quantity']??null)&&preg_match('/^\s*([1-9][0-9]{0,4})\s*$/u',$l,$m)){ $s['quantity']=min(50000,(int)$m[1]);$s['mockup_sent']=false; }
+  if(preg_match('/\b([1-9][0-9]{0,4})\s*(?:adet|tane)\b/u',$l,$m)){
+   $s['quantity']=min(50000,(int)$m[1]);$s['mockup_sent']=false;
+  } elseif(($s['product']??null)&&!($s['quantity']??null)&&preg_match('/^\s*([1-9][0-9]{0,4})\s*$/u',$l,$m)){
+   $s['quantity']=min(50000,(int)$m[1]);$s['mockup_sent']=false;
+  } elseif(($s['product']??null)&&!($s['quantity']??null)&&preg_match('/(?:^|\s)([1-9][0-9]{0,4})(?:\s|$)/u',$l,$m)){
+   $s['quantity']=min(50000,(int)$m[1]);$s['mockup_sent']=false;
+  }
   $p=[]; foreach(['ön sol göğüs'=>'left_chest','on sol gogus'=>'left_chest','sol göğüs'=>'left_chest','sol gogus'=>'left_chest','ön sağ göğüs'=>'right_chest','on sag gogus'=>'right_chest','sağ göğüs'=>'right_chest','sag gogus'=>'right_chest','ön orta'=>'front_center','on orta'=>'front_center','ön büyük'=>'front_large','on buyuk'=>'front_large','arka büyük'=>'back_large','arka buyuk'=>'back_large','sırt'=>'back_large','sirt'=>'back_large','arkada'=>'back_large','sağ kol'=>'right_sleeve','sag kol'=>'right_sleeve','sol kol'=>'left_sleeve'] as $n=>$c) if(str_contains($l,$n)) $p[]=$c;
   if($p){ $s['positions']=array_values(array_unique($p));$s['mockup_sent']=false; }
   if(($s['mockup_sent']??false)&&preg_match('/\b(onaylıyorum|onayliyorum|uygun)\b/u',$l)) $s['approved']=true;
