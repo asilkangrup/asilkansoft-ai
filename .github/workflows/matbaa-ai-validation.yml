@@ -4,14 +4,19 @@ on:
   pull_request:
     paths:
       - 'app/Services/Printing/**'
+      - 'app/Jobs/ProcessPrintingTextBurst.php'
+      - 'app/Jobs/ProcessWhatsAppWebhook.php'
       - 'config/matbaa.php'
       - 'tests/Feature/Printing/**'
       - '.env.example'
   push:
     branches:
       - matbaa-ai
+      - matbaa-whatsapp-live
     paths:
       - 'app/Services/Printing/**'
+      - 'app/Jobs/ProcessPrintingTextBurst.php'
+      - 'app/Jobs/ProcessWhatsAppWebhook.php'
       - 'config/matbaa.php'
       - 'tests/Feature/Printing/**'
       - '.env.example'
@@ -47,6 +52,9 @@ jobs:
           php -l app/Services/Printing/PrintingConversationService.php
           php -l app/Services/Printing/PrintingOpenAiService.php
           php -l app/Services/Printing/PrintingAssistantService.php
+          php -l app/Services/Printing/PrintingWhatsAppInboundService.php
+          php -l app/Jobs/ProcessPrintingTextBurst.php
+          php -l app/Jobs/ProcessWhatsAppWebhook.php
 
       - name: Run Matbaa tests
         env:
