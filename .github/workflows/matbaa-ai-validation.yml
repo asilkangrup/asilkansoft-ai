@@ -1,0 +1,54 @@
+name: Matbaa AI Validation
+
+on:
+  pull_request:
+    paths:
+      - 'app/Services/Printing/**'
+      - 'config/matbaa.php'
+      - 'tests/Feature/Printing/**'
+      - '.env.example'
+  push:
+    branches:
+      - matbaa-ai
+    paths:
+      - 'app/Services/Printing/**'
+      - 'config/matbaa.php'
+      - 'tests/Feature/Printing/**'
+      - '.env.example'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          touch database/database.sqlite
+
+      - name: Validate PHP syntax
+        run: |
+          php -l app/Services/Printing/PrintingProductCatalog.php
+          php -l app/Services/Printing/PrintingIntentExtractor.php
+          php -l app/Services/Printing/PrintingConversationService.php
+          php -l app/Services/Printing/PrintingOpenAiService.php
+          php -l app/Services/Printing/PrintingAssistantService.php
+
+      - name: Run Matbaa tests
+        env:
+          MATBAA_AI_ENABLED: 'false'
+        run: php artisan test tests/Feature/Printing/PrintingConversationServiceTest.php
