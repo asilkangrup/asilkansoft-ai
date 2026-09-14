@@ -175,6 +175,15 @@ class WhatsAppBagla extends Page
             return;
         }
 
+        if ((int) $this->record->getKey() === 55) {
+            $whatsAppService->setWebhook(
+                $instanceName,
+                $baseUrl.'/api/textile-v2/whatsapp/webhook'
+            );
+
+            return;
+        }
+
         $webhookPath = (int) $this->record->getKey() === 48
             ? '/api/wai-sales/whatsapp/webhook'
             : '/api/whatsapp/webhook';
