@@ -15,6 +15,7 @@ class TextileV2WhatsAppInboundService
     public const USER_ID=48;
     public const INSTANCE='istanbul-tisort-v2-55';
     private const GROUP_JID='120363414072361301@g.us';
+    private const DEBOUNCE_SECONDS=8;
 
     public function __construct(
         private readonly EvolutionMediaService $media,
@@ -59,6 +60,10 @@ class TextileV2WhatsAppInboundService
         $mid=trim((string)data_get($payload,'data.key.id',''));
         if($mid!==''&&!Cache::store('database')->add('textile_v2_in:'.$mid,true,now()->addDay())) return true;
 
+        [$text,$mediaPayload]=$this->debounceInbound($phone,$mid,$text,$payload);
+        if($text===null && $mediaPayload===null) return true;
+        if(is_array($mediaPayload)) $payload=$mediaPayload;
+
         $conversation=$this->conversation($phone,$payload);
         if((bool)$conversation->human_takeover) return true;
 
@@ -100,13 +105,13 @@ class TextileV2WhatsAppInboundService
         }
 
         if(($state['color']??null)&&!in_array($state['color'],['black','white'],true)){
-            $this->send($phone,"Renk talebinizi aldım ✓\n\nOtomatik önizleme şu an *siyah* ve *beyaz* tişörtte hazırlanıyor. Seçtiğiniz rengi Fatih Bey manuel olarak hazırlayacak.");
+            $this->send($phone,"Renk talebinizi aldım ✓\n\nOtomatik önizleme şu an *siyah* ve *beyaz* tişörtte hazırlanıyor. Diğer renk taleplerini manuel olarak hazırlıyoruz.");
             $this->notifyGroup($phone,$conversation,$state,'Manuel renk talebi');
             return true;
         }
 
         if(($state['approved']??false)){
-            $this->send($phone,'Teşekkür ederim. Onayınızı aldım ✓ Fatih Bey siparişinizin devamı için sizinle iletişime geçecek.');
+            $this->send($phone,'Teşekkür ederim, onayınızı aldım ✓ Siparişinizi netleştirmek için sizi kısa süre içinde arayacağız.');
             $this->notifyGroup($phone,$conversation,$state,'Müşteri önizlemeyi onayladı');
             return true;
         }
@@ -123,7 +128,7 @@ class TextileV2WhatsAppInboundService
                 return true;
             }catch(Throwable $e){
                 Log::error('TEXTILE V2 MOCKUP FAILED',['phone'=>$phone,'message'=>$e->getMessage()]);
-                $this->send($phone,'Önizlemeyi hazırlarken teknik bir sorun oluştu. Bilgilerinizi kaybetmedim; Fatih Bey gerekirse buradan devralacak.');
+                $this->send($phone,'Önizlemeyi hazırlarken teknik bir sorun oluştu. Bilgilerinizi kaybetmedim; siparişinizi netleştirmek için gerekirse sizi arayacağız.');
                 return true;
             }
         }
@@ -131,6 +136,33 @@ class TextileV2WhatsAppInboundService
         $reply=$this->stateService->next($state,$text);
         if($reply!=='') $this->send($phone,$reply);
         return true;
+    }
+
+    private function debounceInbound(string $phone,string $mid,string $text,array $payload): array
+    {
+        $store=Cache::store('database');
+        $bundleKey='textile_v2_pending_bundle:'.self::BOT_ID.':'.$phone;
+        $tokenKey='textile_v2_pending_token:'.self::BOT_ID.':'.$phone;
+        $bundle=$store->get($bundleKey,['texts'=>[],'media_payload'=>null]);
+        if(!is_array($bundle)) $bundle=['texts'=>[],'media_payload'=>null];
+        if(!isset($bundle['texts'])||!is_array($bundle['texts'])) $bundle['texts']=[];
+
+        if(trim($text)!=='') $bundle['texts'][]=trim($text);
+        if(in_array($this->mediaType($payload),['image','document'],true)) $bundle['media_payload']=$payload;
+        $bundle['texts']=array_slice($bundle['texts'],-12);
+        $store->put($bundleKey,$bundle,now()->addMinutes(5));
+
+        $token=$mid!==''?$mid:bin2hex(random_bytes(8));
+        $store->put($tokenKey,$token,now()->addMinutes(5));
+        sleep(self::DEBOUNCE_SECONDS);
+
+        if((string)$store->get($tokenKey,'')!==$token) return [null,null];
+
+        $bundle=$store->pull($bundleKey,['texts'=>[],'media_payload'=>null]);
+        $store->forget($tokenKey);
+        $texts=is_array($bundle['texts']??null)?$bundle['texts']:[];
+        $combined=trim(implode("\n",array_values(array_filter(array_map('trim',$texts)))));
+        return [$combined!==''?$combined:null,is_array($bundle['media_payload']??null)?$bundle['media_payload']:null];
     }
 
     private function sendColorCatalogues(string $phone): void
@@ -169,7 +201,7 @@ class TextileV2WhatsAppInboundService
             $this->send($phone,$label.' renk kartelasını gönderdim ✓');
         } catch (Throwable $e) {
             Log::error('TEXTILE V2 CATALOGUE FAILED',['phone'=>$phone,'message'=>$e->getMessage()]);
-            $this->send($phone,'Renk kartelasını gönderirken teknik bir sorun oluştu. Fatih Bey renk seçeneklerini manuel olarak iletecek.');
+            $this->send($phone,'Renk kartelasını gönderirken teknik bir sorun oluştu. Renk seçeneklerini manuel olarak ileteceğiz.');
         }
     }
 
