@@ -104,6 +104,46 @@ final class PrintingConversationServiceTest extends TestCase
         $this->assertStringNotContainsString('Kağıt türü veya gramaj tercihiniz var mı?', $result['reply']);
     }
 
+    public function test_standard_and_you_choose_answers_close_pending_size_and_paper(): void
+    {
+        $service = app(PrintingConversationService::class);
+
+        $state = $service->process('500 adet çift yön kartvizit')['state'];
+        $paper = $service->process('standart olsun', $state);
+        $size = $service->process('onu da siz belirleyin', $paper['state']);
+
+        $this->assertSame('no_preference', $size['state']['slots']['paper']);
+        $this->assertSame('85x50 mm', $size['state']['slots']['size']);
+        $this->assertNotContains('paper', $size['missing']);
+        $this->assertNotContains('size', $size['missing']);
+    }
+
+    public function test_design_without_artwork_enters_design_brief_flow(): void
+    {
+        $service = app(PrintingConversationService::class);
+
+        $state = $service->process('500 adet 350 gr çift yön kartvizit')['state'];
+        $result = $service->process('tasarımım yok siz yapın', $state);
+
+        $this->assertSame('needs_design', $result['state']['slots']['design_status']);
+        $this->assertSame('collecting_design_brief', $result['status']);
+        $this->assertStringContainsString('Tasarımı biz hazırlayabiliriz', $result['reply']);
+    }
+
+    public function test_design_brief_can_be_completed_in_natural_messages(): void
+    {
+        $service = app(PrintingConversationService::class);
+
+        $state = $service->process('500 adet 350 gr çift yön kartvizit, tasarım yok')['state'];
+        $first = $service->process('firma adı Ruba Ofset, modern ve premium olsun', $state);
+        $second = $service->process('telefon 0532 111 22 33, instagram @rubaofset ve sloganımız Kaliteli Baskı', $first['state']);
+
+        $this->assertSame('Ruba Ofset', $second['state']['design_brief']['brand_name']);
+        $this->assertSame('modern', $second['state']['design_brief']['style']);
+        $this->assertArrayHasKey('content', $second['state']['design_brief']);
+        $this->assertSame('design_brief_ready', $second['status']);
+    }
+
     public function test_greeting_gets_a_natural_greeting_back(): void
     {
         $service = app(PrintingConversationService::class);
