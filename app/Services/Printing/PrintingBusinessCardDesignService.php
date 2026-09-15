@@ -10,7 +10,7 @@ final class PrintingBusinessCardDesignService
     private const HEIGHT = 1000;
 
     /** @return array{front:string,back:string} */
-    public function create(array $brief): array
+    public function create(array $brief, ?string $creativeBackgroundBase64 = null): array
     {
         if (! function_exists('imagecreatetruecolor')) {
             throw new RuntimeException('Sunucuda GD görsel desteği etkin değil.');
@@ -24,10 +24,13 @@ final class PrintingBusinessCardDesignService
         $style = mb_strtolower(trim((string) ($brief['style'] ?? 'modern')), 'UTF-8');
         [$background, $foreground, $accent] = $this->palette((string) ($brief['colors'] ?? ''), $style);
 
-        $front = $this->canvas($background);
+        $creativeFront = $creativeBackgroundBase64 !== null
+            ? $this->canvasFromBackground($creativeBackgroundBase64)
+            : null;
+        $front = $creativeFront ?? $this->canvas($background);
         $back = $this->canvas($background);
 
-        $this->drawFront($front, $brand, $style, $foreground, $accent, $brief);
+        $this->drawFront($front, $brand, $style, $foreground, $accent, $brief, $creativeFront !== null);
         $this->drawBack($back, $brand, $foreground, $accent, $brief);
 
         return [
@@ -36,12 +39,27 @@ final class PrintingBusinessCardDesignService
         ];
     }
 
-    private function drawFront(mixed $image, string $brand, string $style, array $fg, array $accent, array $brief): void
-    {
+    private function drawFront(
+        mixed $image,
+        string $brand,
+        string $style,
+        array $fg,
+        array $accent,
+        array $brief,
+        bool $creativeBackground,
+    ): void {
         $accentColor = imagecolorallocate($image, ...$accent);
         $fgColor = imagecolorallocate($image, ...$fg);
 
-        if (in_array($style, ['premium', 'lüks'], true)) {
+        if ($creativeBackground) {
+            imagealphablending($image, true);
+            $lightText = array_sum($fg) > 500;
+            $panel = $lightText
+                ? imagecolorallocatealpha($image, 10, 10, 12, 48)
+                : imagecolorallocatealpha($image, 255, 255, 255, 38);
+            imagefilledrectangle($image, 390, 300, 1310, 670, $panel);
+            imagefilledrectangle($image, 390, 670, 870, 682, $accentColor);
+        } elseif (in_array($style, ['premium', 'lüks'], true)) {
             imagefilledrectangle($image, 0, 0, 90, self::HEIGHT, $accentColor);
             imagefilledrectangle($image, 1500, 0, self::WIDTH, 26, $accentColor);
         } elseif ($style === 'minimal' || $style === 'sade') {
@@ -54,6 +72,10 @@ final class PrintingBusinessCardDesignService
         $sector = trim((string) ($brief['sector'] ?? ''));
         if ($sector !== '') {
             $this->text($image, mb_strtoupper($sector, 'UTF-8'), 720, 535, 28, $fgColor, false, 'center');
+        }
+        $slogan = trim((string) ($brief['slogan'] ?? ''));
+        if ($slogan !== '') {
+            $this->text($image, $slogan, 720, 610, 24, $fgColor, false, 'center');
         }
     }
 
@@ -70,6 +92,7 @@ final class PrintingBusinessCardDesignService
             'phone' => 'Tel',
             'email' => 'E-posta',
             'instagram' => 'Instagram',
+            'address' => 'Adres',
         ] as $field => $label) {
             $value = trim((string) ($brief[$field] ?? ''));
             if ($value !== '') {
@@ -82,10 +105,10 @@ final class PrintingBusinessCardDesignService
             $lines = array_slice(preg_split('/\R+/u', $content) ?: [], 0, 5);
         }
 
-        $y = 360;
-        foreach (array_slice($lines, 0, 5) as $line) {
+        $y = 340;
+        foreach (array_slice($lines, 0, 6) as $line) {
             $this->text($image, trim((string) $line), 125, $y, 30, $fgColor);
-            $y += 72;
+            $y += 68;
         }
 
         $this->text($image, 'WAI Tasarım Önizlemesi', 125, 885, 20, $accentColor);
@@ -99,16 +122,55 @@ final class PrintingBusinessCardDesignService
         return $image;
     }
 
+    private function canvasFromBackground(string $encoded): mixed
+    {
+        if (str_contains($encoded, ';base64,')) {
+            $encoded = explode(';base64,', $encoded, 2)[1] ?? '';
+        }
+        $bytes = base64_decode(trim($encoded), true);
+        if (! is_string($bytes) || $bytes === '') {
+            return null;
+        }
+        $source = @imagecreatefromstring($bytes);
+        if ($source === false) {
+            return null;
+        }
+
+        $sourceW = imagesx($source);
+        $sourceH = imagesy($source);
+        if ($sourceW < 1 || $sourceH < 1) {
+            imagedestroy($source);
+            return null;
+        }
+
+        $scale = max(self::WIDTH / $sourceW, self::HEIGHT / $sourceH);
+        $drawW = max(1, (int) ceil($sourceW * $scale));
+        $drawH = max(1, (int) ceil($sourceH * $scale));
+        $offsetX = (int) floor(($drawW - self::WIDTH) / 2);
+        $offsetY = (int) floor(($drawH - self::HEIGHT) / 2);
+
+        $resized = imagecreatetruecolor($drawW, $drawH);
+        imagecopyresampled($resized, $source, 0, 0, 0, 0, $drawW, $drawH, $sourceW, $sourceH);
+        imagedestroy($source);
+
+        $canvas = imagecreatetruecolor(self::WIDTH, self::HEIGHT);
+        imagecopy($canvas, $resized, 0, 0, $offsetX, $offsetY, self::WIDTH, self::HEIGHT);
+        imagedestroy($resized);
+
+        return $canvas;
+    }
+
     private function palette(string $requested, string $style): array
     {
-        $requested = mb_strtolower($requested, 'UTF-8');
-        $accent = match (true) {
-            str_contains($requested, 'mavi') => [32, 105, 210],
-            str_contains($requested, 'kırmızı'), str_contains($requested, 'kirmizi') => [190, 35, 45],
-            str_contains($requested, 'yeşil'), str_contains($requested, 'yesil') => [34, 139, 84],
-            str_contains($requested, 'mor') => [112, 65, 180],
-            str_contains($requested, 'turuncu') => [225, 112, 30],
-            str_contains($requested, 'sarı'), str_contains($requested, 'sari') => [215, 168, 35],
+        $requestedLower = mb_strtolower($requested, 'UTF-8');
+        $hex = $this->firstHex($requested);
+        $accent = $hex ?? match (true) {
+            str_contains($requestedLower, 'mavi') => [32, 105, 210],
+            str_contains($requestedLower, 'kırmızı'), str_contains($requestedLower, 'kirmizi') => [190, 35, 45],
+            str_contains($requestedLower, 'yeşil'), str_contains($requestedLower, 'yesil') => [34, 139, 84],
+            str_contains($requestedLower, 'mor') => [112, 65, 180],
+            str_contains($requestedLower, 'turuncu') => [225, 112, 30],
+            str_contains($requestedLower, 'sarı'), str_contains($requestedLower, 'sari') => [215, 168, 35],
             in_array($style, ['premium', 'lüks'], true) => [191, 150, 62],
             default => [36, 98, 173],
         };
@@ -118,6 +180,15 @@ final class PrintingBusinessCardDesignService
         }
 
         return [[248, 248, 247], [25, 31, 38], $accent];
+    }
+
+    private function firstHex(string $value): ?array
+    {
+        if (! preg_match('/#([A-Fa-f0-9]{6})\b/', $value, $m)) {
+            return null;
+        }
+        $hex = $m[1];
+        return [hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2))];
     }
 
     private function text(
