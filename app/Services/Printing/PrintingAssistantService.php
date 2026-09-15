@@ -2,6 +2,7 @@
 
 namespace App\Services\Printing;
 
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 
 final class PrintingAssistantService
@@ -19,7 +20,8 @@ final class PrintingAssistantService
         array $recentMessages = [],
     ): array {
         $cacheKey = $this->cacheKey($sessionId);
-        $state = Cache::get($cacheKey, []);
+        $cache = $this->store();
+        $state = $cache->get($cacheKey, []);
         if (! is_array($state)) {
             $state = [];
         }
@@ -27,7 +29,10 @@ final class PrintingAssistantService
         $attachments = $this->normalizeAttachments($attachments);
         $result = $this->conversation->process($message, $state, $attachments);
 
-        Cache::put($cacheKey, $result['state'], now()->addDays(30));
+        // Printing state is operational order data, not ephemeral UI cache. Keep
+        // it in the shared database cache so queue workers and container
+        // redeploys do not make the assistant appear to forget the order.
+        $cache->put($cacheKey, $result['state'], now()->addDays(30));
 
         $result['reply'] = $this->openAi->naturalize(
             draft: $result['reply'],
@@ -40,12 +45,12 @@ final class PrintingAssistantService
 
     public function reset(string $sessionId): void
     {
-        Cache::forget($this->cacheKey($sessionId));
+        $this->store()->forget($this->cacheKey($sessionId));
     }
 
     public function state(string $sessionId): array
     {
-        $state = Cache::get($this->cacheKey($sessionId), []);
+        $state = $this->store()->get($this->cacheKey($sessionId), []);
         return is_array($state) ? $state : [];
     }
 
@@ -58,6 +63,7 @@ final class PrintingAssistantService
             'memory_messages' => (int) config('matbaa.memory_messages', 50),
             'debounce_seconds' => (int) config('matbaa.debounce_seconds', 10),
             'max_questions_per_turn' => (int) config('matbaa.max_questions_per_turn', 2),
+            'state_store' => 'database',
             'ready_for_live_traffic' => (bool) config('matbaa.enabled') && filled(config('matbaa.api_key')),
         ];
     }
@@ -88,6 +94,7 @@ final class PrintingAssistantService
                     'name' => $name !== '' ? $name : 'tasarim',
                     'mime' => $mime,
                     'url' => $attachment['url'] ?? null,
+                    'role' => $attachment['role'] ?? null,
                 ], static fn ($value) => $value !== null && $value !== '');
             },
             $attachments
@@ -97,5 +104,10 @@ final class PrintingAssistantService
     private function cacheKey(string $sessionId): string
     {
         return 'matbaa_ai:conversation:'.sha1($sessionId);
+    }
+
+    private function store(): Repository
+    {
+        return Cache::store('database');
     }
 }
