@@ -18,8 +18,6 @@ final class PrintingIntentExtractor
         if ($product && $slots === []) {
             $slots = $this->catalog->defaults($product);
         } elseif ($product) {
-            // A product may be resolved after a generic first turn. Defaults must
-            // still be applied without overwriting information already supplied.
             $slots = array_replace($this->catalog->defaults($product), $slots);
         }
 
@@ -84,6 +82,8 @@ final class PrintingIntentExtractor
             || str_contains($text, 'siz tasarlayin')
             || str_contains($text, 'tasarımı siz yapın')
             || str_contains($text, 'tasarimi siz yapin')
+            || str_contains($text, 'siz hazırlayın')
+            || str_contains($text, 'siz hazirlayin')
             || str_contains($text, 'siz yapın')
             || str_contains($text, 'siz yapin');
 
@@ -120,6 +120,29 @@ final class PrintingIntentExtractor
         }
 
         $standardChoice = $this->standardChoice($text);
+
+        // Explicit delegation must work even on the very first message, before
+        // there is any pending-field history. Example:
+        // "kağıt ve ölçüyü siz belirleyin".
+        $delegatesPaper = $standardChoice && preg_match('/\b(kağıt|kagit|gramaj)\b/u', $text) === 1;
+        $delegatesSize = $standardChoice && preg_match('/\b(ölçü|olcu|ebat|boyut)\b/u', $text) === 1;
+        $delegatesMaterial = $standardChoice && preg_match('/\b(malzeme|materyal)\b/u', $text) === 1;
+
+        if ($delegatesPaper && ! isset($slots['paper'])) {
+            $slots['paper'] = 'no_preference';
+        }
+        if ($delegatesMaterial && ! isset($slots['material'])) {
+            $slots['material'] = 'no_preference';
+        }
+        if ($delegatesSize && $product) {
+            $defaultSize = $this->catalog->defaults($product)['size'] ?? null;
+            if (is_string($defaultSize) && $defaultSize !== '') {
+                $slots['size'] = $defaultSize;
+            }
+        }
+
+        // Contextual short replies ("yok", "standart olsun", "siz seçin")
+        // still use the previously asked field when the customer did not name it.
         if ($standardChoice) {
             if (in_array('paper', $pendingFields, true) && ! isset($slots['paper'])) {
                 $slots['paper'] = 'no_preference';
@@ -127,7 +150,7 @@ final class PrintingIntentExtractor
             if (in_array('material', $pendingFields, true) && ! isset($slots['material'])) {
                 $slots['material'] = 'no_preference';
             }
-            if (in_array('size', $pendingFields, true) && ! isset($slots['size']) && $product) {
+            if (in_array('size', $pendingFields, true) && $product) {
                 $defaultSize = $this->catalog->defaults($product)['size'] ?? null;
                 if (is_string($defaultSize) && $defaultSize !== '') {
                     $slots['size'] = $defaultSize;
