@@ -13,25 +13,25 @@ final class PrintingDesignBriefService
     /**
      * Collect enough structured information to hand a design job to a creative
      * renderer without forcing the customer through a rigid form.
+     *
+     * @param list<string> $pendingFields
      */
-    public function collect(string $message, array $brief = []): array
+    public function collect(string $message, array $brief = [], array $pendingFields = []): array
     {
         $text = trim($message);
         $lower = mb_strtolower($text, 'UTF-8');
 
-        if (preg_match('/(?:firma|marka|işletme|isletme)\s*(?:adı|adi|ismi)?\s*[:\-]?\s*([^,\n]{2,80})/iu', $text, $m)) {
-            $brief['brand_name'] = trim($m[1]);
+        if ($text === '') {
+            return $brief;
         }
 
-        foreach (['modern', 'kurumsal', 'sade', 'minimal', 'lüks', 'luks', 'premium', 'renkli', 'eğlenceli', 'eglenceli', 'klasik'] as $style) {
-            if (str_contains($lower, $style)) {
-                $brief['style'] = match ($style) {
-                    'luks' => 'lüks',
-                    'eglenceli' => 'eğlenceli',
-                    default => $style,
-                };
-                break;
-            }
+        if (preg_match('/(?:firma|marka|işletme|isletme)\s*(?:adı|adi|ismi)?\s*[:\-]?\s*([^,\n]{2,80})/iu', $text, $m)) {
+            $brief['brand_name'] = $this->cleanBrand((string) $m[1]);
+        }
+
+        $detectedStyle = $this->detectStyle($lower);
+        if ($detectedStyle !== null) {
+            $brief['style'] = $detectedStyle;
         }
 
         if (preg_match('/(?:renk|renkler|renk tercihi)\s*[:\-]?\s*([^\n]{2,80})/iu', $text, $m)) {
@@ -52,11 +52,43 @@ final class PrintingDesignBriefService
 
         if (preg_match('/(?:instagram|insta|ig)\s*[:\-]?\s*@?([A-Za-z0-9._]{2,40})/iu', $text, $m)) {
             $brief['instagram'] = '@'.trim($m[1]);
+        } elseif (preg_match('/^@([A-Za-z0-9._]{2,40})$/u', $text, $m)) {
+            $brief['instagram'] = '@'.trim($m[1]);
         }
 
-        // If the customer gives a reasonably detailed free-form brief, preserve
-        // it verbatim instead of trying to over-structure every sentence.
-        if (mb_strlen($text, 'UTF-8') >= 18 && ! $this->isGenericDesignAnswer($lower)) {
+        if (preg_match('/(?:slogan|motto)\s*(?:ımız|imiz|umuz|ümüz)?\s*[:\-]?\s*([^\n]{2,120})/iu', $text, $m)) {
+            $brief['slogan'] = trim($m[1]);
+        }
+
+        if (preg_match('/(?:adres|konum)\s*[:\-]?\s*([^\n]{4,180})/iu', $text, $m)) {
+            $brief['address'] = trim($m[1]);
+        }
+
+        // WhatsApp customers often answer “Soykan Auto, premium” after the bot
+        // has asked brand + style. Interpret that naturally instead of forcing
+        // them to repeat labels such as “firma adı”.
+        if (! isset($brief['brand_name']) && $this->isPending($pendingFields, 'brand_name')) {
+            $candidate = $this->brandCandidate($text);
+            if ($candidate !== null) {
+                $brief['brand_name'] = $candidate;
+            }
+        }
+
+        if (! isset($brief['style']) && $this->isPending($pendingFields, 'style') && $detectedStyle === null) {
+            $candidateStyle = $this->detectStyle($lower);
+            if ($candidateStyle !== null) {
+                $brief['style'] = $candidateStyle;
+            }
+        }
+
+        // Contact fields themselves are usable card content. A phone number on
+        // its own must not cause the assistant to ask the same “content” question
+        // again just because the free-form sentence was short.
+        if ($this->hasUsableContent($brief)) {
+            $brief['content'] = $this->contentSummary($brief, (string) ($brief['content'] ?? ''));
+        } elseif (mb_strlen($text, 'UTF-8') >= 8 && ! $this->isGenericDesignAnswer($lower) && $this->isPending($pendingFields, 'content')) {
+            $brief['content'] = $this->mergeContent((string) ($brief['content'] ?? ''), $text);
+        } elseif (mb_strlen($text, 'UTF-8') >= 18 && ! $this->isGenericDesignAnswer($lower)) {
             $brief['content'] = $this->mergeContent((string) ($brief['content'] ?? ''), $text);
         }
 
@@ -67,16 +99,18 @@ final class PrintingDesignBriefService
     {
         return array_values(array_filter(
             self::REQUIRED,
-            static fn (string $field) => ! isset($brief[$field]) || trim((string) $brief[$field]) === ''
+            fn (string $field) => $field === 'content'
+                ? ! $this->hasUsableContent($brief) && trim((string) ($brief['content'] ?? '')) === ''
+                : ! isset($brief[$field]) || trim((string) $brief[$field]) === ''
         ));
     }
 
     public function questions(array $missing, int $max = 2): array
     {
         $map = [
-            'brand_name' => 'Tasarımda kullanacağımız firma veya marka adı nedir?',
+            'brand_name' => 'Kartta kullanacağımız firma veya marka adı nedir?',
             'style' => 'Nasıl bir görünüm istersiniz; sade, modern, kurumsal veya daha premium bir tarz olabilir?',
-            'content' => 'Tasarımda mutlaka yer alması gereken bilgileri paylaşır mısınız? Örneğin telefon, adres, sosyal medya veya slogan.',
+            'content' => 'Kartta hangi iletişim bilgileri yer alsın? Telefon, adres, sosyal medya, e-posta veya slogan paylaşabilirsiniz.',
         ];
 
         return array_values(array_map(
@@ -90,15 +124,89 @@ final class PrintingDesignBriefService
         return $this->missing($brief) === [];
     }
 
+    private function isPending(array $pendingFields, string $field): bool
+    {
+        return in_array($field, $pendingFields, true)
+            || in_array('brief:'.$field, $pendingFields, true);
+    }
+
+    private function detectStyle(string $lower): ?string
+    {
+        foreach (['modern', 'kurumsal', 'sade', 'minimal', 'lüks', 'luks', 'premium', 'renkli', 'eğlenceli', 'eglenceli', 'klasik'] as $style) {
+            if (! str_contains($lower, $style)) {
+                continue;
+            }
+
+            return match ($style) {
+                'luks' => 'lüks',
+                'eglenceli' => 'eğlenceli',
+                default => $style,
+            };
+        }
+
+        return null;
+    }
+
+    private function brandCandidate(string $text): ?string
+    {
+        $parts = preg_split('/[,;\n]+/u', trim($text)) ?: [];
+        $candidate = trim((string) ($parts[0] ?? ''));
+
+        if ($candidate === '' || mb_strlen($candidate, 'UTF-8') < 2 || mb_strlen($candidate, 'UTF-8') > 80) {
+            return null;
+        }
+
+        $lower = mb_strtolower($candidate, 'UTF-8');
+        if ($this->isGenericDesignAnswer($lower) || $this->detectStyle($lower) !== null || preg_match('/^\+?\d[\d\s.-]+$/u', $candidate)) {
+            return null;
+        }
+
+        return $this->cleanBrand($candidate);
+    }
+
+    private function cleanBrand(string $brand): string
+    {
+        return trim(preg_replace('/\s+/u', ' ', $brand) ?? $brand);
+    }
+
+    private function hasUsableContent(array $brief): bool
+    {
+        foreach (['phone', 'email', 'instagram', 'address', 'slogan'] as $field) {
+            if (trim((string) ($brief[$field] ?? '')) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function contentSummary(array $brief, string $existing): string
+    {
+        $parts = [];
+        foreach (['phone', 'email', 'instagram', 'address', 'slogan'] as $field) {
+            $value = trim((string) ($brief[$field] ?? ''));
+            if ($value !== '') {
+                $parts[] = $field.': '.$value;
+            }
+        }
+
+        $summary = implode("\n", $parts);
+        return $this->mergeContent($existing, $summary);
+    }
+
     private function isGenericDesignAnswer(string $text): bool
     {
-        return preg_match('/^(?:siz yapın|siz yapin|siz tasarlayın|siz tasarlayin|tasarım yok|tasarim yok|tasarımım yok|tasarimim yok)$/u', trim($text)) === 1;
+        return preg_match('/^(?:siz yapın|siz yapin|siz tasarlayın|siz tasarlayin|siz hazırlayın|siz hazirlayin|hazırla|hazirla|devam|örnek|ornek|referans|tasarım yok|tasarim yok|tasarımım yok|tasarimim yok)$/u', trim($text)) === 1;
     }
 
     private function mergeContent(string $existing, string $new): string
     {
         $existing = trim($existing);
         $new = trim($new);
+
+        if ($new === '') {
+            return $existing;
+        }
 
         if ($existing === '') {
             return $new;
