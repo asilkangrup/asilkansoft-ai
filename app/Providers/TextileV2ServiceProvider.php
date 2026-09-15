@@ -41,8 +41,6 @@ class TextileV2ServiceProvider extends ServiceProvider
                     ?? ''
                 ));
 
-                // A real manual text sent by Fatih immediately takes over the customer chat.
-                // Bot-originated text is marked by TextileV2WhatsAppInboundService::send().
                 if ($text !== '') {
                     $phoneJid = trim((string) data_get($payload, 'data.key.remoteJidAlt', ''));
                     if ($phoneJid === '' || ! str_ends_with($phoneJid, '@s.whatsapp.net')) {
@@ -57,7 +55,7 @@ class TextileV2ServiceProvider extends ServiceProvider
                                 TextileV2WhatsAppInboundService::INSTANCE.'|'.$phone.'|'.$text
                             );
 
-                            // Use get(), never pull(): duplicate outbound webhooks must remain recognized as bot messages.
+                            // Do not consume this marker; duplicate bot webhooks must stay recognized as bot traffic.
                             $isBotOutbound = (bool) Cache::store('database')->get($outboundKey, false);
 
                             if (! $isBotOutbound) {
@@ -83,7 +81,7 @@ class TextileV2ServiceProvider extends ServiceProvider
                                     'updated_at' => now(),
                                 ])->save();
 
-                                // Cancel any customer message currently waiting in the debounce window.
+                                // Cancel any reply currently waiting in the debounce window.
                                 Cache::store('database')->forget(
                                     'textile_v2_pending_bundle:'.TextileV2WhatsAppInboundService::BOT_ID.':'.$phone
                                 );
@@ -99,6 +97,17 @@ class TextileV2ServiceProvider extends ServiceProvider
 
                 // Never send fromMe traffic into the AI inbound processor.
                 return response()->json(['ok' => true, 'from_me' => true]);
+            }
+
+            // Evolution may address the same chat by @lid while providing the real phone in remoteJidAlt.
+            // Normalize the payload before the AI service so takeover/state use the exact same phone key.
+            if ($event === 'messages.upsert') {
+                $remoteJid = trim((string) data_get($payload, 'data.key.remoteJid', ''));
+                $remoteJidAlt = trim((string) data_get($payload, 'data.key.remoteJidAlt', ''));
+
+                if (! str_ends_with($remoteJid, '@g.us') && str_ends_with($remoteJidAlt, '@s.whatsapp.net')) {
+                    data_set($payload, 'data.key.remoteJid', $remoteJidAlt);
+                }
             }
 
             $service->process($payload);
