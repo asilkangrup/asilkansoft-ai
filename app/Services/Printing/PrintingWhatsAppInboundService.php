@@ -6,6 +6,7 @@ use App\Jobs\ProcessPrintingTextBurst;
 use App\Models\AiBot;
 use App\Models\ConversationControl;
 use App\Models\Organization;
+use App\Services\EvolutionMediaService;
 use App\Services\MemoryService;
 use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\Cache;
@@ -17,6 +18,8 @@ final class PrintingWhatsAppInboundService
 {
     public function __construct(
         private readonly PrintingAssistantService $assistant,
+        private readonly PrintingBusinessCardMockupService $businessCardMockup,
+        private readonly EvolutionMediaService $mediaService,
         private readonly WhatsAppService $whatsAppService,
         private readonly MemoryService $memoryService,
     ) {
@@ -143,11 +146,18 @@ final class PrintingWhatsAppInboundService
             );
 
             $answer = trim((string) ($result['reply'] ?? ''));
-            if ($answer === '') {
-                return true;
-            }
+            $mockupSent = $this->trySendBusinessCardMockup(
+                bot: $bot,
+                conversation: $conversation,
+                instance: $instance,
+                phone: $phone,
+                payload: $payload,
+                result: $result,
+            );
 
-            $this->sendText($bot, $conversation, $instance, $phone, $answer);
+            if (! $mockupSent && $answer !== '') {
+                $this->sendText($bot, $conversation, $instance, $phone, $answer);
+            }
 
             if (($result['status'] ?? null) === 'quote_ready') {
                 Log::info('PRINTING QUOTE READY', [
@@ -174,6 +184,79 @@ final class PrintingWhatsAppInboundService
         }
 
         return true;
+    }
+
+    private function trySendBusinessCardMockup(
+        AiBot $bot,
+        ConversationControl $conversation,
+        string $instance,
+        string $phone,
+        array $payload,
+        array $result,
+    ): bool {
+        $state = is_array($result['state'] ?? null) ? $result['state'] : [];
+        if (($state['product'] ?? null) !== 'business_card') {
+            return false;
+        }
+
+        $image = data_get($payload, 'data.message.imageMessage');
+        if (! is_array($image)) {
+            // PDF rendering will be added separately; do not fake or redraw it.
+            return false;
+        }
+
+        $mime = strtolower(trim((string) data_get($image, 'mimetype', 'image/jpeg')));
+        if (! in_array($mime, ['image/jpeg', 'image/jpg', 'image/png'], true)) {
+            return false;
+        }
+
+        try {
+            $envelope = [
+                'key' => data_get($payload, 'data.key', []),
+                'message' => data_get($payload, 'data.message', []),
+                'messageTimestamp' => data_get($payload, 'data.messageTimestamp'),
+            ];
+
+            $artworkBase64 = $this->mediaService->downloadBase64($instance, $envelope);
+            $finish = (string) data_get($state, 'slots.lamination', 'mat');
+            $mockupBase64 = $this->businessCardMockup->create($artworkBase64, null, $finish);
+            $caption = 'Kartvizit önizlemesini hazırladım. Tasarım içeriğini değiştirmeden baskı sunumuna yerleştirdim. İsterseniz farklı açı veya yüzey görünümü için revize yapabilirim.';
+
+            $this->whatsAppService->sendImage(
+                $instance,
+                $phone,
+                $mockupBase64,
+                'kartvizit-onizleme.jpg',
+                $caption,
+                'image/jpeg',
+            );
+
+            $this->memoryService->mesajKaydet(
+                userId: $bot->user_id,
+                aiBotId: $bot->id,
+                sessionId: $conversation->session_id,
+                role: 'assistant',
+                message: $caption,
+                senderType: 'ai',
+            );
+
+            Log::info('PRINTING BUSINESS CARD MOCKUP SENT', [
+                'ai_bot_id' => $bot->id,
+                'conversation_id' => $conversation->id,
+                'phone_number' => $phone,
+                'finish' => $finish,
+            ]);
+
+            return true;
+        } catch (Throwable $exception) {
+            Log::warning('PRINTING BUSINESS CARD MOCKUP FAILED', [
+                'ai_bot_id' => $bot->id,
+                'conversation_id' => $conversation->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     private function extractMessageAndAttachments(array $messagePayload, string $text): array
