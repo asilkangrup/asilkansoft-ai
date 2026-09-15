@@ -16,6 +16,7 @@ on:
       - matbaa-business-card-mockup
       - matbaa-card-pdf-preview-2
       - matbaa-v1-professional
+      - matbaa-professional-hardening
     paths:
       - 'app/Services/Printing/**'
       - 'app/Jobs/ProcessPrintingTextBurst.php'
@@ -58,6 +59,7 @@ jobs:
           php -l app/Services/Printing/PrintingConversationService.php
           php -l app/Services/Printing/PrintingDesignBriefService.php
           php -l app/Services/Printing/PrintingArtworkClassifierService.php
+          php -l app/Services/Printing/PrintingReferenceAnalysisService.php
           php -l app/Services/Printing/PrintingBusinessCardDesignService.php
           php -l app/Services/Printing/PrintingOpenAiService.php
           php -l app/Services/Printing/PrintingAssistantService.php
