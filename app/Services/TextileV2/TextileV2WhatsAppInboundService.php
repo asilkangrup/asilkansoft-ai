@@ -69,7 +69,10 @@ class TextileV2WhatsAppInboundService
 
         $key='textile_v2_state:'.self::BOT_ID.':'.$phone;
         $state=$this->stateService->normalize(Cache::store('database')->get($key));
-        if($text!==null && $this->stateService->restart($text)) $state=$this->stateService->initial();
+        if($text!==null && $this->stateService->restart($text)){
+            Cache::store('database')->forget('textile_v2_approval_once:'.self::BOT_ID.':'.$phone);
+            $state=$this->stateService->initial();
+        }
 
         $mediaType=$this->mediaType($payload);
         if(in_array($mediaType,['image','document'],true)){
@@ -111,6 +114,14 @@ class TextileV2WhatsAppInboundService
         }
 
         if(($state['approved']??false)){
+            $approvalKey='textile_v2_approval_once:'.self::BOT_ID.':'.$phone;
+            if(($state['approved_notified']??false) || !Cache::store('database')->add($approvalKey,true,now()->addHours(48))){
+                $state['approved_notified']=true;
+                Cache::store('database')->put($key,$state,now()->addHours(48));
+                return true;
+            }
+            $state['approved_notified']=true;
+            Cache::store('database')->put($key,$state,now()->addHours(48));
             $this->send($phone,'Teşekkür ederim, onayınızı aldım ✓ Siparişinizi netleştirmek için sizi kısa süre içinde arayacağız.');
             $this->notifyGroup($phone,$conversation,$state,'Müşteri önizlemeyi onayladı');
             return true;
