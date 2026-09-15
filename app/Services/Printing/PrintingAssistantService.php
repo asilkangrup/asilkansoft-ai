@@ -29,9 +29,6 @@ final class PrintingAssistantService
         $attachments = $this->normalizeAttachments($attachments);
         $result = $this->conversation->process($message, $state, $attachments);
 
-        // Printing state is operational order data, not ephemeral UI cache. Keep
-        // it in the shared database cache so queue workers and container
-        // redeploys do not make the assistant appear to forget the order.
         $cache->put($cacheKey, $result['state'], now()->addDays(30));
 
         $result['reply'] = $this->openAi->naturalize(
@@ -52,6 +49,14 @@ final class PrintingAssistantService
     {
         $state = $this->store()->get($this->cacheKey($sessionId), []);
         return is_array($state) ? $state : [];
+    }
+
+    public function mergeState(string $sessionId, array $patch): array
+    {
+        $state = $this->state($sessionId);
+        $merged = array_replace_recursive($state, $patch);
+        $this->store()->put($this->cacheKey($sessionId), $merged, now()->addDays(30));
+        return $merged;
     }
 
     public function readiness(): array
