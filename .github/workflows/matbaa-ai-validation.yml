@@ -13,6 +13,7 @@ on:
     branches:
       - matbaa-ai
       - matbaa-whatsapp-live
+      - matbaa-business-card-mockup
     paths:
       - 'app/Services/Printing/**'
       - 'app/Jobs/ProcessPrintingTextBurst.php'
@@ -52,6 +53,7 @@ jobs:
           php -l app/Services/Printing/PrintingConversationService.php
           php -l app/Services/Printing/PrintingOpenAiService.php
           php -l app/Services/Printing/PrintingAssistantService.php
+          php -l app/Services/Printing/PrintingBusinessCardMockupService.php
           php -l app/Services/Printing/PrintingWhatsAppInboundService.php
           php -l app/Jobs/ProcessPrintingTextBurst.php
           php -l app/Jobs/ProcessWhatsAppWebhook.php
@@ -59,4 +61,4 @@ jobs:
       - name: Run Matbaa tests
         env:
           MATBAA_AI_ENABLED: 'false'
-        run: php artisan test tests/Feature/Printing/PrintingConversationServiceTest.php
+        run: php artisan test tests/Feature/Printing
