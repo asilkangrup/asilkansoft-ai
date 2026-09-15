@@ -19,6 +19,7 @@ final class PrintingWhatsAppInboundService
     public function __construct(
         private readonly PrintingAssistantService $assistant,
         private readonly PrintingBusinessCardMockupService $businessCardMockup,
+        private readonly PrintingBusinessCardDesignService $businessCardDesign,
         private readonly PrintingPdfArtworkRenderer $pdfArtworkRenderer,
         private readonly PrintingArtworkClassifierService $artworkClassifier,
         private readonly EvolutionMediaService $mediaService,
@@ -46,9 +47,6 @@ final class PrintingWhatsAppInboundService
         if ((bool) data_get($payload, 'data.key.fromMe', false)) return true;
         if (! $bot->whatsappAiKullanilabilirMi()) return true;
 
-        // Evolution/WhatsApp may deliver the same contact as @lid on one event
-        // and @s.whatsapp.net on another. Prefer the alternate phone JID when
-        // available so conversation state does not appear to "forget" midway.
         $remoteJidAlt = trim((string) data_get($payload, 'data.key.remoteJidAlt', ''));
         $identityJid = str_ends_with($remoteJid, '@lid') && $remoteJidAlt !== ''
             ? $remoteJidAlt
@@ -120,6 +118,10 @@ final class PrintingWhatsAppInboundService
                 recentMessages: [],
             );
 
+            if ($this->trySendGeneratedBusinessCardDesign($bot, $conversation, $instance, $phone, $result)) {
+                return true;
+            }
+
             $answer = trim((string) ($result['reply'] ?? ''));
             $preview = $this->trySendBusinessCardMockup(
                 bot: $bot,
@@ -158,6 +160,62 @@ final class PrintingWhatsAppInboundService
         }
 
         return true;
+    }
+
+    private function trySendGeneratedBusinessCardDesign(
+        AiBot $bot,
+        ConversationControl $conversation,
+        string $instance,
+        string $phone,
+        array $result,
+    ): bool {
+        if (($result['status'] ?? null) !== 'design_brief_ready') return false;
+
+        $state = is_array($result['state'] ?? null) ? $result['state'] : [];
+        if (($state['product'] ?? null) !== 'business_card') return false;
+
+        try {
+            $brief = is_array($state['design_brief'] ?? null) ? $state['design_brief'] : [];
+            $faces = $this->businessCardDesign->create($brief);
+            $finish = (string) data_get($state, 'slots.lamination', 'mat');
+            $mockup = $this->businessCardMockup->create($faces['front'], $faces['back'], $finish);
+            $caption = 'İlk kartvizit taslak önizlemesini hazırladım. Firma bilgilerini okunabilir tutarak ön ve arka yüzü baskı sunumuna yerleştirdim. Renk, yazı, logo veya yerleşim için istediğiniz revizeyi yazabilirsiniz.';
+
+            $this->whatsAppService->sendImage(
+                $instance,
+                $phone,
+                $mockup,
+                'kartvizit-tasarim-taslak.jpg',
+                $caption,
+                'image/jpeg',
+            );
+
+            $this->memoryService->mesajKaydet(
+                userId: $bot->user_id,
+                aiBotId: $bot->id,
+                sessionId: $conversation->session_id,
+                role: 'assistant',
+                message: $caption,
+                senderType: 'ai',
+            );
+
+            Log::info('PRINTING GENERATED BUSINESS CARD DESIGN SENT', [
+                'ai_bot_id' => $bot->id,
+                'conversation_id' => $conversation->id,
+                'phone_number' => $phone,
+                'style' => $brief['style'] ?? null,
+            ]);
+
+            return true;
+        } catch (Throwable $exception) {
+            Log::warning('PRINTING GENERATED BUSINESS CARD DESIGN FAILED', [
+                'ai_bot_id' => $bot->id,
+                'conversation_id' => $conversation->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /** @return array{handled: bool, message?: string} */
