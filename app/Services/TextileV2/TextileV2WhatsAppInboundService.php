@@ -33,6 +33,13 @@ class TextileV2WhatsAppInboundService
         $event=strtolower(str_replace(['_','-'],'.',(string)($payload['event']??'')));
         if($event!=='messages.upsert') return true;
 
+        $messageTs=(int)data_get($payload,'data.messageTimestamp',0);
+        if($messageTs>1000000000000) $messageTs=(int)floor($messageTs/1000);
+        if($messageTs>0 && $messageTs<now()->subMinutes(3)->timestamp){
+            Log::info('TEXTILE V2 STALE SYNC IGNORED',['message_ts'=>$messageTs,'id'=>data_get($payload,'data.key.id')]);
+            return true;
+        }
+
         $jid=trim((string)data_get($payload,'data.key.remoteJid',''));
         if($jid===''||str_ends_with($jid,'@g.us')) return true;
         $phone=preg_replace('/\D+/','',explode('@',$jid)[0]??'')??'';
