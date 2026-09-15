@@ -136,22 +136,37 @@ class TextileV2WhatsAppInboundService
     private function sendColorCatalogues(string $phone): void
     {
         try {
-            foreach ([
-                'regular' => 'regular-renk-kartelasi.jpg',
-                'oversize' => 'oversize-renk-kartelasi.jpg',
-                'polo' => 'polo-renk-kartelasi.jpg',
-            ] as $product => $fileName) {
-                $this->wa->sendImage(
-                    self::INSTANCE,
-                    $phone,
-                    $this->catalogue->create($product),
-                    $fileName,
-                    '',
-                    'image/jpeg'
-                );
+            $key='textile_v2_state:'.self::BOT_ID.':'.$phone;
+            $state=$this->stateService->normalize(Cache::store('database')->get($key));
+            $product=$state['product']??null;
+
+            if(!in_array($product,['regular','oversize','polo'],true)){
+                $this->send($phone,'Tabii. Hangi ürünün renklerini görmek istersiniz: *regular, oversize veya polo yaka*?');
+                return;
             }
 
-            $this->send($phone,"Renk kartelalarımız bunlar ✓\n\n*Regular, oversize ve polo yaka* seçeneklerini ayrı ayrı gönderdim. Otomatik baskı önizlemesini *siyah* ve *beyaz* ürünlerde hazırlıyoruz; diğer renkleri Fatih Bey manuel olarak hazırlıyor.");
+            $fileNames=[
+                'regular'=>'regular-renk-kartelasi.jpg',
+                'oversize'=>'oversize-renk-kartelasi.jpg',
+                'polo'=>'polo-renk-kartelasi.jpg',
+            ];
+
+            $this->wa->sendImage(
+                self::INSTANCE,
+                $phone,
+                $this->catalogue->create($product),
+                $fileNames[$product],
+                '',
+                'image/jpeg'
+            );
+
+            if($product==='oversize'){
+                $this->send($phone,'Oversize ürünlerde mevcut renklerimiz *siyah ve beyazdır* ✓');
+                return;
+            }
+
+            $label=$product==='polo'?'Polo yaka':'Regular';
+            $this->send($phone,$label.' renk kartelasını gönderdim ✓');
         } catch (Throwable $e) {
             Log::error('TEXTILE V2 CATALOGUE FAILED',['phone'=>$phone,'message'=>$e->getMessage()]);
             $this->send($phone,'Renk kartelasını gönderirken teknik bir sorun oluştu. Fatih Bey renk seçeneklerini manuel olarak iletecek.');
