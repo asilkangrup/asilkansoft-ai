@@ -205,9 +205,13 @@ final class PrintingDesignBriefService
             return true;
         }
 
-        // A compact "brand, style" reply (for example "Soykan Auto, premium")
-        // is brief metadata, not card content. Do not mark the design ready until
-        // actual contact/slogan/content information arrives.
+        // Order-intake sentences must never be promoted to card copy simply
+        // because they are long. This is what caused "500 adet ... tasarım yok"
+        // to complete the brief before the customer supplied contact details.
+        if (preg_match('/\b(?:adet|tane|kartvizit|broşür|brosur|etiket|katalog|tasarım yok|tasarim yok|tasarımım yok|tasarimim yok|çift yön|cift yon|tek yön|tek yon|kağıt|kagit|gramaj|ölçü|olcu)\b/iu', $text)) {
+            return false;
+        }
+
         $parts = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/u', $text) ?: [])));
         if (count($parts) <= 2 && $this->detectStyle($lower) !== null) {
             return false;
