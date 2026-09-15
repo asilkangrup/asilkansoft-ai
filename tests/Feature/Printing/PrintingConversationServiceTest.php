@@ -118,6 +118,23 @@ final class PrintingConversationServiceTest extends TestCase
         $this->assertNotContains('size', $size['missing']);
     }
 
+    public function test_explicit_first_message_delegation_is_respected_without_pending_history(): void
+    {
+        $service = app(PrintingConversationService::class);
+
+        $result = $service->process('500 adet çift yön kartvizit istiyorum, kağıt ve ölçüyü siz belirleyin. Tasarımım yok, siz hazırlayın.');
+
+        $this->assertSame('business_card', $result['state']['product']);
+        $this->assertSame(500, $result['state']['slots']['quantity']);
+        $this->assertSame('double', $result['state']['slots']['sides']);
+        $this->assertSame('no_preference', $result['state']['slots']['paper']);
+        $this->assertSame('85x50 mm', $result['state']['slots']['size']);
+        $this->assertSame('needs_design', $result['state']['slots']['design_status']);
+        $this->assertNotContains('paper', $result['missing']);
+        $this->assertNotContains('size', $result['missing']);
+        $this->assertSame('collecting_design_brief', $result['status']);
+    }
+
     public function test_design_without_artwork_enters_design_brief_flow(): void
     {
         $service = app(PrintingConversationService::class);
