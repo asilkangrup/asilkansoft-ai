@@ -20,6 +20,9 @@ final class PrintingWhatsAppInboundService
         private readonly PrintingAssistantService $assistant,
         private readonly PrintingBusinessCardMockupService $businessCardMockup,
         private readonly PrintingBusinessCardDesignService $businessCardDesign,
+        private readonly PrintingCreativeBackgroundService $creativeBackground,
+        private readonly PrintingReferenceAssetStore $referenceAssetStore,
+        private readonly PrintingReferenceAnalysisService $referenceAnalysis,
         private readonly PrintingPdfArtworkRenderer $pdfArtworkRenderer,
         private readonly PrintingArtworkClassifierService $artworkClassifier,
         private readonly EvolutionMediaService $mediaService,
@@ -111,6 +114,14 @@ final class PrintingWhatsAppInboundService
         if ((bool) $conversation->human_takeover) return true;
 
         try {
+            $this->captureReferenceIfApplicable(
+                sessionId: $sessionId,
+                instance: $instance,
+                payload: $payload,
+                message: $message,
+                attachments: $attachments,
+            );
+
             $result = $this->assistant->handle(
                 sessionId: $sessionId,
                 message: $message,
@@ -162,6 +173,60 @@ final class PrintingWhatsAppInboundService
         return true;
     }
 
+    private function captureReferenceIfApplicable(
+        string $sessionId,
+        string $instance,
+        array $payload,
+        string $message,
+        array $attachments,
+    ): void {
+        if ($attachments === []) return;
+
+        $image = data_get($payload, 'data.message.imageMessage');
+        if (! is_array($image)) return;
+
+        $mime = strtolower(trim((string) data_get($image, 'mimetype', 'image/jpeg')));
+        if (! in_array($mime, ['image/jpeg', 'image/jpg', 'image/png'], true)) return;
+
+        $state = $this->assistant->state($sessionId);
+        $designStatus = data_get($state, 'slots.design_status');
+        $lower = mb_strtolower($message, 'UTF-8');
+        $explicitReference = preg_match('/\b(?:örnek|ornek|referans|buna benzer|bunun gibi|bu tarz|şuna benzer|suna benzer)\b/u', $lower) === 1;
+
+        if ($designStatus !== 'needs_design' && ! $explicitReference) return;
+
+        try {
+            $envelope = [
+                'key' => data_get($payload, 'data.key', []),
+                'message' => data_get($payload, 'data.message', []),
+                'messageTimestamp' => data_get($payload, 'data.messageTimestamp'),
+            ];
+            $base64 = $this->mediaService->downloadBase64($instance, $envelope);
+            $this->referenceAssetStore->put($sessionId, $base64, $mime);
+            $analysis = $this->referenceAnalysis->analyze($base64);
+
+            $brief = is_array($state['design_brief'] ?? null) ? $state['design_brief'] : [];
+            if (trim((string) ($brief['colors'] ?? '')) === '') {
+                $brief['colors'] = $analysis['primary_color'].' '.$analysis['secondary_color'];
+            }
+            $brief['reference_tone'] = $analysis['tone'];
+
+            $this->assistant->mergeState($sessionId, [
+                'design_brief' => $brief,
+                'reference_asset_count' => (int) ($state['reference_asset_count'] ?? 0) + 1,
+            ]);
+
+            Log::info('PRINTING REFERENCE ASSET CAPTURED', [
+                'session_id_hash' => sha1($sessionId),
+                'tone' => $analysis['tone'],
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('PRINTING REFERENCE ASSET CAPTURE FAILED', [
+                'message' => $exception->getMessage(),
+            ]);
+        }
+    }
+
     private function trySendGeneratedBusinessCardDesign(
         AiBot $bot,
         ConversationControl $conversation,
@@ -176,10 +241,14 @@ final class PrintingWhatsAppInboundService
 
         try {
             $brief = is_array($state['design_brief'] ?? null) ? $state['design_brief'] : [];
-            $faces = $this->businessCardDesign->create($brief);
+            $referenceAsset = $this->referenceAssetStore->get((string) $conversation->session_id);
+            $creative = $this->creativeBackground->generate($brief, $referenceAsset);
+            $faces = $this->businessCardDesign->create($brief, $creative);
             $finish = (string) data_get($state, 'slots.lamination', 'mat');
             $mockup = $this->businessCardMockup->create($faces['front'], $faces['back'], $finish);
-            $caption = 'İlk kartvizit taslak önizlemesini hazırladım. Firma bilgilerini okunabilir tutarak ön ve arka yüzü baskı sunumuna yerleştirdim. Renk, yazı, logo veya yerleşim için istediğiniz revizeyi yazabilirsiniz.';
+            $caption = $referenceAsset !== null
+                ? 'İlk kartvizit taslak önizlemesini hazırladım. Gönderdiğiniz görselin genel renk ve görsel yönünü referans alıp iletişim bilgilerini okunabilir şekilde ayrı katmanda tuttum. İstediğiniz revizeyi yazabilirsiniz.'
+                : 'İlk kartvizit taslak önizlemesini hazırladım. Firma bilgilerini okunabilir tutarak ön ve arka yüzü baskı sunumuna yerleştirdim. Renk, yazı, logo veya yerleşim için istediğiniz revizeyi yazabilirsiniz.';
 
             $this->whatsAppService->sendImage(
                 $instance,
@@ -199,11 +268,17 @@ final class PrintingWhatsAppInboundService
                 senderType: 'ai',
             );
 
+            $this->assistant->mergeState((string) $conversation->session_id, [
+                'design_generation_completed_at' => now()->toIso8601String(),
+            ]);
+
             Log::info('PRINTING GENERATED BUSINESS CARD DESIGN SENT', [
                 'ai_bot_id' => $bot->id,
                 'conversation_id' => $conversation->id,
                 'phone_number' => $phone,
                 'style' => $brief['style'] ?? null,
+                'creative_background' => $creative !== null,
+                'reference_used' => $referenceAsset !== null,
             ]);
 
             return true;
@@ -229,6 +304,7 @@ final class PrintingWhatsAppInboundService
     ): array {
         $state = is_array($result['state'] ?? null) ? $result['state'] : [];
         if (($state['product'] ?? null) !== 'business_card') return ['handled' => false];
+        if (data_get($state, 'slots.design_status') === 'needs_design') return ['handled' => false];
 
         $image = data_get($payload, 'data.message.imageMessage');
         $document = data_get($payload, 'data.message.documentMessage');
@@ -273,7 +349,7 @@ final class PrintingWhatsAppInboundService
 
                     return [
                         'handled' => true,
-                        'message' => 'Gönderdiğiniz görsel kartvizit baskı tasarımı gibi görünmüyor. Önizleme hazırlayabilmem için kartvizitin ön/arka yüz tasarımını JPG, PNG veya PDF olarak gönderebilirsiniz. Yalnızca logo gönderdiyseniz tasarımı da birlikte hazırlayabiliriz.',
+                        'message' => 'Gönderdiğiniz görsel kartvizit baskı tasarımı gibi görünmüyor. Önizleme hazırlayabilmem için kartvizitin ön/arka yüz tasarımını JPG, PNG veya PDF olarak gönderebilirsiniz. Yalnızca logo veya örnek gönderdiyseniz tasarımı da birlikte hazırlayabiliriz.',
                     ];
                 }
                 $front = $mediaBase64;
