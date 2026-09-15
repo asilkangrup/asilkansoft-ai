@@ -6,7 +6,6 @@ use RuntimeException;
 
 class TextileV2ColorCatalogueService
 {
-    // Generates durable WhatsApp-ready catalogues from the product image library.
     private const COLORS = [
         'beige' => 'Bej',
         'orange' => 'Turuncu',
@@ -34,8 +33,20 @@ class TextileV2ColorCatalogueService
             throw new RuntimeException('Geçersiz kartela ürünü.');
         }
 
-        $width = 1200;
-        $height = 1050;
+        $colors = $product === 'oversize'
+            ? ['white' => 'Beyaz', 'black' => 'Siyah']
+            : self::COLORS;
+
+        $font = $this->fontPath();
+        $cols = $product === 'oversize' ? 2 : 4;
+        $cellW = 285;
+        $cellH = 300;
+        $startX = 30;
+        $startY = 92;
+        $rows = (int) ceil(count($colors) / $cols);
+        $width = $product === 'oversize' ? 620 : 1200;
+        $height = $startY + ($rows * $cellH) + 30;
+
         $canvas = imagecreatetruecolor($width, $height);
         if (! $canvas) {
             throw new RuntimeException('Kartela görseli oluşturulamadı.');
@@ -46,17 +57,11 @@ class TextileV2ColorCatalogueService
         $gray = imagecolorallocate($canvas, 245, 245, 245);
         imagefill($canvas, 0, 0, $white);
 
-        imagestring($canvas, 5, 30, 24, $labels[$product], $black);
-        imagestring($canvas, 3, 30, 52, 'İstanbul Tişört Baskı', $black);
-
-        $cols = 4;
-        $cellW = 285;
-        $cellH = 300;
-        $startX = 30;
-        $startY = 92;
+        $this->writeText($canvas, 22, 30, 40, $black, $font, $labels[$product]);
+        $this->writeText($canvas, 14, 30, 70, $black, $font, 'İstanbul Tişört Baskı');
 
         $index = 0;
-        foreach (self::COLORS as $color => $label) {
+        foreach ($colors as $color => $label) {
             $row = intdiv($index, $cols);
             $col = $index % $cols;
             $x = $startX + ($col * $cellW);
@@ -82,12 +87,12 @@ class TextileV2ColorCatalogueService
                 }
             }
 
-            imagestring($canvas, 5, $x + 18, $y + 240, $label, $black);
+            $this->writeText($canvas, 15, $x + 18, $y + 258, $black, $font, $label);
             $index++;
         }
 
         ob_start();
-        imagejpeg($canvas, null, 88);
+        imagejpeg($canvas, null, 90);
         $bytes = ob_get_clean();
         imagedestroy($canvas);
 
@@ -96,5 +101,25 @@ class TextileV2ColorCatalogueService
         }
 
         return base64_encode($bytes);
+    }
+
+    private function fontPath(): string
+    {
+        foreach ([
+            public_path('fonts/DejaVuSans.ttf'),
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+            '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+        ] as $font) {
+            if (is_file($font)) {
+                return $font;
+            }
+        }
+
+        throw new RuntimeException('Türkçe karakter destekli font bulunamadı.');
+    }
+
+    private function writeText($image, int $size, int $x, int $y, int $color, string $font, string $text): void
+    {
+        imagettftext($image, $size, 0, $x, $y, $color, $font, $text);
     }
 }
