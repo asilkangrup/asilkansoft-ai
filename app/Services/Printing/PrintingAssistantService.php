@@ -42,7 +42,9 @@ final class PrintingAssistantService
 
     public function reset(string $sessionId): void
     {
-        $this->store()->forget($this->cacheKey($sessionId));
+        $cache = $this->store();
+        $cache->forget($this->cacheKey($sessionId));
+        $cache->forget($this->referenceAssetKey($sessionId));
     }
 
     public function state(string $sessionId): array
@@ -109,6 +111,11 @@ final class PrintingAssistantService
     private function cacheKey(string $sessionId): string
     {
         return 'matbaa_ai:conversation:'.sha1($sessionId);
+    }
+
+    private function referenceAssetKey(string $sessionId): string
+    {
+        return 'matbaa_ai:reference_asset:'.sha1($sessionId);
     }
 
     private function store(): Repository
