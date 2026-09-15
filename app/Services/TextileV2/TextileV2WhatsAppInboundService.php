@@ -69,7 +69,7 @@ class TextileV2WhatsAppInboundService
 
         $key='textile_v2_state:'.self::BOT_ID.':'.$phone;
         $state=$this->stateService->normalize(Cache::store('database')->get($key));
-        if($this->stateService->restart($text)) $state=$this->stateService->initial();
+        if($text!==null && $this->stateService->restart($text)) $state=$this->stateService->initial();
 
         $mediaType=$this->mediaType($payload);
         if(in_array($mediaType,['image','document'],true)){
@@ -91,15 +91,15 @@ class TextileV2WhatsAppInboundService
             }
         }
 
-        if($text!=='') $state=$this->stateService->parse($state,$text);
+        if($text!==null && trim($text)!=='') $state=$this->stateService->parse($state,$text);
         Cache::store('database')->put($key,$state,now()->addHours(48));
 
-        if($this->stateService->asksColors($text)){
+        if($text!==null && $this->stateService->asksColors($text)){
             $this->sendColorCatalogues($phone);
             return true;
         }
 
-        if(($faq=$this->stateService->faq($text))!==null){
+        if($text!==null && ($faq=$this->stateService->faq($text))!==null){
             $this->send($phone,$faq);
             return true;
         }
@@ -133,7 +133,7 @@ class TextileV2WhatsAppInboundService
             }
         }
 
-        $reply=$this->stateService->next($state,$text);
+        $reply=$this->stateService->next($state,$text??'');
         if($reply!=='') $this->send($phone,$reply);
         return true;
     }
