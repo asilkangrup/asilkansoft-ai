@@ -60,6 +60,8 @@ jobs:
           php -l app/Services/Printing/PrintingDesignBriefService.php
           php -l app/Services/Printing/PrintingArtworkClassifierService.php
           php -l app/Services/Printing/PrintingReferenceAnalysisService.php
+          php -l app/Services/Printing/PrintingReferenceAssetStore.php
+          php -l app/Services/Printing/PrintingCreativeBackgroundService.php
           php -l app/Services/Printing/PrintingBusinessCardDesignService.php
           php -l app/Services/Printing/PrintingOpenAiService.php
           php -l app/Services/Printing/PrintingAssistantService.php
