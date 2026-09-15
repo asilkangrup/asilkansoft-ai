@@ -13,6 +13,8 @@ on:
     branches:
       - matbaa-ai
       - matbaa-whatsapp-live
+      - matbaa-business-card-mockup
+      - matbaa-card-pdf-preview-2
     paths:
       - 'app/Services/Printing/**'
       - 'app/Jobs/ProcessPrintingTextBurst.php'
@@ -36,6 +38,9 @@ jobs:
           extensions: mbstring, gd, sqlite3, pdo_sqlite
           coverage: none
 
+      - name: Install system PDF tools
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
@@ -52,6 +57,8 @@ jobs:
           php -l app/Services/Printing/PrintingConversationService.php
           php -l app/Services/Printing/PrintingOpenAiService.php
           php -l app/Services/Printing/PrintingAssistantService.php
+          php -l app/Services/Printing/PrintingBusinessCardMockupService.php
+          php -l app/Services/Printing/PrintingPdfArtworkRenderer.php
           php -l app/Services/Printing/PrintingWhatsAppInboundService.php
           php -l app/Jobs/ProcessPrintingTextBurst.php
           php -l app/Jobs/ProcessWhatsAppWebhook.php
@@ -59,4 +66,4 @@ jobs:
       - name: Run Matbaa tests
         env:
           MATBAA_AI_ENABLED: 'false'
-        run: php artisan test tests/Feature/Printing/PrintingConversationServiceTest.php
+        run: php artisan test tests/Feature/Printing
