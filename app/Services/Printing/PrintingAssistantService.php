@@ -10,6 +10,7 @@ final class PrintingAssistantService
     public function __construct(
         private readonly PrintingConversationService $conversation,
         private readonly PrintingOpenAiService $openAi,
+        private readonly PrintingSemanticInterpreterService $semantic,
     ) {
     }
 
@@ -27,7 +28,15 @@ final class PrintingAssistantService
         }
 
         $attachments = $this->normalizeAttachments($attachments);
-        $result = $this->conversation->process($message, $state, $attachments);
+
+        $semanticMessage = $this->semantic->normalize(
+            message: $message,
+            state: $state,
+            recentMessages: $recentMessages,
+        );
+
+        $result = $this->conversation->process($semanticMessage, $state, $attachments);
+        $result['semantic_message'] = $semanticMessage;
 
         $cache->put($cacheKey, $result['state'], now()->addDays(30));
 
@@ -71,6 +80,7 @@ final class PrintingAssistantService
             'debounce_seconds' => (int) config('matbaa.debounce_seconds', 10),
             'max_questions_per_turn' => (int) config('matbaa.max_questions_per_turn', 2),
             'state_store' => 'database',
+            'semantic_interpreter' => $this->semantic->enabled(),
             'ready_for_live_traffic' => (bool) config('matbaa.enabled') && filled(config('matbaa.api_key')),
         ];
     }
