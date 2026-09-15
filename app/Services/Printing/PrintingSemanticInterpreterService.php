@@ -11,16 +11,19 @@ final class PrintingSemanticInterpreterService
         return (bool) config('matbaa.enabled') && filled(config('matbaa.api_key'));
     }
 
-    /**
-     * Converts short/contextual WhatsApp replies into an explicit sentence that
-     * the deterministic order engine can safely consume. It may clarify only
-     * what the customer already meant in the current state; it must never invent
-     * quantity, material, price, delivery time or design content.
-     */
     public function normalize(string $message, array $state, array $recentMessages = []): string
     {
         $original = trim($message);
-        if ($original === '' || ! $this->enabled()) {
+        if ($original === '') {
+            return $original;
+        }
+
+        $fast = $this->fastContextNormalization($original, $state);
+        if ($fast !== null) {
+            return $fast;
+        }
+
+        if (! $this->enabled()) {
             return $original;
         }
 
@@ -94,5 +97,33 @@ PROMPT;
             report($exception);
             return $original;
         }
+    }
+
+    private function fastContextNormalization(string $message, array $state): ?string
+    {
+        $text = mb_strtolower(trim($message), 'UTF-8');
+        $pending = array_values(array_filter($state['pending_fields'] ?? [], 'is_string'));
+
+        if (in_array('design_status', $pending, true)) {
+            if (preg_match('/^(?:siz\s+)?(?:hazırlayın|hazirlayin|yapın|yapin|tasarlayın|tasarlayin|hazırlayalım|hazirlayalim|yapalım|yapalim)[.! ]*$/u', $text)) {
+                return 'Tasarımım yok, siz hazırlayın.';
+            }
+            if (preg_match('/^(?:hazır|hazir|var|evet|bende var|dosya hazır|dosya hazir)[.! ]*$/u', $text)) {
+                return 'Tasarım dosyam hazır.';
+            }
+        }
+
+        if ((in_array('paper', $pending, true) || in_array('material', $pending, true) || in_array('size', $pending, true))
+            && preg_match('/^(?:standart|siz seçin|siz secin|siz belirleyin|fark etmez|farketmez|uygun olan)[.! ]*$/u', $text)) {
+            $field = in_array('paper', $pending, true) ? 'Kağıt ve gramajı' : (in_array('material', $pending, true) ? 'Malzemeyi' : 'Ölçüyü');
+            return $field.' uygun standart seçeneğe göre siz belirleyin.';
+        }
+
+        if (in_array('brief:content', $pending, true)
+            && preg_match('/^\+?[\d\s().-]{10,24}$/u', trim($message))) {
+            return 'Kartta telefon: '.trim($message).' yer alsın.';
+        }
+
+        return null;
     }
 }
