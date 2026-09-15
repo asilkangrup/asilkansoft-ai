@@ -79,10 +79,10 @@ final class PrintingCreativeBackgroundService
             ->asMultipart()
             ->attach('image[]', $bytes, 'reference.'.$extension, ['Content-Type' => $mime])
             ->post('https://api.openai.com/v1/images/edits', [
-                ['name' => 'model', 'contents' => $model],
-                ['name' => 'prompt', 'contents' => $prompt],
-                ['name' => 'size', 'contents' => '1536x1024'],
-                ['name' => 'quality', 'contents' => $quality],
+                'model' => $model,
+                'prompt' => $prompt,
+                'size' => '1536x1024',
+                'quality' => $quality,
             ]);
     }
 
