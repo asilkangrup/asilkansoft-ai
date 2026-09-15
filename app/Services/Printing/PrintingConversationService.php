@@ -22,6 +22,7 @@ final class PrintingConversationService
     public function __construct(
         private readonly PrintingIntentExtractor $extractor,
         private readonly PrintingProductCatalog $catalog,
+        private readonly PrintingDesignBriefService $designBrief,
     ) {
     }
 
@@ -46,60 +47,81 @@ final class PrintingConversationService
         $product = $this->catalog->get($state['product']);
         $label = $product['label'] ?? 'baskı işi';
 
-        if ($missing === []) {
-            $design = $state['slots']['design_status'] ?? null;
-            if ($design === null) {
-                $reply = $this->paperPreferenceAcknowledgement($state)
-                    ."Tasarım dosyanız hazırsa buradan gönderebilirsiniz. Hazır değilse tasarım desteği gerektiğini söylemeniz yeterli.";
-                return $this->result($state, [], trim($reply), 'awaiting_design', ['design_status']);
-            }
+        if ($missing !== []) {
+            $questionText = implode(' ', array_map(
+                static fn (string $field) => self::QUESTIONS[$field] ?? ucfirst(str_replace('_', ' ', $field)).' bilgisini de alabilir miyim?',
+                $questions
+            ));
 
-            if ($design === 'ready' && empty($state['attachments'])) {
-                $reply = "Tasarım hazırsa dosyayı PDF, JPG veya PNG olarak buradan gönderebilirsiniz. Dosya gelince işi teklif için hazır hale getireceğim.";
-                return $this->result($state, [], $reply, 'awaiting_file', ['design_file']);
-            }
+            $previousPending = $state['pending_fields'] ?? [];
+            $isFirstProductTurn = in_array('product', $previousPending, true);
+            $prefix = $isFirstProductTurn
+                ? ucfirst($label)." için ilerleyelim. "
+                : $this->preferenceAcknowledgement($state);
 
-            $reply = "{$label} talebiniz teklif hazırlanabilecek seviyede. Bilgileri ekibe aktaracağım; net fiyat kontrol edilmeden kesin rakam paylaşmayacağım.";
-            return $this->result($state, [], $reply, 'quote_ready', []);
+            return $this->result($state, $missing, trim($prefix.$questionText), 'collecting', $questions);
         }
 
-        $questionText = implode(' ', array_map(
-            static fn (string $field) => self::QUESTIONS[$field] ?? ucfirst(str_replace('_', ' ', $field)).' bilgisini de alabilir miyim?',
-            $questions
-        ));
+        $design = $state['slots']['design_status'] ?? null;
 
-        // Her turda siparişin tamamını tekrar okuyup "not aldım" deme. Yalnızca
-        // ilk ürün seçiminde kısa teyit ver, devamında doğrudan eksik bilgiye geç.
-        $previousPending = $state['pending_fields'] ?? [];
-        $isFirstProductTurn = in_array('product', $previousPending, true);
-        $prefix = $isFirstProductTurn
-            ? ucfirst($label)." için ilerleyelim. "
-            : $this->paperPreferenceAcknowledgement($state);
+        if ($design === 'needs_design') {
+            $state['design_brief'] = $this->designBrief->collect(
+                message: $message,
+                brief: is_array($state['design_brief'] ?? null) ? $state['design_brief'] : [],
+            );
 
-        return $this->result($state, $missing, trim($prefix.$questionText), 'collecting', $questions);
+            $briefMissing = $this->designBrief->missing($state['design_brief']);
+            if ($briefMissing !== []) {
+                $briefQuestions = $this->designBrief->questions($briefMissing, $max);
+                $reply = 'Tasarımı biz hazırlayabiliriz. '.implode(' ', $briefQuestions);
+
+                return $this->result(
+                    $state,
+                    [],
+                    $reply,
+                    'collecting_design_brief',
+                    array_map(static fn (string $field) => 'brief:'.$field, array_slice($briefMissing, 0, $max))
+                );
+            }
+
+            $reply = 'Tasarım briefi yeterli seviyede. İlk taslağı hazırlamak için bilgileri yaratıcı üretim akışına aktarıyorum; baskı detaylarını değiştirmeden ilerleyeceğim.';
+            return $this->result($state, [], $reply, 'design_brief_ready', []);
+        }
+
+        if ($design === null) {
+            $reply = $this->preferenceAcknowledgement($state)
+                .'Tasarım dosyanız hazır mı? Hazırsa buradan gönderebilirsiniz; yoksa tasarımı sizin için hazırlayabiliriz.';
+            return $this->result($state, [], trim($reply), 'awaiting_design_choice', ['design_status']);
+        }
+
+        if ($design === 'ready' && empty($state['attachments'])) {
+            $reply = 'Tasarım hazırsa dosyayı PDF, JPG veya PNG olarak buradan gönderebilirsiniz. Dosyayı kontrol edip uygun üründe baskı önizlemesi hazırlayacağım.';
+            return $this->result($state, [], $reply, 'awaiting_file', ['design_file']);
+        }
+
+        $reply = "{$label} talebiniz teklif hazırlanabilecek seviyede. Bilgileri ekibe aktaracağım; net fiyat kontrol edilmeden kesin rakam paylaşmayacağım.";
+        return $this->result($state, [], $reply, 'quote_ready', []);
     }
 
     public function systemPrompt(): string
     {
         return <<<'PROMPT'
-Sen Türkiye'deki profesyonel bir matbaa/ofset baskı işletmesinin WhatsApp satış danışmanısın.
+Sen Türkiye'deki profesyonel bir matbaa/ofset baskı işletmesinin WhatsApp satış ve tasarım danışmanısın.
 
 Konuşma kuralları:
 - Türkçe, doğal, kısa ve insan gibi konuş. Robot, form veya çağrı merkezi dili kullanma.
 - Müşterinin yazdığı bilgileri ASLA tekrar sorma. Tek mesajda verdiği tüm ayrıntıları kullan.
 - Her turda sipariş özetini baştan sayma; "not aldım", "tamamdır" gibi kalıpları peş peşe tekrarlama.
-- Müşteri "yok", "tercihim yok", "fark etmez" derse son sorulan alan için bunu geçerli cevap kabul et; aynı soruyu tekrar sorma.
-- Tercihi olmayan müşteriye kesin teknik özellik uydurma. Uygun standart seçeneğin ekipçe önerilebileceğini söyle ve akışı ilerlet.
+- Müşteri "yok", "tercihim yok", "fark etmez", "siz seçin", "siz belirleyin", "standart olsun" derse son sorulan alan için bunu geçerli cevap kabul et; aynı soruyu tekrar sorma.
+- Ürün belli olduktan sonra tekrar ürün sorma.
+- Tasarım yoksa bunu problem gibi sunma; kısa bir brief toplayıp tasarım hazırlama akışına geçir.
+- Dosya geldi diye körlemesine baskı tasarımı kabul etme. Dosya rolü belirsizse önce doğrula.
 - Bir turda en fazla 1-2 mantıklı soru sor; soruları mümkünse aynı doğal cümlede grupla.
 - Ürüne göre gerekli teknik bilgileri sor. İlgisiz teknik detaylarla müşteriyi yorma.
-- Müşteri terimi yanlış kullandıysa üstünlük taslamadan doğru seçeneğe yönlendir.
 - Tasarım dosyası geldiyse tekrar 'tasarımınız hazır mı' diye sorma.
-- PDF/JPG/PNG dosyalarını tasarım dosyası olarak kabul et.
 - Fiyat tablosu veya doğrulanmış fiyat sonucu yoksa ASLA fiyat uydurma, tahmin verme veya 'yaklaşık' rakam üretme.
 - Teslim süresini sistemde doğrulanmış bilgi yoksa kesin vaat etme.
 - İş baskıya/teklife hazır hale geldiğinde kısa bir özetle personele aktarılacağını söyle.
-- Müşteri birden fazla ürün istiyorsa her ürünü ayrı kalem olarak tut; bilgileri birbirine karıştırma.
-- 'Nasıl yardımcı olabilirim?' gibi gereksiz tekrarlar yapma; konuşmanın kaldığı yerden devam et.
 - Emoji kullanımı çok sınırlı olsun; profesyonel matbaa görüşmesinde gerekmedikçe emoji kullanma.
 PROMPT;
     }
@@ -118,11 +140,18 @@ PROMPT;
         ];
     }
 
-    private function paperPreferenceAcknowledgement(array $state): string
+    private function preferenceAcknowledgement(array $state): string
     {
-        return (($state['slots']['paper'] ?? null) === 'no_preference')
-            ? 'Sorun değil, kağıt/gramaj için uygun standart seçeneği önerebiliriz. '
-            : '';
+        $parts = [];
+
+        if (($state['slots']['paper'] ?? null) === 'no_preference') {
+            $parts[] = 'Kağıt/gramaj için uygun standart seçeneği önerebiliriz.';
+        }
+        if (($state['slots']['material'] ?? null) === 'no_preference') {
+            $parts[] = 'Malzeme için kullanımınıza uygun standart seçeneği önerebiliriz.';
+        }
+
+        return $parts === [] ? '' : implode(' ', $parts).' ';
     }
 
     private function isGreeting(string $message): bool
