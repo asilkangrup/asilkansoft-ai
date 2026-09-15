@@ -237,6 +237,9 @@ class TextileV2WhatsAppInboundService
         try{
             $name=trim((string)($c->customer_name??''))?:'İsimsiz müşteri';
             $positions=empty($s['positions'])?'-':implode(', ',array_map(fn($p)=>$this->stateService->label($p),$s['positions']));
+            $dedupePayload=['status'=>$status,'phone'=>$phone,'product'=>$s['product']??null,'color'=>$s['color']??null,'quantity'=>$s['quantity']??null,'positions'=>$s['positions']??[],'logo'=>hash('sha256',(string)($s['logo_base64']??''))];
+            $dedupeKey='textile_v2_group_once:'.sha1(json_encode($dedupePayload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
+            if(!Cache::store('database')->add($dedupeKey,true,now()->addMinutes(10))) return;
             $this->wa->sendGroupText(self::INSTANCE,self::GROUP_JID,implode("\n",[
                 '🖨️ *İstanbul Tişört V2*','',
                 'Durum: *'.$status.'*','Müşteri: *'.$name.'*','Telefon: *+'.$phone.'*',
