@@ -2,7 +2,7 @@
 namespace App\Services\TextileV2;
 use Illuminate\Support\Str;
 class TextileV2StateService {
- public function initial(): array { return ['product'=>null,'product_label'=>null,'color'=>null,'color_label'=>null,'quantity'=>null,'positions'=>[],'logo_base64'=>null,'logo_received'=>false,'mockup_sent'=>false,'approved'=>false]; }
+ public function initial(): array { return ['product'=>null,'product_label'=>null,'color'=>null,'color_label'=>null,'quantity'=>null,'positions'=>[],'logo_base64'=>null,'logo_received'=>false,'mockup_sent'=>false,'approved'=>false,'approved_notified'=>false]; }
  public function normalize(mixed $v): array { return is_array($v)?array_replace($this->initial(),$v):$this->initial(); }
  public function parse(array $s,string $text): array {
   $l=Str::lower(trim($text));
