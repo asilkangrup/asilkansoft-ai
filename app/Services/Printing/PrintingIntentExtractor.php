@@ -12,11 +12,15 @@ final class PrintingIntentExtractor
     {
         $text = mb_strtolower(trim($message), 'UTF-8');
         $product = $this->catalog->detect($text) ?? ($current['product'] ?? null);
-        $slots = $current['slots'] ?? [];
+        $slots = is_array($current['slots'] ?? null) ? $current['slots'] : [];
         $pendingFields = array_values(array_filter($current['pending_fields'] ?? [], 'is_string'));
 
-        if ($product && empty($slots)) {
+        if ($product && $slots === []) {
             $slots = $this->catalog->defaults($product);
+        } elseif ($product) {
+            // A product may be resolved after a generic first turn. Defaults must
+            // still be applied without overwriting information already supplied.
+            $slots = array_replace($this->catalog->defaults($product), $slots);
         }
 
         if (preg_match('/(?<!\d)(\d{1,3}(?:[\.\s]\d{3})+|\d+)\s*(?:adet|tane)\b/u', $text, $m)) {
@@ -33,9 +37,18 @@ final class PrintingIntentExtractor
             $slots['paper'] = $m[1].' gr';
         }
 
-        if (str_contains($text, 'çift yön') || str_contains($text, 'cift yon') || str_contains($text, 'ön arka') || str_contains($text, 'on arka')) {
+        if (
+            str_contains($text, 'çift yön') || str_contains($text, 'cift yon')
+            || str_contains($text, 'çift taraf') || str_contains($text, 'cift taraf')
+            || str_contains($text, 'ön arka') || str_contains($text, 'on arka')
+            || preg_match('/\b4\s*\+\s*4\b/u', $text)
+        ) {
             $slots['sides'] = 'double';
-        } elseif (str_contains($text, 'tek yön') || str_contains($text, 'tek yon')) {
+        } elseif (
+            str_contains($text, 'tek yön') || str_contains($text, 'tek yon')
+            || str_contains($text, 'tek taraf')
+            || preg_match('/\b4\s*\+\s*0\b/u', $text)
+        ) {
             $slots['sides'] = 'single';
         }
 
@@ -55,9 +68,28 @@ final class PrintingIntentExtractor
             $slots['sheet_count'] = (int) $m[1];
         }
 
-        if (str_contains($text, 'tasarım hazır') || str_contains($text, 'tasarim hazir') || str_contains($text, 'dosyam hazır') || str_contains($text, 'dosyam hazir')) {
+        $designReady = str_contains($text, 'tasarım hazır')
+            || str_contains($text, 'tasarim hazir')
+            || str_contains($text, 'dosyam hazır')
+            || str_contains($text, 'dosyam hazir')
+            || (in_array('design_status', $pendingFields, true) && preg_match('/^(?:hazır|hazir|evet|var)$/u', $text));
+
+        $needsDesign = str_contains($text, 'tasarım yok')
+            || str_contains($text, 'tasarim yok')
+            || str_contains($text, 'tasarımım yok')
+            || str_contains($text, 'tasarimim yok')
+            || str_contains($text, 'tasarım lazım')
+            || str_contains($text, 'tasarim lazim')
+            || str_contains($text, 'siz tasarlayın')
+            || str_contains($text, 'siz tasarlayin')
+            || str_contains($text, 'tasarımı siz yapın')
+            || str_contains($text, 'tasarimi siz yapin')
+            || str_contains($text, 'siz yapın')
+            || str_contains($text, 'siz yapin');
+
+        if ($designReady) {
             $slots['design_status'] = 'ready';
-        } elseif (str_contains($text, 'tasarım yok') || str_contains($text, 'tasarim yok') || str_contains($text, 'tasarım lazım') || str_contains($text, 'tasarim lazim')) {
+        } elseif ($needsDesign) {
             $slots['design_status'] = 'needs_design';
         }
 
@@ -87,21 +119,19 @@ final class PrintingIntentExtractor
             $slots['cut_shape'] = 'özel kesim';
         }
 
-        // "Yok", "farketmez", "tercihim yok" gibi kısa cevapları son sorulan
-        // alana göre yorumla. Böylece müşteri aynı soruya tekrar tekrar maruz kalmaz.
-        $noPreference = preg_match('/^(?:yok|hayır|hayir|farketmez|fark etmez|tercihim yok|siz seçin|siz secin|standart olsun)$/u', $text) === 1
-            || str_contains($text, 'tercihim yok')
-            || str_contains($text, 'fark etmez');
-
-        if ($noPreference) {
+        $standardChoice = $this->standardChoice($text);
+        if ($standardChoice) {
             if (in_array('paper', $pendingFields, true) && ! isset($slots['paper'])) {
                 $slots['paper'] = 'no_preference';
             }
             if (in_array('material', $pendingFields, true) && ! isset($slots['material'])) {
                 $slots['material'] = 'no_preference';
             }
-            if (in_array('design_status', $pendingFields, true) && ! isset($slots['design_status'])) {
-                $slots['design_status'] = 'needs_design';
+            if (in_array('size', $pendingFields, true) && ! isset($slots['size']) && $product) {
+                $defaultSize = $this->catalog->defaults($product)['size'] ?? null;
+                if (is_string($defaultSize) && $defaultSize !== '') {
+                    $slots['size'] = $defaultSize;
+                }
             }
         }
 
@@ -109,6 +139,7 @@ final class PrintingIntentExtractor
             'product' => $product,
             'slots' => array_filter($slots, static fn ($value) => $value !== null && $value !== ''),
             'pending_fields' => $pendingFields,
+            'design_brief' => is_array($current['design_brief'] ?? null) ? $current['design_brief'] : [],
         ];
     }
 
@@ -125,5 +156,20 @@ final class PrintingIntentExtractor
             $this->catalog->requiredFields($product),
             static fn (string $field) => ! array_key_exists($field, $slots)
         ));
+    }
+
+    private function standardChoice(string $text): bool
+    {
+        return preg_match(
+            '/^(?:yok|hayır|hayir|farketmez|fark etmez|tercihim yok|siz seçin|siz secin|siz belirleyin|onu siz belirleyin|onu da siz belirleyin|onuda siz belirleyin|standart olsun|standart|uygun olan olsun|uygun olanı siz seçin|uygun olani siz secin)$/u',
+            trim($text)
+        ) === 1
+            || str_contains($text, 'tercihim yok')
+            || str_contains($text, 'fark etmez')
+            || str_contains($text, 'siz belirleyin')
+            || str_contains($text, 'siz seçin')
+            || str_contains($text, 'siz secin')
+            || str_contains($text, 'standart olsun')
+            || str_contains($text, 'uygun olan');
     }
 }
