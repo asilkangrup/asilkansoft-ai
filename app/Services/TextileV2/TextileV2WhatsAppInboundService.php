@@ -21,6 +21,7 @@ class TextileV2WhatsAppInboundService
         private readonly WhatsAppService $wa,
         private readonly TextileV2StateService $stateService,
         private readonly TextileV2PreviewService $preview,
+        private readonly TextileV2ColorCatalogueService $catalogue,
     ) {}
 
     public function process(array $payload): bool
@@ -82,7 +83,7 @@ class TextileV2WhatsAppInboundService
         Cache::store('database')->put($key,$state,now()->addHours(48));
 
         if($this->stateService->asksColors($text)){
-            $this->send($phone,"Elbette. Mevcut renk kartelasını birazdan göndereceğim.\n\nOtomatik baskı önizlemesini *siyah* ve *beyaz* tişörtlerde hazırlıyoruz; diğer renkleri Fatih Bey manuel hazırlıyor.");
+            $this->sendColorCatalogues($phone);
             return true;
         }
 
@@ -123,6 +124,31 @@ class TextileV2WhatsAppInboundService
         $reply=$this->stateService->next($state,$text);
         if($reply!=='') $this->send($phone,$reply);
         return true;
+    }
+
+    private function sendColorCatalogues(string $phone): void
+    {
+        try {
+            foreach ([
+                'regular' => 'regular-renk-kartelasi.jpg',
+                'oversize' => 'oversize-renk-kartelasi.jpg',
+                'polo' => 'polo-renk-kartelasi.jpg',
+            ] as $product => $fileName) {
+                $this->wa->sendImage(
+                    self::INSTANCE,
+                    $phone,
+                    $this->catalogue->create($product),
+                    $fileName,
+                    '',
+                    'image/jpeg'
+                );
+            }
+
+            $this->send($phone,"Renk kartelalarımız bunlar ✓\n\n*Regular, oversize ve polo yaka* seçeneklerini ayrı ayrı gönderdim. Otomatik baskı önizlemesini *siyah* ve *beyaz* ürünlerde hazırlıyoruz; diğer renkleri Fatih Bey manuel olarak hazırlıyor.");
+        } catch (Throwable $e) {
+            Log::error('TEXTILE V2 CATALOGUE FAILED',['phone'=>$phone,'message'=>$e->getMessage()]);
+            $this->send($phone,'Renk kartelasını gönderirken teknik bir sorun oluştu. Fatih Bey renk seçeneklerini manuel olarak iletecek.');
+        }
     }
 
     private function conversation(string $phone,array $payload): ConversationControl
