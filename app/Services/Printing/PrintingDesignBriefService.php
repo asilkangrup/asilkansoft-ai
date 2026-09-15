@@ -64,9 +64,6 @@ final class PrintingDesignBriefService
             $brief['address'] = trim($m[1]);
         }
 
-        // WhatsApp customers often answer “Soykan Auto, premium” after the bot
-        // has asked brand + style. Interpret that naturally instead of forcing
-        // them to repeat labels such as “firma adı”.
         if (! isset($brief['brand_name']) && $this->isPending($pendingFields, 'brand_name')) {
             $candidate = $this->brandCandidate($text);
             if ($candidate !== null) {
@@ -81,14 +78,11 @@ final class PrintingDesignBriefService
             }
         }
 
-        // Contact fields themselves are usable card content. A phone number on
-        // its own must not cause the assistant to ask the same “content” question
-        // again just because the free-form sentence was short.
         if ($this->hasUsableContent($brief)) {
             $brief['content'] = $this->contentSummary($brief, (string) ($brief['content'] ?? ''));
-        } elseif (mb_strlen($text, 'UTF-8') >= 8 && ! $this->isGenericDesignAnswer($lower) && $this->isPending($pendingFields, 'content')) {
+        } elseif ($this->isPending($pendingFields, 'content') && $this->looksLikeActualContent($text, $lower)) {
             $brief['content'] = $this->mergeContent((string) ($brief['content'] ?? ''), $text);
-        } elseif (mb_strlen($text, 'UTF-8') >= 18 && ! $this->isGenericDesignAnswer($lower)) {
+        } elseif ($this->looksLikeActualContent($text, $lower) && mb_strlen($text, 'UTF-8') >= 18) {
             $brief['content'] = $this->mergeContent((string) ($brief['content'] ?? ''), $text);
         }
 
@@ -192,6 +186,34 @@ final class PrintingDesignBriefService
 
         $summary = implode("\n", $parts);
         return $this->mergeContent($existing, $summary);
+    }
+
+    private function looksLikeActualContent(string $text, string $lower): bool
+    {
+        if ($this->isGenericDesignAnswer($lower)) {
+            return false;
+        }
+
+        if (preg_match('/\b(?:telefon|tel|gsm|adres|instagram|insta|ig|e-?posta|email|mail|web|site|www|slogan|motto)\b/iu', $text)) {
+            return true;
+        }
+
+        if (preg_match('/\b(?:\+?90\s*)?(?:0?5\d{2})[\s.-]*\d{3}[\s.-]*\d{2}[\s.-]*\d{2}\b/u', $text)
+            || preg_match('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/iu', $text)
+            || preg_match('/@([A-Za-z0-9._]{2,40})/u', $text)
+            || preg_match('/https?:\/\//iu', $text)) {
+            return true;
+        }
+
+        // A compact "brand, style" reply (for example "Soykan Auto, premium")
+        // is brief metadata, not card content. Do not mark the design ready until
+        // actual contact/slogan/content information arrives.
+        $parts = array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/u', $text) ?: [])));
+        if (count($parts) <= 2 && $this->detectStyle($lower) !== null) {
+            return false;
+        }
+
+        return mb_strlen($text, 'UTF-8') >= 24;
     }
 
     private function isGenericDesignAnswer(string $text): bool
