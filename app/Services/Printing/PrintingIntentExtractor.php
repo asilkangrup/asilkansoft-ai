@@ -68,6 +68,10 @@ final class PrintingIntentExtractor
 
         $designReady = str_contains($text, 'tasarım hazır')
             || str_contains($text, 'tasarim hazir')
+            || str_contains($text, 'baskıya hazır')
+            || str_contains($text, 'baskiya hazir')
+            || str_contains($text, 'hazır tasarım')
+            || str_contains($text, 'hazir tasarim')
             || str_contains($text, 'dosyam hazır')
             || str_contains($text, 'dosyam hazir')
             || (in_array('design_status', $pendingFields, true) && preg_match('/^(?:hazır|hazir|evet|var)$/u', $text));
@@ -120,10 +124,6 @@ final class PrintingIntentExtractor
         }
 
         $standardChoice = $this->standardChoice($text);
-
-        // Explicit delegation must work even on the very first message, before
-        // there is any pending-field history. Example:
-        // "kağıt ve ölçüyü siz belirleyin".
         $delegatesPaper = $standardChoice && preg_match('/\b(kağıt|kagit|gramaj)\b/u', $text) === 1;
         $delegatesSize = $standardChoice && preg_match('/\b(ölçü|olcu|ebat|boyut)\b/u', $text) === 1;
         $delegatesMaterial = $standardChoice && preg_match('/\b(malzeme|materyal)\b/u', $text) === 1;
@@ -141,8 +141,6 @@ final class PrintingIntentExtractor
             }
         }
 
-        // Contextual short replies ("yok", "standart olsun", "siz seçin")
-        // still use the previously asked field when the customer did not name it.
         if ($standardChoice) {
             if (in_array('paper', $pendingFields, true) && ! isset($slots['paper'])) {
                 $slots['paper'] = 'no_preference';
@@ -163,6 +161,9 @@ final class PrintingIntentExtractor
             'slots' => array_filter($slots, static fn ($value) => $value !== null && $value !== ''),
             'pending_fields' => $pendingFields,
             'design_brief' => is_array($current['design_brief'] ?? null) ? $current['design_brief'] : [],
+            'attachments' => is_array($current['attachments'] ?? null) ? $current['attachments'] : [],
+            'design_assets' => is_array($current['design_assets'] ?? null) ? $current['design_assets'] : [],
+            'last_intent' => $this->intent($text, $current),
         ];
     }
 
@@ -194,5 +195,22 @@ final class PrintingIntentExtractor
             || str_contains($text, 'siz secin')
             || str_contains($text, 'standart olsun')
             || str_contains($text, 'uygun olan');
+    }
+
+    private function intent(string $text, array $current): string
+    {
+        if (preg_match('/\b(?:örnek|ornek|referans|buna benzer|bunun gibi|bu tarz|şuna benzer|suna benzer)\b/u', $text)) {
+            return 'reference';
+        }
+
+        if (preg_match('/^(?:hazırla|hazirla|devam|devam et|tasarla|oluştur|olustur|başla|basla)[.! ]*$/u', $text)) {
+            return 'generate_design';
+        }
+
+        if (preg_match('/\b(?:revize|değiştir|degistir|büyüt|buyut|küçült|kucult|renk değiş|renk degis)\b/u', $text)) {
+            return 'revision';
+        }
+
+        return (string) ($current['last_intent'] ?? 'order');
     }
 }
