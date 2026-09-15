@@ -74,7 +74,6 @@ PROMPT;
             $response = $client->chat()->create([
                 'model' => (string) config('matbaa.model', 'gpt-5.6'),
                 'messages' => $messages,
-                'temperature' => 0,
             ]);
 
             $content = trim((string) ($response->choices[0]->message->content ?? ''));
