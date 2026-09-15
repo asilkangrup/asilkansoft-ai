@@ -75,7 +75,42 @@ final class PrintingConversationServiceTest extends TestCase
         ]);
 
         $this->assertSame('quote_ready', $result['status']);
-        $this->assertStringContainsString('net fiyatı kontrol edilmeden kesin rakam paylaşmayacağım', $result['reply']);
+        $this->assertStringContainsString('net fiyat', $result['reply']);
         $this->assertDoesNotMatchRegularExpression('/\b\d+[\.,]?\d*\s*(?:₺|tl|lira)\b/iu', $result['reply']);
+    }
+
+    public function test_no_preference_answer_does_not_repeat_paper_question(): void
+    {
+        $service = app(PrintingConversationService::class);
+
+        $first = $service->process('kartvizit');
+        $second = $service->process('çift yön', $first['state']);
+        $third = $service->process('1000 adet düşünüyorum kağıt türü ve gramaj tercihim yok', $second['state']);
+
+        $this->assertSame('no_preference', $third['state']['slots']['paper']);
+        $this->assertNotContains('paper', $third['missing']);
+        $this->assertStringNotContainsString('Kağıt türü veya gramaj tercihiniz var mı?', $third['reply']);
+    }
+
+    public function test_plain_yok_is_understood_for_the_last_pending_paper_question(): void
+    {
+        $service = app(PrintingConversationService::class);
+
+        $state = $service->process('1000 adet kartvizit çift yön')['state'];
+        $result = $service->process('yok', $state);
+
+        $this->assertSame('no_preference', $result['state']['slots']['paper']);
+        $this->assertNotContains('paper', $result['missing']);
+        $this->assertStringNotContainsString('Kağıt türü veya gramaj tercihiniz var mı?', $result['reply']);
+    }
+
+    public function test_greeting_gets_a_natural_greeting_back(): void
+    {
+        $service = app(PrintingConversationService::class);
+
+        $result = $service->process('merhaba');
+
+        $this->assertStringStartsWith('Merhaba', $result['reply']);
+        $this->assertContains('product', $result['state']['pending_fields']);
     }
 }

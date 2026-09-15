@@ -13,6 +13,7 @@ final class PrintingIntentExtractor
         $text = mb_strtolower(trim($message), 'UTF-8');
         $product = $this->catalog->detect($text) ?? ($current['product'] ?? null);
         $slots = $current['slots'] ?? [];
+        $pendingFields = array_values(array_filter($current['pending_fields'] ?? [], 'is_string'));
 
         if ($product && empty($slots)) {
             $slots = $this->catalog->defaults($product);
@@ -86,9 +87,28 @@ final class PrintingIntentExtractor
             $slots['cut_shape'] = 'özel kesim';
         }
 
+        // "Yok", "farketmez", "tercihim yok" gibi kısa cevapları son sorulan
+        // alana göre yorumla. Böylece müşteri aynı soruya tekrar tekrar maruz kalmaz.
+        $noPreference = preg_match('/^(?:yok|hayır|hayir|farketmez|fark etmez|tercihim yok|siz seçin|siz secin|standart olsun)$/u', $text) === 1
+            || str_contains($text, 'tercihim yok')
+            || str_contains($text, 'fark etmez');
+
+        if ($noPreference) {
+            if (in_array('paper', $pendingFields, true) && ! isset($slots['paper'])) {
+                $slots['paper'] = 'no_preference';
+            }
+            if (in_array('material', $pendingFields, true) && ! isset($slots['material'])) {
+                $slots['material'] = 'no_preference';
+            }
+            if (in_array('design_status', $pendingFields, true) && ! isset($slots['design_status'])) {
+                $slots['design_status'] = 'needs_design';
+            }
+        }
+
         return [
             'product' => $product,
             'slots' => array_filter($slots, static fn ($value) => $value !== null && $value !== ''),
+            'pending_fields' => $pendingFields,
         ];
     }
 
