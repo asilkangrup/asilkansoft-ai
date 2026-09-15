@@ -6,6 +6,7 @@ use RuntimeException;
 
 class TextileV2ColorCatalogueService
 {
+    // Generates durable WhatsApp-ready catalogues from the product image library.
     private const COLORS = [
         'beige' => 'Bej',
         'orange' => 'Turuncu',
