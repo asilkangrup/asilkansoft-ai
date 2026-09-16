@@ -1,0 +1,1 @@
+Trigger deploy for Istanbul real estate mobile layout fix.
